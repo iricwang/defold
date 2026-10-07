@@ -13,7 +13,8 @@
 ;; specific language governing permissions and limitations under the License.
 
 (ns editor.docking-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [cljfx.api] ; Initialize JavaFX before loading AOT-compiled control classes.
+            [clojure.test :refer [deftest is]]
             [editor.docking :as docking]))
 
 ;; Rejects missing, duplicate and unknown panels in saved layouts before creating JavaFX nodes.
