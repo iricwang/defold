@@ -165,7 +165,7 @@
                                          version
                                          release-platform
                                          extension)
-                                 http-cache/download)
+                                 (http-cache/download false))
                 output-dir (.getCanonicalFile (io/file pack-path platform "bin" "lsp" "lua"))]]
     (let [actual-sha256 (with-open [^InputStream input (io/input-stream archive-file)]
                           (DigestUtils/sha256Hex input))]
