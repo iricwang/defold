@@ -35,3 +35,9 @@ specific language governing permissions and limitations under the License.
 ## Tests
 
 - Prefer explicit events or completion signals over sleeps and other timing-dependent test logic, since timing assumptions can make tests unstable on CI.
+
+## Fork patch delivery
+
+- Deliver subsequent user-facing changes on this fork through the incremental patch workflow in [patch/README.md](patch/README.md).
+- Before building each new update, increment the patch revision and describe the change with `python3.12 patch/manage.py bump --notes "..."`. Keep a ZIP of the installed baseline for local update verification.
+- Verify the incremental package against its exact baseline and confirm download, installation, and restart. Report whether verification used a local feed or the published GitHub feed.

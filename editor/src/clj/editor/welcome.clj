@@ -27,6 +27,7 @@
             [editor.game-project-core :as game-project-core]
             [editor.icons :as icons]
             [editor.localization :as localization]
+            [editor.patch :as patch]
             [editor.prefs :as prefs]
             [editor.progress :as progress]
             [editor.settings-core :as settings-core]
@@ -34,6 +35,7 @@
             [editor.ui :as ui]
             [editor.ui.bindings :as b]
             [editor.ui.fuzzy-choices :as fuzzy-choices]
+            [editor.ui.patch :as ui.patch]
             [editor.ui.updater :as ui.updater]
             [schema.core :as s]
             [util.coll :as coll]
@@ -801,6 +803,13 @@
        (.setCellFactory language-selector cell-factory))
      (.addListener (.valueProperty language-selector) ^ChangeListener #(do (localization/set-locale! localization %3)
                                                                            (analytics/track-locale! %3)))
+
+     ;; Branch patch builds also expose update checks before opening a project.
+     (when (patch/configured?)
+       (ui/with-controls left-pane [update-link]
+         (ui/visible! update-link true)
+         (localization/localize! update-link localization (localization/message "patch.title"))
+         (ui/on-action! update-link (fn [_] (ui.patch/show! stage localization (fn [restart-fn] (restart-fn)))))))
 
      ;; Install pending update check.
      (when (some? updater)

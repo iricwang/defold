@@ -589,7 +589,8 @@
                                      (s/optional-key :particlefx-resource-names) TGuiResourceNames
                                      (s/optional-key :texture-page-counts) TGuiResourcePageCounts
                                      (s/optional-key :exclude-gles-sm100) s/Any
-                                     (s/optional-key :texture-resource-names) TGuiResourceNames})
+                                     (s/optional-key :texture-resource-names) TGuiResourceNames
+                                     (s/optional-key :texture-resource-paths) {s/Str (s/maybe s/Str)}})
 (s/def ^:private TCostlyGuiSceneInfo {(s/optional-key :font-datas) TFontDatas
                                       (s/optional-key :gui-resource-kind-costly-info) {s/Keyword s/Any}
                                       (s/optional-key :font-shaders) TGuiResourceShaders
@@ -682,6 +683,19 @@
   ;; to lookup rendering resources in case the value has not been assigned.
   ;; We don't want any of these as an option in the dropdown.
   (properties/->choicebox (sort (remove empty? coll))))
+
+(defn- texture-source-resource [{:keys [project]} texture-resource texture-value evaluation-context]
+  (when-let [texture-node (project/get-resource-node project texture-resource evaluation-context)]
+    (if (= "tilesource" (resource/type-ext texture-resource))
+      (g/node-value texture-node :image evaluation-context)
+      (let [animation-id (second (str/split texture-value #"/" 2))
+            texture-outline (g/node-value texture-node :node-outline evaluation-context)
+            animation-outline (coll/first-where #(= animation-id (:node-outline-key %))
+                                                (:children texture-outline))]
+        ;; Image outlines already reflect atlas rename patterns. Animation children
+        ;; are ordered by frame, so animated textures reveal their first source image.
+        (or (:link animation-outline)
+            (:link (first (:children animation-outline))))))))
 
 ;; SDK api
 (defn optional-gui-resource-choicebox
@@ -1883,7 +1897,18 @@
             (dynamic edit-type (g/fnk [basic-gui-scene-info]
                                  (let [texture-page-counts (:texture-page-counts basic-gui-scene-info)
                                        texture-names (some-> texture-page-counts keys)]
-                                   (wrap-layout-property-edit-type texture (optional-gui-resource-choicebox texture-names) texture-property-changes-fn))))
+                                   (wrap-layout-property-edit-type
+                                     texture
+                                     (assoc (optional-gui-resource-choicebox texture-names)
+                                       :source-resource-fn texture-source-resource
+                                       :resource-paths
+                                       (into {}
+                                             (map (fn [texture-name]
+                                                    (pair texture-name
+                                                          (get (:texture-resource-paths basic-gui-scene-info)
+                                                               (first (str/split texture-name #"/" 2))))))
+                                             texture-names))
+                                     texture-property-changes-fn))))
             (dynamic error (g/fnk [_node-id basic-gui-scene-info texture]
                              (let [texture-page-counts (:texture-page-counts basic-gui-scene-info)]
                                (validate-texture-resource _node-id texture-page-counts texture))))
@@ -3980,7 +4005,7 @@
 
   (input aux-basic-gui-scene-info BasicGuiSceneInfo)
   (output own-basic-gui-scene-info BasicGuiSceneInfo :cached
-          (g/fnk [font-names gui-resource-kind-basic-info gui-resource-kind-names layer->index layer-names material-infos particlefx-resource-names texture-page-counts exclude-gles-sm100 texture-resource-names]
+          (g/fnk [font-names gui-resource-kind-basic-info gui-resource-kind-names layer->index layer-names material-infos particlefx-resource-names texture-page-counts exclude-gles-sm100 texture-resource-names texture-msgs]
             {:font-names font-names
              :gui-resource-kind-basic-info gui-resource-kind-basic-info
              :gui-resource-kind-names gui-resource-kind-names
@@ -3990,7 +4015,8 @@
              :particlefx-resource-names particlefx-resource-names
              :texture-page-counts texture-page-counts
              :exclude-gles-sm100 exclude-gles-sm100
-             :texture-resource-names texture-resource-names}))
+             :texture-resource-names texture-resource-names
+             :texture-resource-paths (into {} (map (juxt :name :texture)) texture-msgs)}))
   (output basic-gui-scene-info BasicGuiSceneInfo :cached
           (g/fnk [aux-basic-gui-scene-info own-basic-gui-scene-info]
             ;; Note: When our scene is imported as a template, the layer

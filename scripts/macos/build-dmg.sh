@@ -53,6 +53,7 @@ source tmp/macos-build-env.sh
 python scripts/build.py install_ext check_sdk --platform="$platform"
 python scripts/build.py build_engine --platform="$platform" --skip-tests -- --skip-build-tests
 python scripts/build.py build_bob --platform="$platform" --skip-tests --keep-bob-uncompressed
+python patch/manage.py stage
 python scripts/build.py build_editor2 --platform="$platform" --channel=dev \
     --engine-artifacts=dynamo-home --skip-tests
 

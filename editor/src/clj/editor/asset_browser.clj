@@ -653,18 +653,19 @@
             (select-resource! asset-browser (workspace/file-resource workspace new-folder))))))))
 
 (defn- selected-or-active-resource
-  [selection active-resource evaluation-context]
-  (or (handler/adapt-single selection resource/Resource evaluation-context)
+  [selection active-resource user-data evaluation-context]
+  (or (when (resource/resource? user-data) user-data)
+      (handler/adapt-single selection resource/Resource evaluation-context)
       active-resource))
 
 (handler/defhandler :file.show-in-assets :global
-  (active? [active-resource selection evaluation-context] (selected-or-active-resource selection active-resource evaluation-context))
-  (enabled? [active-resource selection evaluation-context]
-    (when-let [r (selected-or-active-resource selection active-resource evaluation-context)]
+  (active? [active-resource selection user-data evaluation-context] (selected-or-active-resource selection active-resource user-data evaluation-context))
+  (enabled? [active-resource selection user-data evaluation-context]
+    (when-let [r (selected-or-active-resource selection active-resource user-data evaluation-context)]
       (resource/exists? r)))
-  (run [active-resource asset-browser selection main-stage]
+  (run [active-resource asset-browser selection main-stage user-data]
     (when-let [r (g/with-auto-evaluation-context evaluation-context
-                   (selected-or-active-resource selection active-resource evaluation-context))]
+                   (selected-or-active-resource selection active-resource user-data evaluation-context))]
       (app-view/show-asset-browser! (.getScene ^Stage main-stage))
       (select-resource! asset-browser r {:scroll? true}))))
 

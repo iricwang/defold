@@ -935,6 +935,44 @@
         (g/transact (g/set-property l :name "new-name"))
         (is (= "new-name" (prop text :layer)))))))
 
+;; Verifies atlas and source-image navigation through templates, including renamed images and animation frames.
+(deftest gui-texture-resource-navigation
+  (test-util/with-loaded-project
+    (let [scene (test-util/resource-node project "/gui/scene.gui")
+          super-scene (test-util/resource-node project "/gui/super_scene.gui")
+          box (gui-node scene "box")
+          template-box (gui-node super-scene "scene/box")
+          nested-template-box (gui-node scene "sub_scene/sub_box")
+          source-resource-fn (get-in (g/node-value box :_properties)
+                                     [:properties :texture :edit-type :source-resource-fn])
+          source-path (fn [texture-path texture-value]
+                        (g/with-auto-evaluation-context evaluation-context
+                          (some-> (source-resource-fn {:project project}
+                                                      (g/node-value (test-util/resource-node project texture-path) :resource evaluation-context)
+                                                      texture-value
+                                                      evaluation-context)
+                                  resource/proj-path)))]
+      (doseq [node [box template-box]]
+        (let [edit-type (get-in (g/node-value node :_properties) [:properties :texture :edit-type])]
+          (is (= "/gui/gui.atlas" (get (:resource-paths edit-type) "main/particle_blob")))
+          (is (nil? (get (:resource-paths edit-type) "")))
+          (is (= (into #{} (map first) (:options edit-type))
+                 (conj (into #{} (map key) (:resource-paths edit-type)) "")))))
+      (is (= "/graphics/atlas.atlas"
+             (get-in (g/node-value nested-template-box :_properties)
+                     [:properties :texture :edit-type :resource-paths "main/particle_blob"])))
+      (is (= "/builtins/graphics/particle_blob.png" (source-path "/gui/gui.atlas" "main/particle_blob")))
+      (is (= "/graphics/ball.png" (source-path "/graphics/atlas.atlas" "main/anim")))
+      (is (= "/graphics/ball.png" (source-path "/tilesource/valid.tilesource" "main/anim")))
+      (is (nil? (source-path "/gui/gui.atlas" "main/missing")))
+      (g/set-property! (test-util/resource-node project "/gui/gui.atlas") :rename-patterns "particle_blob=renamed")
+      (is (= "/builtins/graphics/particle_blob.png" (source-path "/gui/gui.atlas" "main/renamed")))
+      (g/set-property! box :texture "")
+      (is (= "" (g/node-value box :texture)))
+      (is (= "/gui/gui.atlas"
+             (get-in (g/node-value box :_properties)
+                     [:properties :texture :edit-type :resource-paths "main/renamed"]))))))
+
 (deftest gui-template-box-overrides
   (test-util/with-loaded-project
     (let [scene-node-id (test-util/resource-node project "/gui/scene.gui")

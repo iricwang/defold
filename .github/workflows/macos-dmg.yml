@@ -55,10 +55,17 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: macos-dmg-${{ matrix.platform }}-${{ hashFiles('build_tools/sdk.py', 'editor/project.clj', 'editor/scripts/lein', '**/*.gradle', '**/gradle-wrapper.properties') }}
+      - name: Test patch packaging
+        run: python3 -m unittest discover -s patch -p 'test_*.py'
       - name: Build engine, Bob, editor and verify DMG
         run: |
           mkdir -p tmp
           bash scripts/macos/build-dmg.sh '${{ matrix.platform }}' 2>&1 | tee tmp/macos-dmg.log
+      - name: Test incremental updater
+        run: |
+          source tmp/macos-build-env.sh
+          cd editor
+          LEIN_HOME="$PWD/build/lein" bash scripts/lein test editor.patch-test
       - name: Upload DMG and checksum
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -66,6 +73,7 @@ jobs:
           path: |
             editor/target/editor/Defold-${{ matrix.platform }}.dmg
             editor/target/editor/Defold-${{ matrix.platform }}.dmg.sha256
+            editor/target/editor/Defold-${{ matrix.platform }}.zip
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
@@ -76,3 +84,28 @@ jobs:
           name: build-log-${{ matrix.platform }}
           path: tmp/macos-dmg.log
           retention-days: 7
+
+  publish-patch:
+    name: Publish dev patch
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && github.repository == 'iricwang/defold'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: Defold-*-macos-${{ github.sha }}
+          path: tmp/patch-release
+          merge-multiple: true
+      - name: Publish packages and update manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_SHA: ${{ github.sha }}
+        run: python3 patch/manage.py publish --directory tmp/patch-release --commit "$BUILD_SHA"

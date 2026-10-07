@@ -71,6 +71,7 @@
             [editor.os :as os]
             [editor.pipeline :as pipeline]
             [editor.pipeline.bob :as bob]
+            [editor.patch :as patch]
             [editor.prefs :as prefs]
             [editor.prefs-dialog :as prefs-dialog]
             [editor.process :as process]
@@ -90,6 +91,7 @@
             [editor.types :as types]
             [editor.ui :as ui]
             [editor.ui.settings-popup :as settings-popup]
+            [editor.ui.patch :as ui.patch]
             [editor.ui.updater :as ui.updater]
             [editor.updater :as updater]
             [editor.view :as view]
@@ -2891,13 +2893,27 @@
 
 (handler/defhandler :help.check-for-updates :global
   (enabled? [updater]
-    (and updater
-         (not (updater/manual-update-check-in-progress? updater))))
+    (or (patch/configured?)
+        (and updater
+             (not (updater/manual-update-check-in-progress? updater)))))
   (run [updater project main-stage localization]
-    (ui.updater/check-for-updates!
-      main-stage project updater
-      (ui/user-data main-stage ::ui.updater/install-and-restart!)
-      localization)))
+    (if (patch/configured?)
+      (ui.patch/show!
+        main-stage localization
+        (fn [restart-fn]
+          (ui/disable-ui!)
+          (disk/async-save!
+            (make-render-task-progress :resource-sync)
+            (make-render-task-progress :save-all)
+            project/dirty-save-data project nil
+            (fn [successful]
+              (if successful
+                (restart-fn)
+                (ui/enable-ui!))))))
+      (ui.updater/check-for-updates!
+        main-stage project updater
+        (ui/user-data main-stage ::ui.updater/install-and-restart!)
+        localization))))
 
 (defn- open-resource-plans-from-prefs [app-view prefs workspace project evaluation-context]
   (let [basis (:basis evaluation-context)

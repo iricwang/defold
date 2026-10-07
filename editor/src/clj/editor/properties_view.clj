@@ -46,7 +46,7 @@
            [javafx.event Event EventHandler]
            [javafx.scene Node]
            [javafx.scene.control Slider]
-           [javafx.scene.input DragEvent KeyCode KeyEvent MouseEvent TransferMode]
+           [javafx.scene.input DragEvent KeyCode KeyEvent MouseButton MouseEvent TransferMode]
            [javafx.scene.paint Color]))
 
 (set! *warn-on-reflection* true)
@@ -494,13 +494,34 @@
   (let [options (into {} options)]
     #(or (options %) (str %))))
 
-(defmethod make-control-view :choicebox [property _context localization-state]
+(def ^:private prop-resource-reveal-filter
+  (fxui/make-event-filter-prop MouseEvent/MOUSE_PRESSED))
+
+(defn- reveal-property-resource! [property {:keys [workspace] :as context} ^MouseEvent event]
+  (when (and (or (.isAltDown event) (.isControlDown event))
+             (= MouseButton/PRIMARY (.getButton event)))
+    (let [edit-type (:edit-type property)
+          value (properties/unify-values (properties/values property))]
+      (when-let [path (get (:resource-paths edit-type) value)]
+        (let [resource (workspace/resolve-workspace-resource workspace path)
+              target (if (.isControlDown event)
+                       resource
+                       (when-let [source-resource-fn (:source-resource-fn edit-type)]
+                         (g/with-auto-evaluation-context evaluation-context
+                           (source-resource-fn context resource value evaluation-context))))]
+          ;; A navigation gesture must never edit the value, even if the source is missing.
+          (.consume event)
+          (when (and target (resource/exists? target))
+            (ui/run-command (.getSource event) :file.show-in-assets target)))))))
+
+(defmethod make-control-view :choicebox [property context localization-state]
   (let [options (:options (:edit-type property))]
     {:fx/type ui/ext-memo
      :fn make-choicebox-to-string
      :args [options]
      :key :to-string
      :desc (-> {:fx/type fxui.combo-box/view
+                prop-resource-reveal-filter #(reveal-property-resource! property context %)
                 :disable (properties/read-only? property)
                 :value (properties/unify-values (properties/values property))
                 :on-value-changed #(set-values! property (repeat %))
@@ -767,6 +788,7 @@
                                                                     "id" (string/replace (name property-keyword) \- \_)}))
                                                       :max-width 350.0
                                                       :project (:project context)}}
+                                  prop-resource-reveal-filter #(reveal-property-resource! property context %)
                                   prop-button-menu ::property-menu
                                   prop-mouse-pressed-handler focus-mouse-event-source!
                                   prop-property-context [(assoc context :property property) selection-provider]}

@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "channel": "dev",
+  "revision": 2,
+  "version": "1.14.1-patch.2",
+  "repository": "iricwang/defold",
+  "notes": "GUI 纹理属性支持 Alt（Option）点击定位 PNG 源图，Ctrl 点击定位 atlas；序列帧动画定位第一帧源图。支持模板和 atlas 重命名规则。"
+}

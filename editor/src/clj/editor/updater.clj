@@ -18,6 +18,7 @@
             [clojure.string :as string]
             [editor.connection-properties :refer [connection-properties]]
             [editor.localization :as localization]
+            [editor.patch :as patch]
             [editor.prefs :as prefs]
             [editor.process :as process]
             [editor.progress :as progress]
@@ -588,7 +589,7 @@
                             "macos" "./Contents/MacOS/Defold"))
         initial-update-delay 1000
         update-delay 3600000]
-    (if (or (string/blank? channel) (string/blank? sha1))
+    (if (or (patch/configured?) (string/blank? channel) (string/blank? sha1))
       (do
         (log/info :message "Automatic updates disabled" :channel channel :sha1 sha1)
         nil)

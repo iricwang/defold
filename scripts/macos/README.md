@@ -31,6 +31,7 @@ Outputs:
 - `editor/target/editor/Defold-arm64-macos.dmg` on Apple Silicon
 - `editor/target/editor/Defold-x86_64-macos.dmg` on Intel
 - A corresponding `.dmg.sha256` checksum file
+- A complete `.zip` bundle, used as the base for subsequent incremental patches
 
 Build on a matching host for each architecture. Subsequent builds reuse CMake
 and dependency caches. The script skips unit/integration test suites, matching
@@ -47,8 +48,11 @@ retained for 7 days, including failed builds. A missing DMG fails the job.
 
 These are development builds without Developer ID signing or notarization.
 macOS may require approval in Privacy & Security when first opening a downloaded
-build. They are uploaded as Actions artifacts, not published as official releases.
-The `dev` channel keeps these builds distinct from the upstream release channels.
+build. Actions artifacts are retained as before. On pushes to this fork's `dev`
+branch, successful builds and patch tests also publish a branch prerelease and
+update manifest using `GITHUB_TOKEN`. See [patch development](../../patch/README.md)
+for revision management, incremental updates, and local preview instructions.
+The editor uses this fork's patch feed instead of the upstream automatic updater.
 
 The upstream **CI - Main** and **CI - Engine nightly** workflows have additional
 platform and official infrastructure requirements. This workflow is independent
