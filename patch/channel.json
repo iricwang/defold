@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 3,
-  "version": "1.14.1-patch.3",
+  "revision": 4,
+  "version": "1.14.1-patch.4",
   "repository": "iricwang/defold",
-  "notes": "新增可扩展资源预览面板：图片预览、WAV/MP3/M4A/AIFF 音频播放及 GUI/场景快照，支持固定和刷新。资产、检查器、工具及预览支持在左/右/底部拖拽停靠、保存布局和恢复默认布局。"
+  "notes": "精简可停靠面板：复用原有标题栏，更多菜单改为轻量省略号；拖放显示目标半区外框，并均分目标面板空间，支持 Escape 取消。"
 }

@@ -34,3 +34,34 @@
     (is (docking/valid-layout? layout))
     (is (= layout (docking/move-panel layout :preview :bottom)))
     (is (= [:preview :tools] (:bottom (docking/move-panel layout :tools :bottom))))))
+
+;; Dropping onto a panel halves only its share and preserves the other target-zone panels.
+(deftest split-target-panel
+  (let [sizes {:left {:assets 1.0} :right {:inspector 0.3 :preview 0.7} :bottom {:tools 1.0}}
+        result (docking/split-panel docking/default-layout sizes :assets :right :inspector true)]
+    (is (= {:left [] :right [:assets :inspector :preview] :bottom [:tools]} (:layout result)))
+    (is (= {:assets 0.15 :inspector 0.15 :preview 0.7} (get-in result [:sizes :right])))
+    (is (docking/valid-layout? (:layout result)))
+    (is (= [:inspector :assets :preview]
+           (get-in (docking/split-panel docking/default-layout sizes :assets :right :inspector false)
+                   [:layout :right])))))
+
+;; Reordering in the same zone neither duplicates a panel nor loses its available space.
+(deftest split-within-zone
+  (let [sizes {:left {:assets 1.0} :right {:inspector 0.3 :preview 0.7} :bottom {:tools 1.0}}
+        result (docking/split-panel docking/default-layout sizes :preview :right :inspector true)]
+    (is (= [:preview :inspector] (get-in result [:layout :right])))
+    (is (= {:preview 0.5 :inspector 0.5} (get-in result [:sizes :right])))
+    (is (= {:layout docking/default-layout :sizes sizes}
+           (docking/split-panel docking/default-layout sizes :preview :right :preview false)))))
+
+;; The outline describes exactly one half of the hovered panel, for both docking orientations.
+(deftest drop-outline-geometry
+  (is (= {:before true :x 0.0 :y 0.0 :width 300.0 :height 200.0}
+         (docking/drop-half 300.0 400.0 false 20.0 100.0)))
+  (is (= {:before false :x 0.0 :y 200.0 :width 300.0 :height 200.0}
+         (docking/drop-half 300.0 400.0 false 20.0 200.0)))
+  (is (= {:before true :x 0.0 :y 0.0 :width 150.0 :height 400.0}
+         (docking/drop-half 300.0 400.0 true 10.0 300.0)))
+  (is (= {:before false :x 150.0 :y 0.0 :width 150.0 :height 400.0}
+         (docking/drop-half 300.0 400.0 true 290.0 300.0))))
