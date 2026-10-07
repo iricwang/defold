@@ -30,6 +30,7 @@
             [editor.dialogs :as dialogs]
             [editor.disk :as disk]
             [editor.doc :as doc]
+            [editor.docking :as docking]
             [editor.editor-extensions :as extensions]
             [editor.editor-extensions.server :as ext.server]
             [editor.engine-profiler :as engine-profiler]
@@ -49,6 +50,7 @@
             [editor.prefs :as prefs]
             [editor.properties-view :as properties-view]
             [editor.resource :as resource]
+            [editor.resource-preview :as resource-preview]
             [editor.resource-types :as resource-types]
             [editor.scene :as scene]
             [editor.scene-visibility :as scene-visibility]
@@ -229,6 +231,10 @@
                                                       (partial app-view/debugger-state-changed! scene tool-tabs)
                                                       localization)
 
+          preview-pane (resource-preview/make-pane! {:workspace workspace :project project :app-view app-view
+                                                     :localization localization :open-resource #(open-resource % {})} assets)
+          dock (docking/init! scene prefs localization (:node preview-pane)
+                              #(app-view/set-pane-visible! scene % true))
           breakpoints-view (breakpoints-view/make-breakpoints-view workspace project open-resource prefs (.lookup root "#breakpoints-container"))
           token (web-server/make-token)
           server-handler (web-server/make-dynamic-handler
@@ -368,6 +374,7 @@
                                     result)))))
 
       (ui/on-closed! stage (fn [_]
+                             ((:dispose! preview-pane))
                              (http-server/stop! web-server)
                              (ui/remove-application-focused-callback! :main-stage)
                              (ui/remove-application-unfocused-callback! :main-stage-unfocused)
@@ -397,7 +404,9 @@
                          :tool-tab-pane       tool-tabs}
             dynamics {:active-resource [:app-view :active-resource]}]
         (ui/context! root :global context-env (ui/->selection-provider assets) dynamics)
-        (ui/context! workbench :workbench context-env (app-view/->selection-provider app-view) dynamics))
+        (ui/context! workbench :workbench context-env (app-view/->selection-provider app-view) dynamics)
+        (doseq [panel [:inspector :tools :preview]]
+          (ui/context! (get-in dock [:panels panel]) :workbench context-env (app-view/->selection-provider app-view) dynamics)))
       (g/transact
         {:undoable false}
         (concat

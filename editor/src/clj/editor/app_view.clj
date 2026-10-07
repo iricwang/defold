@@ -38,6 +38,7 @@
             [editor.dialogs :as dialogs]
             [editor.disk :as disk]
             [editor.disk-availability :as disk-availability]
+            [editor.docking :as docking]
             [editor.editor-extensions :as extensions]
             [editor.editor-localization-bundle :as editor-localization-bundle]
             [editor.editor-tab :as editor-tab]
@@ -148,7 +149,8 @@
 
 (defn- pane-visible? [^Scene main-scene pane-kw]
   (let [{:keys [pane-id split-id]} (split-info-by-pane-kw pane-kw)]
-    (some? (.lookup main-scene (str "#" split-id " #" pane-id)))))
+    (when-let [^Node split (docking/find-split main-scene split-id)]
+      (some? (.lookup split (str "#" pane-id))))))
 
 (defn- split-pane-length
   ^double [^SplitPane split-pane]
@@ -156,9 +158,9 @@
     Orientation/HORIZONTAL (.getWidth split-pane)
     Orientation/VERTICAL (.getHeight split-pane)))
 
-(defn- set-pane-visible! [^Scene main-scene pane-kw visible?]
+(defn set-pane-visible! [^Scene main-scene pane-kw visible?]
   (let [{:keys [index pane-id split-id]} (split-info-by-pane-kw pane-kw)
-        ^SplitPane split (.lookup main-scene (str "#" split-id))
+        ^SplitPane split (docking/find-split main-scene split-id)
         ^Parent pane (.lookup split (str "#" pane-id))]
     (cond
       (and (nil? pane) visible?)
@@ -201,7 +203,7 @@
 (defn- select-tool-tab! [tab-id ^Scene main-scene ^TabPane tool-tab-pane]
   (let [tabs (.getTabs tool-tab-pane)
         tab-index (first (keep-indexed (fn [i ^Tab tab] (when (= tab-id (.getId tab)) i)) tabs))]
-    (set-pane-visible! main-scene :bottom true)
+    (set-pane-visible! main-scene (docking/panel-zone main-scene :tools :bottom) true)
     (if (some? tab-index)
       (.select (.getSelectionModel tool-tab-pane) ^long tab-index)
       (throw (ex-info (str "Tab id not found: " tab-id)
@@ -214,12 +216,12 @@
 (def show-search-results! (partial select-tool-tab! "search-results-tab"))
 
 (defn show-asset-browser! [main-scene]
-  (set-pane-visible! main-scene :left true))
+  (set-pane-visible! main-scene (docking/panel-zone main-scene :assets :left) true))
 
 (defn- show-debugger! [main-scene tool-tab-pane]
   ;; In addition to the controls in the console pane,
   ;; the right pane is used to display locals.
-  (set-pane-visible! main-scene :right true)
+  (set-pane-visible! main-scene (docking/panel-zone main-scene :inspector :right) true)
   (show-console! main-scene tool-tab-pane))
 
 (defn debugger-state-changed! [main-scene tool-tab-pane attention?]
@@ -696,7 +698,10 @@
                           "workbench-split"
                           "center-split"
                           "right-split"
-                          "assets-split"])
+                          "assets-split"
+                          "dock-left-split"
+                          "dock-right-split"
+                          "dock-bottom-split"])
 
 (defn- existing-split-panes [^Scene scene]
   (into {}
@@ -2075,6 +2080,10 @@
                 :command :window.show-build-errors}
                {:label (localization/message "command.window.show-search-results")
                 :command :window.show-search-results}
+               {:label (localization/message "command.window.show-resource-preview")
+                :command :window.show-resource-preview}
+               {:label (localization/message "command.window.reset-layout")
+                :command :window.reset-layout}
                (menu-items/separator-with-id ::view-end)]}
    {:label (localization/message "menu.help")
     :children [{:label (localization/message "command.dev.reload-css")
@@ -3387,10 +3396,19 @@
 
 (handler/defhandler :window.toggle-changed-files-pane :global
   (enabled? [^Stage main-stage]
-    (pane-visible? (.getScene main-stage) :left))
+    (let [scene (.getScene main-stage)]
+      (pane-visible? scene (docking/panel-zone scene :assets :left))))
   (run [^Stage main-stage]
     (let [main-scene (.getScene main-stage)]
       (set-pane-visible! main-scene :changed-files (not (pane-visible? main-scene :changed-files))))))
+
+(handler/defhandler :window.show-resource-preview :global
+  (run [^Stage main-stage]
+    (let [scene (.getScene main-stage)]
+      (set-pane-visible! scene (docking/panel-zone scene :preview :right) true))))
+
+(handler/defhandler :window.reset-layout :global
+  (run [^Stage main-stage] (docking/reset-layout! (.getScene main-stage))))
 
 (handler/defhandler :window.show-console :global
   (run [^Stage main-stage tool-tab-pane] (show-console! (.getScene main-stage) tool-tab-pane)))

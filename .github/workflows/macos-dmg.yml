@@ -61,11 +61,11 @@ jobs:
         run: |
           mkdir -p tmp
           bash scripts/macos/build-dmg.sh '${{ matrix.platform }}' 2>&1 | tee tmp/macos-dmg.log
-      - name: Test incremental updater
+      - name: Test incremental updater and panel layout
         run: |
           source tmp/macos-build-env.sh
           cd editor
-          LEIN_HOME="$PWD/build/lein" bash scripts/lein test editor.patch-test
+          LEIN_HOME="$PWD/build/lein" bash scripts/lein test editor.patch-test editor.docking-test
       - name: Upload DMG and checksum
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

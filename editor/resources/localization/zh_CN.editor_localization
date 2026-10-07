@@ -2009,3 +2009,26 @@ patch.check = 重新检查
 patch.open = 打开安装包
 patch.download = 下载更新
 patch.full-installer = 完整安装包
+
+# Resource previews and panel docking
+resource-preview.play = 播放
+resource-preview.pause = 暂停
+resource-preview.stop = 停止
+resource-preview.audio-loading = 正在加载音频…
+resource-preview.pin = 固定
+resource-preview.open = 打开
+resource-preview.refresh = 刷新
+resource-preview.loading = 正在生成预览…
+resource-preview.empty = 在资产窗口中选择资源以查看预览。
+resource-preview.unsupported = 此类资源暂未提供预览。
+resource-preview.failed = 无法预览
+dock.assets = 资产
+dock.inspector = 检查器
+dock.tools = 工具
+dock.preview = 资源预览
+dock.to-left = 停靠到左侧
+dock.to-right = 停靠到右侧
+dock.to-bottom = 停靠到底部
+command.window.show-resource-preview = 显示资源预览
+command.window.reset-layout = 恢复默认面板布局
+resource-preview.audio-unsupported = 预览播放器暂不支持此音频编码。可播放 WAV、MP3、M4A 和 AIFF。

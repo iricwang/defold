@@ -190,6 +190,9 @@
                                        :height {:type :number}
                                        :maximized {:type :boolean}
                                        :full-screen {:type :boolean}}}]}
+              :panel-layout {:type :object-of
+                             :key {:type :keyword}
+                             :val {:type :array :item {:type :keyword}}}
               :split-positions {:type :object-of
                                 :key {:type :keyword}
                                 :val {:type :array :item {:type :number}}}

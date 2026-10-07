@@ -2831,3 +2831,26 @@ patch.check = Check Again
 patch.open = Open Installer
 patch.download = Download Update
 patch.full-installer = Full Installer
+
+# Resource previews and panel docking
+resource-preview.play = Play
+resource-preview.pause = Pause
+resource-preview.stop = Stop
+resource-preview.audio-loading = Loading audio…
+resource-preview.pin = Pin
+resource-preview.open = Open
+resource-preview.refresh = Refresh
+resource-preview.loading = Rendering preview…
+resource-preview.empty = Select a resource in Assets to preview it.
+resource-preview.unsupported = No preview provider for this resource type.
+resource-preview.failed = Preview unavailable
+dock.assets = Assets
+dock.inspector = Inspector
+dock.tools = Tools
+dock.preview = Resource Preview
+dock.to-left = Dock Left
+dock.to-right = Dock Right
+dock.to-bottom = Dock Bottom
+command.window.show-resource-preview = Show Resource Preview
+command.window.reset-layout = Reset Panel Layout
+resource-preview.audio-unsupported = This audio encoding is not supported by the preview player. WAV, MP3, M4A and AIFF can be played here.
