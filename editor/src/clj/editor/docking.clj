@@ -82,6 +82,19 @@
     (let [before (< y (/ height 2.0))]
       {:before before :x 0.0 :y (if before 0.0 (/ height 2.0)) :width width :height (/ height 2.0)})))
 
+(defn panel-rectangle
+  "Locate a panel in a planned split, including space released by its old position."
+  [ids sizes panel width height horizontal]
+  (let [offset (:offset (reduce (fn [result id]
+                                  (if (= id panel)
+                                    (reduced result)
+                                    (update result :offset + (sizes id))))
+                                {:offset 0.0} ids))
+        share (sizes panel)]
+    (if horizontal
+      {:x (* width offset) :y 0.0 :width (* width share) :height height}
+      {:x 0.0 :y (* height offset) :width width :height (* height share)})))
+
 (defn init! [^Scene scene preferences localization ^Node preview show-zone!]
   (let [saved (prefs/get preferences [:window :panel-layout])
         layout (atom (if (valid-layout? saved) saved default-layout))
@@ -176,10 +189,16 @@
                                           point (.sceneToLocal panel (double x) (double y))]
                                       (if (.contains panel point)
                                         (reduced (when (not= source id)
-                                                   (merge {:zone zone :target id :node panel}
-                                                          (drop-half (.getWidth (.getLayoutBounds panel))
-                                                                     (.getHeight (.getLayoutBounds panel))
-                                                                     (= :bottom zone) (.getX point) (.getY point)))))
+                                                   (let [half (drop-half (.getWidth (.getLayoutBounds panel))
+                                                                         (.getHeight (.getLayoutBounds panel))
+                                                                         (= :bottom zone) (.getX point) (.getY point))]
+                                                     (if (contains? (set (zone @layout)) source)
+                                                       (let [{planned-layout :layout sizes :sizes}
+                                                             (split-panel @layout (capture-sizes) source zone id (:before half))]
+                                                         (merge {:zone zone :target id :node split :before (:before half)}
+                                                                (panel-rectangle (zone planned-layout) (zone sizes) source
+                                                                                 (.getWidth split) (.getHeight split) (= :bottom zone))))
+                                                       (merge {:zone zone :target id :node panel} half)))))
                                         result))) nil (zone @layout))
                           (when (zero? (count (zone @layout)))
                             {:zone zone :node split :x 0.0 :y 0.0

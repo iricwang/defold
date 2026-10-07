@@ -65,3 +65,13 @@
          (docking/drop-half 300.0 400.0 true 10.0 300.0)))
   (is (= {:before false :x 150.0 :y 0.0 :width 150.0 :height 400.0}
          (docking/drop-half 300.0 400.0 true 290.0 300.0))))
+
+;; Same-zone drag outlines include the space released by the source, matching the final split.
+(deftest same-zone-outline-matches-planned-layout
+  (let [sizes {:left {:assets 1.0} :right {:inspector 0.3 :preview 0.7} :bottom {:tools 1.0}}
+        {layout :layout planned-sizes :sizes}
+        (docking/split-panel docking/default-layout sizes :preview :right :inspector true)]
+    (is (= {:x 0.0 :y 0.0 :width 300.0 :height 400.0}
+           (docking/panel-rectangle (:right layout) (:right planned-sizes) :preview 300.0 800.0 false)))
+    (is (= {:x 150.0 :y 0.0 :width 150.0 :height 800.0}
+           (docking/panel-rectangle (:right layout) (:right planned-sizes) :inspector 300.0 800.0 true)))))
