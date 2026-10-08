@@ -452,6 +452,48 @@ def create_standalone_editor_jar(jdk, platform):
     return standalone_jar
 
 
+def create_patch(jdk, platform, options):
+    if not platform_is_macos(platform) or options.codesign:
+        raise ValueError('Patch-only builds require an unsigned macOS baseline')
+    sys.path.insert(0, os.path.abspath('../patch'))
+    import package as patch_package
+    from pathlib import Path
+    base = json.loads(Path(options.patch_base).read_text())
+    metadata = json.loads(Path('resources/patch/build.json').read_text())
+    metadata['commit'] = options.editor_sha1
+    output = Path('target/editor')
+    output.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='defold-patch-') as temporary:
+        payload = Path(temporary)
+        resources = payload / 'Contents/Resources'
+        packages = resources / 'packages'
+        executable = payload / 'Contents/MacOS/Defold'
+        packages.mkdir(parents=True)
+        executable.parent.mkdir(parents=True)
+        for name in ('Assets.car', 'document_legacy.icns', 'logo.icns'):
+            shutil.copy(Path('bundle-resources') / name, resources / name)
+        shutil.copy('bundle-resources/Info.plist', payload / 'Contents/Info.plist')
+        config = configparser.ConfigParser()
+        config.read('bundle-resources/config')
+        for key, value in {'editor_sha1': options.editor_sha1, 'engine_sha1': options.engine_sha1 or '',
+                           'version': options.version, 'time': datetime.datetime.now().isoformat(),
+                           'archive_domain': options.archive_domain, 'channel': options.channel or ''}.items():
+            config.set('build', key, value)
+        if not config.get('launcher', 'jdk').endswith('/jdk-' + java_version):
+            raise ValueError('Launcher JDK path does not match the patch runtime')
+        with (resources / 'config').open('w') as stream:
+            config.write(stream)
+        jar = packages / ('defold-' + options.editor_sha1 + '.jar')
+        shutil.copy(create_standalone_editor_jar(jdk, platform), jar)
+        remove_platform_files_from_archive(platform, str(jar), jdk)
+        validate_android_vkquality_files(str(jar))
+        shutil.copy(launcher_path(options, platform, get_exe_suffix(platform)), executable)
+        patch_name = 'Defold-%s-patch-%s-to-%s.zip' % (platform, base['metadata']['revision'], metadata['revision'])
+        state = patch_package.create(base, payload, metadata, platform, java_version,
+                                     Path('jlink-options').read_text(), output / patch_name)
+        (output / ('Defold-%s-state.json' % platform)).write_text(json.dumps(state, indent=2) + '\n')
+        log('Created patch only: %s' % (output / patch_name))
+
 def create_bundle(jdk, platform, options):
     mkdirs('target/editor')
     jar_file = create_standalone_editor_jar(jdk, platform)
@@ -716,7 +758,10 @@ def build(options):
         else:
             run_tests(jdk)
         invoke_lein(['prerelease'], jdk_path=jdk)
-        create_bundle(jdk, platform, options)
+        if options.patch_base:
+            create_patch(jdk, platform, options)
+        else:
+            create_bundle(jdk, platform, options)
 
 def init_editor(options, platform, jdk):
     init_command = ['with-profile', '+release', 'init',
@@ -783,6 +828,9 @@ Commands:
     parser.add_option('--launcher', dest='launcher',
                       default = None,
                       help = 'Specific local launcher to use when creating the bundle, e.g. "../engine/tools/build/src/launcher/launcher". Useful when testing.')
+
+    parser.add_option('--patch-base', dest='patch_base', default=None,
+                      help='Released platform state JSON; emit only an incremental patch and next state')
 
     parser.add_option('--skip-tests', dest='skip_tests',
                       action = 'store_true',

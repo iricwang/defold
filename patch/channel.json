@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 4,
-  "version": "1.14.1-patch.4",
+  "revision": 5,
+  "version": "1.14.1-patch.5",
   "repository": "iricwang/defold",
-  "notes": "精简可停靠面板：复用原有标题栏，更多菜单改为轻量省略号；拖放显示目标半区外框，并均分目标面板空间，支持 Escape 取消。"
+  "notes": "后续更新仅生成增量 patch，不再打包完整应用；保留现有 JDK，支持跳过版本后按历史补丁逐版更新。"
 }

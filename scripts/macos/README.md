@@ -1,59 +1,41 @@
-# macOS DMG builds for a fork
+# macOS patch builds for this fork
 
-The local build and `.github/workflows/macos-dmg.yml` use the same entry point.
-It compiles the current checkout's engine, Bob and editor, then creates and
-verifies a DMG. It does not need Defold's S3, signing, or publishing credentials.
+Local builds and the **macOS Patch** workflow compile the engine, Bob and editor,
+then produce only an incremental patch ZIP and a small file-inventory JSON.
+They do not create an application bundle, run `jlink`, or package a DMG/full-app ZIP.
 
-## Local setup
+## Build locally
 
-Install Xcode, complete its first-launch setup, and select it with
-`xcode-select`. Install the command-line dependencies:
-
-```sh
-brew install python@3.12 openjdk@25 cmake ninja
-```
-
-From the repository root:
+Install Xcode and `python@3.12`, `openjdk@25`, `cmake`, `ninja`, and `gh` with
+Homebrew. Authenticate `gh` to read the published baseline, then run:
 
 ```sh
-bash scripts/macos/build-dmg.sh
+python3.12 patch/manage.py bump --notes "Describe this update"
+bash scripts/macos/build-patch.sh
 ```
 
-The script detects the host architecture and Homebrew JDK, creates a Python
-virtual environment in `tmp/macos-build-venv`, and uses the repository's bundled
-Leiningen launcher. It respects an existing `JAVA_HOME`; that must point to JDK
-25. Set `DEFOLD_PYTHON` if Python 3.12 is installed at a nonstandard path.
-The editor's bundled runtime is the exact Temurin version in
-`build_tools/sdk.py`, downloaded by the existing packaging script.
+The old `build-dmg.sh` entry point now forwards to `build-patch.sh` for compatibility.
+The script detects the host architecture, reuses downloaded dependencies and
+builds on a matching Mac. `JAVA_HOME` must point to JDK 25; `DEFOLD_PYTHON` can
+select Python 3.12 at a custom path. Outputs in `editor/target/editor/` are:
 
-Outputs:
+- `Defold-<platform>-patch-<base>-to-<revision>.zip`
+- `Defold-<platform>-state.json`
 
-- `editor/target/editor/Defold-arm64-macos.dmg` on Apple Silicon
-- `editor/target/editor/Defold-x86_64-macos.dmg` on Intel
-- A corresponding `.dmg.sha256` checksum file
-- A complete `.zip` bundle, used as the base for subsequent incremental patches
-
-Build on a matching host for each architecture. Subsequent builds reuse CMake
-and dependency caches. The script skips unit/integration test suites, matching
-the upstream editor packaging job; a successful run confirms compilation,
-packaging and DMG integrity, not full test coverage.
+The first transition from patch.4 reads its existing published application ZIP
+to create the baseline inventory, then discards the download. Later builds fetch
+only the small state JSON. The installed JDK is retained; changing its version
+or requiring new runtime modules fails the patch build rather than producing an
+incomplete update. Such a runtime migration requires a separately planned full
+installation; this workflow never generates one automatically.
 
 ## GitHub Actions
 
-The **macOS DMG** workflow runs on pushes (except `skip-ci-*` and `contrib/**`),
-pull requests, and manual dispatch. It builds ARM64 and Intel independently on
-`macos-26` and `macos-26-intel`. Download the DMG and checksum from the successful
-run's **Artifacts** section; these are retained for 14 days. Build logs are
-retained for 7 days, including failed builds. A missing DMG fails the job.
+The workflow builds Apple Silicon and Intel on matching macOS runners, tests the
+updater and docking layout, and retains patch artifacts for 14 days and logs for
+7 days. Pushes to `codex/editor-docking-patch4` in `iricwang/defold` publish both
+platforms and update the existing `dev` patch feed. Other branches and PRs only
+produce artifacts. Every new patch must have a revision higher than the latest
+published release. No signing or official Defold publishing credentials are used.
 
-These are development builds without Developer ID signing or notarization.
-macOS may require approval in Privacy & Security when first opening a downloaded
-build. Actions artifacts are retained as before. On pushes to this fork's `dev`
-branch, successful builds and patch tests also publish a branch prerelease and
-update manifest using `GITHUB_TOKEN`. See [patch development](../../patch/README.md)
-for revision management, incremental updates, and local preview instructions.
-The editor uses this fork's patch feed instead of the upstream automatic updater.
-
-The upstream **CI - Main** and **CI - Engine nightly** workflows have additional
-platform and official infrastructure requirements. This workflow is independent
-of them; enabling it does not provision their secrets or validate other targets.
+See [patch delivery](../../patch/README.md) for installation and local verification.

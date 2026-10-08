@@ -1,4 +1,4 @@
-name: macOS DMG
+name: macOS Patch
 
 on:
   push:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: DMG (${{ matrix.platform }})
+    name: Patch (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
@@ -57,23 +57,24 @@ jobs:
           key: macos-dmg-${{ matrix.platform }}-${{ hashFiles('build_tools/sdk.py', 'editor/project.clj', 'editor/scripts/lein', '**/*.gradle', '**/gradle-wrapper.properties') }}
       - name: Test patch packaging
         run: python3 -m unittest discover -s patch -p 'test_*.py'
-      - name: Build engine, Bob, editor and verify DMG
+      - name: Build engine, Bob and editor patch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p tmp
-          bash scripts/macos/build-dmg.sh '${{ matrix.platform }}' 2>&1 | tee tmp/macos-dmg.log
+          bash scripts/macos/build-patch.sh '${{ matrix.platform }}' 2>&1 | tee tmp/macos-patch.log
       - name: Test incremental updater and panel layout
         run: |
           source tmp/macos-build-env.sh
           cd editor
           LEIN_HOME="$PWD/build/lein" bash scripts/lein test editor.patch-test editor.docking-test
-      - name: Upload DMG and checksum
+      - name: Upload patch and baseline inventory
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Defold-${{ matrix.platform }}-${{ github.sha }}
           path: |
-            editor/target/editor/Defold-${{ matrix.platform }}.dmg
-            editor/target/editor/Defold-${{ matrix.platform }}.dmg.sha256
-            editor/target/editor/Defold-${{ matrix.platform }}.zip
+            editor/target/editor/Defold-${{ matrix.platform }}-patch-*-to-*.zip
+            editor/target/editor/Defold-${{ matrix.platform }}-state.json
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
@@ -82,13 +83,13 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: build-log-${{ matrix.platform }}
-          path: tmp/macos-dmg.log
+          path: tmp/macos-patch.log
           retention-days: 7
 
   publish-patch:
-    name: Publish dev patch
+    name: Publish branch patch
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && github.repository == 'iricwang/defold'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/editor-docking-patch4' && github.repository == 'iricwang/defold'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -215,3 +215,25 @@
             (System/setProperty key value)
             (System/clearProperty key)))
         (PatchInstaller/deleteTree (.toPath directory))))))
+
+;; Patch-only feeds walk backwards to the next compatible update and reject cyclic or foreign history.
+(deftest patch-only-history-test
+  (let [routes (atom {})]
+    (with-server routes
+      (fn [base]
+        (let [config {:feed (str base "/latest") :channel "dev" :repository "owner/repo" :revision 5}
+              next-update {:schema 1 :channel "dev" :repository "owner/repo" :revision 6 :version "patch.6"
+                           :notes "Next update" :assets {:arm64-macos {:url (str base "/patch.zip")
+                                                                       :size 4 :base_revision 5 :sha256 (DigestUtils/sha256Hex "test")}}}
+              latest (-> next-update (assoc :revision 7 :version "patch.7" :previous (str base "/previous"))
+                         (assoc-in [:assets :arm64-macos :base_revision] 6))]
+          (reset! routes {"/latest" {:status 200 :body (json/write-str latest)}
+                          "/previous" {:status 200 :body (json/write-str next-update)}})
+          (let [result (patch/check! config "arm64-macos")]
+            (is (= :available (:status result)))
+            (is (= :patch (:kind result)))
+            (is (= 6 (get-in result [:manifest :revision]))))
+          (swap! routes assoc "/previous" {:status 200 :body (json/write-str latest)})
+          (is (thrown? Exception (patch/check! config "arm64-macos")))
+          (swap! routes assoc "/previous" {:status 200 :body (json/write-str (assoc next-update :repository "other/repo"))})
+          (is (thrown? Exception (patch/check! config "arm64-macos"))))))))

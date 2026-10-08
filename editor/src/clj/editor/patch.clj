@@ -94,38 +94,47 @@
           (recur next-url (inc redirects)))))))
 
 (defn check! [config platform]
-  (let [out (ByteArrayOutputStream.)]
-    (transfer! (:feed config) out 1048576 (fn [_]))
-    (let [manifest (json/read-str (.toString out "UTF-8") :key-fn keyword)
-          {:keys [schema channel revision version notes]} manifest
-          delta (get-in manifest [:assets (keyword platform)])
-          incremental (= (:revision config) (:base_revision delta))
-          installer (get-in manifest [:installers (keyword platform)])
-          asset (if incremental delta installer)]
-      (when-not (and (= 1 schema)
-                     (= (:channel config) channel)
-                     (= (:repository config) (:repository manifest))
-                     (pos-int? revision)
-                     (string? version)
-                     (not (string/blank? version))
-                     (string? notes)
-                     (map? (:assets manifest)))
-        (throw (ex-info "Invalid patch manifest or wrong update channel" {})))
-      (doseq [candidate [asset installer]
-              :when candidate]
-        (when-not (and (allowed-url? (:url candidate))
-                       (string? (:sha256 candidate))
-                       (re-matches #"[0-9a-f]{64}" (:sha256 candidate))
-                       (pos-int? (:size candidate)))
-          (throw (ex-info "Invalid patch package metadata" {}))))
-      {:manifest manifest
-       :asset asset
-       :installer installer
-       :kind (if incremental :patch :installer)
-       :status (cond
-                 (<= revision (:revision config)) :current
-                 (nil? asset) :unsupported
-                 :else :available)})))
+  (loop [feed (:feed config) ceiling Long/MAX_VALUE remaining 100]
+    (when (zero? remaining)
+      (throw (ex-info "Patch history exceeds the supported update depth" {})))
+    (let [out (ByteArrayOutputStream.)]
+      (transfer! feed out 1048576 (fn [_]))
+      (let [manifest (json/read-str (.toString out "UTF-8") :key-fn keyword)
+            {:keys [schema channel revision version notes]} manifest
+            delta (get-in manifest [:assets (keyword platform)])
+            incremental (= (:revision config) (:base_revision delta))
+            installer (get-in manifest [:installers (keyword platform)])
+            asset (if incremental delta installer)]
+        (when-not (and (= 1 schema)
+                       (= (:channel config) channel)
+                       (= (:repository config) (:repository manifest))
+                       (pos-int? revision)
+                       (< revision ceiling)
+                       (string? version)
+                       (not (string/blank? version))
+                       (string? notes)
+                       (map? (:assets manifest)))
+          (throw (ex-info "Invalid patch manifest or wrong update channel" {})))
+        (doseq [candidate [asset installer]
+                :when candidate]
+          (when-not (and (allowed-url? (:url candidate))
+                         (string? (:sha256 candidate))
+                         (re-matches #"[0-9a-f]{64}" (:sha256 candidate))
+                         (pos-int? (:size candidate)))
+            (throw (ex-info "Invalid patch package metadata" {}))))
+        (if (and (> revision (:revision config))
+                 (not incremental)
+                 (nil? installer)
+                 (:previous manifest))
+          (recur (:previous manifest) revision (dec remaining))
+          {:manifest manifest
+           :asset asset
+           :installer installer
+           :kind (if incremental :patch :installer)
+           :status (cond
+                     (<= revision (:revision config)) :current
+                     (nil? asset) :unsupported
+                     :else :available)})))))
 
 (defn download! [asset ^File directory progress-fn]
   (.mkdirs directory)
