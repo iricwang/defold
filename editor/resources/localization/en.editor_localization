@@ -2854,3 +2854,15 @@ dock.to-bottom = Dock Bottom
 command.window.show-resource-preview = Show Resource Preview
 command.window.reset-layout = Reset Panel Layout
 resource-preview.audio-unsupported = This audio encoding is not supported by the preview player. WAV, MP3, M4A and AIFF can be played here.
+
+dock.to-center = Dock Beside Scene
+
+game-preview.ready = Click Run to play here
+game-preview.embedded = Embed
+game-preview.run = Run Project
+game-preview.stop = Stop Game
+game-preview.external = This target runs in a separate window
+game-preview.starting = Starting game…
+game-preview.stopped = Game stopped
+game-preview.resolution-limit = Game preview supports up to 2048 × 2048. Reduce the window resolution.
+game-preview.connection-closed = Game connection closed. Stop and run again.

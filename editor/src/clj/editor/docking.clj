@@ -27,18 +27,18 @@
 
 (set! *warn-on-reflection* true)
 
-(def default-layout {:left [:assets] :right [:inspector :preview] :bottom [:tools]})
+(def default-layout {:left [:assets] :right [:inspector :preview] :bottom [:tools] :center [:game]})
 
 (defn valid-layout? [layout]
   (and (map? layout)
-       (= #{:left :right :bottom} (set (coll/keys layout)))
+       (= #{:left :right :bottom :center} (set (coll/keys layout)))
        (coll/every? vector? (coll/vals layout))
-       (= {:assets 1 :inspector 1 :preview 1 :tools 1}
+       (= {:assets 1 :inspector 1 :preview 1 :tools 1 :game 1}
           (frequencies (into [] cat (coll/vals layout))))))
 
 (defn move-panel [layout panel zone]
   (assert (valid-layout? layout))
-  (assert (contains? #{:assets :inspector :preview :tools} panel))
+  (assert (contains? #{:assets :inspector :preview :tools :game} panel))
   (assert (contains? default-layout zone))
   (update (into {} (map (fn [[key panels]] [key (filterv #(not= panel %) panels)])) layout)
           zone conj panel))
@@ -95,13 +95,15 @@
       {:x (* width offset) :y 0.0 :width (* width share) :height height}
       {:x 0.0 :y (* height offset) :width width :height (* height share)})))
 
-(defn init! [^Scene scene preferences localization ^Node preview show-zone!]
+(defn init! [^Scene scene preferences localization ^Node preview ^Node game set-zone-visible!]
   (let [saved (prefs/get preferences [:window :panel-layout])
+        saved (if (and saved (not (contains? saved :center))) (assoc saved :center [:game]) saved)
         layout (atom (if (valid-layout? saved) saved default-layout))
         bodies {:assets (.lookup scene "#assets-split")
                 :inspector (.lookup scene "#right-split")
                 :tools (.lookup scene "#tool-tabs")
-                :preview preview}
+                :preview preview
+                :game game}
         zones (into {} (map (fn [zone]
                               (let [^AnchorPane host (.lookup scene (str "#" (name zone) "-pane"))
                                     split (doto (SplitPane.)
@@ -116,7 +118,7 @@
                                 (AnchorPane/setRightAnchor split 0.0)
                                 (.add (.getChildren host) split)
                                 [zone split])))
-                    [:left :right :bottom])
+                    [:left :right :bottom :center])
         panels (into {} (map (fn [[id ^Node body]]
                                (let [menu (doto (Button. "…")
                                             (.setId (str "dock-menu-" (name id)))
@@ -124,7 +126,7 @@
                                             (.setMinSize 24.0 22.0)
                                             (.setPrefSize 24.0 22.0)
                                             (.setMaxSize 24.0 22.0)
-                                            (.setStyle "-fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 0; -fx-opacity: 0.65; -fx-font-size: 16px;"))
+                                            (.setStyle "-fx-min-width: 24px; -fx-pref-width: 24px; -fx-max-width: 24px; -fx-min-height: 22px; -fx-max-height: 22px; -fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 0; -fx-opacity: 0.65; -fx-font-size: 16px;"))
                                      title (when (= :preview id)
                                              (doto (Label.)
                                                (.setId "dock-header-preview")
@@ -140,7 +142,7 @@
                                              (.setMinSize 80.0 60.0))]
                                  (when title (VBox/setVgrow body Priority/ALWAYS))
                                  (StackPane/setAlignment menu Pos/TOP_RIGHT)
-                                 (StackPane/setMargin menu (Insets. 1.0 4.0 0.0 0.0))
+                                 (StackPane/setMargin menu (Insets. 0.0 0.0 0.0 0.0))
                                  [id {:node panel :menu menu}]))) bodies)
         root ^StackPane (.getRoot scene)
         indicator (doto (Rectangle.)
@@ -154,6 +156,7 @@
         gesture (volatile! nil)]
     (.add (.getChildren root) indicator)
     (letfn [(render! [sizes]
+              (set-zone-visible! :center (pos? (count (:center @layout))))
               (doseq [[_ ^SplitPane split] zones] (.clear (.getItems split)))
               (doseq [[zone ids] @layout]
                 (let [^SplitPane split (zones zone)]
@@ -174,7 +177,7 @@
             (move! [id zone]
               (swap! layout move-panel id zone)
               (save!)
-              (show-zone! zone)
+              (set-zone-visible! zone true)
               (render! nil))
             (cancel! []
               (vreset! gesture nil)
@@ -207,7 +210,7 @@
       (doseq [[id {:keys [^Node node ^Button menu]}] panels]
         (let [popup (ContextMenu.)]
           (.setOnAction menu (ui/event-handler _ (.show popup menu Side/BOTTOM 0.0 0.0)))
-          (doseq [zone [:left :right :bottom]]
+          (doseq [zone [:left :right :bottom :center]]
             (let [item (doto (MenuItem.) (localization/localize! localization (localization/message (str "dock.to-" (name zone)))))]
               (.setOnAction item (ui/event-handler _ (move! id zone)))
               (.add (.getItems popup) item))))
@@ -216,7 +219,8 @@
           (ui/event-handler event
             (when (and (.isPrimaryButtonDown ^MouseEvent event)
                        (< (.getY (.sceneToLocal node (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event))) 28.0)
-                       (nil? (ui/closest-node-where #(identical? menu %) (.getTarget event))))
+                       (nil? (ui/closest-node-where #(or (instance? javafx.scene.control.ButtonBase %)
+                                                         (identical? menu %)) (.getTarget event))))
               (vreset! gesture {:panel id :x (.getSceneX ^MouseEvent event) :y (.getSceneY ^MouseEvent event)}))))
         (.addEventFilter node MouseEvent/MOUSE_DRAGGED
           (ui/event-handler event
@@ -224,7 +228,7 @@
               (let [dx (- (.getSceneX ^MouseEvent event) x)
                     dy (- (.getSceneY ^MouseEvent event) y)]
                 (when (or active (> (+ (* dx dx) (* dy dy)) 36.0))
-                  (when-not active (doseq [zone [:left :right :bottom]] (show-zone! zone)))
+                  (when-not active (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true)))
                   (let [{:keys [^Node node x y width height] :as target}
                         (target-at panel (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event))]
                     (vswap! gesture assoc :active true :target target)
@@ -263,7 +267,7 @@
                                 (cancel!)
                                 (reset! layout default-layout)
                                 (save!)
-                                (doseq [zone [:left :right :bottom]] (show-zone! zone))
+                                (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true))
                                 (render! nil))})
       (render! nil)
       (.applyCss root)

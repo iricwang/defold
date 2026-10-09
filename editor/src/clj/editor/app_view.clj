@@ -143,6 +143,9 @@
    :bottom {:index 1
             :pane-id "bottom-pane"
             :split-id "center-split"}
+   :center {:index 1
+            :pane-id "center-pane"
+            :split-id "scene-game-split"}
    :changed-files {:index 1
                    :pane-id "changed-files-pane"
                    :split-id "assets-split"}})
@@ -701,7 +704,9 @@
                           "assets-split"
                           "dock-left-split"
                           "dock-right-split"
-                          "dock-bottom-split"])
+                          "dock-bottom-split"
+                          "dock-center-split"
+                          "scene-game-split"])
 
 (defn- existing-split-panes [^Scene scene]
   (into {}

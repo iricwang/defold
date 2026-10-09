@@ -66,7 +66,8 @@
             [service.smoke-log :as slog]
             [util.debug-util :as du]
             [util.http-server :as http-server])
-  (:import [java.io File]
+  (:import [com.defold.editor GamePreview]
+           [java.io File]
            [javafx.scene Node Scene]
            [javafx.scene.control MenuBar SplitPane Tab TabPane TreeView]
            [javafx.scene.input DragEvent InputEvent KeyCombination KeyEvent MouseEvent]
@@ -233,8 +234,14 @@
 
           preview-pane (resource-preview/make-pane! {:workspace workspace :project project :app-view app-view
                                                      :localization localization :open-resource #(open-resource % {})} assets)
-          dock (docking/init! scene prefs localization (:node preview-pane)
-                              #(app-view/set-pane-visible! scene % true))
+          game-pane (GamePreview. (.getAbsolutePath (workspace/project-directory workspace))
+                                  ^Runnable #(ui/execute-command (ui/contexts scene true) :project.build nil)
+                                  ^Runnable #(app-view/set-pane-visible! scene (docking/panel-zone scene :game :center) true)
+                                  (reify java.util.function.BiConsumer
+                                    (accept [_ control key]
+                                      (localization/localize! control localization (localization/message key)))))
+          dock (docking/init! scene prefs localization (:node preview-pane) (.getNode game-pane)
+                              #(app-view/set-pane-visible! scene %1 %2))
           breakpoints-view (breakpoints-view/make-breakpoints-view workspace project open-resource prefs (.lookup root "#breakpoints-container"))
           token (web-server/make-token)
           server-handler (web-server/make-dynamic-handler
@@ -375,6 +382,7 @@
 
       (ui/on-closed! stage (fn [_]
                              ((:dispose! preview-pane))
+                             (.close game-pane)
                              (http-server/stop! web-server)
                              (ui/remove-application-focused-callback! :main-stage)
                              (ui/remove-application-unfocused-callback! :main-stage-unfocused)

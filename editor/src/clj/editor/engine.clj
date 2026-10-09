@@ -24,11 +24,13 @@
             [editor.protobuf :as protobuf]
             [editor.resource :as resource]
             [editor.system :as system])
-  (:import [com.dynamo.bob Platform]
+  (:import [com.defold.editor GamePreview]
+           [com.dynamo.bob Platform]
            [com.dynamo.render.proto Render$Resize]
            [com.dynamo.resource.proto Resource$Reload]
            [com.dynamo.system.proto System$Exit]
            [java.io BufferedReader File IOException InputStream]
+           [java.lang ProcessHandle]
            [java.net HttpURLConnection InetSocketAddress Socket URI]
            [java.util.zip ZipEntry ZipFile]))
 
@@ -302,12 +304,19 @@
       (catch Exception _))))
 
 (defn launch! [^File engine project-directory prefs debug instance-index focus]
-  (let [defold-log-dir (some-> (system/defold-log-dir)
+  (let [game-session (GamePreview/prepare (.getAbsolutePath ^File project-directory)
+                                          (and system/mac? (zero? instance-index)
+                                               (.startsWith (.getAbsolutePath engine) (system/defold-unpack-path))))
+        defold-log-dir (some-> (system/defold-log-dir)
                                (File.)
                                (.getAbsolutePath))
         command (.getAbsolutePath engine)
         engine-arguments (prefs/get prefs [:run :engine-arguments])
         args (cond-> []
+               game-session
+               (into ["--config=display.fullscreen=0"
+                      "--config=display.high_dpi=0"
+                      "--config=engine.run_while_iconified=1"])
                defold-log-dir
                (into ["--config=project.write_log=1"
                       (format "--config=project.log_dir=%s" defold-log-dir)])
@@ -331,15 +340,24 @@
              "_NT_ALT_SYMBOL_PATH" (.getAbsolutePath (.getParentFile engine))
              "MESA_GL_VERSION_OVERRIDE" nil
              "MESA_LOADER_DRIVER_OVERRIDE" nil}
+        env (cond-> env game-session
+              (assoc "DM_EDITOR_GAME_FILE" (.getPath game-session)
+                     "DM_EDITOR_GAME_PARENT" (str (.pid (ProcessHandle/current)))
+                     "DM_QUIT_ON_ESC" "0"))
         opts {:dir project-directory
               :err :stdout
-              :env env}]
-    ;; Closing "is" seems to cause any dmengine output to stdout/err
-    ;; to generate SIGPIPE and close/crash. Also, we need to read
-    ;; the output of dmengine because there is a risk of the stream
-    ;; buffer filling up, stopping the process.
-    ;; https://www.securecoding.cert.org/confluence/display/java/FIO07-J.+Do+not+let+external+processes+block+on+IO+buffers
-    (let [p (apply process/start! opts command args)]
-      {:process p
-       :name (.getName engine)
-       :log-stream (process/out p)})))
+              :env env}
+        ;; Closing "is" seems to cause any dmengine output to stdout/err
+        ;; to generate SIGPIPE and close/crash. Also, we need to read
+        ;; the output of dmengine because there is a risk of the stream
+        ;; buffer filling up, stopping the process.
+        ;; https://www.securecoding.cert.org/confluence/display/java/FIO07-J.+Do+not+let+external+processes+block+on+IO+buffers
+        p (try
+            (apply process/start! opts command args)
+            (catch Exception e
+              (when game-session (.close game-session))
+              (throw e)))]
+    (when game-session (.attach game-session p))
+    {:process p
+     :name (.getName engine)
+     :log-stream (process/out p)}))

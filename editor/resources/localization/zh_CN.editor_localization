@@ -2032,3 +2032,15 @@ dock.to-bottom = 停靠到底部
 command.window.show-resource-preview = 显示资源预览
 command.window.reset-layout = 恢复默认面板布局
 resource-preview.audio-unsupported = 预览播放器暂不支持此音频编码。可播放 WAV、MP3、M4A 和 AIFF。
+
+dock.to-center = 停靠到场景旁
+
+game-preview.ready = 点击运行，在此操作游戏
+game-preview.embedded = 内嵌
+game-preview.run = 运行项目
+game-preview.stop = 停止游戏
+game-preview.external = 此运行目标使用独立窗口
+game-preview.starting = 正在启动游戏…
+game-preview.stopped = 游戏已停止
+game-preview.resolution-limit = Game 预览支持最高 2048 × 2048，请降低窗口分辨率
+game-preview.connection-closed = Game 连接已关闭，请停止后重新运行。

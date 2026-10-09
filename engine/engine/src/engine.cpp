@@ -119,6 +119,8 @@ DM_PROPERTY_EXTERN(rmtp_Script);
 DM_PROPERTY_U32(rmtp_LuaMem, 0, PROFILE_PROPERTY_FRAME_RESET, "kb", &rmtp_Script); // kilo bytes
 DM_PROPERTY_U32(rmtp_LuaRefs, 0, PROFILE_PROPERTY_FRAME_RESET, "# Lua references", &rmtp_Script);
 
+#include "editor_game_bridge.h"
+
 namespace dmEngine
 {
 #if !(defined(DM_PLATFORM_VENDOR))
@@ -497,6 +499,7 @@ namespace dmEngine
 
     void Delete(HEngine engine)
     {
+        dmEditorGame::Close();
         {
             ScopedExtensionParams params(engine);
 
@@ -1288,6 +1291,11 @@ namespace dmEngine
         window_params.m_HighDPI                 = (bool) dmConfigFile::GetInt(engine->m_Config, "display.high_dpi", 0);
         window_params.m_FocusOnShow             = (bool) dmConfigFile::GetInt(engine->m_Config, "display.focus_on_show", 1);
         window_params.m_BackgroundColor         = clear_color;
+        if (dmEditorGame::Open())
+        {
+            window_params.m_Hidden = 1;
+            window_params.m_FocusOnShow = 0;
+        }
         window_params.m_GraphicsApi             = AdapterFamilyToGraphicsAPI(dmGraphics::GetInstalledAdapterFamily());
 #if defined(__EMSCRIPTEN__)
         window_params.m_ContextAlphabits        = dmConfigFile::GetInt(engine->m_Config, "html5.transparent_graphics_context", 0) == 0 ? 0 : 8;
@@ -1659,7 +1667,8 @@ namespace dmEngine
 
         dmGui::SetDisplayProfiles(engine->m_GuiContext, engine->m_DisplayProfiles);
 
-        dmPlatform::ShowWindow(engine->m_Window);
+        if (!dmEditorGame::Active())
+            dmPlatform::ShowWindow(engine->m_Window);
 
         // clear it a couple of times, due to initialization of extensions might stall the updates
         for (int i = 0; i < 3; ++i) {
@@ -1956,6 +1965,11 @@ bail:
 
     static void StepFrame(HEngine engine, float dt)
     {
+        if (!dmEditorGame::ParentAlive())
+        {
+            Exit(engine, 0);
+            return;
+        }
         dmProfiler::SetUpdateFrequency((uint32_t)(1.0f / dt));
 
         if (dmGraphics::GetWindowStateParam(engine->m_GraphicsContext, WINDOW_STATE_ICONIFIED)
@@ -2002,6 +2016,8 @@ bail:
                 {
                     DM_PROFILE("Hid");
                     has_input = dmHID::Update(engine->m_HidContext);
+                    dmEditorGame::Input(engine->m_HidContext);
+                    has_input = has_input || dmEditorGame::Active();
                 }
 
                 // Check if we should skip this frame
@@ -2184,6 +2200,7 @@ bail:
                     dmExtension::PostRender(ext_params);
                 }
 
+                dmEditorGame::Frame(engine->m_GraphicsContext);
                 dmGraphics::Flip(engine->m_GraphicsContext);
 
                 RecordData* record_data = &engine->m_RecordData;

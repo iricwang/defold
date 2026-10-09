@@ -20,7 +20,7 @@
 ;; Rejects missing, duplicate and unknown panels in saved layouts before creating JavaFX nodes.
 (deftest saved-layout-validation
   (is (docking/valid-layout? docking/default-layout))
-  (doseq [layout [nil {} {:left [:assets] :right [:preview] :bottom [:tools]}
+  (doseq [layout [nil {} {:left [:assets] :right [:preview] :bottom [:tools] :center [:game]}
                   (update docking/default-layout :left conj :preview)
                   (assoc docking/default-layout :bottom [:unknown])]]
     (is (not (docking/valid-layout? layout)))))
@@ -30,7 +30,7 @@
   (let [layout (-> docking/default-layout
                    (docking/move-panel :assets :right)
                    (docking/move-panel :preview :bottom))]
-    (is (= {:left [] :right [:inspector :assets] :bottom [:tools :preview]} layout))
+    (is (= {:left [] :right [:inspector :assets] :bottom [:tools :preview] :center [:game]} layout))
     (is (docking/valid-layout? layout))
     (is (= layout (docking/move-panel layout :preview :bottom)))
     (is (= [:preview :tools] (:bottom (docking/move-panel layout :tools :bottom))))))
@@ -39,7 +39,7 @@
 (deftest split-target-panel
   (let [sizes {:left {:assets 1.0} :right {:inspector 0.3 :preview 0.7} :bottom {:tools 1.0}}
         result (docking/split-panel docking/default-layout sizes :assets :right :inspector true)]
-    (is (= {:left [] :right [:assets :inspector :preview] :bottom [:tools]} (:layout result)))
+    (is (= {:left [] :right [:assets :inspector :preview] :bottom [:tools] :center [:game]} (:layout result)))
     (is (= {:assets 0.15 :inspector 0.15 :preview 0.7} (get-in result [:sizes :right])))
     (is (docking/valid-layout? (:layout result)))
     (is (= [:inspector :assets :preview]

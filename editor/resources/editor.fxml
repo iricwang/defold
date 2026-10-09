@@ -72,12 +72,17 @@
                       <children>
                         <SplitPane id="center-split" dividerPositions="0.5746666666666667" layoutX="24.0" layoutY="398.0" orientation="VERTICAL" prefHeight="200.0" prefWidth="160.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" minWidth="100.0">
                           <items>
+                            <SplitPane id="scene-game-split" dividerPositions="0.6" orientation="HORIZONTAL">
+                            <items>
                             <AnchorPane prefHeight="100.0" prefWidth="160.0">
                               <children>
                                 <SplitPane id="editor-tabs-split" dividerPositions="0.5" orientation="HORIZONTAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
                                 <fx:include source="quick-help-view.fxml" />
                               </children>
                             </AnchorPane>
+                            <AnchorPane id="center-pane" minWidth="80.0" />
+                            </items>
+                            </SplitPane>
                             <AnchorPane id="bottom-pane" prefHeight="100.0" prefWidth="160.0" SplitPane.resizableWithParent="false">
                               <children>
                                 <TabPane id="tool-tabs" layoutX="3.0" layoutY="38.0" prefHeight="200.0" prefWidth="200.0" tabClosingPolicy="UNAVAILABLE" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
