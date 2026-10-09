@@ -33,9 +33,9 @@ import java.util.function.BiConsumer;
 
 /** An isolated game process presents BGRA frames through a private, locked shared file. */
 public final class GamePreview implements AutoCloseable {
-    public static final int MAGIC = 0x44464731;
+    public static final int MAGIC = 0x44464732;
     public static final int HEADER = 4096;
-    public static final int CAPACITY = HEADER + 2048 * 2048 * 4;
+    public static final int CAPACITY = HEADER + 2 * 2048 * 2048 * 4;
     private static final Map<String, GamePreview> VIEWS = new ConcurrentHashMap<>();
     private final String project;
     private final Runnable showGame;
@@ -45,13 +45,16 @@ public final class GamePreview implements AutoCloseable {
     private final ImageView image = new ImageView();
     private final Label status = new Label();
     private final CheckBox embedded = new CheckBox();
+    private final ComboBox<Integer> frameRate = new ComboBox<>();
+    private volatile int targetFrameRate = 120;
     private final Button run = new Button("▶");
     private final Button stop = new Button("■");
     private final AnimationTimer timer;
     private volatile boolean enabled = true;
     private volatile Session session;
     private WritableImage pixels;
-    private byte[] frame;
+    private ByteBuffer frame;
+    private PixelBuffer<ByteBuffer> pixelBuffer;
     private final byte[] keys = new byte[256];
     private final ArrayDeque<Integer> text = new ArrayDeque<>();
     private int buttons, mouseX, mouseY, wheel, sequence;
@@ -80,7 +83,19 @@ public final class GamePreview implements AutoCloseable {
             button.setFocusTraversable(false);
             button.setStyle("-fx-min-width: 24px; -fx-pref-width: 24px; -fx-max-width: 24px; -fx-background-color: transparent; -fx-padding: 0;");
         }
-        HBox toolbar = new HBox(5, title, spacer, embedded, run, stop);
+        frameRate.setId("game-frame-rate");
+        frameRate.getItems().addAll(60, 120, 144);
+        frameRate.setValue(targetFrameRate);
+        frameRate.setFocusTraversable(false);
+        frameRate.setConverter(new javafx.util.StringConverter<Integer>() {
+            public String toString(Integer value) { return value + " FPS"; }
+            public Integer fromString(String value) { throw new UnsupportedOperationException(); }
+        });
+        frameRate.valueProperty().addListener((p, old, value) -> targetFrameRate = value);
+        frameRate.setStyle("-fx-min-width: 88px; -fx-pref-width: 88px; -fx-max-width: 88px;");
+        frameRate.setTooltip(new Tooltip());
+        localize.accept(frameRate.getTooltip(), "game-preview.frame-rate");
+        HBox toolbar = new HBox(5, title, spacer, embedded, frameRate, run, stop);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setMinHeight(26);
         toolbar.setStyle("-fx-padding: 0 28 0 8;");
@@ -152,7 +167,7 @@ public final class GamePreview implements AutoCloseable {
             return null;
         }
         view.stop();
-        Session next = new Session();
+        Session next = new Session(view.targetFrameRate);
         view.session = next;
         Platform.runLater(() -> { view.showGame.run(); view.sequence = 0; view.image.setImage(null); view.pixels = null;
             view.releaseInput(); view.status.setVisible(true); view.localize.accept(view.status, "game-preview.starting"); });
@@ -172,6 +187,7 @@ public final class GamePreview implements AutoCloseable {
     private void update() {
         Session current = session;
         stop.setDisable(current == null);
+        frameRate.setDisable(current != null);
         if (current == null || root.getScene() == null || root.getScene().getWindow() == null) return;
         if (current.process != null && !current.process.isAlive()) {
             localize.accept(status, "game-preview.stopped"); status.setVisible(true); stop(); return;
@@ -193,16 +209,22 @@ public final class GamePreview implements AutoCloseable {
             if (data.getInt(16) == -1) { localize.accept(status, "game-preview.resolution-limit"); status.setVisible(true); return; }
             if (next == sequence || w <= 0 || h <= 0 || w > 2048 || h > 2048) return;
             if (pixels == null || pixels.getWidth() != w || pixels.getHeight() != h) {
-                pixels = new WritableImage(w, h); frame = new byte[w*h*4]; image.setImage(pixels);
+                frame = ByteBuffer.allocateDirect(w*h*4);
+                pixelBuffer = new PixelBuffer<>(w, h, frame, PixelFormat.getByteBgraPreInstance());
+                pixels = new WritableImage(pixelBuffer);
+                image.setImage(pixels);
             }
-            data.position(HEADER); data.get(frame);
-            // The displayed backbuffer is opaque even if the game's clear alpha is zero.
-            for (int i = 3; i < frame.length; i += 4) frame[i] = (byte)255;
-            pixels.getPixelWriter().setPixels(0, 0, w, h, PixelFormat.getByteBgraInstance(), frame, 0, w*4);
-            sequence = next; status.setVisible(false);
+            frame.put(0, data, HEADER + data.getInt(44) * 2048 * 2048 * 4, frame.capacity());
+            sequence = next;
         } catch (IOException | IllegalStateException e) {
-            localize.accept(status, "game-preview.connection-closed"); status.setVisible(true); stop();
+            stop();
+            localize.accept(status, "game-preview.connection-closed"); status.setVisible(true); return;
         }
+        // Release the shared lock before uploading to JavaFX. PixelBuffer avoids
+        // PixelWriter's extra staging copy and per-frame format conversion.
+        for (int i = 3; i < frame.capacity(); i += 4) frame.put(i, (byte)255);
+        pixelBuffer.updateBuffer(buffer -> null);
+        status.setVisible(false);
     }
 
     @Override public void close() { timer.stop(); stop(); VIEWS.remove(project, this); }
@@ -213,12 +235,15 @@ public final class GamePreview implements AutoCloseable {
         private final MappedByteBuffer data;
         private volatile Process process;
         private boolean closed;
-        private Session() throws IOException {
+        private final int frameRate;
+        private Session(int frameRate) throws IOException {
+            this.frameRate = frameRate;
             path = Files.createTempFile("defold-game-", ".shm", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
             channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
             data = channel.map(FileChannel.MapMode.READ_WRITE, 0, CAPACITY);
             data.order(ByteOrder.nativeOrder()); data.putInt(0, MAGIC);
         }
+        public int getFrameRate() { return frameRate; }
         public String getPath() { return path.toString(); }
         public synchronized void attach(Process process) {
             this.process = process;

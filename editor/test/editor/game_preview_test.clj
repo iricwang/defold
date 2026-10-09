@@ -13,9 +13,12 @@
 ;; specific language governing permissions and limitations under the License.
 
 (ns editor.game-preview-test
-  (:require [cljfx.api]
+  (:require [cljfx.api :as fx]
             [clojure.test :refer [deftest is]])
   (:import [com.defold.editor GamePreview]
+           [java.nio.file Files Path]
+           [java.util.function BiConsumer]
+           [javafx.scene.control ComboBox]
            [javafx.scene.input KeyCode]))
 
 ;; Letterboxing maps the displayed game center and edges to the original input coordinates.
@@ -34,3 +37,21 @@
   (is (= 129 (GamePreview/keyCode KeyCode/UP)))
   (is (= 155 (GamePreview/keyCode KeyCode/F12)))
   (is (= -1 (GamePreview/keyCode KeyCode/UNDEFINED))))
+
+;; Selected FPS belongs to each run, and stopping a run removes its private frame file.
+(deftest preview-session-frame-rate-and-cleanup
+  @(fx/on-fx-thread
+     (with-open [view (GamePreview. "frame-rate-test" (fn []) (fn [])
+                                    (reify BiConsumer (accept [_ _ _])))]
+       (let [^ComboBox selector (.lookup (.getNode view) "#game-frame-rate")
+             first-session (GamePreview/prepare "frame-rate-test" true)
+             first-path (Path/of (.getPath first-session) (make-array String 0))]
+         (is (= 120 (.getFrameRate first-session)))
+         (.setValue selector (int 144))
+         (is (= 120 (.getFrameRate first-session)))
+         (with-open [next-session (GamePreview/prepare "frame-rate-test" true)]
+           (is (= 144 (.getFrameRate next-session)))
+           (is (not (Files/exists first-path (make-array java.nio.file.LinkOption 0))))
+           (.stop view)
+           (is (not (Files/exists (Path/of (.getPath next-session) (make-array String 0))
+                                  (make-array java.nio.file.LinkOption 0)))))))))

@@ -35,6 +35,10 @@ struct dmWindow
 
 namespace dmPlatform
 {
+#if defined(DM_PLATFORM_MACOS)
+    void ConfigureBackgroundApplication() {}
+#endif
+
     HWindow NewWindow()
     {
         dmWindow* wnd = new dmWindow();

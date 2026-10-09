@@ -2866,3 +2866,5 @@ game-preview.starting = Starting game…
 game-preview.stopped = Game stopped
 game-preview.resolution-limit = Game preview supports up to 2048 × 2048. Reduce the window resolution.
 game-preview.connection-closed = Game connection closed. Stop and run again.
+
+game-preview.frame-rate = Preview frame rate (takes effect on the next run)

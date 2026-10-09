@@ -17,7 +17,8 @@
 
 // Private, versioned editor bridge. Files are created with owner-only permissions.
 // A nonblocking POSIX record lock protects both the frame and input snapshot.
-#if defined(__APPLE__) && !defined(DM_RELEASE)
+#if defined(DM_PLATFORM_MACOS) && !defined(DM_RELEASE)
+#include <platform/platform_window_osx.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -27,12 +28,11 @@
 namespace dmEditorGame
 {
     static const uint32_t HEADER_SIZE = 4096;
-    static const uint32_t CAPACITY = HEADER_SIZE + 2048 * 2048 * 4;
-    static const uint32_t MAGIC = 0x44464731;
+    static const uint32_t CAPACITY = HEADER_SIZE + 2 * 2048 * 2048 * 4;
+    static const uint32_t MAGIC = 0x44464732;
     static int g_File = -1;
     static uint32_t* g_Data = 0;
     static pid_t g_Parent = 0;
-    static uint64_t g_LastFrame = 0;
     static uint32_t g_Input[256];
 
     static bool Lock(short type)
@@ -75,7 +75,7 @@ namespace dmEditorGame
             g_File = -1;
             return false;
         }
-        g_LastFrame = 0;
+        dmPlatform::ConfigureBackgroundApplication();
         memset(g_Input, 0, sizeof(g_Input));
         return true;
     }
@@ -132,20 +132,29 @@ namespace dmEditorGame
     static void Frame(dmGraphics::HContext graphics)
     {
         if (!g_Data) return;
-        uint64_t now = dmTime::GetMonotonicTime();
-        if (now - g_LastFrame < 33333 || !Lock(F_WRLCK)) return;
         uint32_t w = dmGraphics::GetWindowWidth(graphics);
         uint32_t h = dmGraphics::GetWindowHeight(graphics);
         if (w > 0 && h > 0 && w <= 2048 && h <= 2048)
         {
-            dmGraphics::ReadPixels(graphics, 0, 0, w, h, (uint8_t*)g_Data + HEADER_SIZE, w*h*4);
+            // GPU readback can wait for rendering. Never hold the input/frame
+            // lock while waiting: the editor must keep delivering input.
+            // Only the engine publishes slots. Reusing the previous front slot
+            // is safe after publication acquired the lock: its reader has finished.
+            uint32_t slot = g_Data[11] ^ 1;
+            uint8_t* frame = (uint8_t*)g_Data + HEADER_SIZE + slot * 2048 * 2048 * 4;
+            dmGraphics::ReadPixels(graphics, 0, 0, w, h, frame, w*h*4);
+            if (!Lock(F_WRLCK)) return;
+            g_Data[11] = slot;
             g_Data[1] = w;
             g_Data[2] = h;
             ++g_Data[3];
             g_Data[4] = getpid();
         }
-        else g_Data[4] = 0xffffffff;
-        g_LastFrame = now;
+        else
+        {
+            if (!Lock(F_WRLCK)) return;
+            g_Data[4] = 0xffffffff;
+        }
         Lock(F_UNLCK);
     }
 }

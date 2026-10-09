@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 6,
-  "version": "1.14.1-patch.6",
+  "revision": 7,
+  "version": "1.14.1-patch.7",
   "repository": "iricwang/defold",
-  "notes": "新增可与场景并排的 Game 运行面板，支持运行、停止和键鼠操作；面板更多按钮贴近右上角。"
+  "notes": "隐藏内嵌 Game 的 macOS Dock 与窗口入口；移除 30 FPS 限制，支持 60/120/144 FPS 并优化帧传输。"
 }

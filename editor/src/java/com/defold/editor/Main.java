@@ -29,6 +29,9 @@ import java.io.IOException;
  */
 public class Main {
     public static void main(String[] args) throws IOException {
+        // Set before JavaFX initializes its pulse timer. Respect explicit overrides.
+        if (System.getProperty("javafx.animation.framerate") == null)
+            System.setProperty("javafx.animation.framerate", "144");
         Start.main(args);
     }
 }

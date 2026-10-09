@@ -313,10 +313,6 @@
         command (.getAbsolutePath engine)
         engine-arguments (prefs/get prefs [:run :engine-arguments])
         args (cond-> []
-               game-session
-               (into ["--config=display.fullscreen=0"
-                      "--config=display.high_dpi=0"
-                      "--config=engine.run_while_iconified=1"])
                defold-log-dir
                (into ["--config=project.write_log=1"
                       (format "--config=project.log_dir=%s" defold-log-dir)])
@@ -331,7 +327,14 @@
                (conj "--config=display.focus_on_show=0")
 
                (not (str/blank? engine-arguments))
-               (into (remove str/blank?) (split-lines engine-arguments)))
+               (into (remove str/blank?) (split-lines engine-arguments))
+
+               game-session
+               (into ["--config=display.fullscreen=0"
+                      "--config=display.high_dpi=0"
+                      "--config=display.vsync=0"
+                      (str "--config=display.update_frequency=" (.getFrameRate game-session))
+                      "--config=engine.run_while_iconified=1"]))
         env {"DM_SERVICE_PORT" (or (validate-service-port (System/getenv "DM_SERVICE_PORT"))
                                    "dynamic")
              "DM_QUIT_ON_ESC" (if (prefs/get prefs [:run :quit-on-escape])

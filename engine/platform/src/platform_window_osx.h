@@ -21,6 +21,7 @@
 
 namespace dmPlatform
 {
+    void ConfigureBackgroundApplication();
     id GetOSXNSWindow(HWindow window);
     id GetOSXNSView(HWindow window);
     id GetOSXNSOpenGLContext(HWindow window);

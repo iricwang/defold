@@ -26,6 +26,14 @@
 
 namespace dmPlatform
 {
+    void ConfigureBackgroundApplication()
+    {
+        // Must run before glfwInit: Cocoa's menu bar setup otherwise promotes the
+        // engine to a regular application, leaving a Dock / app-switcher entry.
+        glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
+        [[NSApplication sharedApplication] setActivationPolicy:NSApplicationActivationPolicyProhibited];
+    }
+
     id GetOSXNSWindow(HWindow window)
     {
         return glfwGetCocoaWindow(window->m_Window);

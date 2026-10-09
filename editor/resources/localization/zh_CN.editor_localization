@@ -2044,3 +2044,5 @@ game-preview.starting = 正在启动游戏…
 game-preview.stopped = 游戏已停止
 game-preview.resolution-limit = Game 预览支持最高 2048 × 2048，请降低窗口分辨率
 game-preview.connection-closed = Game 连接已关闭，请停止后重新运行。
+
+game-preview.frame-rate = 预览帧率（下次运行生效）
