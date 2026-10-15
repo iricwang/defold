@@ -43,6 +43,7 @@ def main():
             archive.extractall(home / 'ext', filter='data')
     archive_url = f'https://d.defold.com/archive/alpha/{ENGINE}'
     download(f'{archive_url}/bob/bob.jar', home / 'share/java/bob.jar')
+    download(f'{archive_url}/engine/share/ref-doc.zip', home / 'share/ref-doc.zip')
     for name in ('launcher.exe', 'dmengine.pdb', 'particle_shared.dll', 'mouse_capture_shared.dll'):
         destination = home / ('bin' if name in ('launcher.exe', 'dmengine.pdb') else 'lib') / 'x86_64-win32' / name
         download(f'{archive_url}/engine/x86_64-win32/{name}', destination)
