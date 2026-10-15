@@ -33,6 +33,7 @@
             [editor.code.data :as data :refer [CursorRange->line-number]]
             [editor.code.view :as code-view]
             [editor.console :as console]
+            [editor.craft-binding :as craft-binding]
             [editor.debug-view :as debug-view]
             [editor.defold-project :as project]
             [editor.dialogs :as dialogs]
@@ -2164,6 +2165,9 @@
    {:label (localization/message "command.file.show-in-desktop")
     :icon "icons/32/Icons_S_14_linkarrow.png"
     :command :file.show-in-desktop}
+   {:label (localization/message "command.photocraft.open-local")
+    :icon "icons/32/Icons_S_14_linkarrow.png"
+    :command :photocraft.open-local}
    {:label (localization/message "command.file.show-references")
     :command :file.show-references}
    {:label (localization/message "command.file.show-dependencies")
@@ -3485,6 +3489,19 @@
   (doto (Clipboard/getSystemClipboard)
     (.setContent (doto (ClipboardContent.)
                    (.putString s)))))
+
+(handler/defhandler :photocraft.open-local :global
+  (active? [app-view selection selection-context evaluation-context]
+    (when-let [r (context-resource app-view selection selection-context evaluation-context)]
+      (= "gui" (resource/type-ext r))))
+  (enabled? [app-view selection selection-context evaluation-context]
+    (when-let [r (context-resource app-view selection selection-context evaluation-context)]
+      (and (resource/exists? r)
+           (craft-binding/local-available?))))
+  (run [app-view selection selection-context prefs localization project]
+    (when-let [r (context-resource app-view selection selection-context)]
+      (craft-binding/open-local! (resource/proj-path r)
+                                #(open-resource! app-view prefs localization project r)))))
 
 (handler/defhandler :edit.copy-resource-path :global
   (active? [app-view selection selection-context evaluation-context]

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 8,
-  "version": "1.14.1-patch.8",
+  "revision": 9,
+  "version": "1.14.1-patch.9",
   "repository": "iricwang/defold",
-  "notes": "PhotoCraft 与 Defold 支持双向 IP 绑定、切换确认和保存关闭保护；新增远端工程资源传输、生成资源回传及 GUI 双端打开。"
+  "notes": "新增 GUI 标签右键菜单“在 PhotoCraft 中打开”：检测到本机在线 PhotoCraft 时启用，否则置灰；保留绑定切换确认、保存关闭保护和 GUI 双端打开，同时发布双向 IP 绑定与工程资源传输功能。"
 }

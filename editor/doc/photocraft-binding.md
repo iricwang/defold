@@ -8,4 +8,6 @@ Defold transfers ordinary project resources to PhotoCraft with bounded traversal
 
 File → Open GUI in PhotoCraft sends the active GUI to the bound application. If the resource was created after initial binding, refresh the project resources in PhotoCraft first.
 
+A GUI tab's context menu includes **Open in PhotoCraft**. It is enabled only while a running PhotoCraft responds on the local binding port (17655); discovery runs every five seconds, including when Defold is bound to a remote peer. Other resource tabs do not show this action. The action uses the context resource, confirms any required binding change through the existing save/close workflow, and reopens the GUI in Defold after sending it to PhotoCraft. Cancelling the binding does not open the file.
+
 Regression coverage lives in `test/editor/craft_binding_test.clj`: consent/idle barriers, cancellation races, session authorization, path validation, immutable uploads and manifest exclusions/content digests. A standalone local HTTP harness also exercises the actual Clojure routes against the production Rust transport in both directions. The headless adapter does not validate JavaFX dialogs or the complete editor runtime. Patch packaging and install/restart verification must be performed with the exact installed baseline using `patch/README.md` before publication.

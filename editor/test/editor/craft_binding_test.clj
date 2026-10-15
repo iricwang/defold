@@ -126,3 +126,42 @@
             (.complete pending {})
             (.completeExceptionally pending (Exception. "interrupted")))
           (is (zero? (:file-operations @(:state service)))))))))
+
+;; A remote binding must not enable the local opener, and discovery must notice a local app exiting.
+(deftest local-availability-tracks-discovery-independently-of-the-binding
+  (let [service {:state (atom {:active {:id "remote" :address "192.0.2.1:17655"}})}
+        status (atom {:app "PhotoCraft" :id "local" :bound "another-editor"})]
+    (with-redefs-fn {#'binding/current (atom service)
+                    #'binding/call! (fn [address _ _ _]
+                                      (is (= "127.0.0.1:17655" address))
+                                      @status)}
+      (fn []
+        (is (not (binding/local-available?)))
+        (#'binding/discover-local! service)
+        (is (binding/local-available?))
+        (is (= "remote" (get-in @(:state service) [:active :id])))
+        (swap! (:state service) assoc-in [:local-peer :seen-at] 0)
+        (is (not (binding/local-available?)))
+        (reset! status {:app "Other application"})
+        (#'binding/discover-local! service)
+        (is (not (binding/local-available?)))))))
+
+;; Opening the captured tab path waits for consent and never opens a file after binding is cancelled.
+(deftest local-open-waits-for-binding-before-opening-the-captured-resource
+  (doseq [accepted [true false]]
+    (let [service {:state (atom {:active {:address "127.0.0.1:17655" :token "scoped"}})}
+          calls (atom [])]
+      (with-redefs-fn {#'binding/current (atom service)
+                      #'binding/bind! (fn [_ address automatic]
+                                       (is (= "127.0.0.1:17655" address))
+                                       (is (false? automatic))
+                                       (CompletableFuture/completedFuture accepted))
+                      #'binding/call! (fn [address route token body]
+                                       (swap! calls conj [address route token body]))
+                      #'ui/do-run-later (fn [f] (f))}
+        (fn []
+          (.get ^CompletableFuture (binding/open-local! "/main/right-clicked.gui" #(swap! calls conj :reopen-defold)))
+          (is (= (if accepted
+                   [["127.0.0.1:17655" "/binding/open" "scoped" {:path "/main/right-clicked.gui"}] :reopen-defold]
+                   [])
+                 @calls)))))))

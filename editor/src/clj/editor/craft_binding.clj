@@ -335,7 +335,8 @@
                 (replace-peer! service {:id id :address target :token ticket})
                 (catch Exception e
                   (try (call! target "/binding/cancel" ticket {}) (catch Exception _))
-                  (throw e))))))
+                  (throw e)))))
+          true)
         (catch Exception e
           (swap! (:state service) assoc :error (ex-message e))
           (when-not automatic
@@ -343,11 +344,46 @@
               (dialogs/make-info-dialog (:localization service)
                                        {:title (localization/message "dialog.craft-binding.title")
                                         :header (localization/message "dialog.craft-binding.failed")
-                                        :content (ex-message e)}))))
+                                        :content (ex-message e)})))
+          false)
         (finally
           (swap! (:state service) (fn [state] (if (= operation (:outgoing state)) (dissoc state :outgoing) state)))
           (when @disabled
             (ui/run-later (ui/enable-ui!))))))))
+
+(defn local-available? []
+  (when-let [service @current]
+    (let [{:keys [local-peer incoming outgoing]} @(:state service)]
+      (and local-peer
+           (< (- (System/currentTimeMillis) (:seen-at local-peer)) 6500)
+           (not incoming)
+           (not outgoing)))))
+
+(defn- discover-local! [service]
+  (let [status (try (call! "127.0.0.1:17655" "/binding/status" "" {}) (catch Exception _))
+        peer (when (= "PhotoCraft" (:app status))
+               {:id (:id status) :seen-at (System/currentTimeMillis)})
+
+        state (swap! (:state service) assoc :local-peer peer)]
+    (when (and peer (not (:bound status))
+               (not (:active state)) (not (:incoming state)) (not (:outgoing state)))
+      (bind! service "127.0.0.1:17655" true))))
+
+(defn open-local! [path on-opened!]
+  (when-let [service @current]
+    (future/io
+      (when (.get ^CompletableFuture (bind! service "127.0.0.1:17655" false))
+        (try
+          (let [{:keys [address token]} (:active @(:state service))]
+            (call! address "/binding/open" token {:path path})
+            (ui/run-later (on-opened!)))
+          (catch Exception error
+            (swap! (:state service) assoc :error (ex-message error))
+            (ui/run-later
+              (dialogs/make-info-dialog (:localization service)
+                                       {:title (localization/message "dialog.craft-binding.title")
+                                        :header (localization/message "dialog.craft-binding.failed")
+                                        :content (ex-message error)}))))))))
 
 (handler/defhandler :photocraft.bind :global
   (run [localization user-data]
@@ -392,15 +428,9 @@
       (.schedule timer
                  (proxy [java.util.TimerTask] []
                    (run []
-                     (when (and (= service @current)
-                                (not (:active @(:state service)))
-                                (not (:incoming @(:state service)))
-                                (not (:outgoing @(:state service))))
-                       (try
-                         (when-not (:bound (call! "127.0.0.1:17655" "/binding/status" "" {}))
-                           (bind! service "127.0.0.1:17655" true))
-                         (catch Exception _)))))
-                 2500 5000)
+                     (when (= service @current)
+                       (discover-local! service))))
+                 0 5000)
       (swap! (:state service) assoc :discovery-timer timer))
     service))
 

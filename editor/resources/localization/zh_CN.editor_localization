@@ -2050,6 +2050,7 @@ game-preview.frame-rate = 预览帧率（下次运行生效）
 # PhotoCraft IP binding
 command.photocraft.bind = 通过 IP 绑定 PhotoCraft…
 command.photocraft.open = 在 PhotoCraft 中打开 GUI
+command.photocraft.open-local = 在 PhotoCraft 中打开
 command.photocraft.status = PhotoCraft 绑定状态
 dialog.craft-binding.title = PhotoCraft 绑定
 dialog.craft-binding.header = 绑定到 {address}？

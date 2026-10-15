@@ -2872,6 +2872,7 @@ game-preview.frame-rate = Preview frame rate (takes effect on the next run)
 # PhotoCraft IP binding
 command.photocraft.bind = Bind PhotoCraft by IP…
 command.photocraft.open = Open GUI in PhotoCraft
+command.photocraft.open-local = Open in PhotoCraft
 command.photocraft.status = PhotoCraft Binding Status
 dialog.craft-binding.title = PhotoCraft Binding
 dialog.craft-binding.header = Bind to {address}?
