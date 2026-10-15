@@ -453,8 +453,8 @@ def create_standalone_editor_jar(jdk, platform):
 
 
 def create_patch(jdk, platform, options):
-    if not platform_is_macos(platform) or options.codesign:
-        raise ValueError('Patch-only builds require an unsigned macOS baseline')
+    if platform not in ('arm64-macos', 'x86_64-macos', 'x86_64-win32') or options.codesign:
+        raise ValueError('Patch-only builds require an unsigned desktop baseline')
     sys.path.insert(0, os.path.abspath('../patch'))
     import package as patch_package
     from pathlib import Path
@@ -465,14 +465,16 @@ def create_patch(jdk, platform, options):
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='defold-patch-') as temporary:
         payload = Path(temporary)
-        resources = payload / 'Contents/Resources'
+        windows = platform == 'x86_64-win32'
+        resources = payload if windows else payload / 'Contents/Resources'
         packages = resources / 'packages'
-        executable = payload / 'Contents/MacOS/Defold'
+        executable = payload / ('Defold.exe' if windows else 'Contents/MacOS/Defold')
         packages.mkdir(parents=True)
-        executable.parent.mkdir(parents=True)
-        for name in ('Assets.car', 'document_legacy.icns', 'logo.icns'):
+        executable.parent.mkdir(parents=True, exist_ok=True)
+        for name in (('logo_blue.png',) if windows else ('Assets.car', 'document_legacy.icns', 'logo.icns')):
             shutil.copy(Path('bundle-resources') / name, resources / name)
-        shutil.copy('bundle-resources/Info.plist', payload / 'Contents/Info.plist')
+        if not windows:
+            shutil.copy('bundle-resources/Info.plist', payload / 'Contents/Info.plist')
         config = configparser.ConfigParser()
         config.read('bundle-resources/config')
         for key, value in {'editor_sha1': options.editor_sha1, 'engine_sha1': options.engine_sha1 or '',
@@ -491,6 +493,24 @@ def create_patch(jdk, platform, options):
         patch_name = 'Defold-%s-patch-%s-to-%s.zip' % (platform, base['metadata']['revision'], metadata['revision'])
         state = patch_package.create(base, payload, metadata, platform, java_version,
                                      Path('jlink-options').read_text(), output / patch_name)
+        if windows:
+            helper = Path(temporary) / 'patch-helper.jar'
+            with zipfile.ZipFile(helper, 'w', zipfile.ZIP_DEFLATED) as archive:
+                for source in Path('target/classes/com/defold/editor').glob('Patch*.class'):
+                    archive.write(source, 'com/defold/editor/' + source.name)
+            command = ('@echo off\r\nsetlocal\r\n'
+                       'set "DEFOLD_APP=%~1"\r\n'
+                       'if not defined DEFOLD_APP set /p "DEFOLD_APP=Defold installation directory: "\r\n'
+                       'if not exist "%DEFOLD_APP%\\Defold.exe" exit /b 1\r\n'
+                       'for /d %%J in ("%DEFOLD_APP%\\packages\\jdk-*") do set "PATCH_JAVA=%%~fJ\\bin\\java.exe"\r\n'
+                       'for %%J in ("%DEFOLD_APP%\\packages\\defold-*.jar") do set "PATCH_EDITOR=%%~fJ"\r\n'
+                       '"%PATCH_JAVA%" -cp "%~dp0patch-helper.jar;%PATCH_EDITOR%" com.defold.editor.PatchBootstrap '
+                       '"%~dp0' + patch_name + '" "%DEFOLD_APP%" ' + str(base['metadata']['revision']) + ' ' + str(metadata['revision']) + '\r\n'
+                       'if errorlevel 1 (pause & exit /b 1)\r\n')
+            with zipfile.ZipFile(output / patch_name, 'a', zipfile.ZIP_DEFLATED) as archive:
+                archive.write(helper, 'patch-helper.jar')
+                archive.writestr('apply-patch.cmd', command)
+                archive.writestr('README.txt', 'Save and close Defold. Extract this ZIP beside the ZIP file, then run apply-patch.cmd with the installation directory. The original ZIP must remain beside apply-patch.cmd. Future updates use Help > Check for Updates.\n')
         (output / ('Defold-%s-state.json' % platform)).write_text(json.dumps(state, indent=2) + '\n')
         log('Created patch only: %s' % (output / patch_name))
 

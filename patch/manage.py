@@ -12,7 +12,7 @@ import zipfile
 import package
 
 ROOT = Path(__file__).resolve().parents[1]
-PLATFORMS = ("arm64-macos", "x86_64-macos")
+PLATFORMS = ("arm64-macos", "x86_64-macos", "x86_64-win32")
 
 
 def channel():
@@ -72,15 +72,21 @@ def publish(directory, commit):
                        key=lambda r: int(r["tag_name"].rsplit("-", 1)[1]), default=None)
         if not previous:
             raise ValueError("Patch-only publication requires an existing installation baseline")
-        base_revision = int(previous["tag_name"].rsplit("-", 1)[1])
+        previous_revision = int(previous["tag_name"].rsplit("-", 1)[1])
         base_url = f"https://github.com/{repo}/releases/download/{tag}"
         result = {**data, "installers": {}, "assets": {}, "states": {},
                   "previous": f"https://github.com/{repo}/releases/download/{previous['tag_name']}/manifest.json"}
         assets = []
         for platform in PLATFORMS:
-            name = f"Defold-{platform}-patch-{base_revision}-to-{data['revision']}.zip"
             state_name = f"Defold-{platform}-state.json"
             state = json.loads((directory / state_name).read_text())
+            base_revision = state.get('base_metadata', {}).get('revision', previous_revision)
+            if base_revision != previous_revision:
+                initial = json.loads((ROOT / 'patch/baselines' / f'{platform}.json').read_text())
+                if (platform != 'x86_64-win32' or previous_revision >= initial['metadata']['revision']
+                        or state.get('base_metadata') != initial['metadata']):
+                    raise ValueError('Unexpected platform baseline')
+            name = f"Defold-{platform}-patch-{base_revision}-to-{data['revision']}.zip"
             if (state['platform'] != platform or any(state['metadata'].get(key) != data[key]
                     for key in ('revision', 'version', 'channel', 'repository', 'commit'))):
                 raise ValueError('Patch state metadata does not match this release')
@@ -131,6 +137,14 @@ def prepare_base(directory, platform):
         raise ValueError('Increment patch/channel.json before building a new patch')
     state_path = directory / f'Defold-{platform}-state.json'
     info = released.get('states', {}).get(platform)
+    if platform == 'x86_64-win32' and not info:
+        state = json.loads((ROOT / 'patch/baselines/x86_64-win32.json').read_text())
+        if (state['metadata']['repository'] != repo or state['metadata']['channel'] != data['channel']
+                or not released['revision'] < state['metadata']['revision'] < data['revision']):
+            raise ValueError('Initial Windows baseline does not match this channel')
+        write_json(state_path, state)
+        print(state_path)
+        return
     if info:
         gh('release', 'download', tag, '--repo', repo, '--pattern', state_path.name, '--dir', str(directory), '--clobber')
         if (state_path.stat().st_size != info['size']

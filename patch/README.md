@@ -12,11 +12,11 @@ bash scripts/macos/build-patch.sh
 ```
 
 `channel.json` 是版本来源。提交并推送到 `codex/editor-docking-patch4` 后，
-**macOS Patch** 工作流构建 Apple Silicon 和 Intel，运行更新器与布局测试，
+**Desktop Patch** 工作流构建 Apple Silicon、Intel macOS 和 Windows x64，运行更新器与布局测试，
 发布 `patch-dev-<revision>`，最后更新 `patch-dev/manifest.json`。
 其他分支及 PR 仅生成构建产物，不更新正式源。
 
-发布内容只有两个架构的增量 ZIP、基线文件清单 JSON 和更新清单。
+发布内容只有三个平台的增量 ZIP、基线文件清单 JSON 和更新清单。
 `Defold-<platform>-state.json` 保存文件哈希、权限、JDK 信息和版本信息，
 下次构建直接使用该清单，无需再打包或下载整个应用。
 首次从 patch.4 迁移时会读取其已有的完整 ZIP 以生成清单，随后删除临时下载。
@@ -31,7 +31,7 @@ bash scripts/macos/build-patch.sh
 一次性更新源的设置方式见下文 `JDK_JAVA_OPTIONS`，本地 `build.json` 只需包含该 `feed` URL。
 
 发布版本不可覆盖。已有 revision 对应不同 commit 时必须先递增版本。
-两个架构均成功后才更新正式清单；失败和中断不会把客户端指向未完成的包。
+三个平台均成功后才更新正式清单；失败和中断不会把客户端指向未完成的包。
 JDK 版本或必需模块变化时构建会失败，需要单独规划运行时迁移，不会自动生成完整应用。
 
 ## 本地更新演练
@@ -69,3 +69,20 @@ LEIN_HOME="$PWD/build/lein" bash scripts/lein test editor.patch-test editor.dock
 
 测试覆盖只包含变化文件、JDK 不变、版本与平台校验、纯补丁发布、历史补丁链、
 下载校验、应用副本组装和独立重启助手。`patch/local/` 仅供本地验证，不提交。
+
+## Windows 首次接入
+
+Windows 初始基线为现有 `1.14.1-patch.8-local` 安装，对应编辑器提交
+`320d7e3499807ea5b8e7a95081ed0f4a250e94a2`。`patch/baselines/x86_64-win32.json`
+记录该安装的精确文件哈希；不包含可变的 `unpack/` 缓存，也不发布完整应用。
+macOS 与 Windows 可以使用不同的初始基线，发布清单会分别记录。
+
+旧 Windows 更新器尚不支持安装，所以首次升级需保存并完全退出 Defold，
+将 Windows 增量 ZIP 解压到同名 ZIP 所在目录，运行 `apply-patch.cmd`，
+输入安装目录。也可运行 `apply-patch.cmd "X:\Programs\Defold"`。
+原始 ZIP 必须与脚本保持在同一目录。该入口拒绝仍在运行的安装，并校验全部基线文件。
+此后使用 **帮助 → 检查更新**。
+
+Windows 重启助手使用安装目录之外的临时 Java 运行时，避免自身占用待替换文件。
+替换保留原安装备份，失败会恢复原目录。运行时版本和文件保持不变。
+构建命令为 `python -X utf8 scripts/windows/build-patch.py`，只生成增量包。

@@ -29,7 +29,9 @@ import java.util.zip.*;
 public final class PatchInstaller {
     private static Path safePath(Path root, String name) throws IOException {
         Path relative = Path.of(name);
-        if (!name.startsWith("Contents/") || name.contains("\\") || relative.isAbsolute()
+        boolean allowed = name.startsWith("Contents/") || name.startsWith("packages/")
+                || Set.of("config", "Defold.exe", "logo_blue.png").contains(name);
+        if (!allowed || name.contains("\\") || name.contains(":") || relative.isAbsolute()
                 || !relative.normalize().equals(relative)) {
             throw new IOException("Unsafe patch path: " + name);
         }
@@ -65,7 +67,9 @@ public final class PatchInstaller {
                     || !entry.path("mode").isInt() || entry.path("mode").asInt() < 0
                     || entry.path("mode").asInt() > 0777) throw new IOException("Invalid inventory entry");
         }
-        if (!result.containsKey("Contents/Resources/config") || !result.containsKey("Contents/MacOS/Defold")) {
+        boolean mac = result.containsKey("Contents/Resources/config") && result.containsKey("Contents/MacOS/Defold");
+        boolean windows = result.containsKey("config") && result.containsKey("Defold.exe");
+        if (mac == windows || result.keySet().stream().anyMatch(path -> mac != path.startsWith("Contents/"))) {
             throw new IOException("Incomplete app inventory");
         }
         return result;
@@ -88,9 +92,12 @@ public final class PatchInstaller {
         }
     }
 
-    private static void copyApp(Path source, Path target) throws IOException {
+    public static void copyApp(Path source, Path target) throws IOException {
         Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
             @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (dir.equals(source.resolve("unpack")) && Files.exists(source.resolve("Defold.exe"))) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
                 Path to = target.resolve(source.relativize(dir));
                 if (!dir.equals(source)) Files.copy(dir, to, StandardCopyOption.COPY_ATTRIBUTES);
                 return FileVisitResult.CONTINUE;
@@ -136,6 +143,19 @@ public final class PatchInstaller {
             }
             Map<String, JsonNode> before = inventory(plan.get("base"));
             Map<String, JsonNode> after = inventory(plan.get("target"));
+            if (before.containsKey("Defold.exe") != after.containsKey("Defold.exe")) {
+                throw new IOException("Patch platform mismatch");
+            }
+            for (Map.Entry<String, JsonNode> entry : before.entrySet()) {
+                if (entry.getKey().contains("/jdk-") && !entry.getValue().equals(after.get(entry.getKey()))) {
+                    throw new IOException("Patches cannot replace the runtime");
+                }
+            }
+            for (String path : after.keySet()) {
+                if (path.contains("/jdk-") && (!before.containsKey(path) || zip.getEntry("files/" + path) != null)) {
+                    throw new IOException("Patches cannot contain runtime files");
+                }
+            }
             verify(root, before);
             staged = Files.createTempDirectory(root.getParent(), ".defold-patch-");
             copyApp(root, staged);
@@ -171,12 +191,16 @@ public final class PatchInstaller {
                         Set<PosixFilePermission> permissions = EnumSet.noneOf(PosixFilePermission.class);
                         PosixFilePermission[] values = PosixFilePermission.values();
                         for (int i = 0; i < 9; ++i) if ((mode & (1 << (8 - i))) != 0) permissions.add(values[i]);
-                        Files.setPosixFilePermissions(target, permissions);
+                        if (Files.getFileStore(target).supportsFileAttributeView("posix")) {
+                            Files.setPosixFilePermissions(target, permissions);
+                        }
                     }
                 }
             }
             verify(staged, after);
-            Files.setPosixFilePermissions(staged, Files.getPosixFilePermissions(root));
+            if (Files.getFileStore(root).supportsFileAttributeView("posix")) {
+                Files.setPosixFilePermissions(staged, Files.getPosixFilePermissions(root));
+            }
             return staged.toFile();
         } catch (Exception error) {
             if (staged != null) {

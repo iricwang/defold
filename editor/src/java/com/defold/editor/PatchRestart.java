@@ -22,12 +22,25 @@ import java.util.concurrent.TimeUnit;
 
 /** Standalone helper; only JDK classes are needed after the editor exits. */
 public final class PatchRestart {
+    private static void move(Path source, Path target) throws Exception {
+        for (int attempt = 0;; ++attempt) {
+            try {
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+                return;
+            } catch (AccessDeniedException error) {
+                if (attempt >= 49) throw error;
+                // Windows native launcher and virus scanners can release handles after the JVM exits.
+                Thread.sleep(100);
+            }
+        }
+    }
+
     public static void swap(Path app, Path staged, Path backup) throws Exception {
-        Files.move(app, backup, StandardCopyOption.ATOMIC_MOVE);
+        move(app, backup);
         try {
-            Files.move(staged, app, StandardCopyOption.ATOMIC_MOVE);
+            move(staged, app);
         } catch (Exception error) {
-            Files.move(backup, app, StandardCopyOption.ATOMIC_MOVE);
+            move(backup, app);
             throw error;
         }
     }
@@ -55,7 +68,8 @@ public final class PatchRestart {
                 error.printStackTrace();
                 if (!Files.isDirectory(app)) throw error;
             }
-            List<String> command = new ArrayList<>(List.of(app.resolve("Contents/MacOS/Defold").toString()));
+            String executable = Files.exists(app.resolve("Defold.exe")) ? "Defold.exe" : "Contents/MacOS/Defold";
+            List<String> command = new ArrayList<>(List.of(app.resolve(executable).toString()));
             command.addAll(Arrays.asList(args).subList(4, args.length));
             // The old editor owns the readiness pipe and will close it on exit.
             // The new app must have independent stdout/stderr, or a write could fail.

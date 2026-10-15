@@ -1,4 +1,4 @@
-name: macOS Patch
+name: Desktop Patch
 
 on:
   push:
@@ -86,9 +86,54 @@ jobs:
           path: tmp/macos-patch.log
           retention-days: 7
 
+  build-windows:
+    name: Patch (x86_64-win32)
+    runs-on: windows-2025
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25.0.4+101.0.LTS'
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.dcache
+            editor/.m2/repository
+            editor/build/lein
+          key: windows-patch-${{ hashFiles('editor/project.clj', 'editor/scripts/lein') }}
+      - name: Test patch packaging
+        run: python -X utf8 -m unittest discover -s patch -p 'test_*.py'
+      - name: Build incremental Windows patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -X utf8 scripts/windows/build-patch.py
+      - name: Test Windows installation and restart
+        shell: pwsh
+        run: |
+          python -X utf8 -c "import pathlib,zipfile; p=next(pathlib.Path('editor/target/editor').glob('Defold-x86_64-win32-patch-*.zip')); z=zipfile.ZipFile(p); n=next(n for n in z.namelist() if n.startswith('files/packages/defold-') and n.endswith('.jar')); pathlib.Path('tmp/windows-test-editor.jar').write_bytes(z.read(n))"
+          $env:DEFOLD_PATCH_TEST_JAR = "$PWD/tmp/windows-test-editor.jar"
+          python -X utf8 -m unittest discover -s patch -p 'test_windows.py'
+      - name: Upload patch and baseline inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Defold-x86_64-win32-${{ github.sha }}
+          path: |
+            editor/target/editor/Defold-x86_64-win32-patch-*-to-*.zip
+            editor/target/editor/Defold-x86_64-win32-state.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
   publish-patch:
     name: Publish branch patch
-    needs: build
+    needs: [build, build-windows]
     if: github.event_name == 'push' && github.ref == 'refs/heads/codex/editor-docking-patch4' && github.repository == 'iricwang/defold'
     runs-on: ubuntu-latest
     permissions:
@@ -102,7 +147,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: Defold-*-macos-${{ github.sha }}
+          pattern: Defold-*-${{ github.sha }}
           path: tmp/patch-release
           merge-multiple: true
       - name: Publish packages and update manifest

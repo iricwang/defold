@@ -10,6 +10,33 @@ import package
 
 
 class PackageTest(unittest.TestCase):
+    # Windows uses root config/executable paths and a different initial revision, while preserving the JDK byte-for-byte.
+    def test_windows_inventory_patch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            app = root / 'installed'
+            (app / 'packages/jdk-25').mkdir(parents=True)
+            (app / 'config').write_text('editor_sha1 = abc\n')
+            (app / 'Defold.exe').write_bytes(b'launcher')
+            (app / 'packages/jdk-25/release').write_text('MODULES="java.base"')
+            old = {'schema': 1, 'revision': 8, 'version': 'patch.8', 'channel': 'dev', 'repository': 'owner/repo'}
+            with zipfile.ZipFile(app / 'packages/defold-abc.jar', 'w') as jar:
+                jar.writestr('patch/build.json', json.dumps(old))
+            base = package.windows_baseline(app)
+            payload = root / 'payload'
+            (payload / 'packages').mkdir(parents=True)
+            (payload / 'config').write_text('new')
+            (payload / 'Defold.exe').write_bytes(b'launcher')
+            new = {**old, 'revision': 10, 'version': 'patch.10'}
+            with zipfile.ZipFile(payload / 'packages/defold-new.jar', 'w') as jar:
+                jar.writestr('patch/build.json', json.dumps(new))
+            state = package.create(base, payload, new, 'x86_64-win32', '25', '--add-modules=java.base', root / 'patch.zip')
+            with zipfile.ZipFile(root / 'patch.zip') as archive:
+                self.assertEqual(8, json.loads(archive.read('patch.json'))['base_revision'])
+                self.assertNotIn('files/Defold.exe', archive.namelist())
+                self.assertFalse(any('/jdk-' in name for name in archive.namelist()))
+            self.assertNotIn('packages/defold-abc.jar', {entry['path'] for entry in state['files']})
+
     # A patch is built from inventory plus changed files, without reading/copying the runtime or creating an app.
     def test_inventory_patch_roundtrip(self):
         with tempfile.TemporaryDirectory() as directory:

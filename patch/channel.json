@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 9,
-  "version": "1.14.1-patch.9",
+  "revision": 10,
+  "version": "1.14.1-patch.10",
   "repository": "iricwang/defold",
-  "notes": "新增 GUI 标签右键菜单“在 PhotoCraft 中打开”：检测到本机在线 PhotoCraft 时启用，否则置灰；保留绑定切换确认、保存关闭保护和 GUI 双端打开，同时发布双向 IP 绑定与工程资源传输功能。"
+  "notes": "GUI 标签右键新增“在 PhotoCraft 中打开”，本机在线时启用；新增 Windows 增量补丁安装与重启、校验和回滚支持，与 Apple Silicon、Intel macOS 一起发布。保留双向 IP 绑定、切换保存保护和远端工程资源传输。"
 }

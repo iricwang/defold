@@ -155,9 +155,10 @@
         (Files/deleteIfExists (.toPath temporary))))))
 
 (defn prepare! [archive config manifest]
-  (when-not (and (system/defold-resourcespath) (system/defold-version) system/mac?)
-    (throw (ex-info "Install the macOS app bundle before applying patches. Development REPLs can only preview updates." {})))
-  (let [app (.getCanonicalFile (io/file (system/defold-resourcespath) "../.."))]
+  (when-not (and (system/defold-resourcespath) (system/defold-version)
+                (or system/mac? (string/starts-with? (system/os-name) "Windows")))
+    (throw (ex-info "Install the desktop application before applying patches. Development REPLs can only preview updates." {})))
+  (let [app (.getCanonicalFile (io/file (system/defold-resourcespath) (if system/mac? "../.." ".")))]
     {:app app
      :staged (PatchInstaller/prepare archive app (:revision config) (:revision manifest))}))
 
@@ -171,7 +172,13 @@
         _ (io/make-parents helper)
         _ (with-open [input (io/input-stream (io/resource "com/defold/editor/PatchRestart.class"))]
             (io/copy input helper))
-        command (into [(str (io/file (system/java-home) "bin/java"))
+        runtime (if system/mac?
+                  (io/file (system/java-home))
+                  (let [runtime (io/file directory "runtime")]
+                    (.mkdirs runtime)
+                    (PatchInstaller/copyApp (.toPath (io/file (system/java-home))) (.toPath runtime))
+                    runtime))
+        command (into [(str (io/file runtime (if system/mac? "bin/java" "bin/java.exe")))
                        "-cp" (str directory) "com.defold.editor.PatchRestart"
                        (str (.pid (ProcessHandle/current))) (str app) (str staged)
                        (str (io/file directory "editor.log"))]

@@ -7,6 +7,33 @@ import zipfile
 import delta
 
 
+def windows_baseline(root):
+    """Capture an existing installation, excluding its mutable extraction cache."""
+    jars = list((root / 'packages').glob('defold-*.jar'))
+    runtimes = list((root / 'packages').glob('jdk-*'))
+    if len(jars) != 1 or len(runtimes) != 1:
+        raise ValueError('Expected one editor and runtime')
+    with zipfile.ZipFile(jars[0]) as jar:
+        metadata = json.loads(jar.read('patch/build.json'))
+    config = (root / 'config').read_text()
+    metadata['commit'] = re.search(r'^editor_sha1\s*=\s*(\w+)', config, re.MULTILINE).group(1)
+    release = (runtimes[0] / 'release').read_text()
+    modules = re.search(r'^MODULES="([^"]+)"', release, re.MULTILINE).group(1).split()
+    files = []
+    for source in sorted(root.rglob('*')):
+        name = source.relative_to(root).as_posix()
+        if not (name in ('config', 'Defold.exe', 'logo_blue.png') or name.startswith('packages/')):
+            continue
+        if source.is_symlink():
+            raise ValueError('Windows baseline must not contain symlinks')
+        if source.is_file():
+            with source.open('rb') as stream:
+                digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+            files.append({'path': name, 'sha256': digest, 'mode': 420, 'kind': 'file'})
+    return {'schema': 1, 'platform': 'x86_64-win32', 'metadata': metadata,
+            'runtime': {'version': runtimes[0].name[4:], 'modules': modules}, 'files': files}
+
+
 def bootstrap(bundle, platform):
     metadata = delta.metadata(bundle)
     with zipfile.ZipFile(bundle) as archive:
@@ -35,23 +62,28 @@ def create(base, payload, metadata, platform, java_version, jlink_options, outpu
     if java_version != base['runtime']['version'] or not modules.issubset(base['runtime']['modules']):
         raise ValueError('JDK changed; patch-only builds cannot replace the runtime')
     before = {item['path']: item for item in base['files']}
+    windows = platform == 'x86_64-win32'
+    jar_prefix = 'packages/defold-' if windows else 'Contents/Resources/packages/defold-'
+    config_path = 'config' if windows else 'Contents/Resources/config'
+    launcher_path = 'Defold.exe' if windows else 'Contents/MacOS/Defold'
     if any('_CodeSignature' in path for path in before):
         raise ValueError('Signed application baselines require a signed full installation')
     after = {path: item for path, item in before.items()
-             if not (path.startswith('Contents/Resources/packages/defold-') and path.endswith('.jar'))}
+             if not (path.startswith(jar_prefix) and path.endswith('.jar'))}
     replacements = {}
     for source in sorted(payload.rglob('*')):
         if source.is_file():
             name = source.relative_to(payload).as_posix()
-            if not name.startswith('Contents/') or '/jdk-' in name or source.is_symlink():
+            allowed = (name in ('config', 'Defold.exe', 'logo_blue.png') or name.startswith('packages/')) if windows else name.startswith('Contents/')
+            if not allowed or '/jdk-' in name or source.is_symlink():
                 raise ValueError(f'Unsafe patch payload: {name}')
             with source.open('rb') as stream:
                 digest = hashlib.file_digest(stream, 'sha256').hexdigest()
             mode = 0o755 if name == 'Contents/MacOS/Defold' else 0o644
             after[name] = {'path': name, 'sha256': digest, 'mode': mode, 'kind': 'file'}
             replacements[name] = source
-    jars = [name for name in replacements if name.startswith('Contents/Resources/packages/defold-') and name.endswith('.jar')]
-    if len(jars) != 1 or 'Contents/Resources/config' not in replacements or 'Contents/MacOS/Defold' not in replacements:
+    jars = [name for name in replacements if name.startswith(jar_prefix) and name.endswith('.jar')]
+    if len(jars) != 1 or config_path not in replacements or launcher_path not in replacements:
         raise ValueError('Incomplete editor patch payload')
     with zipfile.ZipFile(replacements[jars[0]]) as jar:
         embedded = json.loads(jar.read('patch/build.json'))
