@@ -24,6 +24,7 @@
             [editor.code.view :as code-view]
             [editor.command-requests :as command-requests]
             [editor.console :as console]
+            [editor.craft-binding :as craft-binding]
             [editor.curve-view :as curve-view]
             [editor.debug-view :as debug-view]
             [editor.defold-project :as project]
@@ -283,7 +284,15 @@
                       (spit port-file-content))
           token-file (doto (io/file project-path ".internal" "editor.token")
                        (io/make-parents)
-                       (spit token))]
+                       (spit token))
+          craft-service (try
+                          (craft-binding/start! project app-view localization project-path token
+                                                #(app-view/prepare-peer-switch! app-view changes-view project prefs localization %1 %2)
+                                                #(app-view/peer-workspace-idle? app-view project)
+                                                #(some-> (g/node-value app-view :active-resource) resource/proj-path))
+                          (catch Exception e
+                            (log/warn :message "PhotoCraft binding service could not start" :exception e)
+                            nil))]
       (localization/localize! (.lookup root "#assets-pane") localization (localization/message "pane.assets"))
       (localization/localize! (.lookup root "#changed-files-titled-pane") localization (localization/message "pane.changed-files"))
       (localization/localize! (.lookup root "#status-label") localization (localization/message "progress.ready"))
@@ -384,6 +393,7 @@
                              ((:dispose! preview-pane))
                              (.close game-pane)
                              (http-server/stop! web-server)
+                             (craft-binding/stop! craft-service)
                              (ui/remove-application-focused-callback! :main-stage)
                              (ui/remove-application-unfocused-callback! :main-stage-unfocused)
 

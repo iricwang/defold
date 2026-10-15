@@ -1,0 +1,11 @@
+# PhotoCraft IP binding
+
+Use File → Bind PhotoCraft by IP to connect to a PhotoCraft instance (default 17655). PhotoCraft connects to the editor on 17654 through its Defold Sync panel. Both sides periodically try loopback when unbound. `-Ddefold.craft.port=<port>` changes this editor listener. The binding channel uses HTTP on a trusted local network and does not expose `.internal/editor.token`.
+
+A different peer triggers confirmation. Save All and Close saves dirty project resources and closes every editor tab pane after asynchronous saves have actually finished. Close Saved Files refuses dirty resources. Open views, pending file operations or a build stop the final switch. The ticket is rechecked on the UI thread so cancellation while a commit is queued wins. Successful changes revoke the previous session. File → PhotoCraft Binding Status shows the current address or the last error.
+
+Defold transfers ordinary project resources to PhotoCraft with bounded traversal and SHA-256 digests. Hidden directories, build/target output, symbolic links and editable `.pcraft` sources are excluded. Limits: 20,000 files, 64 MiB per file, 1 GiB per project, 128 levels. PhotoCraft caches native editable sources separately and refreshes project resources explicitly. Generated uploads can create only immutable files below `photocraft_generated/`; authored resources are never overwritten by this endpoint. The bound eval route uses the existing editor-extension runtime, and PhotoCraft opens its linked GUI in the Defold workspace before accessing it. Saving that GUI after synchronization remains explicit.
+
+File → Open GUI in PhotoCraft sends the active GUI to the bound application. If the resource was created after initial binding, refresh the project resources in PhotoCraft first.
+
+Regression coverage lives in `test/editor/craft_binding_test.clj`: consent/idle barriers, cancellation races, session authorization, path validation, immutable uploads and manifest exclusions/content digests. A standalone local HTTP harness also exercises the actual Clojure routes against the production Rust transport in both directions. The headless adapter does not validate JavaFX dialogs or the complete editor runtime. Patch packaging and install/restart verification must be performed with the exact installed baseline using `patch/README.md` before publication.

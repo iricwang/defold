@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 7,
-  "version": "1.14.1-patch.7",
+  "revision": 8,
+  "version": "1.14.1-patch.8",
   "repository": "iricwang/defold",
-  "notes": "隐藏内嵌 Game 的 macOS Dock 与窗口入口；移除 30 FPS 限制，支持 60/120/144 FPS 并优化帧传输。"
+  "notes": "PhotoCraft 与 Defold 支持双向 IP 绑定、切换确认和保存关闭保护；新增远端工程资源传输、生成资源回传及 GUI 双端打开。"
 }

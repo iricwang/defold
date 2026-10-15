@@ -228,6 +228,7 @@
                 query (.getQuery uri)
                 request-method (.getRequestMethod exchange)
                 request (cond-> {:method request-method
+                                 :remote-address (.getHostAddress (.getAddress (.getRemoteAddress exchange)))
                                  :path (.getPath uri)
                                  :headers (persistent!
                                             (reduce

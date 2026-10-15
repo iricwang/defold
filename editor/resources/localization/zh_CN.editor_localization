@@ -2046,3 +2046,20 @@ game-preview.resolution-limit = Game 预览支持最高 2048 × 2048，请降低
 game-preview.connection-closed = Game 连接已关闭，请停止后重新运行。
 
 game-preview.frame-rate = 预览帧率（下次运行生效）
+
+# PhotoCraft IP binding
+command.photocraft.bind = 通过 IP 绑定 PhotoCraft…
+command.photocraft.open = 在 PhotoCraft 中打开 GUI
+command.photocraft.status = PhotoCraft 绑定状态
+dialog.craft-binding.title = PhotoCraft 绑定
+dialog.craft-binding.header = 绑定到 {address}？
+dialog.craft-binding.content = 当前绑定：{address}\n切换前请保存或关闭工作区中的全部文件，并等待文件操作结束。
+dialog.craft-binding.button.close = 关闭已保存文件
+dialog.craft-binding.button.save = 全部保存并关闭
+dialog.craft-binding.unsaved = 工作区中有未保存文件
+dialog.craft-binding.save-first = 请先保存编辑中的文件，再切换绑定。
+dialog.craft-binding.save-detail = 当前绑定未改变。请选择“全部保存并关闭”，或先完成编辑并关闭文件。
+dialog.craft-binding.failed = 绑定失败
+dialog.craft-binding.ip = PhotoCraft IP 地址（可附加 :端口）
+dialog.craft-binding.disconnected = 尚未绑定
+dialog.craft-binding.ready = 未绑定时会自动尝试连接本机的另一款应用。

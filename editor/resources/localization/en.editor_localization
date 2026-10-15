@@ -2868,3 +2868,20 @@ game-preview.resolution-limit = Game preview supports up to 2048 × 2048. Reduce
 game-preview.connection-closed = Game connection closed. Stop and run again.
 
 game-preview.frame-rate = Preview frame rate (takes effect on the next run)
+
+# PhotoCraft IP binding
+command.photocraft.bind = Bind PhotoCraft by IP…
+command.photocraft.open = Open GUI in PhotoCraft
+command.photocraft.status = PhotoCraft Binding Status
+dialog.craft-binding.title = PhotoCraft Binding
+dialog.craft-binding.header = Bind to {address}?
+dialog.craft-binding.content = Current peer: {address}\nSave or close all workspace files before switching. Wait for file operations to finish.
+dialog.craft-binding.button.close = Close Saved Files
+dialog.craft-binding.button.save = Save All and Close
+dialog.craft-binding.unsaved = Unsaved Workspace Files
+dialog.craft-binding.save-first = Save edited files before switching binding.
+dialog.craft-binding.save-detail = The current binding is unchanged. Choose Save All and Close, or finish editing and close the files first.
+dialog.craft-binding.failed = Binding Failed
+dialog.craft-binding.ip = PhotoCraft IP address (optional :port)
+dialog.craft-binding.disconnected = Not Bound
+dialog.craft-binding.ready = Unbound editors try the local application automatically.
