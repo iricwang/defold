@@ -60,6 +60,24 @@
         duration (double (animation/animation-duration document animation-id))]
     (max 0.0 (min duration (/ (double (Math/round (* (double time) fps))) fps)))))
 
+(defn visible-span
+  "100% zoom shows one second. Clip duration extends the scroll range, not the scale."
+  ^double [zoom]
+  (/ 1.0 (double zoom)))
+
+(defn time->x
+  ^double [time offset zoom width]
+  (+ 16.0 (* (- (double time) (double offset)) (double zoom) (max 1.0 (- (double width) 32.0)))))
+
+(defn x->time
+  ^double [x offset zoom width]
+  (+ (double offset) (* (visible-span zoom) (/ (- (double x) 16.0) (max 1.0 (- (double width) 32.0))))))
+
+(defn pan-offset
+  [duration zoom width offset delta-x]
+  (max 0.0 (min (max 0.0 (- (double duration) (visible-span zoom)))
+                (- (double offset) (* (double delta-x) (/ (visible-span zoom) (max 1.0 (- (double width) 32.0))))))))
+
 (defn navigate [document animation-id time direction]
   (let [time (double time)
         duration (double (animation/animation-duration document animation-id))

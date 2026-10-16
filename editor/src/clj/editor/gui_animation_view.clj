@@ -31,10 +31,10 @@
             [util.coll :as coll])
   (:import [java.nio.file Files OpenOption StandardOpenOption]
            [javafx.geometry Insets Pos Side]
-           [javafx.scene Node Parent]
+           [javafx.scene Cursor Node Parent]
            [javafx.scene.canvas Canvas]
            [javafx.scene.control Button CheckBox ComboBox Label MenuButton MenuItem ScrollBar ScrollPane Separator Slider Tab TabPane TabPane$TabClosingPolicy TextField TitledPane ToggleButton Tooltip]
-           [javafx.scene.input KeyCode KeyEvent MouseEvent]
+           [javafx.scene.input KeyCode KeyEvent MouseButton MouseEvent]
            [javafx.scene.layout BorderPane ColumnConstraints FlowPane GridPane HBox Pane Priority Region VBox]
            [javafx.scene.paint Color]
            [javafx.scene.shape SVGPath]
@@ -92,19 +92,12 @@
 
 (defn- time-x
   ^double [^Canvas canvas state time]
-  (let [{:keys [document animation-id zoom offset]} state
-        duration (animation/animation-duration document animation-id)]
-    (+ 16.0 (* (/ (- (double time) (double offset)) (max 0.001 (double duration)))
-               (double zoom) (max 1.0 (- (.getWidth canvas) 32.0))))))
+  (timeline/time->x time (:offset state) (:zoom state) (.getWidth canvas)))
 
 (defn- x-time
   ^double [^Canvas canvas state x]
-  (let [{:keys [document animation-id zoom offset]} state
-        duration (animation/animation-duration document animation-id)
-        time (+ (double offset)
-                (* (/ (double duration) (double zoom))
-                   (/ (- (double x) 16.0) (max 1.0 (- (.getWidth canvas) 32.0)))))]
-    (double (timeline/snap-time document animation-id time))))
+  (double (timeline/snap-time (:document state) (:animation-id state)
+                              (timeline/x->time x (:offset state) (:zoom state) (.getWidth canvas)))))
 
 (defn- replace-items! [^java.util.List items values]
   (.clear items)
@@ -114,25 +107,25 @@
   (doto (SVGPath.) (.setContent path) (ui/add-style! "animation-glyph")))
 
 (defn- draw-timeline! [^Canvas canvas state]
-  (let [{:keys [document animation-id time selected active-track zoom offset dragging-key frame-display rows]} state
-        duration (double (animation/animation-duration document animation-id))
+  (let [{:keys [document animation-id time selected active-track zoom offset dragging-key frame-display rows ruler-y]} state
         fps (double (timeline/frames-per-second document))
         gc (.getGraphicsContext2D canvas)
         width (.getWidth canvas)
-        height (max (double (get state :viewport-height 264.0)) (+ 44.0 (* 36.0 (count rows))))]
+        height (max (double (get state :viewport-height 264.0)) (+ 32.0 (* 28.0 (count rows))))
+        ruler-y (double (or ruler-y 0.0))]
     (.setHeight canvas height)
-    (.setFill gc (Color/web "#22272d"))
+    (.setFill gc (Color/web "#181818"))
     (.fillRect gc 0.0 0.0 width height)
-    (.setFont gc (Font/font 14.0))
+    (.setFont gc (Font/font 13.0))
     (doseq [[index {:keys [node-name property-id kind]}] (eduction (map-indexed vector) rows)]
-      (let [top (+ 44.0 (* 36.0 (double index)))
-            y (+ top 18.0)]
+      (let [top (+ 32.0 (* 28.0 (double index)))
+            y (+ top 14.0)]
         (.setFill gc (Color/web (cond
-                                  (= active-track [node-name property-id]) "#234068"
-                                  (= kind :node) "#24292f"
-                                  (odd? (long index)) "#262a30"
-                                  :else "#22272d")))
-        (.fillRect gc 0.0 top width 36.0)
+                                  (= active-track [node-name property-id]) "#214d7d"
+                                  (= kind :node) "#2b2b2b"
+                                  (odd? (long index)) "#181818"
+                                  :else "#181818")))
+        (.fillRect gc 0.0 top width 28.0)
         (when property-id
           (doseq [keyframe (timeline/display-keyframes document animation-id node-name property-id)]
             (let [key-id [node-name property-id (:time keyframe)]
@@ -142,30 +135,30 @@
               (.setFill gc (Color/web (if active "#d4e8ff" "#83b7fb")))
               (.fillPolygon gc (double-array [x (+ x 5.0) x (- x 5.0)])
                             (double-array [(- y 5.0) y (+ y 5.0) y]) 4))))))
-    (.setFill gc (Color/web "#20252a"))
-    (.fillRect gc 0.0 0.0 width 44.0)
-    (let [visible-frames (* (/ duration (double zoom)) fps)
+    (.setFill gc (Color/web "#181818"))
+    (.fillRect gc 0.0 ruler-y width 32.0)
+    (let [visible-frames (* (timeline/visible-span zoom) fps)
           tick-step (double (timeline/ruler-step visible-frames width))
           start-frame (* tick-step (Math/ceil (/ (* (double offset) fps) tick-step)))]
       (doseq [tick (range (inc (long (Math/ceil (/ visible-frames tick-step)))))]
         (let [frame (+ start-frame (* (double tick) tick-step))
               t (/ frame fps)
               x (time-x canvas state t)]
-          (.setStroke gc (Color/web "#3a424a" 0.55))
+          (.setStroke gc (Color/web "#343434" 0.55))
           (.setLineWidth gc 1.0)
-          (.strokeLine gc x 29.0 x height)
-          (.setFill gc (Color/web "#b9c1cb"))
-          (.fillText gc (if frame-display (format "%.0f" frame) (format "%.2f" t)) (- x 5.0) 19.0))))
+          (.strokeLine gc x (+ ruler-y 22.0) x height)
+          (.setFill gc (Color/web "#c8c8c8"))
+          (.fillText gc (if frame-display (format "%.0f" frame) (format "%.2f" t)) (- x 5.0) (+ ruler-y 15.0)))))
     (let [x (time-x canvas state time)
           label (if frame-display (str (Math/round (* (double time) fps))) (format "%.2f" (double time)))
           badge-width (max 26.0 (+ 12.0 (* 7.0 (count label))))]
-      (.setStroke gc (Color/web "#d97842"))
+      (.setStroke gc (Color/web "#579b8b"))
       (.setLineWidth gc 1.0)
-      (.strokeLine gc x 37.0 x height)
-      (.setFill gc (Color/web "#bf6034"))
-      (.fillRoundRect gc (- x (/ badge-width 2.0)) 27.0 badge-width 21.0 4.0 4.0)
+      (.strokeLine gc x (+ ruler-y 28.0) x height)
+      (.setFill gc (Color/web "#356a61"))
+      (.fillRoundRect gc (- x (/ badge-width 2.0)) (+ ruler-y 20.0) badge-width 18.0 4.0 4.0)
       (.setFill gc (Color/web "#fff0de"))
-      (.fillText gc label (- x (* 3.5 (count label))) 42.0))))
+      (.fillText gc label (- x (* 3.5 (count label))) (+ ruler-y 33.0)))))
 
 (defn- draw-curve! [^Canvas canvas state easing detail]
   (let [gc (.getGraphicsContext2D canvas)
@@ -185,15 +178,15 @@
         low (if detail (reduce min samples) 0.0)
         high (if detail (reduce max samples) 1.0)
         span (max 0.001 (- (double high) (double low)))]
-    (.setFill gc (Color/web "#1b2025"))
+    (.setFill gc (Color/web "#181818"))
     (.fillRoundRect gc 0.0 0.0 width height 4.0 4.0)
     (.setLineWidth gc 1.0)
-    (.setStroke gc (Color/web "#343d46"))
+    (.setStroke gc (Color/web "#303030"))
     (doseq [index (range 6)]
       (let [fraction (/ (double index) 5.0)]
         (.strokeLine gc (+ x0 (* span-x fraction)) 16.0 (+ x0 (* span-x fraction)) y0)
         (.strokeLine gc x0 (- y0 (* span-y fraction)) (+ x0 span-x) (- y0 (* span-y fraction)))))
-    (.setStroke gc (Color/web "#448df0"))
+    (.setStroke gc (Color/web "#69adfa"))
     (.setLineWidth gc 2.0)
     (.beginPath gc)
     (doseq [[index value] (eduction (map-indexed vector) samples)]
@@ -207,9 +200,9 @@
 
 (defn- timeline-key [^Canvas canvas state x y]
   (let [{:keys [document animation-id rows]} state
-        row (int (Math/floor (/ (- (double y) 44.0) 36.0)))
+        row (int (Math/floor (/ (- (double y) 32.0) 28.0)))
         {:keys [node-name property-id]} (get rows row)]
-    (when property-id
+    (when (and property-id (>= (double y) (+ (double (get state :ruler-y 0.0)) 32.0)))
       (when-let [keyframe (coll/first-where
                             #(< (Math/abs (- (double x) (time-x canvas state (:time %)))) 9.0)
                             (timeline/display-keyframes document animation-id node-name property-id))]
@@ -249,7 +242,7 @@
         manipulation-handler (atom nil)
         scene-content (first (.getChildrenUnmodifiable parent))
         root (BorderPane.)
-        content (doto (VBox. 0.0) (.setMinWidth 0.0) (ui/add-style! "gui-animation-workspace") (.setPrefHeight 620.0))
+        content (doto (VBox. 0.0) (.setMinWidth 0.0) (ui/add-style! "gui-animation-workspace") (.setPrefHeight 468.0))
         title (doto (TitledPane.) (.setId "gui-animation-panel") (.setMinWidth 0.0) (.setContent content) (.setExpanded true))
         status (doto (Label.) (.setId "gui-animation-status") (.setWrapText true))
         canvas (doto (Canvas. 700.0 100.0) (.setId "gui-animation-timeline") (.setFocusTraversable true)
@@ -258,7 +251,7 @@
         track-pane (doto (VBox.) (.setMinWidth 280.0) (.setMaxWidth 460.0))
         track-fields (atom {})
         track-content (doto (HBox.) (.setMinWidth 0.0) (ui/children! [track-pane canvas-pane]))
-        scroll (doto (ScrollPane. track-content) (.setMinWidth 0.0) (.setPrefWidth 0.0) (.setFitToWidth true) (.setPrefViewportHeight 288.0) (.setMinHeight 160.0) (ui/add-style! "animation-tracks-scroll"))
+        scroll (doto (ScrollPane. track-content) (.setMinWidth 0.0) (.setPrefWidth 0.0) (.setFitToWidth true) (.setPrefViewportHeight 232.0) (.setMinHeight 160.0) (ui/add-style! "animation-tracks-scroll"))
         animation-choice (doto (ComboBox.) (.setId "gui-animation-choice") (.setPrefWidth 140.0))
         node-choice (doto (ComboBox.) (.setId "gui-animation-node") (.setPrefWidth 150.0))
         property-choice (doto (ComboBox.) (.setId "gui-animation-property") (.setPrefWidth 130.0)
@@ -277,15 +270,16 @@
         fps-choice (doto (ComboBox.) (.setId "gui-animation-fps") (ui/items! [24 30 60 120]) (.setValue (int 60)))
         frame-display (doto (ToggleButton.) (.setId "gui-animation-frame-display") (.setSelected true))
         playback-mode (doto (ComboBox.) (.setId "gui-animation-playback-mode") (ui/items! [:normal :reverse :ping-pong]) (.setValue :normal))
-        curve (doto (Canvas. 200.0 112.0) (.setId "gui-animation-easing-curve"))
-        detail-curve (doto (Canvas. 700.0 122.0) (.setId "gui-animation-detail-curve"))
+        curve (doto (Canvas. 200.0 80.0) (.setId "gui-animation-easing-curve"))
+        detail-curve (doto (Canvas. 700.0 112.0) (.setId "gui-animation-detail-curve"))
         curve-pane (doto (Pane.) (.setMinWidth 0.0) (ui/children! [detail-curve]))
         event-list (doto (VBox. 6.0) (.setPadding (Insets. 12.0)))
-        zoom-choice (doto (ComboBox.) (.setId "gui-animation-zoom-choice") (ui/items! [100 150 200 400 800]) (.setValue (int 100)))
-        zoom-slider (doto (Slider. 1.0 8.0 1.0) (.setId "gui-animation-zoom") (.setPrefWidth 100.0))
+        zoom-choice (doto (ComboBox.) (.setId "gui-animation-zoom-choice") (ui/items! [1.0 5.0 10.0 12.5 25.0 50.0 100.0 150.0 200.0 400.0 800.0]) (.setValue 100.0))
+        zoom-slider (doto (Slider. 0.001 8.0 1.0) (.setId "gui-animation-zoom") (.setPrefWidth 100.0))
         time-scroll (doto (ScrollBar.) (.setId "gui-animation-scroll") (.setMin 0.0))
         play-button (doto (Button.) (.setId "gui-animation-play") (ui/add-style! "button-small"))
         drag (atom nil)
+        pan (atom nil)
         localize! (fn [control suffix]
                     (localization/localize! control localization
                                             (localization/message (str "gui-animation." suffix))))
@@ -341,7 +335,7 @@
                     (let [{:keys [document animation-id offset zoom]} @state
                           duration (double (animation/animation-duration document animation-id))
                           time (max 0.0 (min duration (double time)))
-                          span (/ duration (double zoom))
+                          span (timeline/visible-span zoom)
                           offset (if (or (< time (double offset)) (> time (+ (double offset) span)))
                                    (max 0.0 (min (- duration span) time))
                                    offset)]
@@ -486,7 +480,7 @@
                                                               (get (node-values node-id) property-id) "linear")))
                           (swap! state update :collapsed disj node-name)
                           (select-track! node-name property-id)))
-        filesbar (doto (GridPane.) (.setHgap 12.0) (.setVgap 10.0) (ui/add-style! "animation-file-actions")
+        filesbar (doto (GridPane.) (.setHgap 8.0) (.setVgap 6.0) (ui/add-style! "animation-file-actions")
                        (ui/children! [(button "create" "gui-animation-create" create!)
                                       (button "import" "gui-animation-import"
                                               #(let [chooser (doto (FileChooser.) (.setTitle "Import Panthera JSON"))]
@@ -513,7 +507,7 @@
                                                    (workspace/resource-sync! workspace))))
                                       (button "save" "gui-animation-save" save!)]))
         grid (fn [pairs]
-               (let [pane (doto (GridPane.) (.setHgap 12.0) (.setVgap 7.0))]
+               (let [pane (doto (GridPane.) (.setHgap 8.0) (.setVgap 5.0))]
                  (doseq [[index [suffix ^Node field]] (eduction (map-indexed vector) pairs)]
                    (.add pane (doto (Label.) (localize! suffix)) 0 (int index))
                    (.add pane field 1 (int index))
@@ -537,12 +531,12 @@
                                                 (ui/children! [(doto (Label.) (localize! "interpolation")) easing-choice])) curve]))
         data-panel (doto (VBox. 10.0) (ui/add-style! "animation-data-panel")
                          (ui/children! [(doto (Label.) (localize! "data")) filesbar]))
-        settings-content (doto (GridPane.) (.setHgap 16.0) (.setMinWidth 1680.0) (.setPadding (Insets. 10.0 16.0 10.0 16.0)))
+        settings-content (doto (GridPane.) (.setHgap 16.0) (.setMinWidth 1280.0) (.setPadding (Insets. 8.0 12.0 8.0 12.0)))
         settings-scroll (doto (ScrollPane. settings-content) (.setFitToHeight true) (.setFitToWidth true) (.setMinWidth 0.0) (.setPrefWidth 0.0)
                               (ui/add-style! "animation-settings-scroll"))
         settings (doto (TabPane.) (.setId "gui-animation-settings") (.setSide Side/TOP)
                        (.setTabClosingPolicy TabPane$TabClosingPolicy/UNAVAILABLE)
-                       (.setMinHeight 186.0) (.setPrefHeight 186.0) (.setMaxHeight 186.0))
+                       (.setMinHeight 156.0) (.setPrefHeight 156.0) (.setMaxHeight 156.0))
         clip-menu (doto (MenuButton.) (.setId "gui-animation-clip-menu") (localize! "title"))
         path-label (doto (Label. path) (.setAlignment Pos/CENTER_RIGHT) (.setMinWidth 0.0) (.setId "gui-animation-path") (.setMaxWidth Double/MAX_VALUE))
         more-menu (doto (MenuButton. "…") (.setId "gui-animation-more"))
@@ -559,19 +553,21 @@
                             (.setOnAction (ui/event-handler _ ((guarded f) nil)))))
         transport-button (fn [suffix id path f]
                            (doto ^Button (icon-button suffix id "" f) (.setGraphic (glyph path)) (ui/add-style! "animation-transport")))
-        zoom-out (icon-button "zoom-out" "gui-animation-zoom-out" "−" #(.setValue zoom-slider (max 1.0 (/ (.getValue zoom-slider) 1.5))))
+        zoom-out (icon-button "zoom-out" "gui-animation-zoom-out" "−" #(.setValue zoom-slider (max 0.001 (/ (.getValue zoom-slider) 1.5))))
         zoom-in (icon-button "zoom-in" "gui-animation-zoom-in" "+" #(.setValue zoom-slider (min 8.0 (* (.getValue zoom-slider) 1.5))))
+        fit (button "fit" "gui-animation-fit"
+                    #(.setValue zoom-slider (max 0.001 (min 8.0 (/ 1.0 (max 0.001 (double (animation/animation-duration (:document @state) (:animation-id @state)))))))))
         fullscreen (doto (ToggleButton.) (.setId "gui-animation-fullscreen")
                          (.setGraphic (glyph "M0 6 L0 0 L6 0 M12 0 L18 0 L18 6 M18 12 L18 18 L12 18 M6 18 L0 18 L0 12")))
         toolbar-spacer (Region.)
-        toolbar (doto (HBox. 8.0) (.setMinWidth 1120.0) (.setAlignment Pos/CENTER_LEFT) (ui/add-style! "animation-toolbar")
+        toolbar (doto (HBox. 8.0) (.setMinWidth 1040.0) (.setAlignment Pos/CENTER_LEFT) (ui/add-style! "animation-toolbar")
                       (ui/children! [(transport-button "first" "gui-animation-first" "M18 0 L7 8 L18 16 Z M7 0 L0 8 L7 16 Z" #(navigate! :first))
                                      play-button
                                      (transport-button "next" "gui-animation-next" "M0 0 L11 8 L0 16 Z M13 0 L15 0 L15 16 L13 16 Z" #(navigate! :next-key))
                                      (transport-button "last" "gui-animation-last" "M0 0 L11 8 L0 16 Z M11 0 L20 8 L11 16 Z" #(navigate! :last))
                                      frame-field (Label. "s") time-field fps-choice (Separator.)
                                      preview-check record-button (Separator.) loop-check frame-display toolbar-spacer
-                                     zoom-out zoom-in zoom-slider zoom-choice fullscreen]))
+                                     zoom-out zoom-in zoom-slider fit zoom-choice fullscreen]))
         toolbar-scroll (doto (ScrollPane. toolbar) (.setFitToHeight true) (.setFitToWidth true) (.setMinWidth 0.0) (.setPrefWidth 0.0)
                              (ui/add-style! "animation-toolbar-scroll"))
         track-header (doto (HBox. 6.0) (.setAlignment Pos/CENTER_LEFT) (ui/add-style! "animation-track-header"))
@@ -582,7 +578,10 @@
                                 rows (timeline/editor-rows (timeline/tracks document animation-id) collapsed (.getValue node-choice) child-counts)
                                 context [animation-id rows]
                                 values (merge-with merge (animation/evaluate document animation-id time) draft)]
-                            (swap! state assoc :rows rows :viewport-height (.getHeight (.getViewportBounds scroll)))
+                            (let [viewport-height (.getHeight (.getViewportBounds scroll))
+                                  ruler-y (* (.getVvalue scroll) (max 0.0 (- (.getHeight canvas) viewport-height)))]
+                              (swap! state assoc :rows rows :viewport-height viewport-height :ruler-y ruler-y)
+                              (.setTranslateY track-header ruler-y))
                             (when (not= context (:rows-context @state))
                               (swap! state assoc :rows-context context)
                               (reset! track-fields {})
@@ -686,6 +685,7 @@
     (ui/children! track-header [(doto (Label.) (localize! "properties") (.setMaxWidth Double/MAX_VALUE))
                                 (icon-button "add-property" "gui-animation-add-property" "+" add-property!)])
     (HBox/setHgrow (first (.getChildren track-header)) Priority/ALWAYS)
+    (.setViewOrder track-header -1.0)
     (.bind (.prefWidthProperty track-pane) (.multiply (.widthProperty scroll) 0.21))
     (replace-items! (.getTabs settings) [(doto (Tab.) (localize! "settings") (.setContent settings-scroll))
                                          (doto (Tab.) (localize! "curves") (.setContent curve-pane))
@@ -695,7 +695,7 @@
                                 (toString [value] (str value " fps"))
                                 (fromString [_] nil)))
     (.setConverter zoom-choice (proxy [StringConverter] []
-                                 (toString [value] (str value "%"))
+                                 (toString [value] (if (nil? value) "" (str (if (== (double value) (Math/rint (double value))) (long value) value) "%")))
                                  (fromString [_] nil)))
     (.setConverter playback-mode (proxy [StringConverter] []
                                    (toString [value] (localization (localization/message (case value :reverse "gui-animation.mode-reverse" :ping-pong "gui-animation.mode-ping-pong" "gui-animation.mode-normal"))))
@@ -718,7 +718,9 @@
     (.setOnAction fps-choice (ui/event-handler _
                                (when-not @updating
                                  ((guarded #(commit! (fn [document] (assoc-in document [:data :metadata :fps] (.getValue fps-choice))))) nil))))
-    (.setOnAction zoom-choice (ui/event-handler _ (.setValue zoom-slider (/ (double (.getValue zoom-choice)) 100.0))))
+    (.setOnAction zoom-choice (ui/event-handler _
+                                (when-let [value (.getValue zoom-choice)]
+                                  (.setValue zoom-slider (/ (double value) 100.0)))))
     (.setOnAction name-field
                   (ui/event-handler _
                     ((guarded #(let [new-name (string/trim (.getText name-field))
@@ -784,7 +786,9 @@
                                                                            (double (timeline/frames-per-second (:document @state)))))) nil)))
     (.setOnAction value-field (ui/event-handler _ ((guarded #(edit-value! (.getValue node-choice) (.getValue property-choice) (finite-number value-field))) nil)))
     (ui/observe (.valueProperty zoom-slider)
-                (fn [_ _ value] (swap! state assoc :zoom (double value) :offset 0.0)))
+                (fn [_ _ value]
+                  (swap! state assoc :zoom (double value) :offset 0.0)
+                  (.setValue zoom-choice (* 100.0 (double value)))))
     (ui/observe (.valueProperty time-scroll)
                 (fn [_ _ value] (swap! state assoc :offset (double value))))
     (.setOnAction record-button
@@ -807,33 +811,64 @@
                                         reverse (= :reverse (.getValue playback-mode))]
                                     (swap! state assoc :direction (if reverse -1 1))
                                     (set-time! (if reverse (if (<= time 0.0) duration time) (if (>= time duration) 0.0 time))))))) nil)))
+    (.addEventFilter scroll MouseEvent/MOUSE_PRESSED
+      (ui/event-handler event
+        (when (= MouseButton/MIDDLE (.getButton ^MouseEvent event))
+          (reset! pan {:x (.getSceneX ^MouseEvent event) :y (.getSceneY ^MouseEvent event)
+                       :offset (:offset @state) :vertical (.getVvalue scroll)})
+          (swap! state assoc :playing false)
+          (.setCursor scroll Cursor/CLOSED_HAND)
+          (.consume ^MouseEvent event))))
+    (.addEventFilter scroll MouseEvent/MOUSE_DRAGGED
+      (ui/event-handler event
+        (when-let [{:keys [x y offset vertical]} @pan]
+          (let [{:keys [document animation-id zoom]} @state
+                duration (animation/animation-duration document animation-id)
+                delta-x (- (.getSceneX ^MouseEvent event) (double x))
+                delta-y (- (.getSceneY ^MouseEvent event) (double y))
+                vertical-range (- (.getHeight (.getLayoutBounds track-content))
+                                  (.getHeight (.getViewportBounds scroll)))]
+            (swap! state assoc :offset (timeline/pan-offset duration zoom (.getWidth canvas) offset delta-x))
+            (when (pos? vertical-range)
+              (.setVvalue scroll (max 0.0 (min 1.0 (- (double vertical) (/ delta-y vertical-range))))))
+            (draw-timeline! canvas @state)
+            (.consume ^MouseEvent event)))))
+    (.addEventFilter scroll MouseEvent/MOUSE_RELEASED
+      (ui/event-handler event
+        (when (and @pan (= MouseButton/MIDDLE (.getButton ^MouseEvent event)))
+          (reset! pan nil)
+          (.setCursor scroll Cursor/DEFAULT)
+          (.consume ^MouseEvent event))))
     (.setOnMousePressed canvas
                         (ui/event-handler event
-                          ((guarded
-                             #(do
-                                (.requestFocus canvas)
-                                (swap! state assoc :playing false)
-                                (let [x (.getX ^MouseEvent event)
-                                      y (.getY ^MouseEvent event)]
-                                  (if-let [[node-name property-id keyframe] (timeline-key canvas @state x y)]
-                                    (do (set-time! (:time keyframe))
-                                        (swap! state assoc :selected [node-name property-id (:time keyframe)])
-                                        (select-track! node-name property-id)
-                                        (.setValue easing-choice (:easing keyframe))
-                                        (reset! drag {:node-name node-name :property-id property-id :keyframe keyframe :x x}))
-                                    (do (reset! drag nil)
-                                        (set-time! (x-time canvas @state x))
-                                        (when-let [{:keys [node-name property-id]}
-                                                   (get (:rows @state)
-                                                        (int (Math/floor (/ (- y 44.0) 36.0))))]
-                                          (when property-id (select-track! node-name property-id)))))))) nil)
-                          ;; Keep the enclosing ScrollPane from stealing keyboard focus.
-                          (.consume ^MouseEvent event)))
+                          (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
+                            ((guarded
+                               #(do
+                                  (.requestFocus canvas)
+                                  (swap! state assoc :playing false)
+                                  (let [x (.getX ^MouseEvent event)
+                                        y (.getY ^MouseEvent event)]
+                                    (if-let [[node-name property-id keyframe] (timeline-key canvas @state x y)]
+                                      (do (set-time! (:time keyframe))
+                                          (swap! state assoc :selected [node-name property-id (:time keyframe)])
+                                          (select-track! node-name property-id)
+                                          (.setValue easing-choice (:easing keyframe))
+                                          (reset! drag {:node-name node-name :property-id property-id :keyframe keyframe :x x}))
+                                      (do (reset! drag nil)
+                                          (set-time! (x-time canvas @state x))
+                                          (when-let [{:keys [node-name property-id]}
+                                                     (get (:rows @state)
+                                                          (int (Math/floor (/ (- y 32.0) 28.0))))]
+                                            (when (and property-id (>= y (+ (double (get @state :ruler-y 0.0)) 32.0)))
+                                              (select-track! node-name property-id)))))))) nil)
+                            ;; Keep the enclosing ScrollPane from stealing keyboard focus.
+                            (.consume ^MouseEvent event))))
     (.setOnMouseDragged canvas
                         (ui/event-handler event
-                          (when-let [{:keys [node-name property-id keyframe]} @drag]
-                            (swap! state assoc :dragging-key [node-name property-id (:time keyframe)]))
-                          ((guarded #(set-time! (x-time canvas @state (.getX ^MouseEvent event)))) nil)))
+                          (when (.isPrimaryButtonDown ^MouseEvent event)
+                            (when-let [{:keys [node-name property-id keyframe]} @drag]
+                              (swap! state assoc :dragging-key [node-name property-id (:time keyframe)]))
+                            ((guarded #(set-time! (x-time canvas @state (.getX ^MouseEvent event)))) nil))))
     (.setOnMouseReleased canvas
                          (ui/event-handler event
                            (when-let [{:keys [node-name property-id keyframe x]} @drag]
@@ -879,10 +914,12 @@
                          (refresh-tracks!)
                          (let [{:keys [document animation-id zoom offset recording preview draft exists]} @state
                                duration (double (animation/animation-duration document animation-id))
-                               maximum (max 0.0 (- duration (/ duration (double zoom))))
+                               maximum (max 0.0 (- duration (timeline/visible-span zoom)))
                                mode (cond recording "recording" (pos? (count draft)) "draft" preview "previewing" :else "layout")]
                            (.setMax time-scroll maximum)
-                           (.setVisibleAmount time-scroll (/ duration (double zoom)))
+                           (.setVisibleAmount time-scroll (timeline/visible-span zoom))
+                           (.setUnitIncrement time-scroll (/ 1.0 (double (timeline/frames-per-second document))))
+                           (.setBlockIncrement time-scroll (* 0.9 (timeline/visible-span zoom)))
                            (.setValue time-scroll (min maximum (double offset)))
                            (.setDisable time-scroll (zero? maximum))
                            (.setVisible time-scroll (pos? maximum))

@@ -109,3 +109,28 @@
   (is (< (Math/abs (- 0.9 (double (:time (timeline/advance-playback 0.9 1.0 0.2 false :ping-pong 1))))) 1.0e-9))
   (is (= {:time 0.0 :playing false :direction -1} (timeline/advance-playback 0.1 1.0 0.2 false :ping-pong -1)))
   (is (= {:time 0.0 :playing false :direction 1} (timeline/advance-playback 0.0 0.0 1.0 true :ping-pong 1))))
+
+;; Extending the clip must extend its timeline instead of shrinking existing frame spacing.
+(deftest fixed-time-scale-test
+  (let [short (animation/new-document "/main.gui")
+        extended (animation/set-duration short "default" 5.0)]
+    (is (= 1.0 (timeline/visible-span 1.0)))
+    (is (= 0.5 (timeline/visible-span 2.0)))
+    (is (= 4.0 (timeline/visible-span 0.25)))
+    (is (= 1016.0 (timeline/time->x (animation/animation-duration short "default") 0.0 1.0 1032.0)))
+    (is (= 5016.0 (timeline/time->x (animation/animation-duration extended "default") 0.0 1.0 1032.0)))
+    (is (= 516.0 (timeline/time->x 0.5 0.0 1.0 1032.0)))
+    (doseq [zoom [0.25 1.0 2.0 8.0]
+            offset [0.0 1.0 4.0]
+            time [0.0 0.5 2.25 5.0]]
+      (is (< (Math/abs (- (double time) (timeline/x->time (timeline/time->x time offset zoom 1032.0) offset zoom 1032.0))) 1.0e-9)))))
+
+;; Middle-button panning translates the visible range and clamps to clip bounds at any zoom.
+(deftest timeline-pan-offset-test
+  (is (= 0.5 (timeline/pan-offset 5.0 1.0 1032.0 0.0 -500.0)))
+  (is (= 1.5 (timeline/pan-offset 5.0 1.0 1032.0 2.0 500.0)))
+  (is (= 0.0 (timeline/pan-offset 5.0 1.0 1032.0 0.0 500.0)))
+  (is (= 4.0 (timeline/pan-offset 5.0 1.0 1032.0 0.0 -10000.0)))
+  (is (= 0.25 (timeline/pan-offset 5.0 2.0 1032.0 0.0 -500.0)))
+  (is (= 0.0 (timeline/pan-offset 0.5 1.0 1032.0 0.0 -500.0)))
+  (is (= 0.0 (timeline/pan-offset 5.0 0.125 1032.0 0.0 -500.0))))

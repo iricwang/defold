@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 23,
-  "version": "1.14.1-patch.23",
+  "revision": 24,
+  "version": "1.14.1-patch.24",
   "repository": "iricwang/defold",
-  "notes": "Restore the reference Panthera workspace layout and dark blue-gray styling, compact settings tabs, and record GUI move/scale/rotation gizmos without changing the original GUI layout."
+  "notes": "Use the compact neutral Graphite theme for GUI animation, extend the timeline with clip duration, and add middle-button panning with a fixed ruler and fit-to-clip zoom."
 }
