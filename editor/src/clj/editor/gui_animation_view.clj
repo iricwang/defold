@@ -32,10 +32,10 @@
             [editor.workspace :as workspace]
             [util.coll :as coll])
   (:import [java.nio.file Files OpenOption StandardOpenOption]
-           [javafx.geometry Insets Pos Side]
+           [javafx.geometry Insets Orientation Pos Side]
            [javafx.scene Cursor Node Parent]
            [javafx.scene.canvas Canvas]
-           [javafx.scene.control Button CheckBox ComboBox Label MenuButton MenuItem ScrollBar ScrollPane Separator Slider Tab TabPane TabPane$TabClosingPolicy TextField ToggleButton Tooltip]
+           [javafx.scene.control Button CheckBox ComboBox Label MenuButton MenuItem ScrollBar ScrollPane Separator Slider SplitPane Tab TabPane TabPane$TabClosingPolicy TextField ToggleButton Tooltip]
            [javafx.scene.input KeyCode KeyEvent MouseButton MouseEvent]
            [javafx.scene.layout BorderPane ColumnConstraints FlowPane GridPane HBox Pane Priority Region StackPane VBox]
            [javafx.scene.paint Color]
@@ -237,10 +237,15 @@
         scene-content (first (.getChildrenUnmodifiable parent))
         root (BorderPane.)
         content (doto (VBox. 0.0) (.setMinWidth 0.0) (ui/add-style! "gui-animation-workspace") (.setPrefHeight 468.0))
+        content-scroll (doto (ScrollPane. content) (.setFitToWidth true) (.setFitToHeight true)
+                             (.setMinSize 0.0 0.0) (ui/add-style! "animation-workspace-scroll"))
         workspace-tab (Tab.)
-        workspace-tabs (doto (TabPane.) (.setId "gui-animation-tabs") (.setMinWidth 0.0)
+        workspace-tabs (doto (TabPane.) (.setId "gui-animation-tabs") (.setMinSize 0.0 0.0)
                              (.setTabClosingPolicy TabPane$TabClosingPolicy/UNAVAILABLE))
-        title (doto (StackPane.) (.setId "gui-animation-panel") (.setMinWidth 0.0))
+        title (doto (StackPane.) (.setId "gui-animation-panel") (.setMinSize 0.0 120.0))
+        scene-pane (doto (StackPane.) (.setMinSize 0.0 64.0) (ui/children! [scene-content]))
+        scene-split (doto (SplitPane.) (.setId "gui-animation-scene-split") (.setOrientation Orientation/VERTICAL)
+                          (.setMinSize 0.0 0.0))
         status (doto (Label.) (.setId "gui-animation-status") (.setWrapText true))
         canvas (doto (Canvas. 700.0 100.0) (.setId "gui-animation-timeline") (.setFocusTraversable true)
                      (.setAccessibleText "Animation timeline. Select a key to edit its time and value."))
@@ -712,7 +717,7 @@
                                   (.setText field (format "%.4f" (double value))))))))]
     (localize! workspace-tab "title")
     (.setGraphic workspace-tab (glyph "M10 0 L20 5 L20 16 L10 21 L0 16 L0 5 Z M0 5 L10 10 L20 5 M10 10 L10 21"))
-    (.setContent workspace-tab content)
+    (.setContent workspace-tab content-scroll)
     (.add (.getTabs workspace-tabs) workspace-tab)
     (ui/children! title [workspace-tabs header])
     (StackPane/setAlignment header Pos/TOP_RIGHT)
@@ -793,8 +798,13 @@
     (.setOnAction fullscreen
                   (ui/event-handler _
                     (if (.isSelected fullscreen)
-                      (do (.setBottom root nil) (.setCenter root title))
-                      (do (.setCenter root scene-content) (.setBottom root title)))))
+                      (do (swap! state assoc :scene-divider (aget (.getDividerPositions scene-split) 0))
+                          (.remove (.getItems scene-split) title)
+                          (.setCenter root title))
+                      (do (.setCenter root nil)
+                          (.add (.getItems scene-split) title)
+                          (.setDividerPositions scene-split (double-array [(:scene-divider @state)]))
+                          (.setCenter root scene-split)))))
     (.setTooltip fullscreen (doto (Tooltip.) (localize! "fullscreen")))
     (.setOnAction fps-choice (ui/event-handler _
                                (when-not @updating
@@ -834,8 +844,10 @@
     (.setTooltip preview-check (Tooltip. "Preview does not change the GUI layout. Turn off to edit the layout."))
     (.setTooltip record-button (doto (Tooltip.) (localize! "record-help")))
     (ui/children! parent [])
-    (.setCenter root scene-content)
-    (.setBottom root title)
+    (.add (.getItems scene-split) scene-pane)
+    (.add (.getItems scene-split) title)
+    (.setDividerPositions scene-split (double-array [0.45]))
+    (.setCenter root scene-split)
     (reset! manipulation-handler animation-manipulation)
     (ui/fill-control root)
     (ui/children! parent [root])

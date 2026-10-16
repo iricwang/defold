@@ -5,7 +5,7 @@
 - 完整 Clojure 回归：**88 项测试、4938 条断言，0 失败、0 错误**，见 [日志](clojure-tests.log)。
 - 增量更新 Python 回归：12 项测试通过，其中 3 项 Windows 专用测试在 macOS 跳过，见 [日志](patch-tests.log)。
 - 动效源码、单元测试和集成测试的 clj-kondo：0 错误、0 警告，见 [日志](clj-kondo.log)。全部修改的动效命名空间完成整文件重载，没有新增反射或装箱警告。
-- **95 项实际运行时检查全部通过**，见 [机器可读结果](ui-results.json)。下面的 PNG 均来自实际界面。
+- **101 项实际运行时检查全部通过**，见 [机器可读结果](ui-results.json)。下面的 PNG 均来自实际界面。
 
 ## 功能与证据
 
@@ -21,6 +21,7 @@
 | 15 种离散触发属性 | [可见性编辑](17-trigger-visibility.png)、[场景触发效果](25-discrete-properties.png)，集成测试逐项检查图属性且不污染原始 GUI |
 | 嵌套动画、模板动画、开始时间优先级 | [嵌套](18-nested-animation.png)、[模板](26-template-animation.png)，另测边界、初始姿态、可达依赖、循环/深度保护 |
 | 原始片段、仅编辑器标记、重叠片段不展平 | [原始片段](19-raw-tween-editor-only.png)、[重叠](27-overlap-segments.png)、[连续微调和粘贴](41-raw-batch-nudge-paste.png) |
+| 小窗口、场景高度、原生分隔条、设置可达性 | [小窗口保留场景并拖动分隔](45-small-window-resizable-scene.png)、[滚动到设置](46-small-window-settings-scroll.png)，另验证展开播放和恢复分隔位置 |
 | 全部 32 个数值通道 | [变换](21-transform-preview.png)、[尺寸/颜色/九宫格](22-size-color-slice9.png)、[文本/描边/阴影](23-text-outline-shadow.png)、[饼图](24-pie-properties.png)；逐通道实时预览及图属性集成测试 |
 | 时长延长、中键平移、适应缩放 | [延长](28-duration-extends-timeline.png)、[中键](29-middle-mouse-pan.png)、[适应](30-fit-timeline.png)；断言平移不修改播放头和 JSON |
 | 正放、倒放、倍速、往返循环、帧/秒标尺 | [倒放倍速](31-reverse-playback-speed.png)、[循环](32-ping-pong-loop.png)、[秒标尺](33-seconds-ruler.png)，等待实际播放时间变化 |
@@ -28,6 +29,8 @@
 | 移动/缩放/旋转手柄录制 | [移动](35-move-gizmo-recording.png)、[缩放](36-scale-gizmo-recording.png)、[旋转](37-rotate-gizmo-recording.png)；实际按下、拖动、松开后检查动画关键帧和原始 GUI 不变 |
 | JSON/Lua 文件往返、Unicode、数据安全 | [文件加载后](38-file-roundtrip.png)；实际磁盘读写，中文及表情字符测试，静态 Lua 解析不执行脚本，非法导出不会截断已有文件 |
 | 未录制草稿、重置、记录全部 | [草稿操作](39-draft-commit-reset.png)，检查未录制时文档不变、提交后写入动画 |
+
+小窗口冒烟检查发现固定高度会挤掉场景，已改为原生垂直分隔条和可滚动的动效内容；旧候选的 CI 已取消，修复后的候选会重新执行安装验证。
 
 ## 验证范围
 

@@ -1,5 +1,9 @@
 // Native controls; neutral collapsed combo cells must not inherit the list selection fill.
 #gui-animation-panel {
+  .animation-workspace-scroll {
+    -fx-background-color: transparent; -fx-padding: 0px; -fx-border-width: 0px;
+    > .viewport { -fx-background-color: -df-background-lightish; }
+  }
   .combo-box > .list-cell { -fx-background-color: -df-background-input; }
   #gui-animation-initial-state { -fx-pref-width: 112px; }
   #gui-animation-speed { -fx-pref-width: 80px; }
