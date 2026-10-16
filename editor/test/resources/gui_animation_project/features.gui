@@ -1,0 +1,77 @@
+fonts {
+  name: "default_font"
+  font: "/builtins/fonts/default.font"
+}
+textures {
+  name: "qa"
+  texture: "/qa.atlas"
+}
+nodes {
+  position {
+    x: 220.0
+    y: 400.0
+  }
+  size {
+    x: 180.0
+    y: 100.0
+  }
+  color {
+    x: 0.2
+    y: 0.45
+    z: 0.8
+  }
+  type: TYPE_BOX
+  texture: "qa/particle_blob"
+  id: "box"
+}
+nodes {
+  position {
+    x: 520.0
+    y: 400.0
+  }
+  size {
+    x: 140.0
+    y: 140.0
+  }
+  color {
+    x: 0.9
+    y: 0.45
+    z: 0.15
+  }
+  type: TYPE_PIE
+  id: "pie"
+  perimeterVertices: 48
+}
+nodes {
+  position {
+    x: 400.0
+    y: 230.0
+  }
+  size {
+    x: 400.0
+    y: 80.0
+  }
+  type: TYPE_TEXT
+  text: "Panthera GUI preview"
+  font: "default_font"
+  id: "label"
+}
+nodes {
+  position {
+    x: 740.0
+    y: 400.0
+  }
+  type: TYPE_TEMPLATE
+  id: "panel"
+  template: "/panel.gui"
+}
+nodes {
+  type: TYPE_BOX
+  id: "panel/tile"
+  parent: "panel"
+  template_node_child: true
+}
+layers {
+  name: "front"
+}
+material: "/builtins/materials/gui.material"

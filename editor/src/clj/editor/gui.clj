@@ -3367,7 +3367,7 @@
   (let [w (:width scene-dims)
         h (:height scene-dims)
         scene {:node-id _node-id
-               :animation-preview-fn gui-animation-preview/apply-preview
+               :animation-preview-fn gui-animation-preview/apply-full-preview
                :aabb geom/null-aabb
                :visibility-aabb (geom/coords->aabb [0 0 0] [w h 0])
                :renderable {:render-fn render-lines

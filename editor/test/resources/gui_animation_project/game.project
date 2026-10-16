@@ -1,0 +1,5 @@
+[project]
+title = GUI Animation Reference
+[display]
+width = 960
+height = 640

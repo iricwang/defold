@@ -16,7 +16,11 @@
   "Lossless Panthera JSON storage and scalar GUI animation editing. Times are
   seconds and rotation values are Euler degrees, as in Panthera's GUI adapter."
   (:require [clojure.data.json :as json]
-            [clojure.string :as string]))
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [clojure.string :as string]
+            [editor.gui-animation-lua :as lua]
+            [util.coll :as coll]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -24,14 +28,29 @@
 (def supported-properties
   ["position_x" "position_y" "position_z"
    "rotation_x" "rotation_y" "rotation_z"
-   "scale_x" "scale_y" "scale_z" "color_a"])
+   "scale_x" "scale_y" "scale_z"
+   "size_x" "size_y" "size_z"
+   "color_r" "color_g" "color_b" "color_a"
+   "outline_r" "outline_g" "outline_b" "outline_a"
+   "shadow_r" "shadow_g" "shadow_b" "shadow_a"
+   "slice9_left" "slice9_top" "slice9_right" "slice9_bottom"
+   "inner_radius" "fill_angle" "text_tracking" "text_leading"])
+
+(def trigger-properties
+  ["text" "layer" "texture" "enabled" "visible" "inherit_alpha" "pivot"
+   "blend_mode" "size_mode" "clipping_mode" "clipping_visible" "clipping_inverted"
+   "line_break" "outer_bounds" "perimeter_verticies"])
 
 (def supported-easings
-  ["linear" "inquad" "outquad" "inoutquad"
-   "incubic" "outcubic" "inoutcubic"
-   "inquart" "outquart" "inoutquart"
-   "inquint" "outquint" "inoutquint"
-   "insine" "outsine" "inoutsine"])
+  (into ["linear"]
+        (mapcat (fn [family] (mapv #(str % family) ["in" "out" "inout" "outin"])))
+        ["quad" "cubic" "quart" "quint" "sine" "expo" "circ" "back" "bounce" "elastic"]))
+
+(defn key-kind [key]
+  (get {0 "trigger" 1 "tween" 2 "event" 3 "animation"} (:key_type key) (:key_type key)))
+
+(defn key-easing [key]
+  (or (:easing_custom key) (:easing key) "linear"))
 
 (defn- require-value! [valid message data]
   (when-not valid
@@ -123,6 +142,16 @@
   [text]
   (validate-document (json/read-str text :key-fn keyword)))
 
+(defn read-source [text resolve-template]
+  (if (string/starts-with? (string/triml text) "{")
+    (read-json text)
+    (let [document (lua/read-data text resolve-template)]
+      (validate-document
+        (update-in (assoc document :format "json") [:data :animations]
+                   (fn [animations]
+                     (mapv #(update % :animation_keys (fn [keys] (if (= {} keys) [] keys)))
+                           (if (= {} animations) [] animations))))))))
+
 (defn write-json [document]
   (str (json/write-str (validate-document document)
                        :key-fn #(if (keyword? %) (subs (str %) 1) %)
@@ -161,41 +190,111 @@
                     {:last-key-time last-time})
     (assoc-in document [:data :animations index :duration] duration)))
 
+(defn- easing-valid? [easing]
+  (if-not (vector? easing)
+    (contains? (set supported-easings) easing)
+    (and (<= 2 (count easing)) (not (coll/any? (complement finite-number?) easing)))))
+
 (defn- key-issues [key]
-  (cond-> []
-    (not (contains? #{"tween" 1} (:key_type key)))
-    (conj "Only numeric tween tracks can be previewed and edited.")
+  (let [kind (key-kind key)]
+    (cond-> []
+      (not (contains? #{"trigger" "tween" "event" "animation"} kind))
+      (conj "Unknown animation key type.")
 
-    (and (contains? #{"tween" 1} (:key_type key))
-         (not (and (finite-number? (get key :start_value 0))
-                   (finite-number? (get key :end_value 0)))))
-    (conj "Tween start and end values must be finite numbers for preview and editing.")
+      (and (contains? #{"tween" "event"} kind)
+           (not (and (finite-number? (get key :start_value 0))
+                     (finite-number? (get key :end_value 0)))))
+      (conj "Tween start and end values must be finite numbers for preview and editing.")
 
-    (not (contains? (set supported-properties) (:property_id key)))
-    (conj (str "Unsupported GUI property: " (:property_id key)))
+      (and (= "tween" kind) (not (contains? (set supported-properties) (:property_id key))))
+      (conj (str "Unsupported GUI property: " (:property_id key)))
 
-    (or (not (string? (:node_id key))) (string/blank? (:node_id key)))
-    (conj "A tween must identify a GUI node.")
+      (and (= "trigger" kind) (not (contains? (set trigger-properties) (:property_id key))))
+      (conj (str "Unsupported trigger property: " (:property_id key)))
 
-    (not (contains? (set supported-easings) (get key :easing "linear")))
-    (conj (str "Unsupported easing: " (:easing key)))
+      (and (contains? #{"tween" "trigger"} kind)
+           (or (not (string? (:node_id key))) (string/blank? (:node_id key))))
+      (conj "A value key must identify a GUI node.")
 
-    (:easing_custom key)
-    (conj "Custom easing curves are preserved but cannot be previewed or edited.")
+      (not (easing-valid? (key-easing key)))
+      (conj "Unsupported easing or invalid custom curve."))))
 
-    (:is_editor_only key)
-    (conj "Editor-only keys are preserved but cannot be previewed or edited.")))
+(defn animation-keys [document animation-id]
+  (:animation_keys (get-animation document animation-id)))
+
+(defn template-document [document node-id]
+  (let [templates (get-in document [:data :metadata :template_animation_paths])]
+    (get templates (keyword node-id) (get templates node-id))))
+
+(defn- reference-issues-impl [document animation-id visited]
+  (let [identity [document animation-id]]
+    (cond
+      (contains? visited identity) ["Animation references form a cycle."]
+      (> (count visited) 16) ["Animation references exceed 16 levels."]
+      (not (contains? (set (animation-ids document)) animation-id)) [(str "Animation reference is missing: " animation-id)]
+      :else
+      (let [animation (get-animation document animation-id)
+            visited (conj visited identity)
+            initial (:initial_state animation)
+            issues (if (string/blank? initial) [] (reference-issues-impl document initial visited))]
+        (into issues
+              (mapcat (fn [key]
+                        (into (key-issues key)
+                              (when (= "animation" (key-kind key))
+                                (let [child (if (string/blank? (:node_id key)) document (template-document document (:node_id key)))]
+                                  (if (map? child)
+                                    (reference-issues-impl child (:property_id key) visited)
+                                    [(str "Template animation must be bound and loaded: " (:node_id key))]))))))
+              (:animation_keys animation))))))
 
 (defn preview-issues
-  "Return reasons why preview would differ from Panthera. Unsupported imported
-  data remains intact; callers must display these reasons instead of previewing."
+  "Validate keys, templates and references before sampling. Events are inspected,
+  never executed as game callbacks in the editor."
   [document animation-id]
-  (let [animation (get-animation document animation-id)]
-    (into (if (or (nil? (:initial_state animation)) (= "" (:initial_state animation)))
-            []
-            ["Initial-state animation references are preserved but cannot be previewed."])
-          (comp (mapcat key-issues) (distinct))
-          (:animation_keys animation))))
+  (into [] (distinct) (reference-issues-impl document animation-id #{})))
+
+(defn- resolve-templates-impl [document load-template visited]
+  (update-in document [:data :metadata :template_animation_paths]
+             (fn [templates]
+               (into {} (map (fn [[node-id target]]
+                               [node-id (if (map? target)
+                                          (resolve-templates-impl target load-template visited)
+                                          (do
+                                            (require-value! (and (string? target) (not (contains? visited target)) (< (count visited) 16))
+                                                            "Invalid or cyclic template animation file reference." {:path target})
+                                            (resolve-templates-impl (load-template target) load-template (conj visited target))))])) templates))))
+
+(defn resolve-templates [document load-template]
+  (resolve-templates-impl document load-template #{}))
+
+(defn- resolve-preview-impl [document animation-id load-template visited identity]
+  (let [token [identity animation-id]]
+    (require-value! (and (not (contains? visited token)) (< (count visited) 16)) "Invalid or cyclic animation reference." {})
+    (let [clip (get-animation document animation-id)
+          visited (conj visited token)
+          local-refs (into (if (string/blank? (:initial_state clip)) [] [(:initial_state clip)])
+                           (comp (filter #(and (= "animation" (key-kind %)) (string/blank? (:node_id %)))) (map :property_id))
+                           (:animation_keys clip))
+          document (reduce #(resolve-preview-impl %1 %2 load-template visited identity) document local-refs)]
+      (reduce (fn [document key]
+                (if (and (= "animation" (key-kind key)) (not (string/blank? (:node_id key))))
+                  (let [node (:node_id key)
+                        target (template-document document node)
+                        child (if (map? target) target (load-template target))
+                        child (resolve-preview-impl child (:property_id key) load-template visited [identity node])]
+                    (assoc-in document [:data :metadata :template_animation_paths (keyword node)] child))
+                  document)) document (:animation_keys clip)))))
+
+(defn resolve-preview
+  "Load only templates reachable from the active clip, keeping unrelated missing files harmless."
+  [document animation-id load-template]
+  (resolve-preview-impl document animation-id load-template #{} :root))
+
+(defn bind-template [document node-id path]
+  (require-value! (and (not (string/blank? node-id)) (string? path) (string/starts-with? path "/")
+                       (or (string/ends-with? path ".json") (string/ends-with? path ".lua")))
+                  "Bind a template node to a project .json or .lua animation resource." {})
+  (assoc-in document [:data :metadata :template_animation_paths (keyword node-id)] path))
 
 (defn- track-keys [animation node-id property-id]
   (into []
@@ -208,6 +307,8 @@
 (defn- editable-points [animation node-id property-id]
   (let [keys (track-keys animation node-id property-id)]
     (run! (fn [key]
+            (require-value! (= "tween" (key-kind key))
+                            "This track includes non-tween segments; edit it in Events / Segments." {})
             (when-let [issue (first (key-issues key))]
               (throw (ex-info issue {:node-id node-id :property-id property-id}))))
           keys)
@@ -223,7 +324,7 @@
                                   {:node-id node-id :property-id property-id})
                   (let [point {:time end
                                :value (get key :end_value 0)
-                               :easing (get key :easing "linear")
+                               :easing (key-easing key)
                                :key key}]
                     (conj (if (same-time? start end) (pop points) points) point))))
               [{:time (get first-key :start_time 0)
@@ -246,28 +347,31 @@
         old-keys (get-in document [:data :animations index :animation_keys])
         new-keys (if (= 1 (count points))
                    (let [{:keys [time value easing key]} (first points)]
-                     [(assoc key :key_type "tween" :node_id node-id :property_id property-id
-                             :start_time time :duration 0.0 :start_value value :end_value value :easing easing)])
+                     [(assoc (dissoc key :easing_custom) :key_type "tween" :node_id node-id :property_id property-id
+                             :start_time time :duration 0.0 :start_value value :end_value value :easing (if (vector? easing) "linear" easing)
+                             :easing_custom (when (vector? easing) easing))])
                    (reduce-kv (fn [result point-index {:keys [time value easing key]}]
                                 (if (zero? (long point-index))
                                   result
                                   (let [previous (nth points (dec (long point-index)))]
                                     (conj result
-                                          (assoc key :key_type "tween" :node_id node-id :property_id property-id
+                                          (assoc (dissoc key :easing_custom) :key_type "tween" :node_id node-id :property_id property-id
                                                  :start_time (:time previous)
                                                  :duration (- (double time) (double (:time previous)))
-                                                 :start_value (:value previous) :end_value value :easing easing)))))
+                                                 :start_value (:value previous) :end_value value :easing (if (vector? easing) "linear" easing)
+                             :easing_custom (when (vector? easing) easing))))))
                               (if-let [key (:key (first points))]
                                 (let [{:keys [time value easing]} (first points)]
-                                  [(assoc key :key_type "tween" :node_id node-id :property_id property-id
-                                          :start_time time :duration 0.0 :start_value value :end_value value :easing easing)])
+                                  [(assoc (dissoc key :easing_custom) :key_type "tween" :node_id node-id :property_id property-id
+                                          :start_time time :duration 0.0 :start_value value :end_value value :easing (if (vector? easing) "linear" easing)
+                             :easing_custom (when (vector? easing) easing))])
                                 [])
                               points))
         combined (into (into []
                              (remove #(and (= node-id (:node_id %))
                                            (= property-id (:property_id %))))
                              old-keys)
-                       new-keys)]
+                       (mapv #(if (nil? (:easing_custom %)) (dissoc % :easing_custom) %) new-keys))]
     (-> document
         (assoc-in [:data :animations index :animation_keys]
                   (into [] (sort-by key-order combined)))
@@ -285,7 +389,7 @@
                   "Unsupported GUI animation property." {:property-id property-id})
   (require-value! (nonnegative-number? time) "Key time must be finite and nonnegative." {})
   (require-value! (finite-number? value) "Key value must be finite." {})
-  (require-value! (contains? (set supported-easings) easing)
+  (require-value! (easing-valid? easing)
                   "Unsupported animation easing." {:easing easing})
   (let [points (editable-points (get-animation document animation-id) node-id property-id)
         existing (reduce (fn [_ point]
@@ -328,63 +432,204 @@
       (replace-track document animation-id node-id property-id
                      (into [] (sort-by :time updated))))))
 
+(def ^:private engine-easings
+  (edn/read-string (slurp (io/resource "gui_animation_easings.edn"))))
+
 (defn ease
+  "Sample the same 64-point built-in curves used by Defold's GUI runtime.
+  Custom curves retain their own samples, including non-unit endpoints."
   ^double [easing ^double t]
-  (case easing
-    "linear" t
-    "insine" (- 1.0 (Math/cos (* t (/ Math/PI 2.0))))
-    "outsine" (Math/sin (* t (/ Math/PI 2.0)))
-    "inoutsine" (* 0.5 (- 1.0 (Math/cos (* Math/PI t))))
-    (let [power (cond
-                  (string/ends-with? easing "quad") 2.0
-                  (string/ends-with? easing "cubic") 3.0
-                  (string/ends-with? easing "quart") 4.0
-                  :else 5.0)]
-      (cond
-        (string/starts-with? easing "inout")
-        (if (< t 0.5)
-          (* 0.5 (Math/pow (* 2.0 t) power))
-          (- 1.0 (* 0.5 (Math/pow (* 2.0 (- 1.0 t)) power))))
+  (if (= "linear" easing) t
+    (let [samples (if (vector? easing) easing (get engine-easings easing))
+        position (* (max 0.0 (min 1.0 t)) (dec (count samples)))
+        index (min (- (count samples) 2) (long position))
+        a (double (nth samples index))
+        b (double (nth samples (inc index)))]
+    (+ a (* (- b a) (- position index))))))
 
-        (string/starts-with? easing "out")
-        (- 1.0 (Math/pow (- 1.0 t) power))
+(defn- sample-key [key ^double time]
+  (let [start (double (get key :start_time 0))]
+    (if (= "trigger" (key-kind key))
+      (if (< time start) (:start_data key) (:data key))
+      (let [duration (double (get key :duration 0))
+            from (double (get key :start_value 0))
+            to (double (get key :end_value 0))]
+        (cond
+          (< time start) from
+          (or (zero? duration) (> time (+ start duration))) to
+          :else (+ from (* (- to from) (ease (key-easing key) (/ (- time start) duration)))))))))
 
-        :else
-        (Math/pow t power)))))
+(defn- started? [key ^double time]
+  (let [start (double (get key :start_time 0))]
+    (if (and (= "animation" (key-kind key)) (pos? (double (get key :duration 0))) (pos? start))
+      (< start time)
+      (<= start time))))
 
-(defn- sample-key
-  ^double [key ^double time]
-  (let [start (double (get key :start_time 0))
-        duration (double (get key :duration 0))
-        from (double (get key :start_value 0))
-        to (double (get key :end_value 0))]
-    (cond
-      (< time start) from
-      (or (zero? duration) (>= time (+ start duration))) to
-      :else (+ from (* (- to from) (ease (get key :easing "linear") (/ (- time start) duration)))))))
+(defn- collect-values-impl [document animation-id time context]
+  (let [{:keys [offset scale depth prefix]} context
+        animation (get-animation document animation-id)
+        time (min (double time) (double (:duration animation)))
+        groups (sort-by (comp key-order first)
+                        (mapv #(into [] (sort-by key-order %)) (coll/vals (group-by (juxt :node_id :property_id) (:animation_keys animation)))))
+        initial (:initial_state animation)
+        initial-values (if (or (neg? time) (string/blank? initial)) []
+                         (collect-values-impl document initial (animation-duration document initial)
+                                              (assoc context :scale 0.0 :depth (inc (long depth)))))
+        own (into initial-values
+                  (mapcat (fn [keys]
+                            (let [first-key (first keys)
+                                  active (reduce (fn [active key] (if (started? key time) key (reduced active))) nil keys)
+                                  key (or active first-key)
+                                  kind (key-kind key)]
+                              (if (and (contains? #{"tween" "trigger"} kind)
+                                       (or active (neg? time) (= 1 (long depth))))
+                                (let [value (if active (sample-key key time)
+                                                (if (= "trigger" kind) (:start_data key) (double (get key :start_value 0))))]
+                                  (if (nil? value) []
+                                    [{:node (str prefix (:node_id key)) :property (:property_id key) :value value
+                                      :root-start (+ (double offset) (* (double scale) (double (if active (get key :start_time 0) 0))))
+                                      :source (if active 1 0)}])) [])))) groups)]
+    (into own
+          (mapcat (fn [keys]
+                    (let [key (first keys)]
+                      (when (= "animation" (key-kind key))
+                        (let [active (reduce (fn [active key] (if (started? key time) key (reduced active))) nil keys)
+                              node (get key :node_id "")
+                              child-document (if (string/blank? node) document (template-document document node))
+                              child (:property_id key)
+                              child-duration (double (animation-duration child-document child))
+                              key-duration (double (get active :duration 0))
+                              key-start (double (get active :start_time 0))
+                              local-time (if-not active -1.0
+                                           (if (or (zero? key-duration) (zero? child-duration)) child-duration
+                                             (* child-duration (ease (key-easing active)
+                                                                        (min 1.0 (/ (- time key-start) key-duration))))))
+                              child-context {:prefix (str prefix (when-not (string/blank? node) (str node "/")))
+                                             :offset (+ (double offset) (* key-start (double scale)))
+                                             :scale (if (or (nil? active) (zero? key-duration) (zero? child-duration)) 0.0
+                                                      (* (double scale) (/ key-duration child-duration)))
+                                             :depth (inc (long depth))}]
+                          (collect-values-impl child-document child local-time child-context)))))) groups)))
 
 (defn evaluate
-  "Return {node-id {Panthera-property-id number}} at time, without mutating the
-  GUI or document. Matches Panthera's first-start-value and last-started-key
-  semantics, including delayed keys, gaps and overlapping tweens."
+  "Sample Panthera's last-started root-time precedence, including initial,
+  nested and template clips. Events never execute game callbacks in the editor."
   [document animation-id time]
   (require-value! (finite-number? time) "Preview time must be finite." {})
   (when-let [issue (first (preview-issues document animation-id))]
     (throw (ex-info issue {:animation-id animation-id})))
-  (let [animation (get-animation document animation-id)
-        time (max 0.0 (min (double time) (double (:duration animation))))
-        groups (group-by (juxt :node_id :property_id) (:animation_keys animation))]
-    (reduce-kv (fn [values [node-id property-id] keys]
-                 (let [ordered (into [] (sort-by key-order keys))
-                       active (reduce (fn [selected key]
-                                        (if (> (double (get key :start_time 0)) time)
-                                          (reduced selected)
-                                          key))
-                                      (first ordered)
-                                      ordered)]
-                   (assoc-in values [node-id property-id] (sample-key active time))))
-               {}
-               groups)))
+  (reduce (fn [values {:keys [node property value]}] (assoc-in values [node property] value))
+          {} (sort-by (juxt :root-start :source)
+                      (collect-values-impl document animation-id (max 0.0 (double time))
+                                           {:offset 0.0 :scale 1.0 :depth 1 :prefix ""}))))
+
+(defn rename-animation [document old-id new-id]
+  (require-value! (and (not (string/blank? new-id))
+                       (or (= old-id new-id) (not (contains? (set (animation-ids document)) new-id))))
+                  "Animation names must be nonempty and unique." {})
+  (animation-index document old-id)
+  (update-in document [:data :animations]
+             (fn [clips]
+               (mapv (fn [clip]
+                       (cond-> (update clip :animation_keys
+                                        (fn [keys] (mapv #(if (and (= "animation" (key-kind %)) (string/blank? (:node_id %)) (= old-id (:property_id %)))
+                                                           (assoc % :property_id new-id) %) keys)))
+                         (= old-id (:animation_id clip)) (assoc :animation_id new-id)
+                         (= old-id (:initial_state clip)) (assoc :initial_state new-id))) clips))))
+
+(defn duplicate-animation [document animation-id new-id]
+  (let [document (add-animation document new-id 1.0)]
+    (assoc-in document [:data :animations (animation-index document new-id)]
+              (assoc (get-animation document animation-id) :animation_id new-id))))
+
+(defn remove-animation [document animation-id]
+  (require-value! (< 1 (count (animation-ids document))) "Keep at least one animation." {})
+  (require-value! (not (coll/any? #(or (= animation-id (:initial_state %))
+                                      (coll/any? (fn [key] (and (= "animation" (key-kind key)) (string/blank? (:node_id key))
+                                                                                (= animation-id (:property_id key)))) (:animation_keys %)))
+                                (into [] (remove #(= animation-id (:animation_id %))) (get-in document [:data :animations]))))
+                  "This animation is referenced by another animation." {})
+  (animation-index document animation-id)
+  (update-in document [:data :animations] #(into [] (remove (fn [clip] (= animation-id (:animation_id clip)))) %)))
+
+(defn set-initial-state [document animation-id initial-id]
+  (let [updated (assoc-in document [:data :animations (animation-index document animation-id) :initial_state] initial-id)]
+    (require-value! (not (coll/any? #(not (string/starts-with? % "Template animation must be bound")) (reference-issues-impl updated animation-id #{}))) "Invalid or cyclic initial-state reference." {})
+    updated))
+
+(defn replace-key
+  "Edit a raw Panthera segment by index, preserving extensions and discontinuities."
+  [document animation-id index key]
+  (let [index-path [:data :animations (animation-index document animation-id) :animation_keys]
+        keys (get-in document index-path)
+        updated (assoc-in document index-path (if (nil? index) (conj keys key) (assoc keys index key)))
+        end (+ (double (get key :start_time 0)) (double (get key :duration 0)))
+        updated (update-in updated [:data :animations (animation-index document animation-id) :duration] #(if (> end (double %)) end %))]
+    (validate-document updated)
+    (when-let [issue (first (key-issues key))] (throw (ex-info issue {})))
+    (require-value! (not (coll/any? #(not (string/starts-with? % "Template animation must be bound")) (reference-issues-impl updated animation-id #{}))) "Invalid or cyclic animation reference." {})
+    updated))
+
+(defn remove-key [document animation-id index]
+  (update-in document [:data :animations (animation-index document animation-id) :animation_keys]
+             #(into (subvec % 0 index) (subvec % (inc (long index))))))
+
+(defn event-samples [document animation-id time]
+  (into []
+        (comp (filter #(and (= "event" (key-kind %)) (<= (double (get % :start_time 0)) (double time))
+                           (or (zero? (double (get % :duration 0)))
+                               (<= (double time) (+ (double (get % :start_time 0)) (double (get % :duration 0)))))))
+              (map #(assoc % :value (sample-key % (double time)))))
+        (animation-keys document animation-id)))
+
+(defn selected-keyframes [document animation-id selection]
+  (into []
+        (mapcat (fn [[node-id property-id]]
+                  (into [] (comp (filter #(contains? selection [node-id property-id (:time %)]))
+                                 (map #(assoc % :node-id node-id :property-id property-id)))
+                        (editable-points (get-animation document animation-id) node-id property-id))))
+        (into #{} (map (fn [[node-id property-id _]] [node-id property-id])) selection)))
+
+(defn delete-keyframes [document animation-id selection]
+  (reduce (fn [document [node-id property-id]]
+            (replace-track document animation-id node-id property-id
+                           (into [] (remove #(contains? selection [node-id property-id (:time %)]))
+                                 (editable-points (get-animation document animation-id) node-id property-id))))
+          document (into #{} (map (fn [[node-id property-id _]] [node-id property-id])) selection)))
+
+(defn paste-keyframes [document animation-id points offset]
+  (require-value! (and (finite-number? offset)
+                       (not (coll/any? #(neg? (+ (double (:time %)) (double offset))) points)))
+                  "Pasted keyframes must have nonnegative times." {})
+  (reduce-kv (fn [document [node-id property-id] points]
+               (let [moved (mapv #(update % :time (fn [time] (+ (double time) (double offset)))) points)
+                     destinations (into #{} (map :time) moved)
+                     kept (into [] (remove #(contains? destinations (:time %)))
+                                (editable-points (get-animation document animation-id) node-id property-id))]
+                 (replace-track document animation-id node-id property-id
+                                (into [] (sort-by :time (into kept moved))))))
+             document (group-by (juxt :node-id :property-id) points)))
+
+(defn move-keyframes [document animation-id selection offset]
+  (let [points (selected-keyframes document animation-id selection)]
+    (paste-keyframes (delete-keyframes document animation-id selection) animation-id points offset)))
+
+(defn copy-selection [document animation-id points indices]
+  {:points (selected-keyframes document animation-id points)
+   :segments (mapv #(nth (animation-keys document animation-id) %) (sort indices))})
+
+(defn delete-selection [document animation-id points indices]
+  (delete-keyframes (reduce #(remove-key %1 animation-id %2) document (sort > indices)) animation-id points))
+
+(defn paste-selection [document animation-id selection offset]
+  (let [document (paste-keyframes document animation-id (:points selection) offset)]
+    (reduce (fn [document key]
+              (replace-key document animation-id nil (update key :start_time #(+ (double (or % 0)) (double offset)))))
+            document (:segments selection))))
+
+(defn move-selection [document animation-id points indices offset]
+  (let [selection (copy-selection document animation-id points indices)]
+    (paste-selection (delete-selection document animation-id points indices) animation-id selection offset)))
 
 (defn- lua-string [value]
   (str "\""

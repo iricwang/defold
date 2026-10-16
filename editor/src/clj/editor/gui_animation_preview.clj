@@ -13,7 +13,8 @@
 ;; specific language governing permissions and limitations under the License.
 
 (ns editor.gui-animation-preview
-  (:require [editor.math :as math])
+  (:require [dynamo.graph :as g]
+            [editor.math :as math])
   (:import [javax.vecmath Quat4d]))
 
 (set! *warn-on-reflection* true)
@@ -60,6 +61,24 @@
   nodes can be previewed without dividing by their original alpha."
   [scene node-overrides]
   (apply-preview-impl scene node-overrides 1.0))
+
+(defn apply-full-preview
+  "Re-evaluate geometry/text/trigger changes against a disposable graph basis.
+  No transaction is committed and the preview context never enters the system cache."
+  [scene node-overrides]
+  (let [steps (into []
+                    (mapcat (fn [[node-id overrides]]
+                              (into [] (mapcat (fn [[property value]] (g/set-property node-id property value)))
+                                    (:graph-properties overrides))))
+                    node-overrides)]
+    (if (zero? (count steps))
+      (apply-preview scene node-overrides)
+      (let [report (g/transact {:dry-run true} steps)
+            context (g/make-evaluation-context {:basis (:basis report)})
+            preview (g/node-value (:node-id scene) :scene context)]
+        (if (g/error? preview)
+          (throw (ex-info "The animated GUI properties cannot be rendered." {}))
+          preview)))))
 
 (defn transform-value
   "Applies a scene gizmo delta to the displayed local pose, never the GUI resource."

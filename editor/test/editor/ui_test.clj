@@ -420,3 +420,19 @@
         (is (instance? ComboBox observed-view))
         (is (identical? observed-view selection-owner))
         (is (= [:b] selected-items))))))
+
+;; Toolbar ancestry checks must tolerate controls detached during workspace expansion without stopping the refresh timer.
+(deftest detached-toolbar-path-test
+  (ui/run-now
+    (let [root (javafx.scene.layout.VBox.)
+          parent (javafx.scene.layout.VBox.)
+          leaf (javafx.scene.layout.Region.)]
+      (.add (.getChildren root) parent)
+      (.add (.getChildren parent) leaf)
+      (is (ui/nodes-along-path? leaf parent root))
+      (is (ui/nodes-along-path? leaf leaf root))
+      (is (false? (ui/nodes-along-path? leaf root root)))
+      (.clear (.getChildren root))
+      (is (false? (ui/nodes-along-path? leaf root root)))
+      (is (ui/nodes-along-path? leaf parent root))
+      (is (false? (ui/nodes-along-path? nil parent root))))))

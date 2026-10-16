@@ -150,3 +150,14 @@
                       :playing (or loop-enabled (< phase (* 2.0 duration)))
                       :direction (if (< phase duration) 1 -1)})
         (assoc (advance time duration dt loop-enabled) :direction 1)))))
+
+(defn segment-rows [document animation-id]
+  (into []
+        (keep-indexed (fn [index key]
+                        (when (or (not= "tween" (animation/key-kind key))
+                                  (zero? (count (display-keyframes document animation-id (:node_id key) (:property_id key)))))
+                          {:kind :segment :key-index index :key key
+                           :node-name (get key :node_id "")
+                           :label (str (animation/key-kind key) " · " (get key :node_id "") " "
+                                       (get key :event_id (get key :property_id "")))})))
+        (animation/animation-keys document animation-id)))

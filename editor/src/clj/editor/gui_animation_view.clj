@@ -21,10 +21,12 @@
             [editor.colors :as colors]
             [editor.defold-project :as project]
             [editor.gui-animation-data :as animation]
+            [editor.gui-animation-inspector :as inspector]
+            [editor.gui-animation-io :as animation-io]
+            [editor.gui-animation-properties :as animation-properties]
             [editor.gui-animation-preview :as preview]
             [editor.gui-animation-timeline :as timeline]
             [editor.localization :as localization]
-            [editor.math :as math]
             [editor.resource :as resource]
             [editor.ui :as ui]
             [editor.workspace :as workspace]
@@ -45,10 +47,7 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:private properties
-  ["position_x" "position_y" "position_z"
-   "rotation_x" "rotation_y" "rotation_z"
-   "scale_x" "scale_y" "scale_z" "color_a"])
+(def ^:private properties animation/supported-properties)
 
 (defn- paint
   ^Color [[r g b a]]
@@ -63,32 +62,12 @@
     value))
 
 (defn- node-values [node-id]
-  (let [position (g/node-value node-id :position)
-        rotation (math/clj-quat->euler (g/node-value node-id :rotation))
-        scale (g/node-value node-id :scale)]
-    (zipmap properties (conj (into [] cat [position rotation scale])
-                             (g/node-value node-id :alpha)))))
+  (animation-properties/node-values node-id))
 
 (defn- preview-overrides [node-ids values]
-  (into {}
-        (keep (fn [[node-name channels]]
-                (when-let [node-id (get node-ids node-name)]
-                  (let [values (merge (node-values node-id) channels)]
-                    [node-id (cond-> {}
-                               (coll/any? #(contains? channels %) ["position_x" "position_y" "position_z"])
-                               (assoc :position (mapv values ["position_x" "position_y" "position_z"]))
-
-                               (coll/any? #(contains? channels %) ["rotation_x" "rotation_y" "rotation_z"])
-                               (assoc :rotation (math/vecmath->clj
-                                                  (math/euler->quat
-                                                    (mapv values ["rotation_x" "rotation_y" "rotation_z"]))))
-
-                               (coll/any? #(contains? channels %) ["scale_x" "scale_y" "scale_z"])
-                               (assoc :scale (mapv values ["scale_x" "scale_y" "scale_z"]))
-
-                               (contains? channels "color_a")
-                               (assoc :alpha (get values "color_a")))]))))
-        values))
+  (into {} (keep (fn [[name channels]]
+                   (when-let [id (get node-ids name)]
+                     [id (animation-properties/node-overrides id channels)]))) values))
 
 (defn- time-x
   ^double [^Canvas canvas state time]
@@ -107,7 +86,7 @@
   (doto (SVGPath.) (.setContent path) (ui/add-style! "animation-glyph")))
 
 (defn- draw-timeline! [^Canvas canvas state]
-  (let [{:keys [document animation-id time selected active-track zoom offset dragging-key frame-display rows ruler-y]} state
+  (let [{:keys [document animation-id time selected selected-keys active-track zoom offset dragging-key frame-display rows ruler-y marquee]} state
         fps (double (timeline/frames-per-second document))
         gc (.getGraphicsContext2D canvas)
         width (.getWidth canvas)
@@ -118,7 +97,8 @@
     (.fillRect gc 0.0 0.0 width height)
     (.setFont gc (Font/font 13.0))
     (doseq [[index {:keys [node-name property-id kind]}] (eduction (map-indexed vector) rows)]
-      (let [top (+ 32.0 (* 28.0 (double index)))
+      (let [row (get rows index)
+            top (+ 32.0 (* 28.0 (double index)))
             y (+ top 14.0)]
         (.setFill gc (Color/web (cond
                                   (= active-track [node-name property-id]) "#174779"
@@ -126,15 +106,27 @@
                                   (odd? (long index)) "#181818"
                                   :else "#181818")))
         (.fillRect gc 0.0 top width 28.0)
+        (when (= kind :segment)
+          (let [key (:key row)
+                x0 (time-x canvas state (get key :start_time 0))
+                x1 (time-x canvas state (+ (double (get key :start_time 0)) (double (get key :duration 0))))]
+            (.setFill gc (Color/web (if (or (= (:selected-raw state) (:key-index row)) (contains? (:selected-raws state) (:key-index row))) "#83b7fb" "#41798c")))
+            (.fillRoundRect gc x0 (+ top 6.0) (max 8.0 (- x1 x0)) 16.0 3.0 3.0)
+            (.setFill gc (Color/web "#eeeeee"))
+            (.fillText gc (get key :event_id (get key :property_id "")) (+ x0 7.0) (+ y 4.0))))
         (when property-id
           (doseq [keyframe (timeline/display-keyframes document animation-id node-name property-id)]
             (let [key-id [node-name property-id (:time keyframe)]
                   dragging (= dragging-key key-id)
                   x (time-x canvas state (if dragging time (:time keyframe)))
-                  active (or dragging (= selected key-id))]
+                  active (or dragging (= selected key-id) (contains? selected-keys key-id))]
               (.setFill gc (Color/web (if active "#d4e8ff" "#83b7fb")))
               (.fillPolygon gc (double-array [x (+ x 5.0) x (- x 5.0)])
                             (double-array [(- y 5.0) y (+ y 5.0) y]) 4))))))
+    (when-let [[x0 y0 x1 y1] marquee]
+      (.setStroke gc (Color/web "#83b7fb"))
+      (.strokeRect gc (min (double x0) (double x1)) (min (double y0) (double y1))
+                      (Math/abs (- (double x1) (double x0))) (Math/abs (- (double y1) (double y0)))))
     (.setFill gc (Color/web "#181818"))
     (.fillRect gc 0.0 ruler-y width 32.0)
     (let [visible-frames (* (timeline/visible-span zoom) fps)
@@ -172,7 +164,7 @@
         samples (mapv (fn [index]
                         (let [t (/ (double index) 64.0)]
                           (if (and detail node-name property-id)
-                            (double (get-in (animation/evaluate document animation-id (* duration t)) [node-name property-id] 0.0))
+                            (double (get-in (animation/evaluate (get state :preview-document document) animation-id (* duration t)) [node-name property-id] 0.0))
                             (animation/ease easing t))))
                       (range 65))
         low (if detail (reduce min samples) 0.0)
@@ -201,12 +193,14 @@
 (defn- timeline-key [^Canvas canvas state x y]
   (let [{:keys [document animation-id rows]} state
         row (int (Math/floor (/ (- (double y) 32.0) 28.0)))
-        {:keys [node-name property-id]} (get rows row)]
-    (when (and property-id (>= (double y) (+ (double (get state :ruler-y 0.0)) 32.0)))
-      (when-let [keyframe (coll/first-where
-                            #(< (Math/abs (- (double x) (time-x canvas state (:time %)))) 9.0)
-                            (timeline/display-keyframes document animation-id node-name property-id))]
-        [node-name property-id keyframe]))))
+        {:keys [node-name property-id kind key key-index]} (get rows row)]
+    (when (>= (double y) (+ (double (get state :ruler-y 0.0)) 32.0))
+      (if (= kind :segment)
+        [node-name nil {:raw-index key-index :time (get key :start_time 0) :easing (get key :easing "linear") :raw-key key}]
+        (when property-id
+          (when-let [keyframe (coll/first-where #(< (Math/abs (- (double x) (time-x canvas state (:time %)))) 9.0)
+                                              (timeline/display-keyframes document animation-id node-name property-id))]
+            [node-name property-id keyframe]))))))
 
 (defn- animation-resource-node [project path]
   (when-let [node-id (project/get-resource-node project path)]
@@ -236,7 +230,7 @@
                      :animation-id "default" :time 0.0 :playing false :preview false
                      :recording false :draft {} :collapsed #{} :zoom 1.0 :offset 0.0
                      :muted #{} :frame-display true :direction 1 :rows []
-                     :selected nil :last-lines nil :last-selection nil :exists false})
+                     :selected nil :selected-keys #{} :selected-raws #{} :clipboard {:points [] :segments []} :speed 1.0 :last-lines nil :last-selection nil :exists false})
         updating (atom false)
         tool-controller-id (g/node-value view-id :tool-controller-id)
         manipulation-handler (atom nil)
@@ -270,13 +264,15 @@
         record-button (doto (ToggleButton.) (.setId "gui-animation-record"))
         loop-check (doto (ToggleButton.) (.setId "gui-animation-loop"))
         mode-label (doto (Label.) (.setId "gui-animation-mode") (.setWrapText true))
-        fps-choice (doto (ComboBox.) (.setId "gui-animation-fps") (ui/items! [24 30 60 120]) (.setValue (int 60)))
+        fps-choice (doto (ComboBox.) (.setId "gui-animation-fps") (ui/items! (mapv int [24 30 60 120])) (.setValue (int 60)))
         frame-display (doto (ToggleButton.) (.setId "gui-animation-frame-display") (.setSelected true))
         playback-mode (doto (ComboBox.) (.setId "gui-animation-playback-mode") (ui/items! [:normal :reverse :ping-pong]) (.setValue :normal))
         curve (doto (Canvas. 200.0 80.0) (.setId "gui-animation-easing-curve"))
         detail-curve (doto (Canvas. 700.0 112.0) (.setId "gui-animation-detail-curve"))
         curve-pane (doto (Pane.) (.setMinWidth 0.0) (ui/children! [detail-curve]))
-        event-list (doto (VBox. 6.0) (.setPadding (Insets. 12.0)))
+        initial-choice (doto (ComboBox.) (.setId "gui-animation-initial-state"))
+        speed-choice (doto (ComboBox.) (.setId "gui-animation-speed") (ui/items! [0.1 0.25 0.5 1.0 1.5 2.0 4.0]) (.setValue 1.0))
+        curve-drag (atom nil)
         zoom-choice (doto (ComboBox.) (.setId "gui-animation-zoom-choice") (ui/items! [1.0 5.0 10.0 12.5 25.0 50.0 100.0 150.0 200.0 400.0 800.0]) (.setValue 100.0))
         zoom-slider (doto (Slider. 0.001 8.0 1.0) (.setId "gui-animation-zoom") (.setPrefWidth 100.0))
         time-scroll (doto (ScrollBar.) (.setId "gui-animation-scroll") (.setMin 0.0))
@@ -294,6 +290,31 @@
         button (fn ^Button [suffix id f]
                  (doto (Button.) (.setId id) (ui/add-style! "button-small") (localize! suffix)
                        (.setOnAction (ui/event-handler _ ((guarded f) nil)))))
+        source-cache (atom {})
+        load-source! (fn [source-path]
+                       (letfn [(load-impl [source-path visited]
+                                 (when (or (contains? visited source-path) (> (count visited) 16))
+                                   (throw (ex-info "Cyclic template animation file reference." {:path source-path})))
+                                 (if-let [node-id (animation-resource-node project source-path)]
+                                   (let [lines (g/node-value node-id :save-value)
+                                         cached (get @source-cache source-path)]
+                                     (if (and (= lines (:lines cached))
+                                              (not (coll/any? (fn [[path expected]]
+                                                                (not= expected (when-let [id (animation-resource-node project path)] (g/node-value id :save-value))))
+                                                              (:dependencies cached))))
+                                       (:document cached)
+                                       (let [dependencies (atom {})
+                                             document (animation/read-source (code-data/lines->string lines)
+                                                                             (fn [path]
+                                                                               (let [child (load-impl path (conj visited source-path))
+                                                                                     entry (get @source-cache path)]
+                                                                                 (swap! dependencies merge {path (:lines entry)} (:dependencies entry))
+                                                                                 child)))]
+                                         (swap! source-cache assoc source-path {:lines lines :document document :dependencies @dependencies})
+                                         document)))
+                                   (throw (ex-info (str "Template animation resource is missing: " source-path) {}))))]
+                         (load-impl source-path #{})))
+        resolved-document! (fn [document] (animation/resolve-preview document (:animation-id @state) load-source!))
         stop-preview! (fn []
                         (swap! state assoc :playing false :preview false :recording false :draft {})
                         (.setSelected preview-check false)
@@ -306,9 +327,11 @@
                                  (g/set-property tool-controller-id :animation-manipulation nil)])))
         update-preview! (fn []
                           (let [{:keys [document animation-id time preview draft]} @state
+                                document (resolved-document! document)
+                                _ (swap! state assoc :preview-document document)
                                 node-ids (g/node-value resource-node :node-ids)
                                 issues (when preview
-                                         (into (animation/preview-issues document animation-id)
+                                         (into (animation/preview-issues (resolved-document! document) animation-id)
                                                (comp (map first) (distinct)
                                                      (remove #(contains? node-ids %))
                                                      (map #(str "GUI node is missing: " %)))
@@ -317,7 +340,7 @@
                                 overrides (if active
                                             (preview-overrides node-ids
                                                                (reduce (fn [values [node-name property-id]] (update values node-name dissoc property-id))
-                                                                       (merge-with merge (animation/evaluate document animation-id time) draft)
+                                                                       (merge-with merge (animation/evaluate (resolved-document! document) animation-id time) draft)
                                                                        (:muted @state)))
                                             {})]
                             (when (not= overrides (g/node-value view-id :animation-preview-overrides))
@@ -358,7 +381,7 @@
                            (when-not (.isFocused frame-field)
                              (.setText frame-field (str (Math/round (* (double time) (double (timeline/frames-per-second document)))))))
                            (when (and node-id (not (.isFocused value-field)))
-                             (let [value (get-in (merge-with merge (animation/evaluate document animation-id time) draft) [node-name property-id]
+                             (let [value (get-in (merge-with merge (animation/evaluate (resolved-document! document) animation-id time) draft) [node-name property-id]
                                                  (get (node-values node-id) property-id))]
                                (.setText value-field (format "%.4f" (double value))))))))
         refresh-document! (fn []
@@ -372,11 +395,14 @@
                                         animation-id (if (contains? (set ids) (:animation-id @state))
                                                        (:animation-id @state) (first ids))]
                                     (swap! state assoc :document document :animation-id animation-id :draft {} :selected nil
+                                           :selected-keys #{} :selected-raws #{} :selected-raw nil
                                            :time (min (double (:time @state)) (double (animation/animation-duration document animation-id)))
                                            :exists true :last-lines lines)
                                     (reset! updating true)
                                     (try (ui/items! animation-choice ids)
                                          (.setValue animation-choice animation-id)
+                                         (ui/items! initial-choice (into [""] (remove #{animation-id}) ids))
+                                         (.setValue initial-choice (get (coll/first-where #(= animation-id (:animation_id %)) (get-in document [:data :animations])) :initial_state ""))
                                          (.setText duration-field (str (animation/animation-duration document animation-id)))
                                          (.setText name-field animation-id)
                                          (.setValue fps-choice (int (timeline/frames-per-second document)))
@@ -440,7 +466,7 @@
                    changes (into []
                                  (mapcat (fn [[name channels]]
                                            (let [initial (merge (node-values (get (g/node-value resource-node :node-ids) name))
-                                                                (get (animation/evaluate document animation-id time) name))]
+                                                                (get (animation/evaluate (resolved-document! document) animation-id time) name))]
                                              (into [] (keep (fn [[property value]]
                                                               (when (> (Math/abs (- (double value) (double (get initial property)))) 1.0e-7)
                                                                 [name property value]))) channels))))
@@ -460,10 +486,41 @@
         navigate! (fn [direction]
                     (swap! state assoc :playing false)
                     (set-time! (timeline/navigate (:document @state) (:animation-id @state) (:time @state) direction)))
+        selection (fn [] (if (pos? (count (:selected-keys @state))) (:selected-keys @state) (if-let [key (:selected @state)] #{key} #{})))
+        raw-selection (fn [] (if (pos? (count (:selected-raws @state))) (:selected-raws @state)
+                              (if-let [index (:selected-raw @state)] #{index} #{})))
         delete-key! (fn []
-                      (when-let [[node-name property-id time] (:selected @state)]
-                        (commit! #(animation/remove-keyframe % (:animation-id @state) node-name property-id time))
-                        (swap! state assoc :selected nil)))
+                      (let [points (selection) indices (raw-selection)]
+                        (when (pos? (+ (count points) (count indices)))
+                          (commit! #(animation/delete-selection % (:animation-id @state) points indices))
+                          (swap! state assoc :selected nil :selected-keys #{} :selected-raw nil :selected-raws #{}))))
+        copy-keys! (fn [] (swap! state assoc :clipboard (animation/copy-selection (:document @state) (:animation-id @state) (selection) (raw-selection))))
+        paste-keys! (fn []
+                      (let [{:keys [points segments] :as clipboard} (:clipboard @state)
+                            times (into (mapv #(double (:time %)) points) (map #(double (get % :start_time 0))) segments)]
+                        (when (pos? (count times))
+                          (let [offset (- (double (:time @state)) (double (reduce min times)))]
+                            (commit! #(animation/paste-selection % (:animation-id @state) clipboard offset))
+                            (swap! state assoc :selected-keys (into #{} (map (fn [point] [(:node-id point) (:property-id point) (+ (double (:time point)) offset)])) points)
+                                   :selected-raw nil
+                                   :selected-raws (let [total (count (animation/animation-keys (:document @state) (:animation-id @state)))]
+                                                    (set (range (- total (count segments)) total))))))))
+        commit-drafts! (fn []
+                         (let [{:keys [animation-id time draft]} @state]
+                           (commit! (fn [document]
+                                      (reduce-kv (fn [document name channels]
+                                                   (reduce-kv (fn [document property value]
+                                                                (timeline/record-value document animation-id name property time value
+                                                                                       (get (node-values (get (g/node-value resource-node :node-ids) name)) property)
+                                                                                       (.getValue easing-choice))) document channels)) document draft)))
+                           (swap! state assoc :draft {})
+                           (update-preview!)))
+        reset-drafts! (fn [] (swap! state assoc :draft {}) (update-preview!))
+        key-inspector (inspector/create! {:state state :commit! commit! :set-time! set-time! :localize! localize! :guard guarded :resolve-document! resolved-document!
+                                          :node-names #(vec (sort (into [] (coll/keys (g/node-value resource-node :node-ids)))))
+                                          :template-document! (fn [name]
+                                                                (let [target (animation/template-document (:document @state) name)]
+                                                                  (cond (map? target) target (string? target) (load-source! target) :else (:document @state))))})
         create! (fn []
                   (let [file (io/file (workspace/project-directory workspace) (subs path 1))]
                     (when-not (.exists file)
@@ -486,19 +543,19 @@
         filesbar (doto (GridPane.) (.setHgap 8.0) (.setVgap 6.0) (ui/add-style! "animation-file-actions")
                        (ui/children! [(button "create" "gui-animation-create" create!)
                                       (button "import" "gui-animation-import"
-                                              #(let [chooser (doto (FileChooser.) (.setTitle "Import Panthera JSON"))]
+                                              #(let [chooser (doto (FileChooser.) (.setTitle "Import Panthera animation"))]
                                                  (.add (.getExtensionFilters chooser)
-                                                       (FileChooser$ExtensionFilter. "Panthera JSON" (java.util.ArrayList. ["*.json"])))
+                                                       (FileChooser$ExtensionFilter. "Panthera animation" (java.util.ArrayList. ["*.json" "*.lua"])))
                                                  (when-let [file (.showOpenDialog chooser (.getWindow (.getScene root)))]
-                                                   (let [document (animation/read-json (slurp file :encoding "UTF-8"))]
+                                                   (let [document (animation-io/read-document-file file load-source!)]
                                                      (create!) (commit! (constantly document))))))
                                       (button "export-json" "gui-animation-export-json"
                                               #(let [chooser (doto (FileChooser.) (.setTitle "Export Panthera JSON")
                                                                    (.setInitialFileName (.getName (io/file path))))]
                                                  (.add (.getExtensionFilters chooser)
-                                                       (FileChooser$ExtensionFilter. "Panthera JSON" (java.util.ArrayList. ["*.json"])))
+                                                       (FileChooser$ExtensionFilter. "Panthera animation" (java.util.ArrayList. ["*.json" "*.lua"])))
                                                  (when-let [file (.showSaveDialog chooser (.getWindow (.getScene root)))]
-                                                   (spit file (animation/write-json (:document @state)) :encoding "UTF-8")
+                                                   (animation-io/write-document-file! file :json (:document @state))
                                                    (workspace/resource-sync! workspace))))
                                       (button "export" "gui-animation-export"
                                               #(let [chooser (doto (FileChooser.) (.setTitle "Export Panthera Lua")
@@ -506,7 +563,7 @@
                                                  (.add (.getExtensionFilters chooser)
                                                        (FileChooser$ExtensionFilter. "Lua animation" (java.util.ArrayList. ["*.lua"])))
                                                  (when-let [file (.showSaveDialog chooser (.getWindow (.getScene root)))]
-                                                   (spit file (animation/write-lua (:document @state)) :encoding "UTF-8")
+                                                   (animation-io/write-document-file! file :lua (:document @state))
                                                    (workspace/resource-sync! workspace))))
                                       (button "save" "gui-animation-save" save!)]))
         grid (fn [pairs]
@@ -518,16 +575,18 @@
                    (when (instance? Region field) (.setMaxWidth ^Region field Double/MAX_VALUE)))
                  pane))
         bottom-loop (doto (CheckBox.) (localize! "loop-playback"))
-        ^GridPane settingsbar (grid [["name" name-field] ["duration" duration-field]
+        ^GridPane settingsbar (grid [["name" (doto (HBox. 6.0) (ui/children! [name-field initial-choice]))]
+                                     ["duration" (doto (HBox. 6.0) (ui/children! [duration-field speed-choice]))]
                                      ["playback-mode" (doto (HBox. 12.0) (.setAlignment Pos/CENTER_LEFT)
                                                             (ui/children! [playback-mode bottom-loop]))]])
+        key-more (doto (MenuButton. "…") (.setId "gui-animation-key-more") (ui/add-style! "button-icon"))
         key-actions (doto (HBox. 8.0) (.setAlignment Pos/CENTER_RIGHT)
                           (ui/children! [(doto ^Button (button "key" "gui-animation-add-key"
                                                                #(record-value! (.getValue node-choice) (.getValue property-choice) (finite-number value-field)))
                                            (ui/add-style! "animation-primary"))
-                                         (button "delete" "gui-animation-delete-key" delete-key!)]))
+                                         (button "delete" "gui-animation-delete-key" delete-key!) key-more]))
         editbar (doto (VBox. 8.0)
-                  (ui/children! [(grid [["current-property" (doto (HBox. 8.0) (ui/children! [property-choice]))]
+                  (ui/children! [(grid [["current-property" (doto (HBox. 8.0) (ui/children! [node-choice property-choice]))]
                                         ["value" value-field]]) key-actions]))
         easing-panel (doto (VBox. 8.0) (ui/add-style! "animation-easing-panel")
                            (ui/children! [(doto (HBox. 10.0) (.setAlignment Pos/CENTER_LEFT)
@@ -576,9 +635,10 @@
         refresh-tracks! (fn []
                           (let [{:keys [document animation-id collapsed time draft active-track muted]} @state
                                 child-counts (frequencies (eduction (map :parent) (:nodes (g/node-value resource-node :save-value))))
-                                rows (timeline/editor-rows (timeline/tracks document animation-id) collapsed (.getValue node-choice) child-counts)
+                                rows (into (timeline/editor-rows (timeline/tracks document animation-id) collapsed (.getValue node-choice) child-counts)
+                                           (timeline/segment-rows document animation-id))
                                 context [animation-id rows]
-                                values (merge-with merge (animation/evaluate document animation-id time) draft)]
+                                values (merge-with merge (animation/evaluate (resolved-document! document) animation-id time) draft)]
                             (let [viewport-height (.getHeight (.getViewportBounds scroll))
                                   ruler-y (* (.getVvalue scroll) (max 0.0 (- (.getHeight canvas) viewport-height)))]
                               (swap! state assoc :rows rows :viewport-height viewport-height :ruler-y ruler-y)
@@ -590,8 +650,11 @@
                               (ui/children! track-pane
                                             (into [track-header]
                                                   (map-indexed
-                                                    (fn [index {:keys [node-name property-id kind child-count]}]
+                                                    (fn [index {:keys [node-name property-id kind child-count label key-index]}]
                                                       (case kind
+                                                        :segment (doto (Button. label) (.setMnemonicParsing false) (ui/add-style! "animation-node-row")
+                                                                       (.setMaxWidth Double/MAX_VALUE) (.setAlignment Pos/CENTER_LEFT)
+                                                                       (.setOnAction (ui/event-handler _ ((:select! key-inspector) key-index))))
                                                         :node (doto (Button. (str (if (contains? collapsed node-name) "▸  " "▾  ") "◇  " node-name))
                                                                 (.setMnemonicParsing false) (ui/add-style! "animation-node-row")
                                                                 (.setMaxWidth Double/MAX_VALUE) (.setAlignment Pos/CENTER_LEFT)
@@ -653,7 +716,7 @@
     (.add (.getTabs workspace-tabs) workspace-tab)
     (ui/children! title [workspace-tabs header])
     (StackPane/setAlignment header Pos/TOP_RIGHT)
-    (StackPane/setMargin header (Insets. 0.0 4.0 0.0 200.0))
+    (StackPane/setMargin header (Insets. 0.0 0.0 0.0 0.0))
     (HBox/setHgrow path-label Priority/ALWAYS)
     (HBox/setHgrow toolbar-spacer Priority/ALWAYS)
     (HBox/setHgrow settingsbar Priority/ALWAYS)
@@ -678,6 +741,28 @@
                                                                                            (if (contains? ids name) (recur (inc index)) name)))]
                                                                               (commit! (fn [document] (animation/add-animation document name 1.0)))
                                                                               (.setValue animation-choice name))) nil))))])
+    (doseq [[^MenuButton menu actions] [[more-menu [["duplicate-clip" "gui-animation-duplicate-clip"
+                                                                  #(let [id (:animation-id @state)
+                                                                         ids (set (animation/animation-ids (:document @state)))
+                                                                         name (loop [index 1] (let [name (str id "_copy" index)] (if (contains? ids name) (recur (inc index)) name)))]
+                                                                     (commit! (fn [document] (animation/duplicate-animation document id name)))
+                                                                     (.setValue animation-choice name))]
+                                                                 ["delete-clip" "gui-animation-delete-clip"
+                                                                  #(commit! (fn [document] (animation/remove-animation document (:animation-id @state))))]]]
+                                       [key-more [["copy-keys" "gui-animation-copy-keys" copy-keys!]
+                                                  ["paste-keys" "gui-animation-paste-keys" paste-keys!]
+                                                  ["commit-all" "gui-animation-commit-all" commit-drafts!]
+                                                  ["reset-all" "gui-animation-reset-all" reset-drafts!]
+                                                  ["custom-curve" "gui-animation-custom-curve"
+                                                   #(when-let [[name property time] (:selected @state)]
+                                                      (let [points (mapv (fn [index] (/ (double index) 16.0)) (range 17))
+                                                            key (coll/first-where (fn [key] (= time (:time key))) (animation/keyframes (:document @state) (:animation-id @state) name property))]
+                                                        (commit! (fn [document] (animation/set-keyframe document (:animation-id @state) name property time (:value key) points)))
+                                                        (.setValue easing-choice points)
+                                                        (swap! state assoc :selected [name property time])))]]]]]
+      (doseq [[suffix id f] actions]
+        (.add (.getItems menu) (doto (MenuItem.) (.setId id) (localize! suffix)
+                                (.setOnAction (ui/event-handler _ ((guarded f) nil)))))))
     (ui/children! track-header [(doto (Label.) (localize! "properties") (.setMaxWidth Double/MAX_VALUE))
                                 (icon-button "add-property" "gui-animation-add-property" "+" add-property!)])
     (HBox/setHgrow (first (.getChildren track-header)) Priority/ALWAYS)
@@ -685,19 +770,19 @@
     (.bind (.prefWidthProperty track-pane) (.multiply (.widthProperty scroll) 0.21))
     (replace-items! (.getTabs settings) [(doto (Tab.) (localize! "settings") (.setContent settings-scroll))
                                          (doto (Tab.) (localize! "curves") (.setContent curve-pane))
-                                         (doto (Tab.) (localize! "events") (.setContent (doto (ScrollPane. event-list) (.setFitToWidth true))))])
+                                         (doto (Tab.) (localize! "events") (.setContent (doto (ScrollPane. (:node key-inspector)) (.setFitToWidth true) (.setFitToHeight true))))])
     (.bind (.widthProperty detail-curve) (.widthProperty curve-pane))
     (.setConverter fps-choice (proxy [StringConverter] []
                                 (toString [value] (str value " fps"))
                                 (fromString [_] nil)))
     (.setConverter zoom-choice (proxy [StringConverter] []
-                                 (toString [value] (if (nil? value) "" (str (if (== (double value) (Math/rint (double value))) (long value) value) "%")))
+                                 (toString [value] (if (nil? value) "" (format "%.0f%%" (double value))))
                                  (fromString [_] nil)))
     (.setConverter playback-mode (proxy [StringConverter] []
                                    (toString [value] (localization (localization/message (case value :reverse "gui-animation.mode-reverse" :ping-pong "gui-animation.mode-ping-pong" "gui-animation.mode-normal"))))
                                    (fromString [_] nil)))
     (.setConverter easing-choice (proxy [StringConverter] []
-                                   (toString [value] (if (= value "linear") "Linear" (str value)))
+                                   (toString [value] (cond (vector? value) (localization (localization/message "gui-animation.custom-curve")) (= value "linear") "Linear" :else (str value)))
                                    (fromString [_] nil)))
     (localize! frame-display "frame-display")
     (.setGraphic frame-display (glyph "M0 0 L0 17 L20 17 M4 5 L4 12 M9 2 L9 12 M14 6 L14 12 M19 3 L19 12"))
@@ -721,14 +806,18 @@
                   (ui/event-handler _
                     ((guarded #(let [new-name (string/trim (.getText name-field))
                                      old-name (:animation-id @state)]
-                                 (when (or (string/blank? new-name)
-                                           (and (not= old-name new-name)
-                                                (contains? (set (animation/animation-ids (:document @state))) new-name)))
-                                   (throw (ex-info "Animation names must be nonempty and unique." {})))
-                                 (commit! (fn [document]
-                                            (update-in document [:data :animations]
-                                                       (fn [clips] (mapv (fn [clip] (if (= old-name (:animation_id clip)) (assoc clip :animation_id new-name) clip)) clips)))))
+                                 (commit! (fn [document] (animation/rename-animation document old-name new-name)))
                                  (.setValue animation-choice new-name))) nil)))
+    (.setTooltip initial-choice (doto (Tooltip.) (localize! "initial-state")))
+    (.setConverter initial-choice (proxy [StringConverter] []
+                                    (toString [value] (if (string/blank? value) (localization (localization/message "gui-animation.initial-state")) value))
+                                    (fromString [_] nil)))
+    (.setOnAction initial-choice (ui/event-handler _
+                                  (when-not @updating
+                                    ((guarded #(commit! (fn [document] (animation/set-initial-state document (:animation-id @state) (.getValue initial-choice))))) nil))))
+    (.setConverter speed-choice (proxy [StringConverter] []
+                                  (toString [value] (str value "×")) (fromString [_] nil)))
+    (.setOnAction speed-choice (ui/event-handler _ (swap! state assoc :speed (double (.getValue speed-choice)))))
     (localize! preview-check "preview")
     (localize! record-button "record")
     (localize! loop-check "loop")
@@ -764,6 +853,10 @@
                     (swap! state assoc :animation-id value :time 0.0 :selected nil :playing false :draft {} :offset 0.0)
                     (.setText duration-field (str (animation/animation-duration (:document @state) value)))
                     (.setText name-field value)
+                    (reset! updating true)
+                    (try (ui/items! initial-choice (into [""] (remove #{value}) (animation/animation-ids (:document @state))))
+                         (.setValue initial-choice (get (coll/first-where #(= value (:animation_id %)) (get-in (:document @state) [:data :animations])) :initial_state ""))
+                         (finally (reset! updating false)))
                     (update-preview!))))
     (.setOnAction duration-field
                   (ui/event-handler _
@@ -777,6 +870,10 @@
                                    (when (not= (:easing key) (.getValue easing-choice))
                                      (commit! (fn [document] (animation/set-keyframe document (:animation-id @state) node-name property-id time (:value key) (.getValue easing-choice))))
                                      (swap! state assoc :selected selected)))) nil))))
+    (doseq [^ComboBox control [node-choice property-choice]]
+      (.setOnAction control (ui/event-handler _
+                             (when-not @updating
+                               (swap! state assoc :active-track [(.getValue node-choice) (.getValue property-choice)])))))
     (.setOnAction time-field (ui/event-handler _ ((guarded #(set-time! (finite-number time-field))) nil)))
     (.setOnAction frame-field (ui/event-handler _ ((guarded #(set-time! (/ (finite-number frame-field)
                                                                            (double (timeline/frames-per-second (:document @state)))))) nil)))
@@ -835,6 +932,75 @@
           (reset! pan nil)
           (.setCursor scroll Cursor/DEFAULT)
           (.consume ^MouseEvent event))))
+    (.setTooltip easing-choice (doto (Tooltip.) (localize! "curve-help")))
+    (let [edit-curve! (fn [^MouseEvent event]
+                        (when-let [selection @curve-drag]
+                          (let [points (get selection :points)
+                                x (max 0.0 (min 1.0 (/ (- (.getX event) 16.0) (max 1.0 (- (.getWidth curve) 32.0)))))
+                                y (max -1.0 (min 2.0 (/ (- (- (.getHeight curve) 16.0) (.getY event)) (max 1.0 (- (.getHeight curve) 32.0)))))
+                                index (max 1 (min (- (count points) 2) (long (Math/round (* x (dec (count points)))))))
+                                points (assoc points index y)]
+                            (swap! curve-drag assoc :points points)
+                            (draw-curve! curve @state points false))))]
+      (.setOnMousePressed curve (ui/event-handler event
+                                 (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
+                                   (when-let [[name property time] (:selected @state)]
+                                     (let [key (coll/first-where #(= time (:time %)) (animation/keyframes (:document @state) (:animation-id @state) name property))
+                                           easing (:easing key)
+                                           points (if (vector? easing) easing (mapv #(animation/ease easing (/ (double %) 16.0)) (range 17)))]
+                                       (reset! curve-drag {:selection [name property time] :points points :value (:value key)})
+                                       (edit-curve! event))))))
+      (.setOnMouseDragged curve (ui/event-handler event (edit-curve! event)))
+      (.setOnMouseReleased curve (ui/event-handler _
+                                  (when-let [{:keys [selection points value]} @curve-drag]
+                                    (reset! curve-drag nil)
+                                    ((guarded #(let [[name property time] selection]
+                                                 (commit! (fn [document] (animation/set-keyframe document (:animation-id @state) name property time value points)))
+                                                 (.setValue easing-choice points)
+                                                 (swap! state assoc :selected selection))) nil)))))
+    (let [all-keys (fn []
+                     (into #{} (mapcat (fn [[name property]]
+                                          (mapv (fn [key] [name property (:time key)])
+                                                (timeline/display-keyframes (:document @state) (:animation-id @state) name property))))
+                           (timeline/tracks (:document @state) (:animation-id @state))))]
+      (.setOnKeyPressed canvas
+        (ui/event-handler event
+          (let [code (.getCode ^KeyEvent event)
+                shortcut (.isShortcutDown ^KeyEvent event)]
+            (cond
+              (and shortcut (= KeyCode/A code)) (do (swap! state assoc :selected-keys (all-keys) :selected-raws (into #{} (map :key-index) (timeline/segment-rows (:document @state) (:animation-id @state)))) (.consume event))
+              (and shortcut (= KeyCode/C code)) (do ((guarded copy-keys!) nil) (.consume event))
+              (and shortcut (= KeyCode/X code)) (do ((guarded #(do (copy-keys!) (delete-key!))) nil) (.consume event))
+              (and shortcut (= KeyCode/V code)) (do ((guarded paste-keys!) nil) (.consume event))
+              (and (.isShiftDown ^KeyEvent event) (= KeyCode/ENTER code)) (do ((guarded commit-drafts!) nil) (.consume event))
+              (= KeyCode/U code) (do ((guarded reset-drafts!) nil) (.consume event))
+              (contains? #{KeyCode/DELETE KeyCode/BACK_SPACE} code) (do ((guarded delete-key!) nil) (.consume event))
+              (= KeyCode/SPACE code) (do (.fire play-button) (.consume event))
+              (= KeyCode/M code) (do (.fire preview-check) (.consume event))
+              (and (not shortcut) (contains? #{KeyCode/A KeyCode/D} code))
+              (do (if (.isShiftDown ^KeyEvent event)
+                    ((guarded #(navigate! (if (= KeyCode/A code) :previous-frame :next-frame))) nil)
+                    (do (.setValue playback-mode (if (= KeyCode/A code) :reverse :normal)) (.fire play-button)))
+                  (.consume event))
+              (contains? #{KeyCode/Q KeyCode/E} code)
+              (do (let [times (mapv #(double (nth % 2)) (selection))]
+                    (when (pos? (count times)) (set-time! (reduce (if (= KeyCode/Q code) min max) times))))
+                  (.consume event))
+              (= KeyCode/COMMA code) (do ((guarded #(navigate! (if (.isAltDown ^KeyEvent event) :previous-key :previous-frame))) nil) (.consume event))
+              (= KeyCode/PERIOD code) (do ((guarded #(navigate! (if (.isAltDown ^KeyEvent event) :next-key :next-frame))) nil) (.consume event))
+              (contains? #{KeyCode/HOME KeyCode/R} code) (do ((guarded #(navigate! (if (.isShiftDown ^KeyEvent event) :last :first))) nil) (.consume event))
+              (= KeyCode/END code) (do ((guarded #(navigate! :last)) nil) (.consume event))
+              (contains? #{KeyCode/LEFT KeyCode/RIGHT} code)
+              (do ((guarded #(let [fps (timeline/frames-per-second (:document @state))
+                                  delta (/ (* (if (= KeyCode/LEFT code) -1.0 1.0) (if (.isShiftDown ^KeyEvent event) 10.0 1.0)) (double fps))
+                                  keys (selection) raws (raw-selection)]
+                              (when (pos? (+ (count keys) (count raws)))
+                                (commit! (fn [document] (animation/move-selection document (:animation-id @state) keys raws delta)))
+                                (swap! state assoc :selected-keys (into #{} (map (fn [[name property time]] [name property (+ (double time) delta)])) keys)
+                                       :selected-raw nil
+                                       :selected-raws (let [total (count (animation/animation-keys (:document @state) (:animation-id @state)))]
+                                                        (set (range (- total (count raws)) total))))))) nil)
+                  (.consume event)))))))
     (.setOnMousePressed canvas
                         (ui/event-handler event
                           (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
@@ -845,13 +1011,26 @@
                                   (let [x (.getX ^MouseEvent event)
                                         y (.getY ^MouseEvent event)]
                                     (if-let [[node-name property-id keyframe] (timeline-key canvas @state x y)]
-                                      (do (set-time! (:time keyframe))
-                                          (swap! state assoc :selected [node-name property-id (:time keyframe)])
-                                          (select-track! node-name property-id)
-                                          (.setValue easing-choice (:easing keyframe))
-                                          (reset! drag {:node-name node-name :property-id property-id :keyframe keyframe :x x}))
-                                      (do (reset! drag nil)
-                                          (set-time! (x-time canvas @state x))
+                                      (do (let [id [node-name property-id (:time keyframe)]
+                                                keys (if (.isShiftDown ^MouseEvent event)
+                                                       (if (contains? (:selected-keys @state) id) (disj (:selected-keys @state) id) (conj (:selected-keys @state) id))
+                                                       (if (contains? (:selected-keys @state) id) (:selected-keys @state) #{id}))]
+                                            (set-time! (:time keyframe))
+                                            (swap! state assoc :selected id :selected-keys keys))
+                                          (if-let [index (:raw-index keyframe)]
+                                            (let [previous (:selected-raws @state)
+                                                  raw-keys (if (.isShiftDown ^MouseEvent event)
+                                                             (if (contains? previous index) (disj previous index) (conj previous index))
+                                                             (if (contains? previous index) previous #{index}))]
+                                              ((:select! key-inspector) index)
+                                              (swap! state assoc :selected nil :selected-keys #{} :selected-raw index :selected-raws raw-keys))
+                                            (do (swap! state assoc :selected-raw nil :selected-raws #{}) (select-track! node-name property-id)
+                                                (.setValue easing-choice (:easing keyframe))))
+                                          (reset! drag {:node-name node-name :property-id property-id :keyframe keyframe :x x :keys (selection) :raws (raw-selection)}))
+                                      (do (reset! drag (when (.isShiftDown ^MouseEvent event) {:marquee true :x x :y y :keys (selection)}))
+                                          (when-not (.isShiftDown ^MouseEvent event)
+                                            (swap! state assoc :selected-keys #{} :selected-raws #{} :selected-raw nil)
+                                            (set-time! (x-time canvas @state x)))
                                           (when-let [{:keys [node-name property-id]}
                                                      (get (:rows @state)
                                                           (int (Math/floor (/ (- y 32.0) 28.0))))]
@@ -860,46 +1039,63 @@
                             ;; Keep the enclosing ScrollPane from stealing keyboard focus.
                             (.consume ^MouseEvent event))))
     (.setOnMouseDragged canvas
-                        (ui/event-handler event
-                          (when (.isPrimaryButtonDown ^MouseEvent event)
-                            (when-let [{:keys [node-name property-id keyframe]} @drag]
-                              (swap! state assoc :dragging-key [node-name property-id (:time keyframe)]))
-                            ((guarded #(set-time! (x-time canvas @state (.getX ^MouseEvent event)))) nil))))
+      (ui/event-handler event
+        (when (.isPrimaryButtonDown ^MouseEvent event)
+          (if-let [{:keys [x y keys]} (and (:marquee @drag) @drag)]
+            (let [x1 (.getX ^MouseEvent event) y1 (.getY ^MouseEvent event)
+                  selected (into keys
+                                 (mapcat (fn [[index {:keys [node-name property-id]}]]
+                                           (let [cy (+ 46.0 (* 28.0 (double index)))]
+                                             (if (and property-id (<= (min (double y) y1) cy (max (double y) y1)))
+                                               (into [] (comp (filter #(<= (min (double x) x1) (time-x canvas @state (:time %)) (max (double x) x1)))
+                                                              (map #(vector node-name property-id (:time %))))
+                                                     (timeline/display-keyframes (:document @state) (:animation-id @state) node-name property-id)) []))))
+                                 (mapv vector (range) (:rows @state)))]
+              (swap! state assoc :marquee [x y x1 y1] :selected-keys selected)
+              (draw-timeline! canvas @state))
+            (do (when-let [{:keys [node-name property-id keyframe]} @drag]
+                  (swap! state assoc :dragging-key [node-name property-id (:time keyframe)]))
+                ((guarded #(set-time! (x-time canvas @state (.getX ^MouseEvent event)))) nil))))))
     (.setOnMouseReleased canvas
-                         (ui/event-handler event
-                           (when-let [{:keys [node-name property-id keyframe x]} @drag]
-                             (reset! drag nil)
-                             (swap! state dissoc :dragging-key)
-                             (when (> (Math/abs (- (.getX ^MouseEvent event) (double x))) 4.0)
-                               ((guarded #(let [new-time (:time @state)]
-                                            (commit! (fn [document]
-                                                       (animation/move-keyframe document (:animation-id @state) node-name property-id (:time keyframe) new-time)))
-                                            (swap! state assoc :selected [node-name property-id new-time]))) nil)))))
-    (.setOnKeyPressed canvas
-                      (ui/event-handler event
-                        (cond
-                          (= KeyCode/DELETE (.getCode ^KeyEvent event)) (do ((guarded delete-key!) nil) (.consume event))
-                          (= KeyCode/SPACE (.getCode ^KeyEvent event)) (do (.fire play-button) (.consume event))
-                          (= KeyCode/COMMA (.getCode ^KeyEvent event)) (do ((guarded #(navigate! (if (.isAltDown ^KeyEvent event) :previous-key :previous-frame))) nil) (.consume event))
-                          (= KeyCode/PERIOD (.getCode ^KeyEvent event)) (do ((guarded #(navigate! (if (.isAltDown ^KeyEvent event) :next-key :next-frame))) nil) (.consume event))
-                          (= KeyCode/HOME (.getCode ^KeyEvent event)) (do ((guarded #(navigate! :first)) nil) (.consume event))
-                          (= KeyCode/END (.getCode ^KeyEvent event)) (do ((guarded #(navigate! :last)) nil) (.consume event)))))
+      (ui/event-handler event
+        (when-let [{:keys [node-name property-id keyframe x keys raws marquee]} @drag]
+          (reset! drag nil)
+          (swap! state dissoc :dragging-key :marquee)
+          (when (and (not marquee) (> (Math/abs (- (.getX ^MouseEvent event) (double x))) 4.0))
+            ((guarded #(let [new-time (:time @state) offset (- (double new-time) (double (:time keyframe)))]
+                         (commit! (fn [document] (animation/move-selection document (:animation-id @state) keys raws offset)))
+                         (swap! state assoc :selected (when property-id [node-name property-id new-time])
+                                :selected-keys (into #{} (map (fn [[name property time]] [name property (+ (double time) offset)])) keys)
+                                :selected-raws (let [total (count (animation/animation-keys (:document @state) (:animation-id @state)))]
+                                                 (set (range (- total (count raws)) total)))))) nil)))))
     (let [refresh! (fn [dt]
                      (when (.isVisible title)
                        (try
                          (refresh-document!)
+                         (when-let [^Node tab (coll/first-where
+                                               #(identical? workspace-tabs (some-> ^Node % .getParent .getParent .getParent))
+                                               (.lookupAll workspace-tabs ".tab"))]
+                           (let [width (.getWidth (.getLayoutBounds tab))]
+                             (StackPane/setMargin header (Insets. 0.0 0.0 0.0 width))))
+                         ((:refresh! key-inspector))
                          (let [node-ids (g/node-value resource-node :node-ids)
                                names (vec (sort (into [] (coll/keys node-ids))))
                                selection (g/node-value (:app-view opts) :selected-node-ids)]
                            (when (not= names (vec (.getItems node-choice)))
                              (ui/items! node-choice names))
+                           (when-let [id (get node-ids (.getValue node-choice))]
+                             (let [channels (animation-properties/numeric-channels id)]
+                               (when (not= channels (vec (.getItems property-choice)))
+                                 (let [selected (.getValue property-choice)]
+                                   (ui/items! property-choice channels)
+                                   (.setValue property-choice (if (contains? (set channels) selected) selected (first channels)))))))
                            (when (not= selection (:last-selection @state))
                              (swap! state assoc :last-selection selection)
                              (when-let [[name _] (coll/first-where #(contains? (set selection) (second %)) node-ids)]
                                (.setValue node-choice name))))
                          (when (:playing @state)
                            (let [duration (double (animation/animation-duration (:document @state) (:animation-id @state)))
-                                 next-state (timeline/advance-playback (:time @state) duration dt (.isSelected loop-check) (.getValue playback-mode) (:direction @state))]
+                                 next-state (timeline/advance-playback (:time @state) duration (* (double dt) (double (:speed @state))) (.isSelected loop-check) (.getValue playback-mode) (:direction @state))]
                              (set-time! (:time next-state))
                              (swap! state assoc :playing (:playing next-state) :direction (:direction next-state))))
                          (when (not= (:playing @state) (:play-label @state))
@@ -923,21 +1119,17 @@
                            (let [message (.getText status)]
                              (.setVisible status (not (or (string/blank? message) (= message path))))
                              (.setManaged status (.isVisible status)))
-                           (draw-curve! curve @state (.getValue easing-choice) false)
-                           (draw-curve! detail-curve @state (.getValue easing-choice) true)
-                           (let [keys (into [] (remove #(contains? #{"tween" 1} (:key_type %)))
-                                            (:animation_keys (coll/first-where #(= animation-id (:animation_id %)) (get-in document [:data :animations]))))]
-                             (when (not= keys (:event-keys @state))
-                               (swap! state assoc :event-keys keys)
-                               (ui/children! event-list
-                                             (if (zero? (count keys))
-                                               [(doto (Label.) (localize! "events-empty"))]
-                                               (mapv #(Label. (str (:start_time %) " s  ·  " (pr-str %))) keys)))))
+                           (let [curve-context [document (:preview-document @state) animation-id (:active-track @state) (.getValue easing-choice)
+                                                (.getWidth curve) (.getWidth detail-curve)]]
+                             (when (and (not @curve-drag) (not= curve-context (:curve-context @state)))
+                               (swap! state assoc :curve-context curve-context)
+                               (draw-curve! curve @state (.getValue easing-choice) false)
+                               (draw-curve! detail-curve @state (.getValue easing-choice) true)))
                            (.setDisable toolbar (not exists))
                            (.setVisible welcome (not exists))
                            (.setManaged welcome (not exists))
                            (.setDisable editbar (not exists))
-                           (.setDisable (.lookup editbar "#gui-animation-delete-key") (nil? (:selected @state)))
+                           (.setDisable (.lookup editbar "#gui-animation-delete-key") (and (nil? (:selected @state)) (nil? (:selected-raw @state)) (zero? (count (:selected-raws @state))) (zero? (count (:selected-keys @state)))))
                            (.setDisable canvas (not exists))
                            (when (not= mode (:mode-label @state))
                              (swap! state assoc :mode-label mode)

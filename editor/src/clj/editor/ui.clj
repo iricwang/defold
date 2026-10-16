@@ -247,11 +247,11 @@
   "Returns true if it is possible to trace a path from the leaf node up to (but
   not including) the root that includes needle. Also true if needle = leaf."
   [leaf needle root]
-  (->> leaf
-       (iterate #(.getParent ^Node %))
-       (take-while #(not (identical? root %)))
-       (some #(identical? needle %))
-       boolean))
+  (loop [^Node node leaf]
+    (cond
+      (or (nil? node) (identical? root node)) false
+      (identical? needle node) true
+      :else (recur (.getParent node)))))
 
 (defn make-stage
   ^Stage []

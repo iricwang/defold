@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 25,
-  "version": "1.14.1-patch.25",
+  "revision": 26,
+  "version": "1.14.1-patch.26",
   "repository": "iricwang/defold",
-  "notes": "Use application-standard buttons, dropdowns and a native GUI animation tab; preserve the compact layout, duration-based timeline extension and middle-button panning."
+  "notes": "Complete Panthera GUI animation editing: native neutral controls, aligned animation tab, clip management, events/triggers/templates, custom curves and batch keyframe workflows."
 }

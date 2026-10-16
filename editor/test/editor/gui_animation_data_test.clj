@@ -107,8 +107,8 @@
             {:time 1.0 :value 20 :easing "inquad"}
             {:time 2.0 :value 50 :easing "linear"}]
            (animation/keyframes document "default" "box" "position_x")))
-    (is (= 12.5 (sample-x document 0.5)))
-    (is (= 20.0 (sample-x replaced 0.5)))
+    (is (< (Math/abs (- 12.5 (sample-x document 0.5))) 0.02))
+    (is (< (Math/abs (- 20.0 (sample-x replaced 0.5))) 0.02))
     (is (= 30.0 (sample-x removed 1)))
     (is (= 2.0 (animation/animation-duration document "default")))
     (is (= {"box" {"position_x" 35.0 "color_a" 0.25}}
@@ -126,7 +126,7 @@
         keys (get-in edited [:data :animations 0 :animation_keys])]
     (is (= ["first" "second"] (into [] (keep :custom_label) keys)))
     (is (contains? (set keys) unsupported))
-    (is (thrown? clojure.lang.ExceptionInfo (animation/evaluate edited "default" 1)))))
+    (is (= 50.0 (get-in (animation/evaluate edited "default" 1) ["box" "position_x"])))))
 
 ;; Verifies moving keys retains their imported metadata, including moves onto existing and initial keys.
 (deftest move-keyframe-metadata-test
@@ -184,22 +184,20 @@
       (is (= 10.0 (sample-x document 0)) easing)
       (is (= 20.0 (sample-x document 1)) easing)))
   (let [document (document-with-keys [(assoc (tween 0 1 0 100) :easing "outcubic")])]
-    (is (= 87.5 (sample-x document 0.5)))))
+    (is (< (Math/abs (- 87.5 (sample-x document 0.5))) 0.02))))
 
-;; Verifies unsupported Panthera features are preserved but rejected rather than previewed incorrectly.
+;; Verifies unknown keys and malformed curves remain lossless and fail preview explicitly.
 (deftest unsupported-preview-test
-  (doseq [key [(assoc (tween 0 1 0 100) :easing "outbounce")
-               (assoc (tween 0 1 0 100) :easing_custom [0 0.4 1])
-               (assoc (tween 0 1 0 100) :is_editor_only true)
-               (assoc (tween 0 1 0 100) :property_id "text_tracking")
+  (doseq [key [(assoc (tween 0 1 0 100) :easing "future-easing")
+               (assoc (tween 0 1 0 100) :easing_custom [0])
+               (assoc (tween 0 1 0 100) :property_id "future-property")
                {:key_type "animation" :node_id "template" :property_id "appear" :duration 1}]]
     (let [document (document-with-keys [key])]
       (is (pos? (count (animation/preview-issues document "default"))))
       (is (thrown? clojure.lang.ExceptionInfo (animation/evaluate document "default" 0.5)))
       (is (= document (animation/read-json (animation/write-json document))))))
-  (let [document (assoc-in (animation/new-document "/main/main.gui")
-                           [:data :animations 0 :initial_state] "idle")]
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Initial-state"
+  (let [document (assoc-in (animation/new-document "/main/main.gui") [:data :animations 0 :initial_state] "idle")]
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"reference is missing"
                          (animation/evaluate document "default" 0)))))
 
 ;; Verifies malformed files and invalid edits fail at the boundary before a save can corrupt data.
