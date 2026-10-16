@@ -36,6 +36,7 @@
            [javafx.scene Cursor Node Parent]
            [javafx.scene.canvas Canvas]
            [javafx.scene.control Button CheckBox ComboBox Label MenuButton MenuItem ScrollBar ScrollPane Separator Slider SplitPane Tab TabPane TabPane$TabClosingPolicy TextField ToggleButton Tooltip]
+           [javafx.scene.control.skin SplitPaneSkin]
            [javafx.scene.input KeyCode KeyEvent MouseButton MouseEvent]
            [javafx.scene.layout BorderPane ColumnConstraints FlowPane GridPane HBox Pane Priority Region StackPane VBox]
            [javafx.scene.paint Color]
@@ -844,6 +845,8 @@
     (.setTooltip preview-check (Tooltip. "Preview does not change the GUI layout. Turn off to edit the layout."))
     (.setTooltip record-button (doto (Tooltip.) (localize! "record-help")))
     (ui/children! parent [])
+    ;; Toolbars are registered before the first CSS pulse, so scene descendants must already be attached.
+    (.setSkin scene-split (SplitPaneSkin. scene-split))
     (.add (.getItems scene-split) scene-pane)
     (.add (.getItems scene-split) title)
     (.setDividerPositions scene-split (double-array [0.45]))
