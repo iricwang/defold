@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 24,
-  "version": "1.14.1-patch.24",
+  "revision": 25,
+  "version": "1.14.1-patch.25",
   "repository": "iricwang/defold",
-  "notes": "Use the compact neutral Graphite theme for GUI animation, extend the timeline with clip duration, and add middle-button panning with a fixed ruler and fit-to-clip zoom."
+  "notes": "Use application-standard buttons, dropdowns and a native GUI animation tab; preserve the compact layout, duration-based timeline extension and middle-button panning."
 }

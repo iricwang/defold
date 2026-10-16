@@ -33,9 +33,9 @@
            [javafx.geometry Insets Pos Side]
            [javafx.scene Cursor Node Parent]
            [javafx.scene.canvas Canvas]
-           [javafx.scene.control Button CheckBox ComboBox Label MenuButton MenuItem ScrollBar ScrollPane Separator Slider Tab TabPane TabPane$TabClosingPolicy TextField TitledPane ToggleButton Tooltip]
+           [javafx.scene.control Button CheckBox ComboBox Label MenuButton MenuItem ScrollBar ScrollPane Separator Slider Tab TabPane TabPane$TabClosingPolicy TextField ToggleButton Tooltip]
            [javafx.scene.input KeyCode KeyEvent MouseButton MouseEvent]
-           [javafx.scene.layout BorderPane ColumnConstraints FlowPane GridPane HBox Pane Priority Region VBox]
+           [javafx.scene.layout BorderPane ColumnConstraints FlowPane GridPane HBox Pane Priority Region StackPane VBox]
            [javafx.scene.paint Color]
            [javafx.scene.shape SVGPath]
            [javafx.scene.text Font]
@@ -121,7 +121,7 @@
       (let [top (+ 32.0 (* 28.0 (double index)))
             y (+ top 14.0)]
         (.setFill gc (Color/web (cond
-                                  (= active-track [node-name property-id]) "#214d7d"
+                                  (= active-track [node-name property-id]) "#174779"
                                   (= kind :node) "#2b2b2b"
                                   (odd? (long index)) "#181818"
                                   :else "#181818")))
@@ -243,7 +243,10 @@
         scene-content (first (.getChildrenUnmodifiable parent))
         root (BorderPane.)
         content (doto (VBox. 0.0) (.setMinWidth 0.0) (ui/add-style! "gui-animation-workspace") (.setPrefHeight 468.0))
-        title (doto (TitledPane.) (.setId "gui-animation-panel") (.setMinWidth 0.0) (.setContent content) (.setExpanded true))
+        workspace-tab (Tab.)
+        workspace-tabs (doto (TabPane.) (.setId "gui-animation-tabs") (.setMinWidth 0.0)
+                             (.setTabClosingPolicy TabPane$TabClosingPolicy/UNAVAILABLE))
+        title (doto (StackPane.) (.setId "gui-animation-panel") (.setMinWidth 0.0))
         status (doto (Label.) (.setId "gui-animation-status") (.setWrapText true))
         canvas (doto (Canvas. 700.0 100.0) (.setId "gui-animation-timeline") (.setFocusTraversable true)
                      (.setAccessibleText "Animation timeline. Select a key to edit its time and value."))
@@ -536,13 +539,11 @@
                               (ui/add-style! "animation-settings-scroll"))
         settings (doto (TabPane.) (.setId "gui-animation-settings") (.setSide Side/TOP)
                        (.setTabClosingPolicy TabPane$TabClosingPolicy/UNAVAILABLE)
-                       (.setMinHeight 156.0) (.setPrefHeight 156.0) (.setMaxHeight 156.0))
-        clip-menu (doto (MenuButton.) (.setId "gui-animation-clip-menu") (localize! "title"))
+                       (.setMinHeight 160.0) (.setPrefHeight 160.0) (.setMaxHeight 160.0))
         path-label (doto (Label. path) (.setAlignment Pos/CENTER_RIGHT) (.setMinWidth 0.0) (.setId "gui-animation-path") (.setMaxWidth Double/MAX_VALUE))
-        more-menu (doto (MenuButton. "…") (.setId "gui-animation-more"))
-        header (doto (HBox. 12.0) (.setMinWidth 0.0) (.setAlignment Pos/CENTER_LEFT) (ui/add-style! "animation-header")
-                     (ui/children! [(glyph "M10 0 L20 5 L20 16 L10 21 L0 16 L0 5 Z M0 5 L10 10 L20 5 M10 10 L10 21")
-                                    clip-menu path-label
+        more-menu (doto (MenuButton. "…") (.setId "gui-animation-more") (ui/add-style! "button-icon"))
+        header (doto (HBox. 8.0) (.setMinWidth 0.0) (.setMaxHeight 26.0) (.setAlignment Pos/CENTER_LEFT) (ui/add-style! "animation-header")
+                     (ui/children! [animation-choice path-label
                                     (button "save-file" "gui-animation-save-file" save!) more-menu]))
         welcome (doto (FlowPane. 8.0 6.0) (ui/add-style! "animation-welcome")
                       (ui/children! [(doto (Label.) (localize! "empty"))
@@ -646,11 +647,13 @@
                                                                     (timeline/display-keyframes document animation-id node-name property-id)) "◆" "◇"))
                                 (when (and (number? value) (not (.isFocused field)))
                                   (.setText field (format "%.4f" (double value))))))))]
-    (.setText title "")
-    (.setGraphic title header)
-    (.setAnimated title false)
-    (ui/add-style! title "animation-titled-pane")
-    (.bind (.prefWidthProperty header) (.subtract (.widthProperty title) 32.0))
+    (localize! workspace-tab "title")
+    (.setGraphic workspace-tab (glyph "M10 0 L20 5 L20 16 L10 21 L0 16 L0 5 Z M0 5 L10 10 L20 5 M10 10 L10 21"))
+    (.setContent workspace-tab content)
+    (.add (.getTabs workspace-tabs) workspace-tab)
+    (ui/children! title [workspace-tabs header])
+    (StackPane/setAlignment header Pos/TOP_RIGHT)
+    (StackPane/setMargin header (Insets. 0.0 4.0 0.0 200.0))
     (HBox/setHgrow path-label Priority/ALWAYS)
     (HBox/setHgrow toolbar-spacer Priority/ALWAYS)
     (HBox/setHgrow settingsbar Priority/ALWAYS)
@@ -667,13 +670,6 @@
       (.add settings-content panel (int index) 0)
       (.add (.getColumnConstraints settings-content) (doto (ColumnConstraints.) (.setPercentWidth (double percent)))))
     (ui/add-style! editbar "animation-edit-panel")
-    (.setOnShowing clip-menu
-                   (ui/event-handler _
-                     (replace-items! (.getItems clip-menu)
-                                     (mapv (fn [id]
-                                             (doto (MenuItem. id)
-                                               (.setOnAction (ui/event-handler _ (.setValue animation-choice id)))))
-                                           (animation/animation-ids (:document @state))))))
     (replace-items! (.getItems more-menu) [(doto (MenuItem.) (localize! "add-clip")
                                                  (.setOnAction (ui/event-handler _
                                                                  ((guarded #(let [ids (set (animation/animation-ids (:document @state)))
@@ -889,7 +885,7 @@
                           (= KeyCode/HOME (.getCode ^KeyEvent event)) (do ((guarded #(navigate! :first)) nil) (.consume event))
                           (= KeyCode/END (.getCode ^KeyEvent event)) (do ((guarded #(navigate! :last)) nil) (.consume event)))))
     (let [refresh! (fn [dt]
-                     (when (.isExpanded title)
+                     (when (.isVisible title)
                        (try
                          (refresh-document!)
                          (let [node-ids (g/node-value resource-node :node-ids)
@@ -952,9 +948,5 @@
                          (catch Exception error
                            (stop-preview!)
                            (.setText status (.getMessage error))))))]
-      (ui/observe (.expandedProperty title)
-                  (fn [_ _ expanded]
-                    (when-not expanded
-                      (stop-preview!))))
       {:refresh-fn refresh!
        :dispose-fn #(swap! state assoc :playing false :preview false)})))
