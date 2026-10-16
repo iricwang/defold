@@ -84,3 +84,28 @@
         recorded (timeline/record-value document "default" "box" "color_a" 0.25 0 1 "linear")]
     (is (= [["box" "position_x"] ["box" "color_a"]] (timeline/tracks document "default")))
     (is (= (timeline/tracks document "default") (timeline/tracks recorded "default")))))
+
+;; The property tree includes unkeyed channels and a child summary; collapsing keeps header alignment.
+(deftest reference-workspace-rows-test
+  (let [rows (timeline/editor-rows [["btn_confirm" "position_x"] ["btn_confirm" "position_z"]] #{} "btn_confirm" {"btn_confirm" 2})]
+    (is (= :node (:kind (first rows))))
+    (is (= ["position_x" "position_y" "scale_x" "scale_y" "rotation_z" "color_a" "position_z"]
+           (into [] (keep :property-id) rows)))
+    (is (= {:node-name "btn_confirm" :kind :children :child-count 2} (peek rows)))
+    (is (= [{:node-name "btn_confirm" :kind :node}]
+           (timeline/editor-rows [["btn_confirm" "position_x"]] #{"btn_confirm"} "btn_confirm" {})))
+    (is (= 8 (count (timeline/editor-rows [] #{} "new_node" {}))))))
+
+;; Ruler labels use predictable frame intervals across zoom levels instead of irregular rounding.
+(deftest reference-ruler-spacing-test
+  (is (= 4 (timeline/ruler-step 60 1500)))
+  (is (= 10 (timeline/ruler-step 60 500)))
+  (is (= 1 (timeline/ruler-step 10 1500))))
+
+;; Reverse and ping-pong playback preserve overshoot and stop correctly when looping is disabled.
+(deftest reference-playback-modes-test
+  (is (= {:time 0.5 :playing true :direction -1} (timeline/advance-playback 0.6 1.0 0.1 false :reverse -1)))
+  (is (= {:time 0.0 :playing false :direction -1} (timeline/advance-playback 0.05 1.0 0.1 false :reverse -1)))
+  (is (< (Math/abs (- 0.9 (double (:time (timeline/advance-playback 0.9 1.0 0.2 false :ping-pong 1))))) 1.0e-9))
+  (is (= {:time 0.0 :playing false :direction -1} (timeline/advance-playback 0.1 1.0 0.2 false :ping-pong -1)))
+  (is (= {:time 0.0 :playing false :direction 1} (timeline/advance-playback 0.0 0.0 1.0 true :ping-pong 1))))

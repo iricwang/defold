@@ -12,7 +12,9 @@
 ;; CONDITIONS OF ANY KIND, either express or implied. See the License for the
 ;; specific language governing permissions and limitations under the License.
 
-(ns editor.gui-animation-preview)
+(ns editor.gui-animation-preview
+  (:require [editor.math :as math])
+  (:import [javax.vecmath Quat4d]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -58,3 +60,18 @@
   nodes can be previewed without dividing by their original alpha."
   [scene node-overrides]
   (apply-preview-impl scene node-overrides 1.0))
+
+(defn transform-value
+  "Applies a scene gizmo delta to the displayed local pose, never the GUI resource."
+  [property value delta]
+  (case property
+    :position (mapv + value (math/vecmath->clj delta))
+    :scale (mapv * value (math/vecmath->clj delta))
+    :rotation (math/vecmath->clj (doto (Quat4d.) (math/clj->vecmath value) (.mul ^Quat4d delta) (.normalize)))))
+
+(defn transform-channels [property value]
+  (let [[prefix components] (case property
+                              :position ["position" value]
+                              :scale ["scale" value]
+                              :rotation ["rotation" (math/clj-quat->euler value)])]
+    (zipmap (mapv #(str prefix "_" %) ["x" "y" "z"]) components)))

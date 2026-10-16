@@ -821,7 +821,7 @@
      :scene-aabb geom/empty-bounding-box}
     (let [preview-overrides (merge-with coll/merge animation-preview-overrides preview-overrides)
           scene (if-let [preview-fn (and (coll/not-empty animation-preview-overrides)
-                                        (:animation-preview-fn scene))]
+                                         (:animation-preview-fn scene))]
                   (preview-fn scene preview-overrides)
                   scene)
           selection-set (set selection)
@@ -901,6 +901,7 @@
   (property overlay-anchor-pane AnchorPane (dynamic visible (g/constantly false)))
   (property render-mode g/Keyword (default :normal))
   (property animation-preview-active g/Bool (default false))
+  (property animation-manipulation-enabled g/Bool (default false))
   (property animation-preview-overrides g/Any (default {}))
 
   (input active-view g/NodeID)
@@ -930,8 +931,8 @@
 
   (output selected-renderables g/Any (g/fnk [scene-render-data] (:selected-renderables scene-render-data)))
   (output tool-selected-renderables g/Any
-          (g/fnk [animation-preview-active selected-renderables]
-            (if animation-preview-active [] selected-renderables)))
+          (g/fnk [animation-preview-active animation-manipulation-enabled selected-renderables]
+            (if (and animation-preview-active (not animation-manipulation-enabled)) [] selected-renderables)))
   (output scene-aabb AABB (g/fnk [scene-render-data] (:scene-aabb scene-render-data)))
   (output selected-aabb AABB :cached (g/fnk [scene-render-data]
                                        (let [selected-aabbs (sequence (comp (mapcat val)
@@ -1758,8 +1759,9 @@
     (let [basis (:basis evaluation-context)
           input-handlers (g/inputs basis view-id :input-handlers)
           animation-preview-active (g/node-value view-id :animation-preview-active evaluation-context)
-          tool-controller-id (g/node-feeding-into basis view-id :tool-controller-id)]
-      {:input-handlers (if animation-preview-active
+          tool-controller-id (g/node-feeding-into basis view-id :tool-controller-id)
+          animation-manipulation-enabled (g/node-value view-id :animation-manipulation-enabled evaluation-context)]
+      {:input-handlers (if (and animation-preview-active (not animation-manipulation-enabled))
                          (filterv #(not= tool-controller-id (gt/source-id %)) input-handlers)
                          input-handlers)
        :user-data (g/node-value view-id :selected-tool-renderables evaluation-context)

@@ -36,7 +36,7 @@
                               (distinct))
                         (:animation_keys
                           (coll/first-where #(= animation-id (:animation_id %))
-                                           (get-in document [:data :animations]))))))))
+                                            (get-in document [:data :animations]))))))))
 
 (defn display-keyframes [document animation-id node-name property-id]
   ;; Complex imported tracks remain readable without inviting a lossy edit.
@@ -90,3 +90,45 @@
                    (animation/set-keyframe document animation-id node-name property-id 0.0 baseline "linear")
                    document)]
     (animation/set-keyframe document animation-id node-name property-id time value easing)))
+
+(def default-visible-properties ["position_x" "position_y" "scale_x" "scale_y" "rotation_z" "color_a"])
+
+(defn editor-rows [track-list collapsed selected-node child-counts]
+  (let [names (into [] (comp (map first) (distinct)) track-list)
+        names (if (or (nil? selected-node) (contains? (set names) selected-node)) names (conj names selected-node))]
+    (into []
+          (mapcat (fn [node-name]
+                    (if (contains? collapsed node-name)
+                      [{:node-name node-name :kind :node}]
+                      (into [{:node-name node-name :kind :node}]
+                            cat
+                            [(mapv (fn [property-id] {:node-name node-name :property-id property-id :kind :property})
+                                   (into default-visible-properties
+                                         (comp (filter #(= node-name (first %)))
+                                               (map second)
+                                               (remove (set default-visible-properties)))
+                                         track-list))
+                             [{:node-name node-name :kind :children :child-count (get child-counts node-name 0)}]]))))
+          names)))
+
+(defn ruler-step [visible-frames width]
+  (let [desired (/ (double visible-frames) (max 1.0 (/ (double width) 76.0)))]
+    (or (coll/first-where #(>= (double %) desired) [1 2 4 5 10 20 30 60 120 240 600 1200 3600])
+        (* 3600.0 (Math/ceil (/ desired 3600.0))))))
+
+(defn advance-playback [time duration dt loop-enabled mode direction]
+  (let [duration (double duration)
+        time (double time)
+        dt (max 0.0 (double dt))]
+    (if (zero? duration)
+      {:time 0.0 :playing false :direction 1}
+      (case mode
+        :reverse (let [next-time (- time dt)]
+                   {:time (if loop-enabled (mod next-time duration) (max 0.0 next-time))
+                    :playing (or loop-enabled (pos? next-time)) :direction -1})
+        :ping-pong (let [phase (+ (if (neg? (long direction)) (- (* 2.0 duration) time) time) dt)
+                         phase (double (if loop-enabled (mod phase (* 2.0 duration)) (min phase (* 2.0 duration))))]
+                     {:time (if (<= phase duration) phase (- (* 2.0 duration) phase))
+                      :playing (or loop-enabled (< phase (* 2.0 duration)))
+                      :direction (if (< phase duration) 1 -1)})
+        (assoc (advance time duration dt loop-enabled) :direction 1)))))

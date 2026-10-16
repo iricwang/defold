@@ -328,7 +328,7 @@
       (replace-track document animation-id node-id property-id
                      (into [] (sort-by :time updated))))))
 
-(defn- ease
+(defn ease
   ^double [easing ^double t]
   (case easing
     "linear" t

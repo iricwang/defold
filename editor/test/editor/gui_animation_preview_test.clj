@@ -88,3 +88,25 @@
         result (preview/apply-preview source {1 {:alpha 0.5} 2 {:alpha 0.8}})]
     (is (< (Math/abs (- 0.16 (double (get-in result [:renderable :user-data :color 3])))) 1.0e-12))
     (is (= source (preview/apply-preview source {})))))
+
+;; Gizmos must start from the animated pose, preserve untouched axes, and leave GUI data immutable.
+(deftest animated-transform-delta-test
+  (let [position [-150.0 320.0 0.0]
+        moved (preview/transform-value :position position (javax.vecmath.Vector3d. 20.0 -5.0 0.0))
+        scaled (preview/transform-value :scale [2.0 3.0 1.0] (javax.vecmath.Vector3d. 1.5 0.5 1.0))]
+    (is (= [-130.0 315.0 0.0] moved))
+    (is (= [-150.0 320.0 0.0] position))
+    (is (= [3.0 1.5 1.0] scaled))
+    (is (= {"position_x" -130.0 "position_y" 315.0 "position_z" 0.0}
+           (preview/transform-channels :position moved)))
+    (is (= {"scale_x" 3.0 "scale_y" 1.5 "scale_z" 1.0}
+           (preview/transform-channels :scale scaled)))))
+
+;; Rotation gizmos use quaternion composition and emit degree-valued Panthera channels.
+(deftest animated-rotation-delta-test
+  (let [delta (javax.vecmath.Quat4d. 0.0 0.0 (Math/sin (/ Math/PI 4.0)) (Math/cos (/ Math/PI 4.0)))
+        rotated (preview/transform-value :rotation [0.0 0.0 0.0 1.0] delta)
+        channels (preview/transform-channels :rotation rotated)]
+    (is (< (Math/abs (- 90.0 (double (get channels "rotation_z")))) 1.0e-6))
+    (is (< (Math/abs (double (get channels "rotation_x"))) 1.0e-6))
+    (is (< (Math/abs (double (get channels "rotation_y"))) 1.0e-6))))

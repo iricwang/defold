@@ -518,19 +518,26 @@
 
 (defn- make-drag-manipulations-fn [manip-opts active-manip manip-origin original-values initial-evaluation-context]
   (let [make-local-manipulation-fn
-        (fn make-local-manipulation-fn [manipulation-fn]
+        (fn make-local-manipulation-fn [property manipulation-fn]
           {:pre [(ifn? manipulation-fn)]}
-          (fn local-manipulation-fn [manip-phase {:keys [node-id]} local-delta]
-            (-> (s/assert ::manipulation (manipulation-fn node-id local-delta manip-phase initial-evaluation-context))
-                (assoc :manip/node-id node-id))))]
+          (let [animation-manipulation (:animation-manipulation manip-opts)
+                animation-functions (when animation-manipulation
+                                      (into {} (map (fn [{:keys [node-id]}]
+                                                      [node-id ((:make-manipulation-fn animation-manipulation) property node-id)])) original-values))]
+            (fn local-manipulation-fn [manip-phase {:keys [node-id]} local-delta]
+              (-> (s/assert ::manipulation
+                            (if animation-manipulation
+                              {:manip/prop-kw->override-value {property ((get animation-functions node-id) local-delta)}}
+                              (manipulation-fn node-id local-delta manip-phase initial-evaluation-context)))
+                  (assoc :manip/node-id node-id)))))]
     (make-manipulations-fn
       manip-opts
       active-manip
       manip-origin
       original-values
-      (make-local-manipulation-fn manip-move)
-      (make-local-manipulation-fn manip-rotate)
-      (make-local-manipulation-fn manip-scale))))
+      (make-local-manipulation-fn :position manip-move)
+      (make-local-manipulation-fn :rotation manip-rotate)
+      (make-local-manipulation-fn :scale manip-scale))))
 
 (defn- make-drag-start-state [manip-opts original-values active-manip manip-space start-action camera viewport initial-evaluation-context]
   (let [{:keys [world-rotation world-transform]} (peek original-values)
@@ -543,6 +550,7 @@
         start-pos (action->manip-pos start-action lead-transform active-manip manip-rotation project-fn)
         manipulations-fn (make-drag-manipulations-fn manip-opts active-manip manip-origin original-values initial-evaluation-context)]
     {:active-manip active-manip
+     :animation-manipulation (:animation-manipulation manip-opts)
      :lead-transform lead-transform
      :manip-origin manip-origin
      :manip-rotation manip-rotation
@@ -593,12 +601,14 @@
                               op-seq (:op-seq drag-start-state)
                               combined-manipulations (apply-manipulator :manip-phase/commit drag-start-state action)
                               commit-tx-data (:tx-data combined-manipulations)]
-                          (when (not (coll/empty? commit-tx-data))
-                            (g/transact
-                              (concat
-                                (g/operation-label (get-in transform-tools [active-tool :label]))
-                                (g/operation-sequence op-seq)
-                                commit-tx-data)))
+                          (if-let [animation-manipulation (:animation-manipulation drag-start-state)]
+                            ((:apply! animation-manipulation) :commit (:node-id->prop-kw->override-value combined-manipulations))
+                            (when (not (coll/empty? commit-tx-data))
+                              (g/transact
+                                (concat
+                                  (g/operation-label (get-in transform-tools [active-tool :label]))
+                                  (g/operation-sequence op-seq)
+                                  commit-tx-data))))
                           (g/transact
                             {:undoable false}
                             (concat
@@ -612,19 +622,21 @@
                          combined-manipulations (apply-manipulator :manip-phase/preview drag-start-state action)
                          preview-tx-data (:tx-data combined-manipulations)
                          preview-overrides (:node-id->prop-kw->override-value combined-manipulations)]
-                     (when (or (not (coll/empty? preview-tx-data))
-                               (not (coll/empty? preview-overrides)))
-                       (when (not (coll/empty? preview-overrides))
-                         (g/transact
-                           {:undoable false}
-                           (concat
-                             (g/operation-sequence op-seq)
-                             (g/set-property self :preview-overrides preview-overrides))))
-                       (when (not (coll/empty? preview-tx-data))
-                         (g/transact
-                           (concat
-                             (g/operation-sequence op-seq)
-                             preview-tx-data))))
+                     (if-let [animation-manipulation (:animation-manipulation drag-start-state)]
+                       ((:apply! animation-manipulation) :preview preview-overrides)
+                       (when (or (not (coll/empty? preview-tx-data))
+                                 (not (coll/empty? preview-overrides)))
+                         (when (not (coll/empty? preview-overrides))
+                           (g/transact
+                             {:undoable false}
+                             (concat
+                               (g/operation-sequence op-seq)
+                               (g/set-property self :preview-overrides preview-overrides))))
+                         (when (not (coll/empty? preview-tx-data))
+                           (g/transact
+                             (concat
+                               (g/operation-sequence op-seq)
+                               preview-tx-data)))))
                      nil)
                    (let [manip (first (get selection-data self))]
                      (when (not= manip (g/node-value self :hot-manip))
@@ -646,8 +658,9 @@
     math/round-vector
     identity))
 
-(g/defnk produce-manip-opts [prefs]
-  {:move-snap-fn (move-snap-fn prefs)})
+(g/defnk produce-manip-opts [prefs animation-manipulation]
+  {:move-snap-fn (move-snap-fn prefs)
+   :animation-manipulation animation-manipulation})
 
 (g/defnk produce-manip-space [active-tool manip-space]
   (let [supported-manip-spaces (supported-manip-spaces active-tool)]
@@ -660,6 +673,7 @@
   (property drag-start-state g/Any)
   (property preview-overrides g/Any)
   (property hot-manip g/Any)
+  (property animation-manipulation g/Any)
 
   (input active-tool g/Keyword)
   (input manip-space g/Keyword)

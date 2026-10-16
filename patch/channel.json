@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 22,
-  "version": "1.14.1-patch.22",
+  "revision": 23,
+  "version": "1.14.1-patch.23",
   "repository": "iricwang/defold",
-  "notes": "Add subtle rounded corners to editor tabs and panel surfaces while preserving docking and selection indicators."
+  "notes": "Restore the reference Panthera workspace layout and dark blue-gray styling, compact settings tabs, and record GUI move/scale/rotation gizmos without changing the original GUI layout."
 }
