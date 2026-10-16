@@ -2887,5 +2887,37 @@ dialog.craft-binding.ip = PhotoCraft IP address (optional :port)
 dialog.craft-binding.disconnected = Not Bound
 dialog.craft-binding.ready = Unbound editors try the local application automatically.
 
+# GUI animation timeline
+gui-animation.title = GUI Animation · Panthera
+gui-animation.create = Create / Open
+gui-animation.import = Import JSON…
+gui-animation.export = Export Lua…
+gui-animation.save = Save all
+gui-animation.add-clip = Add animation
+gui-animation.duration = Duration (s)
+gui-animation.play = Play
+gui-animation.pause = Pause
+gui-animation.preview = Preview
+gui-animation.record = ● Record
+gui-animation.loop = Loop
+gui-animation.frame = Frame
+gui-animation.first = |◀
+gui-animation.previous = ◀◆
+gui-animation.next = ◆▶
+gui-animation.last = ▶|
+gui-animation.settings = Clip settings · Import / Export
+gui-animation.properties = Animated properties
+gui-animation.zoom = Zoom
+gui-animation.fit = Fit
+gui-animation.add-property = Add property
+gui-animation.recording = ● Recording — edits to values in this panel create keys at the playhead.
+gui-animation.previewing = Preview — edit a track value, then Set key to keep it.
+gui-animation.draft = Preview changed — Set key to keep the selected value. Moving the playhead discards unrecorded changes.
+gui-animation.layout = Layout — select a property or scrub the timeline to preview.
+gui-animation.value = Value
+gui-animation.key = Set key
+gui-animation.delete = Delete key
+gui-animation.empty = Create an animation, select a GUI node, then set a key. Scrub the timeline to preview without changing the layout.
+
 dialog.craft-binding.project-content = Connection applies to this project. Open tabs and unsaved edits stay open; only manual synchronization publishes changes.
 dialog.craft-binding.button.connect = Connect Project

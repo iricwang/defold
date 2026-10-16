@@ -1,0 +1,23 @@
+// Neutral surfaces shared by all three stylesheet entry points.
+// Keep status, resource-type and syntax colors independent of UI selection.
+* {
+  -df-background-darker: #111111;
+  -df-background: #181818;
+  -df-background-lightish: #202020;
+  -df-background-light: #242424;
+  -df-background-lighter: #383838;
+  -df-background-input: #151515;
+  -df-component-darker: #181818;
+  -df-component-dark: #303030;
+  -df-component-light: #424242;
+  -df-component-lighter: #505050;
+  -df-component-icon: #aaaaaa;
+  -df-text-dark: #929292;
+  -df-text: #c8c8c8;
+  -df-text-light: #e0e0e0;
+  -df-text-selected: #ffffff;
+  -df-ui-accent: #0078d4;
+  -df-ui-selection: #174779;
+  -df-ui-header: #2b2b2b;
+  -df-ui-divider: #111111;
+}

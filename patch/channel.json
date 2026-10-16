@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 20,
-  "version": "1.14.1-patch.20",
+  "revision": 21,
+  "version": "1.14.1-patch.21",
   "repository": "iricwang/defold",
-  "notes": "PhotoCraft native GUI project collaboration: structured project adapter, safe Euler rotation conversion, stable atlas updates, targeted saves, durable publication receipts and project-level reconnect without closing drafts."
+  "notes": "Integrate native PhotoCraft GUI collaboration and reliable manual asset publication, add GUI animation editing and preview, and apply the Graphite editor theme."
 }

@@ -39,6 +39,26 @@
       (scene/produce-scene-render-data)
       (:renderables)))
 
+;; Verifies animation transforms and tool previews compose without changing the source scene.
+(deftest animation-preview-render-data-test
+  (let [source {:node-id :root
+                :children [{:node-id :child
+                            :pose (pose/translation-pose 1.0 2.0 3.0)
+                            :renderable {:passes [pass/transparent]}}]}
+        render-data (scene/produce-scene-render-data
+                      {:scene source
+                       :animation-preview-overrides {:child {:position [4.0 5.0 6.0]
+                                                              :scale [2.0 3.0 4.0]}}
+                       :preview-overrides {:child {:position [7.0 8.0 9.0]}}
+                       :selection []
+                       :hidden-renderable-tags #{}
+                       :hidden-node-outline-key-paths #{}
+                       :local-camera (camera/make-camera)})
+        renderable (get-in render-data [:renderables pass/transparent 0])]
+    (is (= (Vector3d. 7.0 8.0 9.0) (:world-translation renderable)))
+    (is (= (Vector3d. 2.0 3.0 4.0) (:world-scale renderable)))
+    (is (= (pose/translation-pose 1.0 2.0 3.0) (get-in source [:children 0 :pose])))))
+
 (deftest claim-scene-test
   (let [scene {:node-id :scene-node-id
                :children [{:node-id :scene-node-id

@@ -1,0 +1,98 @@
+// Use stable control classes/IDs so new standard controls inherit the theme.
+// Docking's existing drag strip is 28px high: keep panel headers within it.
+#main-window {
+  -fx-background-color: -df-ui-divider;
+
+  .titled-pane > .title {
+    -fx-background-color: -df-ui-header;
+    -fx-padding: 4px 30px 4px 10px;
+  }
+
+  .fake-titled-pane > .fake-titled-pane-label {
+    -fx-background-color: -df-ui-header;
+    -fx-padding: 4px 30px 4px 10px;
+  }
+
+  .split-pane > .split-pane-divider {
+    -fx-background-color: -df-ui-divider;
+    -fx-opacity: 1;
+    -fx-padding: 2px;
+    &:hover, &:armed {
+      -fx-background-color: -df-component-light;
+      -fx-opacity: 1;
+    }
+  }
+
+  #main-split, #workbench-split {
+    > .split-pane-divider {
+      -fx-background-image: none;
+      -fx-padding: 0px 3px;
+    }
+  }
+
+  #center-split > .split-pane-divider {
+    -fx-background-image: none;
+    -fx-padding: 3px 0px;
+  }
+}
+
+#dock-header-preview, .game-preview-toolbar {
+  -fx-background-color: -df-ui-header;
+  -fx-text-fill: -df-text-light;
+}
+
+#game-viewport {
+  -fx-background-color: -df-background-darker;
+}
+
+#game-frame-rate {
+  -fx-min-width: 100px;
+  -fx-pref-width: 100px;
+  -fx-max-width: 100px;
+}
+
+#resource-preview {
+  -fx-background-color: -df-background-light;
+}
+
+#status-label {
+  -fx-text-fill: -df-text-dark;
+}
+
+#scene-view-anchor-pane #toolbar {
+  -fx-background-color: -df-ui-header;
+  -fx-background-radius: 2px;
+  -fx-padding: 3px;
+  -fx-spacing: 6px;
+  -fx-effect: null;
+
+  > .toggle-button, > .button-group > .toggle-button {
+    -fx-background-radius: 2px;
+    -fx-border-radius: 2px;
+    &:selected {
+      -fx-background-color: -df-ui-selection;
+    }
+  }
+
+  > .button-group > .more-button {
+    -fx-background-radius: 0px 2px 2px 0px;
+    -fx-border-radius: 0px 2px 2px 0px;
+  }
+
+  > .button-group.active .more-button {
+    -fx-background-color: -df-ui-selection;
+  }
+
+  .popup-settings .text-input:focused,
+  .popup-settings .ext-color-picker:focus-within .ext-color-picker-field {
+    -fx-border-color: -df-component-light -df-component-light -df-ui-accent -df-component-light;
+  }
+}
+
+#properties .text-field {
+  -fx-background-color: -df-background-input;
+}
+
+.property-component .label, .property-component-matrix .label {
+  -fx-text-fill: -df-text-dark;
+}

@@ -35,6 +35,8 @@
             [editor.gl.vertex :as vtx]
             [editor.gl.vertex2 :as vtx2]
             [editor.graph-util :as gu]
+            [editor.gui-animation-preview :as gui-animation-preview]
+            [editor.gui-animation-view :as gui-animation-view]
             [editor.gui-attachment :as gui-attachment]
             [editor.gui-clipping :as clipping]
             [editor.handler :as handler]
@@ -3321,18 +3323,27 @@
 
 ;; //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-(defn- apply-alpha [parent-alpha scene]
-  (let [scene-alpha (get-in scene [:renderable :user-data :color 3] 1.0)]
+(defn- apply-alpha [parent-alpha parent-alpha-factors scene]
+  (let [color (get-in scene [:renderable :user-data :color])
+        scene-alpha (get color 3 1.0)
+        local-alpha-factors (if color
+                             (get scene ::gui-animation-preview/alpha-factors [[(:node-id scene) scene-alpha]])
+                             [])
+        scene (assoc scene
+                ::gui-animation-preview/local-alpha scene-alpha
+                ::gui-animation-preview/alpha-factors local-alpha-factors)]
     (if (get-in scene [:renderable :user-data :inherit-alpha] true)
       (let [alpha (* parent-alpha scene-alpha)
+            alpha-factors (into parent-alpha-factors local-alpha-factors)
             inherit? (get-in scene [:renderable :user-data :inherit-alpha] false)]
         (cond-> scene
           inherit?
-          (assoc-in [:renderable :user-data :color 3] alpha)
+          (-> (assoc-in [:renderable :user-data :color 3] alpha)
+              (assoc ::gui-animation-preview/alpha-factors alpha-factors))
 
           true
-          (update :children #(mapv (partial apply-alpha alpha) %))))
-      (update scene :children #(mapv (partial apply-alpha scene-alpha) %)))))
+          (update :children #(mapv (partial apply-alpha alpha alpha-factors) %))))
+      (update scene :children #(mapv (partial apply-alpha scene-alpha local-alpha-factors) %)))))
 
 (defn- sort-children [node-order scene]
   (let [key (clipping/scene-key scene)
@@ -3356,6 +3367,7 @@
   (let [w (:width scene-dims)
         h (:height scene-dims)
         scene {:node-id _node-id
+               :animation-preview-fn gui-animation-preview/apply-preview
                :aabb geom/null-aabb
                :visibility-aabb (geom/coords->aabb [0 0 0] [w h 0])
                :renderable {:render-fn render-lines
@@ -3364,7 +3376,7 @@
                             :batch-key nil
                             :user-data {:line-data [[0 0 0] [w 0 0] [w 0 0] [w h 0] [w h 0] [0 h 0] [0 h 0] [0 0 0]]
                                         :line-color colors/defold-white}}
-               :children (mapv (partial apply-alpha 1.0) child-scenes)}]
+               :children (mapv (partial apply-alpha 1.0 []) child-scenes)}]
     (-> scene
         clipping/setup-states
         sort-scene)))
@@ -4719,6 +4731,7 @@
           :template (:template def)
           :view-types [:scene :text]
           :view-opts {:scene {:grid true
+                              :augment-view-fn gui-animation-view/attach!
                               :drop-fn handle-drop}})
         (update-gui-resource-type-tx-data
           workspace

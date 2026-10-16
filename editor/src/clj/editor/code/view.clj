@@ -282,11 +282,11 @@
 
 (def ^:private default-editor-color-scheme
   (let [foreground-color (Color/valueOf "#DDDDDD")
-        background-color (Color/valueOf "#27292D")
-        selection-background-color (Color/valueOf "#4E4A46")
+        background-color (Color/valueOf "#202020")
+        selection-background-color (Color/valueOf "#174779")
         execution-marker-color (Color/valueOf "#FBCE2F")
         execution-marker-frame-color (.deriveColor execution-marker-color 0.0 1.0 1.0 0.5)
-        gutter-background-color (Color/valueOf "#393C41")]
+        gutter-background-color (Color/valueOf "#303030")]
     [["editor.foreground" foreground-color]
      ["editor.background" background-color]
      ["editor.cursor" Color/WHITE]

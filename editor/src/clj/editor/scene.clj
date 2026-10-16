@@ -812,14 +812,19 @@
                              renderables))))
         renderables-by-pass))
 
-(g/defnk produce-scene-render-data [scene preview-overrides selection hidden-renderable-tags hidden-node-outline-key-paths local-camera]
+(g/defnk produce-scene-render-data [scene preview-overrides animation-preview-overrides selection hidden-renderable-tags hidden-node-outline-key-paths local-camera]
   (if-let [error (:error scene)]
     {:error error
      :renderables {}
      :preview-light-data (light/preview-light-data-from-renderables [])
      :selected-renderables []
      :scene-aabb geom/empty-bounding-box}
-    (let [selection-set (set selection)
+    (let [preview-overrides (merge-with coll/merge animation-preview-overrides preview-overrides)
+          scene (if-let [preview-fn (and (coll/not-empty animation-preview-overrides)
+                                        (:animation-preview-fn scene))]
+                  (preview-fn scene preview-overrides)
+                  scene)
+          selection-set (set selection)
           view-matrix (c/camera-view-matrix local-camera)
           {:keys [renderables] :as flattened-scene} (flatten-scene scene preview-overrides selection-set hidden-renderable-tags hidden-node-outline-key-paths view-matrix)
           selection-pass-renderables-by-node-id (get-selection-pass-renderables-by-node-id renderables)
@@ -895,6 +900,8 @@
 (g/defnode SceneRenderer
   (property overlay-anchor-pane AnchorPane (dynamic visible (g/constantly false)))
   (property render-mode g/Keyword (default :normal))
+  (property animation-preview-active g/Bool (default false))
+  (property animation-preview-overrides g/Any (default {}))
 
   (input active-view g/NodeID)
   (input scene g/Any :substitute substitute-scene)
@@ -922,6 +929,9 @@
   (output aux-render-data g/Any :cached produce-aux-render-data)
 
   (output selected-renderables g/Any (g/fnk [scene-render-data] (:selected-renderables scene-render-data)))
+  (output tool-selected-renderables g/Any
+          (g/fnk [animation-preview-active selected-renderables]
+            (if animation-preview-active [] selected-renderables)))
   (output scene-aabb AABB (g/fnk [scene-render-data] (:scene-aabb scene-render-data)))
   (output selected-aabb AABB :cached (g/fnk [scene-render-data]
                                        (let [selected-aabbs (sequence (comp (mapcat val)
@@ -1381,6 +1391,8 @@
         node (g/node-by-id basis node-id)
         image-view (g/raw-property-value* basis node :image-view)]
     (when-not (ui/inside-hidden-tab? image-view)
+      (when-let [refresh-fn (:refresh-fn (g/user-data node-id ::view-augmentation))]
+        (refresh-fn dt))
       (let [drawable (g/raw-property-value* basis node :drawable)
             async-copy-state-atom (g/raw-property-value* basis node :async-copy-state)]
         (when (and (some? drawable)
@@ -1400,8 +1412,15 @@
 (defn- supports-camera-inset-drawable? [node-id]
   (g/node-instance? (g/now) SceneView node-id))
 
+(defn- dispose-view-augmentation! [node-id]
+  (when-let [augmentation (g/user-data node-id ::view-augmentation)]
+    (g/user-data! node-id ::view-augmentation nil)
+    (when-let [dispose-fn (:dispose-fn augmentation)]
+      (dispose-fn))))
+
 (defn dispose-scene-view! [node-id]
   (when (g/node-by-id node-id)
+    (dispose-view-augmentation! node-id)
     (when-let [^GLAutoDrawable drawable (g/node-value node-id :drawable)]
       (gl/with-drawable-as-current drawable
         (scene-cache/drop-context! gl)
@@ -1736,9 +1755,15 @@
 
 (defn input-dispatch-context [view-id]
   (g/with-auto-evaluation-context evaluation-context
-    {:input-handlers (g/inputs (:basis evaluation-context) view-id :input-handlers)
-     :user-data (g/node-value view-id :selected-tool-renderables evaluation-context)
-     :mouse-binding-context (g/node-value view-id :mouse-binding-context evaluation-context)}))
+    (let [basis (:basis evaluation-context)
+          input-handlers (g/inputs basis view-id :input-handlers)
+          animation-preview-active (g/node-value view-id :animation-preview-active evaluation-context)
+          tool-controller-id (g/node-feeding-into basis view-id :tool-controller-id)]
+      {:input-handlers (if animation-preview-active
+                         (filterv #(not= tool-controller-id (gt/source-id %)) input-handlers)
+                         input-handlers)
+       :user-data (g/node-value view-id :selected-tool-renderables evaluation-context)
+       :mouse-binding-context (g/node-value view-id :mouse-binding-context evaluation-context)})))
 
 (defn dispatch-input-action [{:keys [input-handlers user-data mouse-binding-context]} input-state action]
   (let [input-state (i/update-input-state input-state action)
@@ -1850,15 +1875,23 @@
       (when-not (identical? (.getImage image-view) new-image)
         (.setImage image-view new-image)))))
 
-(defn- nudge! [scene-node-ids ^double dx ^double dy ^double dz]
-  (g/transact
-    (g/with-auto-evaluation-context evaluation-context
-      (for [node-id scene-node-ids]
-        (let [delta (Vector3d. dx dy dz)]
-          (s/assert
-            :manip/tx-data
-            (:manip/tx-data
-              (scene-tools/manip-move node-id delta :manip-phase/commit evaluation-context))))))))
+(defn- nudge! [app-view scene-node-ids dx dy dz]
+  (g/with-auto-evaluation-context evaluation-context
+    (let [active-view (g/node-value app-view :active-view evaluation-context)
+          animation-preview-active (and active-view
+                                        (g/node-instance? (:basis evaluation-context) SceneRenderer active-view)
+                                        (g/node-value active-view :animation-preview-active evaluation-context))]
+      (when-not animation-preview-active
+        (g/transact
+          (into []
+                (mapcat
+                  (fn [node-id]
+                    (let [delta (Vector3d. (double dx) (double dy) (double dz))]
+                      (s/assert
+                        :manip/tx-data
+                        (:manip/tx-data
+                          (scene-tools/manip-move node-id delta :manip-phase/commit evaluation-context))))))
+                scene-node-ids))))))
 
 (defn- selection->movable
   ([selection]
@@ -1869,35 +1902,35 @@
 
 (handler/defhandler :scene.move-up :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) 0.0 1.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) 0.0 1.0 0.0)))
 
 (handler/defhandler :scene.move-down :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) 0.0 -1.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) 0.0 -1.0 0.0)))
 
 (handler/defhandler :scene.move-left :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) -1.0 0.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) -1.0 0.0 0.0)))
 
 (handler/defhandler :scene.move-right :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) 1.0 0.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) 1.0 0.0 0.0)))
 
 (handler/defhandler :scene.move-up-major :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) 0.0 10.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) 0.0 10.0 0.0)))
 
 (handler/defhandler :scene.move-down-major :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) 0.0 -10.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) 0.0 -10.0 0.0)))
 
 (handler/defhandler :scene.move-left-major :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) -10.0 0.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) -10.0 0.0 0.0)))
 
 (handler/defhandler :scene.move-right-major :workbench
   (active? [selection evaluation-context] (selection->movable selection evaluation-context))
-  (run [selection] (nudge! (selection->movable selection) 10.0 0.0 0.0)))
+  (run [app-view selection] (nudge! app-view (selection->movable selection) 10.0 0.0 0.0)))
 
 (defn- attempt-handle-arrow-key-commands! [^KeyEvent event]
   (if (or (.isAltDown event) (.isMetaDown event) (.isShiftDown event) (.isShortcutDown event))
@@ -2247,7 +2280,7 @@
       (g/connect view-id         :manip-space                   tool-controller :manip-space)
       (g/connect view-id         :viewport                      tool-controller :viewport)
       (g/connect camera          :camera                        tool-controller :camera)
-      (g/connect view-id         :selected-renderables          tool-controller :selected-renderables)
+      (g/connect view-id         :tool-selected-renderables     tool-controller :selected-renderables)
 
       (attach-tool-controller tool-controller-type tool-controller view-id resource-node)
 
@@ -2275,6 +2308,12 @@
     (g/transact
       {:undoable false}
       (setup-view view-id resource-node opts))
+    (when-let [augment-view-fn (:augment-view-fn opts)]
+      (g/user-data! view-id ::view-augmentation
+                    (augment-view-fn parent view-id resource-node opts))
+      ;; A tab can close before the GL pane has ever been laid out.
+      (when-let [tab (:tab opts)]
+        (ui/on-closed! tab (fn [_event] (dispose-view-augmentation! view-id)))))
     view-id))
 
 (defn make-preview [resource-node opts width height]

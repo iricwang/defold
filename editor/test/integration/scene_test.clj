@@ -199,6 +199,38 @@
           (g/set-property tool-controller :preview-overrides nil))
         (is (= initial-position (g/node-value go-node :position)))))))
 
+;; Verifies timeline preview and attempted nudges leave resource values and undo history intact.
+(deftest animation-preview-does-not-edit-resources
+  (test-util/with-loaded-project
+    (let [[resource-node view] (test-util/open-scene-view! project app-view "/logic/atlas_sprite.collection" 128 128)
+          go-node (gt/source-id (first (g/inputs (g/now) resource-node :child-scenes)))
+          tool-controller (g/node-feeding-into (g/now) view :tool-controller-id)]
+      (test-util/mouse-click! view 64 64)
+      (let [initial-position (g/node-value go-node :position)
+            initial-save-value (g/node-value resource-node :save-value)
+            initial-undo-revisions (g/undo-stack-revisions)]
+        (g/transact
+          {:undoable false}
+          (g/set-properties view
+            :animation-preview-active true
+            :animation-preview-overrides {go-node {:position [30.0 40.0 0.0]}}))
+        (is (= [] (g/node-value view :tool-selected-renderables)))
+        (is (not (coll/any? #(= tool-controller (gt/source-id %))
+                           (:input-handlers (scene/input-dispatch-context view)))))
+        (#'scene/nudge! app-view [go-node] 10.0 0.0 0.0)
+        (is (= initial-position (g/node-value go-node :position)))
+        (is (= initial-save-value (g/node-value resource-node :save-value)))
+        (is (= initial-undo-revisions (g/undo-stack-revisions)))
+        (g/transact
+          {:undoable false}
+          (g/set-properties view
+            :animation-preview-active false
+            :animation-preview-overrides {}))
+        (is (= initial-position (g/node-value go-node :position)))
+        (is (= initial-undo-revisions (g/undo-stack-revisions)))
+        (is (coll/any? #(= tool-controller (gt/source-id %))
+                      (:input-handlers (scene/input-dispatch-context view))))))))
+
 (deftest delete-undo-delete-selection
   (testing "Scene generation"
     (test-util/with-loaded-project

@@ -726,8 +726,8 @@
                :name "console.debug"}]})
 
 (def ^:private console-color-scheme
-  (let [^Color background-color (Color/valueOf "#27292D")
-        ^Color selection-background-color (Color/valueOf "#264A8B")]
+  (let [^Color background-color (Color/valueOf "#242424")
+        ^Color selection-background-color (Color/valueOf "#174779")]
     (view/make-color-scheme
       [["console.reload.successful" (Color/valueOf "#33CC33")]
        ["console.error" (Color/valueOf "#FF6161")]
@@ -739,7 +739,7 @@
        ["editor.warning" (Color/valueOf "#FF9A34")]
        ["editor.info" (Color/valueOf "#CCCFD3")]
        ["editor.debug" (Color/valueOf "#3B8CF8")]
-       ["editor.foreground" (Color/valueOf "#A2B0BE")]
+       ["editor.foreground" (Color/valueOf "#c8c8c8")]
        ["editor.background" background-color]
        ["editor.cursor" Color/TRANSPARENT]
        ["editor.gutter.eval.expression" (Color/valueOf "#DDDDDD")]

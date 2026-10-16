@@ -1,0 +1,114 @@
+// Override visual properties only. Do not replace skins or event handling.
+.root {
+  -fx-font-size: 14px;
+  -fx-accent: -df-ui-accent;
+  -fx-focus-color: -df-ui-accent;
+  -fx-selection-bar: -df-ui-selection;
+  -fx-selection-bar-non-focused: -df-background-lighter;
+  -fx-cell-focus-inner-border: -df-ui-accent;
+}
+
+.button, .toggle-button, .menu-button, .choice-box, .combo-box,
+.text-field, .text-area, .color-picker {
+  -fx-background-radius: 2px;
+  -fx-border-radius: 2px;
+}
+
+.toggle-button:selected {
+  -fx-background-color: -df-ui-selection;
+  -fx-text-fill: -df-text-selected;
+}
+
+.text-field, .text-area {
+  -fx-highlight-fill: -df-ui-selection;
+  -fx-highlight-text-fill: -df-text-selected;
+}
+
+.text-field:focused, .text-area:focused,
+.cljfx-form-contents .filter-text-field:focused {
+  -fx-border-color: -df-component-light -df-component-light -df-ui-accent -df-component-light;
+}
+
+.combo-box:focused, .combo-box:showing {
+  -fx-border-color: -df-ui-accent;
+}
+
+.combo-box:focused > .list-cell {
+  -fx-border-color: -df-component-light -df-component-light -df-ui-accent -df-component-light;
+}
+
+.table-view:focused, .radio-button:focused {
+  -fx-border-color: transparent transparent -df-ui-accent transparent;
+}
+
+.check-box > .box {
+  -fx-background-radius: 2px;
+  -fx-border-radius: 2px;
+}
+
+.check-box:selected > .box {
+  -fx-background-color: -df-ui-accent;
+  -fx-border-color: -df-ui-accent;
+}
+
+.check-box:selected > .box > .mark {
+  -fx-background-color: -df-text-selected;
+}
+
+.check-box:focused > .box {
+  -fx-border-color: -df-ui-accent;
+}
+
+// Slide switches share CheckBox's skin but retain their track/thumb geometry.
+.check-box.slide-switch > .box {
+  -fx-background-color: -df-background;
+  -fx-background-radius: 10px;
+  -fx-border-width: 0px;
+}
+
+.check-box.slide-switch:selected > .box > .mark {
+  -fx-background-color: -df-ui-accent;
+}
+
+.tree-cell:filled:selected,
+.list-cell:filled:selected,
+.flat-list-view .list-cell:filled:selected,
+.table-row-cell:filled:selected,
+.tree-table-row-cell:filled:selected {
+  -fx-background-color: -df-ui-selection;
+  -fx-border-color: -df-ui-accent;
+  -fx-text-fill: -df-text-selected;
+}
+
+.context-menu {
+  -fx-background-color: -df-background-light;
+  -fx-border-color: -df-component-dark;
+  -fx-border-width: 1px;
+  -fx-background-radius: 2px;
+  -fx-border-radius: 2px;
+}
+
+.context-menu .menu-item:focused,
+.menu-bar > .container > .menu-button:showing {
+  -fx-background-color: -df-ui-selection;
+}
+
+.tab-pane .tab:selected {
+  -fx-background-color: -df-ui-header;
+  -fx-border-color: -df-ui-accent;
+}
+
+.tab-pane.inactive .tab:selected {
+  -fx-border-color: -df-component-light;
+}
+
+.tab-header-background, .menu-bar {
+  -fx-background-color: -df-background-darker;
+}
+
+.tooltip {
+  -fx-background-color: -df-background-light;
+  -fx-text-fill: -df-text-light;
+  -fx-border-color: -df-component-light;
+  -fx-border-width: 1px;
+}

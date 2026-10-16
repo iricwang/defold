@@ -92,14 +92,13 @@ public final class GamePreview implements AutoCloseable {
             public Integer fromString(String value) { throw new UnsupportedOperationException(); }
         });
         frameRate.valueProperty().addListener((p, old, value) -> targetFrameRate = value);
-        frameRate.setStyle("-fx-min-width: 88px; -fx-pref-width: 88px; -fx-max-width: 88px;");
         frameRate.setTooltip(new Tooltip());
         localize.accept(frameRate.getTooltip(), "game-preview.frame-rate");
         HBox toolbar = new HBox(5, title, spacer, embedded, frameRate, run, stop);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setMinHeight(26);
+        toolbar.getStyleClass().add("game-preview-toolbar");
         toolbar.setStyle("-fx-padding: 0 28 0 8;");
-        viewport.setStyle("-fx-background-color: #15171a;");
         viewport.setMinSize(0, 0);
         viewport.setFocusTraversable(true);
         viewport.setId("game-viewport");
