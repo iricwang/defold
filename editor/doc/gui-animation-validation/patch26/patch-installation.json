@@ -1,0 +1,21 @@
+{
+  "version": "1.14.1-patch.26",
+  "commit": "2411a688bee92ba78570185c74c8aebb1ea30959",
+  "baseline_revision": 22,
+  "feed": "local http://127.0.0.1:8771/manifest.json",
+  "download_install_restart": "passed",
+  "verified_files": 168,
+  "mismatches": [],
+  "processes": [
+    "57525 /Users/applemima1111/Documents/Dev/Defold/tmp/gui-panthera-upgrade/Defold.app/Contents/Resources/packages/jdk-25.0.4.1+1/bin/java -cp /Users/applemima1111/Documents/Dev/Defold/tmp/gui-panthera-upgrade/Defold.app/Contents/Resources/packages/defold-2411a688bee92ba78570185c74c8aebb1ea30959.jar -Xdock:icon=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-panthera-upgrade/Defold.app/Contents/Resources/logo.icns -Xdock:name=Defold -Dfile.encoding=UTF-8 -Djna.nosys=true -Ddefold.launcherpath=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-panthera-upgrade/Defold.app/Contents/MacOS/Defold -Ddefold.resourcespath=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-panthera-upgrade/Defold.app/Contents/Resources -Ddefold.version=1.14.1 -Ddefold.editor.sha1=2411a688bee92ba78570185c74c8aebb1ea30959 -Ddefold.engine.sha1= -Ddefold.buildtime=2026-10-17T02:38:39.116642 -Ddefold.channel=dev -Ddefold.archive.domain=d.defold.com -Djava.net.preferIPv4Stack=true -Ddefold.library.connectTimeoutMillis=10000 -Ddefold.library.hostProbeTimeoutMillis=10000 -Dsun.net.client.defaultConnectTimeout=30000 -Dsun.net.client.defaultReadTimeout=30000 -Djogl.windows.cpu_affinity_mode=0 -Djogl.texture.notexrect=true -Dglass.accessible.force=false -Ddefold.schema.check.disable=true --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.desktop/sun.awt=ALL-UNNAMED --add-opens=java.desktop/sun.java2d.opengl=ALL-UNNAMED --add-opens=java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED --add-opens=java.base/sun.nio.fs=ALL-UNNAMED --add-opens=java.desktop/sun.awt.image=ALL-UNNAMED --enable-native-access=ALL-UNNAMED -XX:+UseCompactObjectHeaders --sun-misc-unsafe-memory-access=allow -Xmx12884901888 com.defold.editor.Main"
+  ],
+  "patch_sha256": "ffff7751305fab1047e920ff42bd77b13b22eb5c00ef6d4e3ff96afd48c0329b",
+  "runtime_ui_checks": 95,
+  "clojure_tests": {
+    "tests": 88,
+    "assertions": 4938,
+    "failures": 0,
+    "errors": 0
+  },
+  "installed_jar_smoke": "passed: project load, GUI preview, native tab alignment, playback"
+}
