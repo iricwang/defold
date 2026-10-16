@@ -286,7 +286,7 @@
                        (io/make-parents)
                        (spit token))
           craft-service (try
-                          (craft-binding/start! project app-view localization project-path token
+                          (craft-binding/start! project app-view prefs localization project-path token
                                                 #(app-view/prepare-peer-switch! app-view changes-view project prefs localization %1 %2)
                                                 #(app-view/peer-workspace-idle? app-view project)
                                                 #(some-> (g/node-value app-view :active-resource) resource/proj-path))
@@ -350,7 +350,9 @@
       (ui/user-data! scene ::ui/refresh-requested? true)
 
       (ui/on-closing! stage (fn [_]
-                              (let [dirty-save-data (project/dirty-save-data project)
+                              (if (disk/managed-write-active?)
+                                false
+                                (let [dirty-save-data (project/dirty-save-data project)
                                     auto-save-on-quit? (prefs/get prefs [:workflow :save-on-app-focus-lost])]
                                 (if (and auto-save-on-quit? (seq dirty-save-data))
                                   (do
@@ -387,7 +389,7 @@
                                                                  :result true}]}))]
                                     (when result
                                       (app-view/store-window-state! stage prefs))
-                                    result)))))
+                                    result))))))
 
       (ui/on-closed! stage (fn [_]
                              ((:dispose! preview-pane))

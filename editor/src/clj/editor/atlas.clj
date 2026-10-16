@@ -934,6 +934,21 @@
       (map (partial make-atlas-animation self resolve-resource-fn owner-resource)
            (:animations atlas)))))
 
+(defn managed-content-tx-data
+  "Replace managed atlas contents in the existing resource node. The caller
+  groups these reversible graph edits with its GUI publication operation."
+  [_workspace self atlas evaluation-context]
+  (let [owner-resource (resource-node/resource (:basis evaluation-context) self)
+        resolve-resource-fn #(workspace/resolve-resource (:basis evaluation-context) %1 %2)
+        atlas (merge (protobuf/make-map-with-defaults AtlasProto$Atlas) atlas)]
+    (into [] cat
+          [(into [] (mapcat g/delete-node) (g/node-value self :nodes evaluation-context))
+           (gu/set-properties-from-pb-map self AtlasProto$Atlas atlas
+             margin :margin inner-padding :inner-padding extrude-borders :extrude-borders rename-patterns :rename-patterns)
+           (g/set-property self :max-page-size [(:max-page-width atlas) (:max-page-height atlas)])
+           (make-image-nodes-in-atlas self (resolve-image-msgs resolve-resource-fn owner-resource (:images atlas) true))
+           (into [] (mapcat #(make-atlas-animation self resolve-resource-fn owner-resource %)) (:animations atlas))])))
+
 (defn- selection->atlas [selection evaluation-context] (handler/adapt-single selection AtlasNode evaluation-context))
 (defn- selection->animation [selection evaluation-context] (handler/adapt-single selection AtlasAnimation evaluation-context))
 (defn- selection->image [selection evaluation-context] (handler/adapt-single selection AtlasImage evaluation-context))

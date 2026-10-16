@@ -2064,3 +2064,6 @@ dialog.craft-binding.failed = 绑定失败
 dialog.craft-binding.ip = PhotoCraft IP 地址（可附加 :端口）
 dialog.craft-binding.disconnected = 尚未绑定
 dialog.craft-binding.ready = 未绑定时会自动尝试连接本机的另一款应用。
+
+dialog.craft-binding.project-content = 连接作用于当前工程。保留已打开的文档和未保存编辑；仅手动同步时发布修改。
+dialog.craft-binding.button.connect = 连接工程

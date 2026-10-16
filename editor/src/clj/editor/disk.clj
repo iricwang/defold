@@ -37,33 +37,57 @@
 
 (set! *warn-on-reflection* true)
 
+;; A managed publication freezes a save snapshot before background I/O. Ordinary
+;; saves/reloads must not race that snapshot, including calls from extensions.
+(defonce ^:private managed-write-atom (atom nil))
+
+(defn managed-write-active? []
+  (boolean @managed-write-atom))
+
+(defn begin-managed-write! [transaction-id]
+  (when (and (disk-availability/available?)
+             (compare-and-set! managed-write-atom nil transaction-id))
+    (disk-availability/push-busy!)
+    true))
+
+(defn end-managed-write! [transaction-id]
+  (let [owner @managed-write-atom]
+    (when (and (= transaction-id owner)
+               (compare-and-set! managed-write-atom owner nil))
+      (disk-availability/pop-busy!))))
+
 ;; -----------------------------------------------------------------------------
 ;; Helpers
 ;; -----------------------------------------------------------------------------
 
 (defn- async-job! [callback! job-atom start-job! & args]
-  (disk-availability/push-busy!)
-  (let [job (swap! job-atom #(or % (apply start-job! args)))]
-    (future
-      (let [successful? (try
-                          (deref job)
-                          (catch Throwable error
-                            (error-reporting/report-exception! error)
-                            false))]
-        (if (nil? callback!)
-          (disk-availability/pop-busy!)
-          (ui/run-later
-            (try
-              (callback! successful?)
-              (finally
-                (disk-availability/pop-busy!)))))))
-    nil))
+  (if (managed-write-active?)
+    (when callback!
+      (ui/run-later (callback! false)))
+    (do
+      (disk-availability/push-busy!)
+      (let [job (swap! job-atom #(or % (apply start-job! args)))]
+        (future
+          (let [successful? (try
+                              (deref job)
+                              (catch Throwable error
+                                (error-reporting/report-exception! error)
+                                false))]
+            (if (nil? callback!)
+              (disk-availability/pop-busy!)
+              (ui/run-later
+                (try
+                  (callback! successful?)
+                  (finally
+                    (disk-availability/pop-busy!))))))))))
+  nil)
 
 (defn- blocking-job! [job-atom start-job! & args]
   ;; Calling this from the ui thread will cause a deadlock, since
   ;; the jobs rely on run-later. Use the async variants instead.
   (assert (not (ui/on-ui-thread?)))
-  (let [successful? (deref (swap! job-atom #(or % (apply start-job! args))))]
+  (let [successful? (when-not (managed-write-active?)
+                      (deref (swap! job-atom #(or % (apply start-job! args)))))]
     successful?))
 
 ;; -----------------------------------------------------------------------------
@@ -220,6 +244,32 @@
             render-progress!
             write-message-fn)]
       (make-post-save-actions written-save-datas written-disk-sha256s snapshot-invalidate-counters))))
+
+(defn capture-save-snapshot
+  "Capture exactly these resource nodes and their invalidation counters. Invoke
+  on the editor thread after the managed graph transaction, before any I/O."
+  [project resource-node-ids]
+  (g/with-auto-evaluation-context evaluation-context
+    (let [workspace (project/workspace project evaluation-context)]
+      {:project project
+       :workspace workspace
+       :localization (workspace/localization workspace evaluation-context)
+       :save-data (mapv #(g/valid-node-value % :save-data evaluation-context) resource-node-ids)
+       :snapshot-invalidate-counters (g/evaluation-context-invalidate-counters evaluation-context)})))
+
+(defn write-save-snapshot!
+  "Write a previously captured, bounded resource set on a background thread.
+  Later editor changes remain dirty; unrelated resources are never visited."
+  [snapshot]
+  (assert (not (ui/on-ui-thread?)))
+  (let [post-save-actions (write-save-data-to-disk!
+                           (:save-data snapshot)
+                           (:snapshot-invalidate-counters snapshot)
+                           (:localization snapshot)
+                           {})]
+    (ui/run-now
+      (process-post-save-actions! (:workspace snapshot) post-save-actions))
+    post-save-actions))
 
 (defn- start-save-job! [render-reload-progress! render-save-progress! save-data-fn project changes-view]
   {:pre [(ifn? render-reload-progress!)

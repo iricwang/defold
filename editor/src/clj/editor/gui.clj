@@ -983,6 +983,12 @@
   {:pre [(g/node-type? node-type)]}
   (node-type-deref->layout-property-names @node-type))
 
+(defn managed-property-names
+  "Declared GUI layout properties for a named native node type. No graph edits."
+  [kind]
+  (when-let [node-type (node-types/->type kind)]
+    (into #{"id"} (coll/keys (node-type->layout-property-names node-type)))))
+
 (defn- make-recursive-prop->value-for-default-layout [basis gui-node-id]
   (let [[root-node-id & override-node-ids] (g/override-originals basis gui-node-id)
         root-node (g/node-by-id basis root-node-id)
@@ -4786,6 +4792,22 @@
 
 (def ^:private add-attachment-to-gui-node (partial g/expand-ec attach-gui-node-to-gui-node))
 
+(defn managed-reparent-tx-data
+  "Reattach a GUI node without touching its local transform or identity. The
+  publication supplies final parent-local transforms in its desired node data."
+  [scene-node gui-node new-parent evaluation-context]
+  (let [basis (:basis evaluation-context)
+        node-tree (gui-attachment/scene-node->node-tree basis scene-node)
+        old-parent (core/scope basis gui-node)
+        new-parent (or new-parent node-tree)]
+    (when (g/override-original basis gui-node)
+      (throw (ex-info "Template override children cannot be reparented" {:code "UNSUPPORTED_GUI_FEATURE"})))
+    (into [] cat
+          [(into [] (mapcat (fn [[source target]] (g/disconnect old-parent source gui-node target))) gui-node-parent-attachments)
+           (into [] (mapcat (fn [[source target]] (g/disconnect gui-node source old-parent target))) gui-node-attachments)
+           (into [] (mapcat (fn [[source target]] (g/connect new-parent source gui-node target))) gui-node-parent-attachments)
+           (into [] (mapcat (fn [[source target]] (g/connect gui-node source new-parent target))) gui-node-attachments)])))
+
 (defn- reorder-gui-nodes [reordered-gui-node-ids]
   (coll/mapcat-indexed #(g/set-property %2 :child-index %1) reordered-gui-node-ids))
 
@@ -5215,8 +5237,9 @@
         (let [layout-name (if last-colon-index (subs property 0 last-colon-index) "")
               layout->prop->value (g/node-value node-id :layout->prop->value evaluation-context)]
           (when-let [prop->value (get layout->prop->value layout-name)]
-            (let [value (prop->value prop-kw)
-                  edit-type-id (properties/edit-type-id (gui-node-ext-edit-type node prop-kw evaluation-context))]
+            (let [edit-type (gui-node-ext-edit-type node prop-kw evaluation-context)
+                  value ((get edit-type :to-type identity) (prop->value prop-kw))
+                  edit-type-id (properties/edit-type-id edit-type)]
               (when-let [converter (-> edit-type-id ext-graph/edit-type-id->value-converter :to)]
                 #(converter value))))))))
   (fn GuiNode-lister [node-id evaluation-context]
@@ -5255,7 +5278,9 @@
                           (contains? layout-name)))
               (let [edit-type (gui-node-ext-edit-type node prop-kw evaluation-context)]
                 (when-let [converter (-> edit-type properties/edit-type-id ext-graph/edit-type-id->value-converter :from)]
-                  #(layout-property-set-in-specific-layout evaluation-context layout-name node-id prop-kw (converter % rt edit-type project evaluation-context)))))))))))
+                  #(layout-property-set-in-specific-layout evaluation-context layout-name node-id prop-kw
+                                                          ((get edit-type :from-type identity)
+                                                           (converter % rt edit-type project evaluation-context))))))))))))
 
 (ext-graph/register-property-resetter!
   ::GuiNode

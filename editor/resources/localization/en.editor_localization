@@ -2886,3 +2886,6 @@ dialog.craft-binding.failed = Binding Failed
 dialog.craft-binding.ip = PhotoCraft IP address (optional :port)
 dialog.craft-binding.disconnected = Not Bound
 dialog.craft-binding.ready = Unbound editors try the local application automatically.
+
+dialog.craft-binding.project-content = Connection applies to this project. Open tabs and unsaved edits stay open; only manual synchronization publishes changes.
+dialog.craft-binding.button.connect = Connect Project

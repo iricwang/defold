@@ -1268,7 +1268,16 @@
 (def ^:private make-resource-nodes-by-path-map
   (partial into {} (map (juxt (comp resource/proj-path second) first))))
 
+(def ^:dynamic *managed-additive-resource-refresh* false)
+
+(defn additive-resource-change-plan?
+  "Only new nodes and invalidation preserve references in the existing undo history."
+  [plan]
+  (not (coll/any? coll/not-empty (coll/vals (dissoc plan :new :invalidate-outputs :kept)))))
+
 (defn perform-resource-change-plan [plan project render-progress!]
+  (when (and *managed-additive-resource-refresh* (not (additive-resource-change-plan? plan)))
+    (throw (ex-info "Managed refresh would invalidate undo references" {:code "UNDO_BARRIER_REQUIRED"})))
   (let [process-metrics (du/make-metrics-collector)
         resource-metrics (du/make-metrics-collector)
         transaction-metrics (du/make-metrics-collector)
@@ -1314,7 +1323,8 @@
     ;; All transactions from this point on will be non-undoable. Find out if we
     ;; have any significant changes, but take care to exclude non-change
     ;; information such as the list of :kept resources from this check.
-    (when (coll/any? coll/not-empty (vals (dissoc plan :invalidate-outputs :kept)))
+    (when (and (not *managed-additive-resource-refresh*)
+               (coll/any? coll/not-empty (coll/vals (dissoc plan :invalidate-outputs :kept))))
       (g/reset-undo! :undo/global))
 
     ;; Create the new nodes in the graph.
@@ -1796,6 +1806,21 @@
             loaded-resources' (conj (or loaded-resources #{}) resource)
             tx-data-context-map' (assoc tx-data-context-map' :loaded-resources loaded-resources')]
         [tx-data-context-map' node-id+source-value-pairs load-tx-data]))))
+
+(defn ensure-resource-loaded!
+  "Load an existing project resource without opening or selecting an editor tab.
+  Must be invoked on the editor thread, like other resource graph mutations."
+  [project path-or-resource]
+  (g/with-auto-evaluation-context evaluation-context
+    (when-let [resource (resolve-path-or-resource project path-or-resource evaluation-context)]
+      (when-let [node-id (get-resource-node project resource evaluation-context)]
+        (when-not (resource-node/loaded? (:basis evaluation-context) node-id)
+          (let [transpiler-tx-data-fn (get-transpiler-tx-data-fn! evaluation-context)
+                [_ node-id+source-value-pairs tx-data]
+                (ensure-resource-node-loaded {} (:basis evaluation-context) project node-id resource transpiler-tx-data-fn)]
+            (g/transact {:undoable false} tx-data)
+            (resource-node/merge-source-values! node-id+source-value-pairs)))
+        node-id))))
 
 (defn connect-resource-node
   "Creates transaction steps for creating `connections` between the

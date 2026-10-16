@@ -16,7 +16,10 @@
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.string :as string]
+            [editor.craft-project :as craft-project]
+            [editor.craft-publish :as craft-publish]
             [editor.dialogs :as dialogs]
+            [editor.disk :as disk]
             [editor.editor-extensions.server :as ext.server]
             [editor.future :as future]
             [editor.handler :as handler]
@@ -29,10 +32,10 @@
   (:import [java.io ByteArrayInputStream File]
            [java.net HttpURLConnection InetAddress InetSocketAddress Socket URI]
            [java.nio.charset StandardCharsets]
-           [java.nio.file FileVisitResult Files OpenOption Path SimpleFileVisitor StandardOpenOption]
+           [java.nio.file AtomicMoveNotSupportedException CopyOption FileVisitResult Files OpenOption Path SimpleFileVisitor StandardCopyOption StandardOpenOption]
            [java.nio.file.attribute BasicFileAttributes]
            [java.security DigestInputStream MessageDigest]
-           [java.util Arrays Base64]
+           [java.util Arrays Base64 UUID]
            [java.util.concurrent CompletableFuture]
            [java.util.function BiConsumer]))
 
@@ -112,6 +115,32 @@
     (when-not (and token (= token (get-in state [:active :token])) (not (:incoming state)) (not (:outgoing state)))
       (fail! "This application is not the bound peer"))))
 
+(defn- require-loopback! [request]
+  (when-not (when-let [address (:remote-address request)]
+              (.isLoopbackAddress (InetAddress/getByName address)))
+    (throw (http-server/error (http-server/response 403 "This editor adapter is only available on loopback")))))
+
+(defn- structured-routes [service]
+  (into {}
+        (map (fn [[path handler]]
+               [path {"POST" (fn [request]
+                               (require-loopback! request)
+                               (web-server/require-authorized! request (:editor-token service))
+                               (try
+                                 (let [body (json/read-str (String. ^bytes (read-limited (:body request) (* 4 1024 1024)) StandardCharsets/UTF_8) :key-fn keyword)]
+                                   (http-server/json-response (handler body)))
+                                 (catch clojure.lang.ExceptionInfo error
+                                   (http-server/json-response {:error (merge {:code "RECOVERY_REQUIRED" :message (ex-message error)} (ex-data error))} 409))
+                                 (catch Exception _
+                                   (http-server/json-response {:error {:code "PROTOCOL_UNSUPPORTED" :message "Invalid structured adapter request"}} 400))))}]))
+        {"/craft/v1/project" (fn [_] (ui/run-now (craft-project/describe service)))
+         "/craft/v1/snapshot" (fn [request] (ui/run-now (craft-project/snapshot service (:path request))))
+         "/craft/v1/resource/open" (fn [request] (ui/run-now (craft-project/open-resource! service (:path request))))
+         "/craft/v1/publish/prepare" #(craft-publish/prepare! service %)
+         "/craft/v1/publish/apply" #(craft-publish/apply! service %)
+         "/craft/v1/publish/status" #(craft-publish/status service %)
+         "/craft/v1/publish/cancel" #(craft-publish/cancel! service %)}))
+
 (defn- manifest [service]
   (let [root (.toPath (.getCanonicalFile ^File (:root service)))
         files (volatile! [])
@@ -133,7 +162,9 @@
           (let [^Path path path
                 ^BasicFileAttributes attrs attrs
                 relative (string/replace (str (.relativize root path)) "\\" "/")]
-            (when (and (.isRegularFile attrs) (not (string/ends-with? relative ".pcraft")))
+            (when (and (.isRegularFile attrs)
+                       (not (string/starts-with? (str (.getFileName path)) "."))
+                       (not (string/ends-with? relative ".pcraft")))
               (when (or (<= 20000 (count @files)) (< (* 64 1024 1024) (.size attrs)))
                 (fail! "Project resource count or file size exceeds limit"))
               (vswap! total-size + (.size attrs))
@@ -192,9 +223,81 @@
           (call! (:address previous) "/binding/release" (:token previous) {})
           (catch Exception _))))))
 
+(defn- referenced-resource? [service resource]
+  (let [root (.toPath (.getCanonicalFile ^File (:root service)))
+        found (volatile! false)]
+    (Files/walkFileTree
+      root
+      (proxy [SimpleFileVisitor] []
+        (preVisitDirectory [path _attrs]
+          (if (and (not= root path)
+                   (or (string/starts-with? (str (.getFileName ^Path path)) ".")
+                       (contains? #{"build" "target"} (str (.getFileName ^Path path)))))
+            FileVisitResult/SKIP_SUBTREE
+            FileVisitResult/CONTINUE))
+        (visitFile [path attrs]
+          (let [^Path path path
+                ^BasicFileAttributes attrs attrs
+                relative (string/replace (str (.relativize root path)) "\\" "/")
+                metadata (and (string/starts-with? relative "photocraft_generated/")
+                              (or (string/includes? relative "/manifests/") (string/ends-with? relative "/assets.json")))]
+            (when (or (.isSymbolicLink attrs)
+                      (and (not metadata)
+                           (not= resource (str "/" relative))
+                           (re-find #"\.(gui|atlas|tilesource|sprite|collection|go|script|gui_script|lua|particlefx|json|material)$" relative)
+                           (or (< (* 16 1024 1024) (.size attrs))
+                               (try
+                                 (let [text (Files/readString path StandardCharsets/UTF_8)]
+                                   (or (string/includes? text resource) (string/includes? text (subs resource 1))))
+                                 (catch Exception _ true)))))
+              (vreset! found true)))
+          (if @found FileVisitResult/TERMINATE FileVisitResult/CONTINUE))))
+    @found))
+
+(defn- managed-upload! [service body]
+  (let [{:keys [path expected remove data]} body
+        relative (relative-path path)
+        file (project-file service relative)
+        state-atom (:state service)]
+    (when-not (string/starts-with? relative "photocraft_generated/")
+      (fail! "Only generated PhotoCraft assets may be updated"))
+    (locking state-atom
+      (when (< (* 64 1024 1024) (.length file)) (fail! "Generated resource exceeds size limit"))
+      (let [before (when (.isFile file) (Files/readAllBytes (.toPath file)))
+            actual (when before
+                     (apply str (into [] (map #(format "%02x" (bit-and 255 %)))
+                                      (.digest (MessageDigest/getInstance "SHA-256") ^bytes before))))]
+        (when-not (= expected actual)
+          (fail! "Generated asset changed before update"))
+        (if remove
+          (if (referenced-resource? service (str "/" relative))
+            {:retained true}
+            (do (Files/deleteIfExists (.toPath file)) {:removed true}))
+          (let [bytes (.decode (Base64/getDecoder) ^String data)]
+            (when (< (* 64 1024 1024) (alength bytes)) (fail! "Generated resource exceeds size limit"))
+            (io/make-parents file)
+            (project-file service relative)
+            (let [temp (Files/createTempFile (.toPath (.getParentFile file)) ".photocraft-" ".tmp" (make-array java.nio.file.attribute.FileAttribute 0))]
+              (try
+                (Files/write temp bytes ^"[Ljava.nio.file.OpenOption;" (make-array OpenOption 0))
+                (try
+                  (Files/move temp (.toPath file) (into-array CopyOption [StandardCopyOption/ATOMIC_MOVE StandardCopyOption/REPLACE_EXISTING]))
+                  (catch AtomicMoveNotSupportedException _
+                    (Files/move temp (.toPath file) (into-array CopyOption [StandardCopyOption/REPLACE_EXISTING]))))
+                (finally (Files/deleteIfExists temp))))
+            {:uploaded true}))))))
+
 (defn- base-routes [service]
   (let [eval-handler (get-in (ext.server/routes (:project service) (:editor-token service)) ["/eval" "POST"])]
     {"/binding/status" {"POST" (fn [_] (http-server/json-response {:app "Defold" :id (:id service) :bound (get-in @(:state service) [:active :id])}))}
+     "/binding/project" {"POST" (fn [request]
+                                  (let [token (bearer request)
+                                        state @(:state service)]
+                                    (when-not (and token (or (= token (get-in state [:active :token]))
+                                                             (= token (get-in state [:incoming :ticket]))
+                                                             (= token (:outgoing-ticket state))))
+                                      (fail! "Project metadata requires a binding ticket")))
+                                  (http-server/json-response {:project (:project-id service)}))}
      "/binding/request" {"POST" #(request-binding! service %)}
      "/binding/result" {"POST" (fn [request] (http-server/json-response (select-keys (pending! service request) [:phase])))}
      "/binding/cancel" {"POST" (fn [request]
@@ -206,7 +309,7 @@
                                    ;; Recheck the ticket on the UI thread: cancellation can arrive while this request waits.
                                    (let [offer (pending! service request)]
                                      (when-not (and (= "ready" (:phase offer)) (zero? (:file-operations @(:state service) 0)) ((:idle? service)))
-                                       (fail! "Close all workspace files and wait for file operations before switching"))
+                                       (fail! "Wait for project file operations before connecting"))
                                      (replace-peer! service {:id (:id offer) :address (:address offer) :token (:ticket offer)})
                                      (swap! (:state service) dissoc :incoming)))
                                  (http-server/json-response {:phase "bound" :id (:id service)}))}
@@ -229,21 +332,23 @@
                                    (http-server/response 200 (read-limited input (* 64 1024 1024))))))}
      "/binding/upload" {"POST" (fn [request]
                                  (authorize! service request)
-                                 (let [{:keys [path data]} (body-json request)
-                                       relative (relative-path path)]
-                                   (when-not (string/starts-with? relative "photocraft_generated/")
-                                     (fail! "Only generated PhotoCraft assets may be uploaded"))
-                                   (let [file (project-file service relative)
-                                         bytes (.decode (Base64/getDecoder) ^String data)]
-                                     (when (< (* 64 1024 1024) (alength bytes))
-                                       (fail! "Generated resource exceeds size limit"))
-                                     (io/make-parents file)
-                                     (project-file service relative)
-                                     (if (.exists file)
-                                       (when-not (Arrays/equals ^bytes bytes ^bytes (Files/readAllBytes (.toPath file)))
-                                         (fail! "A different generated asset already exists"))
-                                       (Files/write (.toPath file) bytes ^"[Ljava.nio.file.OpenOption;" (into-array OpenOption [StandardOpenOption/CREATE_NEW StandardOpenOption/WRITE])))))
-                                 (http-server/json-response {:uploaded true}))}
+                                 (let [body (body-json request)]
+                                   (if (:managed body)
+                                     (http-server/json-response (managed-upload! service body))
+                                     (let [{:keys [path data]} body
+                                           relative (relative-path path)]
+                                       (when-not (string/starts-with? relative "photocraft_generated/")
+                                         (fail! "Only generated PhotoCraft assets may be uploaded"))
+                                       (let [file (project-file service relative)
+                                             bytes (.decode (Base64/getDecoder) ^String data)]
+                                         (when (< (* 64 1024 1024) (alength bytes)) (fail! "Generated resource exceeds size limit"))
+                                         (io/make-parents file)
+                                         (project-file service relative)
+                                         (if (.exists file)
+                                           (when-not (Arrays/equals ^bytes bytes ^bytes (Files/readAllBytes (.toPath file)))
+                                             (fail! "A different generated asset already exists"))
+                                           (Files/write (.toPath file) bytes ^"[Ljava.nio.file.OpenOption;" (into-array OpenOption [StandardOpenOption/CREATE_NEW StandardOpenOption/WRITE]))))
+                                       (http-server/json-response {:uploaded true})))))}
      "/binding/preview" {"POST" (fn [request]
                                   (authorize! service request)
                                   (let [{:keys [path width height]} (body-json request)
@@ -251,6 +356,7 @@
                                     ((get-in (scene/routes (:project service) (:app-view service)) ["/preview/{*path}" "GET"])
                                      {:method "GET" :path-params {:path path} :query (str "width=" width "&height=" height)})))}
      "/binding/eval" {"POST" (fn [request]
+                               (require-loopback! request)
                                (authorize! service request)
                                (eval-handler (assoc request
                                                :body (ByteArrayInputStream. (read-limited (:body request) (* 4 1024 1024)))
@@ -267,6 +373,9 @@
                                  (fn [request]
                                    (locking state
                                      (authorize! service request)
+                                     (when (and (contains? #{"/binding/upload" "/binding/eval"} path)
+                                                (disk/managed-write-active?))
+                                       (fail! "Wait for the current managed publication before using the legacy writer"))
                                      (swap! (:state service) update :file-operations (fnil inc 0)))
                                    (try
                                      (let [result (handler request)]
@@ -281,7 +390,7 @@
                                      (catch Throwable error
                                        (swap! (:state service) update :file-operations dec)
                                        (throw error)))))))]))
-          (base-routes service))))
+        (merge (base-routes service) (structured-routes service)))))
 
 (defn- own-address [target port]
   (with-open [socket (Socket.)]
@@ -304,8 +413,9 @@
               (when (or (:incoming @state) (:outgoing @state) (pos? (:file-operations @state 0)))
                 (fail! "Wait for the current binding request or project file operation to finish"))
               (swap! state assoc :outgoing operation))
-            (let [{:keys [ticket id]} (call! target "/binding/request" "" {:id (:id service) :address (own-address target (:port service))})
+            (let [{:keys [ticket id]} (call! target "/binding/request" "" {:id (:id service) :address (own-address target (:port service)) :project (:project-id service)})
                   expires (+ (System/currentTimeMillis) 170000)]
+              (swap! state assoc :outgoing-ticket ticket)
               (try
                 (loop []
                   (let [{:keys [phase]} (call! target "/binding/result" ticket {})]
@@ -347,7 +457,7 @@
                                         :content (ex-message e)})))
           false)
         (finally
-          (swap! (:state service) (fn [state] (if (= operation (:outgoing state)) (dissoc state :outgoing) state)))
+          (swap! (:state service) (fn [state] (if (= operation (:outgoing state)) (dissoc state :outgoing :outgoing-ticket) state)))
           (when @disabled
             (ui/run-later (ui/enable-ui!))))))))
 
@@ -364,10 +474,22 @@
         peer (when (= "PhotoCraft" (:app status))
                {:id (:id status) :seen-at (System/currentTimeMillis)})
 
-        state (swap! (:state service) assoc :local-peer peer)]
-    (when (and peer (not (:bound status))
-               (not (:active state)) (not (:incoming state)) (not (:outgoing state)))
-      (bind! service "127.0.0.1:17655" true))))
+        _state (swap! (:state service)
+                      (fn [state]
+                        (let [active (:active state)
+                              state (assoc state :local-peer peer)]
+                          (if (and peer
+                                   (= "127.0.0.1:17655" (:address active))
+                                   (not= (:id peer) (:id active))
+                                   (not (:bound status))
+                                   (not (:incoming state))
+                                   (not (:outgoing state))
+                                   (zero? (:file-operations state 0)))
+                            ;; A new instance owns the same listening socket; the previous one is gone.
+                            (dissoc state :active)
+                            state))))]
+    ;; PhotoCraft initiates discovery offers to avoid simultaneous requests.
+    nil))
 
 (defn open-local! [path on-opened!]
   (when-let [service @current]
@@ -408,21 +530,54 @@
         (when-let [path ((:selected-path service))]
           (future/io (call! address "/binding/open" token {:path path})))))))
 
-(defn start! [project app-view localization root editor-token prepare! idle? selected-path]
+(defn- discovery-file
+  ^File [service]
+  (let [root (.getCanonicalFile (io/file (:root service)))
+        file (.getCanonicalFile (io/file root ".internal" "photocraft" "editor-adapter.json"))]
+    (when-not (.startsWith (.toPath file) (.toPath root))
+      (fail! "Editor discovery resolves outside the project"))
+    file))
+
+(defn- write-discovery! [service]
+  (let [file (discovery-file service)]
+    (io/make-parents file)
+    (let [temp (Files/createTempFile (.toPath (.getParentFile file)) ".adapter-" ".tmp" (make-array java.nio.file.attribute.FileAttribute 0))]
+      (try
+        (spit (.toFile temp) (json/write-str {:schemaVersion 1 :port (:port service) :editorSessionId (craft-project/session-id service)}))
+        (try
+          (Files/move temp (.toPath file) (into-array CopyOption [StandardCopyOption/ATOMIC_MOVE StandardCopyOption/REPLACE_EXISTING]))
+          (catch AtomicMoveNotSupportedException _
+            (Files/move temp (.toPath file) (into-array CopyOption [StandardCopyOption/REPLACE_EXISTING]))))
+        (finally (Files/deleteIfExists temp))))))
+
+(defn- remove-discovery! [service]
+  (let [file (discovery-file service)]
+    (when (and (.isFile file) (= (craft-project/session-id service) (:editorSessionId (json/read-str (slurp file) :key-fn keyword))))
+      (Files/deleteIfExists (.toPath file)))))
+
+(defn start! [project app-view prefs localization root editor-token prepare! idle? selected-path]
   (let [service {:project project
                  :app-view app-view
+                 :prefs prefs
                  :localization localization
                  :root (io/file root)
                  :project-id (.getCanonicalPath (io/file root))
                  :editor-token editor-token
                  :id (apply str (into [] (map #(format "%02x" (bit-and 255 %))) (.decode (Base64/getUrlDecoder) ^String (web-server/make-token))))
+                 :editor-session-id (str (UUID/randomUUID))
                  :state (atom {})
+                 :publish-state (atom {})
                  :prepare! prepare!
                  :idle? idle?
                  :selected-path selected-path}
         port (Integer/parseInt (System/getProperty "defold.craft.port" "17654"))
         server (http-server/start! (http-server/router-handler (routes service)) :host "0.0.0.0" :port port)
-        service (assoc service :port port :server server)]
+        service (assoc service :port (http-server/port server) :server server)]
+    (try
+      (write-discovery! service)
+      (catch Throwable error
+        (http-server/stop! server)
+        (throw error)))
     (reset! current service)
     (let [timer (java.util.Timer. "PhotoCraft local discovery" true)]
       (.schedule timer
@@ -439,4 +594,5 @@
     (when-let [^java.util.Timer timer (:discovery-timer @(:state service))]
       (.cancel timer))
     (http-server/stop! (:server service))
+    (remove-discovery! service)
     (compare-and-set! current service nil)))

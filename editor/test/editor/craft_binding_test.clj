@@ -17,6 +17,7 @@
             [clojure.java.io :as io]
             [clojure.test :refer :all]
             [editor.craft-binding :as binding]
+            [editor.craft-project :as craft-project]
             [editor.editor-extensions.server :as ext.server]
             [editor.ui :as ui])
   (:import [java.io ByteArrayInputStream]
@@ -25,8 +26,37 @@
            [java.util Base64]
            [java.util.concurrent CompletableFuture]))
 
+;; Named images update in place, while checksum mismatches and live references prevent deletion.
+(deftest managed-asset-updates-preserve-external-edits-and-referenced-images
+  (let [root (.toFile (Files/createTempDirectory "craft-managed-test" (make-array java.nio.file.attribute.FileAttribute 0)))
+        service {:root root :state (atom {})}
+        resource "/photocraft_generated/test/images/Reward.png"
+        image (io/file root (subs resource 1))
+        atlas (io/file root "test.atlas")
+        encoded (fn [text] (.encodeToString (Base64/getEncoder) (.getBytes ^String text StandardCharsets/UTF_8)))
+        hash-text (fn [text] (apply str (into [] (map #(format "%02x" (bit-and 255 %)))
+                                                (.digest (java.security.MessageDigest/getInstance "SHA-256") (.getBytes ^String text StandardCharsets/UTF_8)))))]
+    (try
+      (is (thrown? Exception (#'binding/managed-upload! service {:path "/game.project" :data (encoded "x")})))
+      (#'binding/managed-upload! service {:path resource :data (encoded "first")})
+      (is (= "first" (slurp image)))
+      (is (thrown? Exception (#'binding/managed-upload! service {:path resource :expected (.repeat "0" 64) :data (encoded "second")})))
+      (is (= "first" (slurp image)))
+      (#'binding/managed-upload! service {:path resource :expected (hash-text "first") :data (encoded "second")})
+      (is (= "second" (slurp image)))
+      (spit atlas (str "images {image: \"" resource "\"}"))
+      (is (= {:retained true} (#'binding/managed-upload! service {:path resource :expected (hash-text "second") :remove true})))
+      (is (.isFile image))
+      (.delete atlas)
+      (is (= {:removed true} (#'binding/managed-upload! service {:path resource :expected (hash-text "second") :remove true})))
+      (is (not (.exists image)))
+      (finally
+        (doseq [path [image atlas (io/file root "photocraft_generated/test/images") (io/file root "photocraft_generated/test") (io/file root "photocraft_generated") root]]
+          (.delete ^java.io.File path))))))
+
 (defn- request [token body]
-  {:headers {"authorization" (str "Bearer " token)}
+  {:remote-address "127.0.0.1"
+   :headers {"authorization" (str "Bearer " token)}
    :body (ByteArrayInputStream. (.getBytes ^String (json/write-str body) StandardCharsets/UTF_8))})
 
 ;; A cancelled or busy request must retain the original binding; consent alone is not a commit.
@@ -103,10 +133,11 @@
       (spit (io/file root "game.project") "abc")
       (spit (io/file root ".internal/editor.token") "secret")
       (spit (io/file root "work.gui.pcraft") "editable-source")
+      (spit (io/file root ".editor_settings") "private settings")
       (is (= [{:path "game.project" :size 3 :sha256 "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}]
              (:files (#'binding/manifest {:root root :project-id "game"}))))
       (finally
-        (doseq [relative ["game.project" ".internal/editor.token" ".internal" "work.gui.pcraft"]]
+        (doseq [relative ["game.project" ".internal/editor.token" ".internal" "work.gui.pcraft" ".editor_settings"]]
           (.delete (io/file root relative)))
         (.delete root)))))
 
@@ -165,3 +196,76 @@
                    [["127.0.0.1:17655" "/binding/open" "scoped" {:path "/main/right-clicked.gui"}] :reopen-defold]
                    [])
                  @calls)))))))
+
+;; Pending and active tickets identify the whole project without reading or changing GUI files.
+(deftest project-identity-is-ticket-scoped-and-independent-of-open-resources
+  (let [service {:project nil :project-id "X:/games/example" :editor-token "secret"
+                 :state (atom {:active {:token "active"}
+                               :incoming {:ticket "pending" :phase "ready" :expires Long/MAX_VALUE}})}
+        endpoint (get-in (#'binding/routes service) ["/binding/project" "POST"])]
+    (is (thrown? Exception (endpoint (request "unknown" {}))))
+    (is (thrown? Exception (endpoint (request "" {}))))
+    (doseq [token ["active" "pending"]]
+      (is (= 200 (:status (endpoint (request token {}))))))
+    (swap! (:state service) dissoc :incoming)
+    (is (thrown? Exception (endpoint (request "pending" {}))))
+    (is (= {:token "active"} (:active @(:state service))))))
+
+;; Restarting the local client must release its stale identity without stealing another live binding.
+(deftest local-client-restart-releases-only-the-replaced-listening-session
+  (doseq [[address identity bound operations released]
+          [["127.0.0.1:17655" "old" nil 0 true]
+           ["127.0.0.1:17655" "new" nil 0 false]
+           ["127.0.0.1:17656" "old" nil 0 false]
+           ["192.0.2.1:17655" "old" nil 0 false]
+           ["127.0.0.1:17655" "old" "another-editor" 0 false]
+           ["127.0.0.1:17655" "old" nil 1 false]]]
+    (let [active {:id identity :address address}
+          service {:state (atom {:active active :file-operations operations})}]
+      (with-redefs-fn {#'binding/call! (fn [_ _ _ _] {:app "PhotoCraft" :id "new" :bound bound})}
+        (fn []
+          (#'binding/discover-local! service)
+          (is (= (when-not released active) (:active @(:state service))))
+          (is (= "new" (get-in @(:state service) [:local-peer :id]))))))))
+
+;; Legacy evaluation and structured control stay loopback-only even with an otherwise valid credential.
+(deftest remote-evaluation-and-structured-control-are-rejected
+  (let [service {:project nil :editor-token "editor-secret" :state (atom {:active {:token "peer-secret"}})}
+        calls (atom 0)]
+    (with-redefs [ext.server/routes (fn [_ _] {"/eval" {"POST" (fn [_] (swap! calls inc))}})]
+      (let [routes (#'binding/routes service)]
+        (doseq [[path token] [["/binding/eval" "peer-secret"] ["/craft/v1/project" "editor-secret"] ["/craft/v1/resource/open" "editor-secret"]]]
+          (is (thrown? Exception
+                       ((get-in routes [path "POST"])
+                        (assoc (request token {}) :remote-address "192.0.2.4")))))
+        (is (zero? @calls))
+        (is (zero? (:file-operations @(:state service))))))))
+
+;; Revealing an asset is an authenticated explicit route and executes through the UI dispatcher.
+(deftest explicit-resource-open-uses-project-adapter-on-ui-thread
+  (let [service {:project nil :editor-token "editor-secret" :state (atom {})}
+        calls (atom [])
+        ui-thread (atom false)
+        endpoint (get-in (#'binding/routes service) ["/craft/v1/resource/open" "POST"])]
+    (with-redefs [ui/do-run-now (fn [f] (reset! ui-thread true) (try (f) (finally (reset! ui-thread false))))
+                  craft-project/open-resource! (fn [actual-service path]
+                                                 (is @ui-thread)
+                                                 (is (= service actual-service))
+                                                 (swap! calls conj path)
+                                                 {:schemaVersion 1 :path path :opened true})]
+      (is (thrown? Exception (endpoint (request "wrong-token" {:path "/test.gui"}))))
+      (is (= 200 (:status (endpoint (request "editor-secret" {:path "/test.gui"})))))
+      (is (= ["/test.gui"] @calls)))))
+
+;; Discovery contains no credential and an old editor session cannot delete a newer registration.
+(deftest project-adapter-discovery-is-session-scoped
+  (let [root (.toFile (Files/createTempDirectory "craft-discovery" (make-array java.nio.file.attribute.FileAttribute 0)))
+        service {:root root :id "old-session" :port 12345 :editor-token "must-not-appear"}
+        file (io/file root ".internal" "photocraft" "editor-adapter.json")]
+    (#'binding/write-discovery! service)
+    (is (= {:schemaVersion 1 :port 12345 :editorSessionId "old-session"} (json/read-str (slurp file) :key-fn keyword)))
+    (#'binding/write-discovery! (assoc service :id "new-session" :port 12346))
+    (#'binding/remove-discovery! service)
+    (is (.isFile file))
+    (#'binding/remove-discovery! (assoc service :id "new-session"))
+    (is (not (.exists file)))))

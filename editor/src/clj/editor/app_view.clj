@@ -3122,6 +3122,7 @@
   (launcher/start!))
 
 (handler/defhandler :app.restart :global
+  (enabled? [] (not (disk/managed-write-active?)))
   (run [app-view changes-view project prefs localization]
     (let [^Stage stage (ui/main-stage)
           dirty-save-data (project/dirty-save-data project)]
@@ -3144,51 +3145,23 @@
                          (when successful?
                            (restart-defold! stage prefs)))))))))
 
-(defn peer-workspace-idle? [app-view project]
+(defn peer-workspace-idle? [_app-view _project]
   (and (disk-availability/available?)
-       (not (build-in-progress?))
-       (coll/empty? (g/node-value app-view :open-views))
-       (coll/empty? (project/dirty-save-data project))))
+       (not (build-in-progress?))))
 
-(defn prepare-peer-switch! [app-view changes-view project prefs localization info done!]
-  (let [open-views (g/node-value app-view :open-views)
-        dirty (project/dirty-save-data project)
-        close! (fn close! []
-                 (let [^SplitPane split (g/node-value app-view :editor-tabs-split)]
-                   (doseq [^TabPane pane (vec (.getItems split))
-                           tab (vec (.getTabs pane))]
-                     (remove-tab! pane tab)))
-                 (done! (peer-workspace-idle? app-view project)))]
-    (if (and (:local info) (not (:current info)) (coll/empty? open-views) (coll/empty? dirty))
-      (done! (peer-workspace-idle? app-view project))
-      (let [choice (dialogs/make-confirmation-dialog
-                         localization
-                         {:title (localization/message "dialog.craft-binding.title")
-                          :icon :icon/circle-question
-                          :header (localization/message "dialog.craft-binding.header" {"address" (:address info)})
-                          :content (localization/message "dialog.craft-binding.content" {"address" (or (:current info) "—")})
-                          :buttons [{:text (localization/message "dialog.button.cancel") :cancel-button true :result :cancel}
-                                    {:text (localization/message "dialog.craft-binding.button.close") :result :close}
-                                    {:text (localization/message "dialog.craft-binding.button.save") :default-button true :result :save}]})]
-        (case choice
-          :save (if-not (disk-availability/available?)
-                  (done! false)
-                  (async-save! app-view changes-view project prefs project/dirty-save-data
-                               (fn [successful _reload! _save!]
-                                 ;; disk/async-job! releases its busy reference after this callback.
-                                 (ui/run-later
-                                   (if successful
-                                     (close!)
-                                     (done! false))))))
-          :close (if (coll/empty? dirty)
-                   (close!)
-                   (do
-                     (dialogs/make-info-dialog localization
-                                               {:title (localization/message "dialog.craft-binding.unsaved")
-                                                :header (localization/message "dialog.craft-binding.save-first")
-                                                :content (localization/message "dialog.craft-binding.save-detail")})
-                     (done! false)))
-          (done! false))))))
+(defn prepare-peer-switch! [app-view _changes-view project _prefs localization info done!]
+  ;; A binding changes the project transport, never the documents or their saved state.
+  (done! (and (peer-workspace-idle? app-view project)
+              (or (:local info)
+                  (= :connect
+                     (dialogs/make-confirmation-dialog
+                       localization
+                       {:title (localization/message "dialog.craft-binding.title")
+                        :icon :icon/circle-question
+                        :header (localization/message "dialog.craft-binding.header" {"address" (:address info)})
+                        :content (localization/message "dialog.craft-binding.project-content")
+                        :buttons [{:text (localization/message "dialog.button.cancel") :cancel-button true :result :cancel}
+                                  {:text (localization/message "dialog.craft-binding.button.connect") :default-button true :result :connect}]}))))))
 
 (defn- make-version-control-info-dialog-content
   ([localization]
