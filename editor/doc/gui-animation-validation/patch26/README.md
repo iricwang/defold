@@ -5,7 +5,7 @@
 - 完整 Clojure 回归：**88 项测试、4938 条断言，0 失败、0 错误**，见 [日志](clojure-tests.log)。
 - 增量更新 Python 回归：12 项测试通过，其中 3 项 Windows 专用测试在 macOS 跳过，见 [日志](patch-tests.log)。
 - 动效源码、单元测试和集成测试的 clj-kondo：0 错误、0 警告，见 [日志](clj-kondo.log)。全部修改的动效命名空间完成整文件重载，没有新增反射或装箱警告。
-- **104 项实际运行时检查全部通过**，见 [机器可读结果](ui-results.json)。下面的 PNG 均来自实际界面。
+- **105 项实际运行时检查全部通过**，见 [机器可读结果](ui-results.json)。下面的 PNG 均来自实际界面。
 
 ## 功能与证据
 
@@ -40,7 +40,7 @@
 
 ## 补丁安装验证
 
-已通过本机 HTTP 更新源 `http://127.0.0.1:8771/manifest.json`，从精确 patch.22 基线的隔离副本实际完成 **下载 → SHA-256 校验 → 安装 → 自动重启**。更新后全部 **168 个文件的哈希、权限一致**，新进程使用 patch.26 JAR。之后再次用安装后的发布 JAR 加载测试项目，验证版本、场景预览、Tab 对齐与实际播放，[截图](44-installed-package-scene.png)。此结论使用本地更新源，未将本地包视为 GitHub 官方源的验证。
+已通过本机 HTTP 更新源 `http://127.0.0.1:8771/manifest.json`，从精确 patch.22 基线的隔离副本实际完成 **下载 → SHA-256 校验 → 安装 → 自动重启**。更新后全部 **168 个文件的哈希、权限一致**，新进程使用 patch.26 JAR。之后再次用安装后的发布 JAR 加载测试项目，验证版本、场景预览、Tab 对齐、实际播放、工具栏以及移动/缩放/旋转录制，[截图](44-installed-package-scene.png)。此结论使用本地更新源，未将本地包视为 GitHub 官方源的验证。
 
 [检测更新截图](42-update-available.png) · [校验完成截图](43-update-verified.png) · [安装记录与补丁 SHA-256](patch-installation.json)。应用原有 JDK 保留；此次只构建增量 ZIP，没有重新打包完整 App/DMG。`/Applications/Defold.app` 的原始基线未被安装演练修改。
 
