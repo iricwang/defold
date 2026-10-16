@@ -67,7 +67,10 @@ jobs:
         run: |
           source tmp/macos-build-env.sh
           cd editor
-          LEIN_HOME="$PWD/build/lein" bash scripts/lein test \
+          # Release AOT uses direct linking, which bypasses the with-redefs
+          # boundaries in editor tests. Retain the release output, then test sources.
+          mv target/classes target/release-classes
+          LEIN_HOME="$PWD/build/lein" bash scripts/lein do javac, test \
             editor.patch-test editor.docking-test editor.game-preview-test \
             editor.gui-animation-data-test editor.gui-animation-features-test editor.gui-animation-io-test \
             editor.gui-animation-timeline-test editor.gui-animation-preview-test \

@@ -1,18 +1,19 @@
+Compiling 64 source files to /Users/applemima1111/Documents/Dev/Defold/editor/target/classes
 Compiling 2 source files to /Users/applemima1111/Documents/Dev/Defold/editor/target/classes
 Compiling 2 source files to /Users/applemima1111/Documents/Dev/Defold/editor/target/classes
-2026-10-17 02:34:48.607 INFO  default    com.defold.libs.ResourceUnpacker - not deleting old unpack dirs from tmp as it is not in system support path /Users/applemima1111/Library/Application Support/Defold
-2026-10-17 02:34:49.133 INFO  default    com.defold.libs.ResourceUnpacker - defold.unpack.path=/Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack
-2026-10-17 02:34:50.346 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_mobile' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_mobile.dylib
-2026-10-17 02:34:51.170 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'gluegen_rt' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libgluegen_rt.dylib
-2026-10-17 02:34:51.992 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_awt' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_awt.dylib
-2026-10-17 02:34:52.859 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_desktop' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_desktop.dylib
-2026-10-17 02:34:53.361 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'particle_shared' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libparticle_shared.dylib
-2026-10-17 02:34:54.175 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'newt_head' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnewt_head.dylib
-2026-10-17 02:34:54.662 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'mouse_capture_shared' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libmouse_capture_shared.dylib
-2026-10-17 02:34:55.477 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_macosx' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_macosx.dylib
-2026-10-17 02:34:55.479 INFO  default    com.defold.libs.ResourceUnpacker - preloaded 8 bundled native libraries from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib
-10月 17, 2026 2:34:57 上午 com.sun.javafx.application.PlatformImpl startup
-警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @7650ded6'
+2026-10-17 02:49:19.603 INFO  default    com.defold.libs.ResourceUnpacker - not deleting old unpack dirs from tmp as it is not in system support path /Users/applemima1111/Library/Application Support/Defold
+2026-10-17 02:49:20.068 INFO  default    com.defold.libs.ResourceUnpacker - defold.unpack.path=/Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack
+2026-10-17 02:49:21.071 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'mouse_capture_shared' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libmouse_capture_shared.dylib
+2026-10-17 02:49:21.956 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_desktop' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_desktop.dylib
+2026-10-17 02:49:22.760 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_mobile' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_mobile.dylib
+2026-10-17 02:49:23.608 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'gluegen_rt' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libgluegen_rt.dylib
+2026-10-17 02:49:24.077 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'particle_shared' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libparticle_shared.dylib
+2026-10-17 02:49:24.886 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_macosx' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_macosx.dylib
+2026-10-17 02:49:25.686 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'newt_head' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnewt_head.dylib
+2026-10-17 02:49:26.492 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_awt' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_awt.dylib
+2026-10-17 02:49:26.492 INFO  default    com.defold.libs.ResourceUnpacker - preloaded 8 bundled native libraries from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib
+10月 17, 2026 2:49:28 上午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @31b7d869'
 patch.clj:129 recur arg for primitive local: ceiling is not matching primitive, had: Object, needed: long
 Auto-boxing loop arg: ceiling
 
