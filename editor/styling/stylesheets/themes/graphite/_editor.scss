@@ -3,13 +3,36 @@
 #main-window {
   -fx-background-color: -df-ui-divider;
 
+  .titled-pane, .fake-titled-pane {
+    -fx-background-color: -df-background-light;
+    -fx-background-radius: 4px;
+  }
+
+  // JavaFX backgrounds do not clip children. Reserve the bottom corner strip
+  // so tree rows and scroll viewports cannot paint over the curved surface.
+  .fake-titled-pane {
+    -fx-padding: 0px 0px 4px 0px;
+  }
+
+  .titled-pane > .content {
+    -fx-background-color: transparent;
+    -fx-padding: 0px 0px 4px 0px;
+  }
+
+  // The inspector's AnchorPane hosts otherwise fill the rounded corners.
+  #right-split > * > AnchorPane {
+    -fx-background-color: transparent;
+  }
+
   .titled-pane > .title {
     -fx-background-color: -df-ui-header;
+    -fx-background-radius: 4px 4px 0px 0px;
     -fx-padding: 4px 30px 4px 10px;
   }
 
   .fake-titled-pane > .fake-titled-pane-label {
     -fx-background-color: -df-ui-header;
+    -fx-background-radius: 4px 4px 0px 0px;
     -fx-padding: 4px 30px 4px 10px;
   }
 
@@ -38,6 +61,7 @@
 
 #dock-header-preview, .game-preview-toolbar {
   -fx-background-color: -df-ui-header;
+  -fx-background-radius: 4px 4px 0px 0px;
   -fx-text-fill: -df-text-light;
 }
 
@@ -53,6 +77,13 @@
 
 #resource-preview {
   -fx-background-color: -df-background-light;
+  -fx-background-radius: 0px 0px 4px 4px;
+}
+
+#tool-tabs {
+  -fx-background-color: -df-background-light;
+  -fx-background-radius: 4px;
+  -fx-padding: 0px 0px 4px 0px;
 }
 
 #status-label {

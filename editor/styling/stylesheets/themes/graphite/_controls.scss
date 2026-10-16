@@ -93,6 +93,11 @@
   -fx-background-color: -df-ui-selection;
 }
 
+.tab-pane .tab {
+  -fx-background-radius: 4px 4px 0px 0px;
+  -fx-border-radius: 4px 4px 0px 0px;
+}
+
 .tab-pane .tab:selected {
   -fx-background-color: -df-ui-header;
   -fx-border-color: -df-ui-accent;

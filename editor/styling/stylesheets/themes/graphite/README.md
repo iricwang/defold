@@ -17,6 +17,11 @@ the UI accent. Do not replace JavaFX skins, the dock layout schema, drag events,
 divider positions or the tab close animation workaround. Dock headers must remain within
 the existing 28px drag strip. Splitter styling must retain a usable hit target.
 
+Tabs and panel surfaces use a subtle 4px corner radius. Tab bottoms stay square for
+the selection underline. JavaFX background radii do not clip children: panel bodies
+reserve a 4px bottom strip, and inspector hosts remain transparent, so scrolling
+content cannot cover the curved corners. Keep header height and drag targets intact.
+
 ## After upstream merges
 
 1. Rebuild all three CSS outputs and check JavaFX CSS diagnostics, not only Sass syntax.

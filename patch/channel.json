@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 21,
-  "version": "1.14.1-patch.21",
+  "revision": 22,
+  "version": "1.14.1-patch.22",
   "repository": "iricwang/defold",
-  "notes": "Integrate native PhotoCraft GUI collaboration and reliable manual asset publication, add GUI animation editing and preview, and apply the Graphite editor theme."
+  "notes": "Add subtle rounded corners to editor tabs and panel surfaces while preserving docking and selection indicators."
 }
