@@ -244,7 +244,8 @@
         workspace-tabs (doto (TabPane.) (.setId "gui-animation-tabs") (.setMinSize 0.0 0.0)
                              (.setTabClosingPolicy TabPane$TabClosingPolicy/UNAVAILABLE))
         title (doto (StackPane.) (.setId "gui-animation-panel") (.setMinSize 0.0 120.0))
-        scene-pane (doto (StackPane.) (.setMinSize 0.0 64.0) (ui/children! [scene-content]))
+        editor-toggle (doto (ToggleButton.) (.setId "gui-animation-toggle") (.setSelected true))
+        scene-pane (doto (StackPane.) (.setMinSize 0.0 64.0) (ui/children! [scene-content editor-toggle]))
         scene-split (doto (SplitPane.) (.setId "gui-animation-scene-split") (.setOrientation Orientation/VERTICAL)
                           (.setMinSize 0.0 0.0))
         status (doto (Label.) (.setId "gui-animation-status") (.setWrapText true))
@@ -806,6 +807,31 @@
                           (.add (.getItems scene-split) title)
                           (.setDividerPositions scene-split (double-array [(:scene-divider @state)]))
                           (.setCenter root scene-split)))))
+    (localize! editor-toggle "toggle-editor")
+    (.setTooltip editor-toggle (doto (Tooltip.) (localize! "toggle-editor-help")))
+    (StackPane/setAlignment editor-toggle Pos/TOP_LEFT)
+    (StackPane/setMargin editor-toggle (Insets. 20.0 0.0 0.0 20.0))
+    (.setOnAction editor-toggle
+                  (ui/event-handler _
+                    ((guarded
+                       (fn []
+                         (if (.isSelected editor-toggle)
+                           (do (.setVisible title true)
+                               (.add (.getItems scene-split) title)
+                               (.setDividerPositions scene-split (double-array [(double (get @state :scene-divider 0.45))]))
+                               (refresh-document!)
+                               (when (:reopen-preview @state)
+                                 (swap! state assoc :preview true)
+                                 (.setSelected preview-check true)
+                                 (update-preview!)))
+                           (do (when-not (.isSelected fullscreen)
+                                 (swap! state assoc :scene-divider (aget (.getDividerPositions scene-split) 0)))
+                               (swap! state assoc :reopen-preview (:preview @state))
+                               (stop-preview!)
+                               (.setSelected fullscreen false)
+                               (.setCenter root scene-split)
+                               (.remove (.getItems scene-split) title)
+                               (.setVisible title false))))) nil)))
     (.setTooltip fullscreen (doto (Tooltip.) (localize! "fullscreen")))
     (.setOnAction fps-choice (ui/event-handler _
                                (when-not @updating

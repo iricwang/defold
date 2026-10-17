@@ -2964,3 +2964,6 @@ gui-animation.custom-curve = Custom curve
 gui-animation.initial-state = Initial state
 gui-animation.curve-help = Drag the curve to edit custom samples. Select a keyframe first.
 gui-animation.template = Template
+
+gui-animation.toggle-editor = Animation
+gui-animation.toggle-editor-help = Show or hide the GUI animation editor

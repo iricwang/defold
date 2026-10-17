@@ -1,4 +1,8 @@
 // Native controls; neutral collapsed combo cells must not inherit the list selection fill.
+#gui-animation-toggle {
+  -fx-min-height: 24px; -fx-pref-height: 26px; -fx-padding: 2px 8px;
+}
+
 #gui-animation-panel {
   .animation-workspace-scroll {
     -fx-background-color: transparent; -fx-padding: 0px; -fx-border-width: 0px;

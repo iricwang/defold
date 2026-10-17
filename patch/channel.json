@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 26,
-  "version": "1.14.1-patch.26",
+  "revision": 27,
+  "version": "1.14.1-patch.27",
   "repository": "iricwang/defold",
-  "notes": "Complete Panthera GUI animation editing: native neutral controls, aligned animation tab, clip management, events/triggers/templates, custom curves and batch keyframe workflows."
+  "notes": "Add a top-left GUI scene toggle to collapse and reopen the animation editor, restore its height and playhead, and stop preview/recording while hidden."
 }

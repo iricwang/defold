@@ -2142,3 +2142,6 @@ gui-animation.custom-curve = 自定义曲线
 gui-animation.initial-state = 初始状态
 gui-animation.curve-help = 拖拽曲线可编辑自定义采样点；需先选择一个关键帧。
 gui-animation.template = 模板动画
+
+gui-animation.toggle-editor = 动效
+gui-animation.toggle-editor-help = 显示或收起 GUI 动效编辑器
