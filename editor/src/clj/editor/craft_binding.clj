@@ -546,7 +546,8 @@
       (pos? (count connections))
       (let [labels (mapv #(str (:address %) " · " (subs (:id %) 0 (min 8 (count (:id %))))) connections)
             selected (first (dialogs/make-select-list-dialog labels localization
-                                                            {:title (localization/message "dialog.craft-binding.select")}))]
+                                                            {:title (localization/message "dialog.craft-binding.select")
+                                                             :cell-fn (fn [label _localization] {:text label})}))]
         (coll/first-where #(= selected (str (:address %) " · " (subs (:id %) 0 (min 8 (count (:id %)))))) connections)))))
 
 (handler/defhandler :photocraft.status :global

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 29,
-  "version": "1.14.1-patch.29",
+  "revision": 30,
+  "version": "1.14.1-patch.30",
   "repository": "iricwang/defold",
-  "notes": "Support many-to-many PhotoCraft project connections with scoped sessions, target selection and independent disconnects."
+  "notes": "Support many-to-many PhotoCraft project connections with independent sessions, safe project routing and a validated native target selector"
 }

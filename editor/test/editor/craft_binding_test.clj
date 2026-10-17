@@ -18,6 +18,7 @@
             [clojure.test :refer :all]
             [editor.craft-binding :as binding]
             [editor.craft-project :as craft-project]
+            [editor.dialogs :as dialogs]
             [editor.editor-extensions.server :as ext.server]
             [editor.ui :as ui]
             [util.coll :as coll])
@@ -323,3 +324,19 @@
         (#'binding/discover-local! service)
         (is (= #{"selected"} (set (coll/keys (#'binding/peers @(:state service))))))
         (is (= "selected" (get-in @(:state service) [:active :id])))))))
+
+;; Connection choices supply renderable cell props; plain strings crash the shared JavaFX selector.
+(deftest multiple-connection-selector-renders-and-selects-the-requested-peer
+  (let [a {:id "aaaaaaaa" :address "127.0.0.1:19155" :token "a"}
+        b {:id "bbbbbbbb" :address "127.0.0.1:19156" :token "b"}
+        service {:state (atom {:peers {(:id b) b (:id a) a}})}]
+    (with-redefs [dialogs/make-select-list-dialog
+                  (fn [items _localization options]
+                    (is (= ["127.0.0.1:19155 · aaaaaaaa" "127.0.0.1:19156 · bbbbbbbb"] items))
+                    (is (= {:text (first items)} ((:cell-fn options) (first items) nil)))
+                    [(second items)])]
+      (is (= b (#'binding/select-peer service nil nil))))
+    (with-redefs [dialogs/make-select-list-dialog (constantly nil)]
+      (is (nil? (#'binding/select-peer service nil nil))))
+    (is (= a (#'binding/select-peer service nil (:id a))))
+    (is (nil? (#'binding/select-peer service nil "missing")))))
