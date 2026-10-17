@@ -1,0 +1,21 @@
+{
+  "version": "1.14.1-patch.27",
+  "commit": "a2f57df30ea12153309d6e6e2ac770ad3336f371",
+  "baseline_revision": 22,
+  "feed": "local http://127.0.0.1:8772/manifest.json",
+  "download_install_restart": "passed",
+  "verified_files": 168,
+  "mismatches": [],
+  "processes": [
+    "76286 /Users/applemima1111/Documents/Dev/Defold/tmp/gui-collapse-upgrade/Defold.app/Contents/Resources/packages/jdk-25.0.4.1+1/bin/java -cp /Users/applemima1111/Documents/Dev/Defold/tmp/gui-collapse-upgrade/Defold.app/Contents/Resources/packages/defold-a2f57df30ea12153309d6e6e2ac770ad3336f371.jar -Xdock:icon=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-collapse-upgrade/Defold.app/Contents/Resources/logo.icns -Xdock:name=Defold -Dfile.encoding=UTF-8 -Djna.nosys=true -Ddefold.launcherpath=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-collapse-upgrade/Defold.app/Contents/MacOS/Defold -Ddefold.resourcespath=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-collapse-upgrade/Defold.app/Contents/Resources -Ddefold.version=1.14.1 -Ddefold.editor.sha1=a2f57df30ea12153309d6e6e2ac770ad3336f371 -Ddefold.engine.sha1= -Ddefold.buildtime=2026-10-17T11:26:30.392777 -Ddefold.channel=dev -Ddefold.archive.domain=d.defold.com -Djava.net.preferIPv4Stack=true -Ddefold.library.connectTimeoutMillis=10000 -Ddefold.library.hostProbeTimeoutMillis=10000 -Dsun.net.client.defaultConnectTimeout=30000 -Dsun.net.client.defaultReadTimeout=30000 -Djogl.windows.cpu_affinity_mode=0 -Djogl.texture.notexrect=true -Dglass.accessible.force=false -Ddefold.schema.check.disable=true --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.desktop/sun.awt=ALL-UNNAMED --add-opens=java.desktop/sun.java2d.opengl=ALL-UNNAMED --add-opens=java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED --add-opens=java.base/sun.nio.fs=ALL-UNNAMED --add-opens=java.desktop/sun.awt.image=ALL-UNNAMED --enable-native-access=ALL-UNNAMED -XX:+UseCompactObjectHeaders --sun-misc-unsafe-memory-access=allow -Xmx12884901888 com.defold.editor.Main"
+  ],
+  "patch_sha256": "ced54fd241332ee4cb8b9334a36cf1803662a00f499c7b6c3dbe6a9aec228f6c",
+  "automatic_tests": {
+    "tests": 26,
+    "assertions": 137,
+    "failures": 0,
+    "errors": 0
+  },
+  "runtime_ui_checks": 16,
+  "installed_application_checks": "passed: native Chinese toggle, collapse/reopen, viewport height, playhead, preview, playback and recording state, repeated toggles, unchanged resource data"
+}
