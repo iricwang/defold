@@ -15,7 +15,8 @@
 (ns editor.gui-animation-io-test
   (:require [clojure.test :refer [deftest is]]
             [editor.gui-animation-data :as animation]
-            [editor.gui-animation-io :as animation-io])
+            [editor.gui-animation-io :as animation-io]
+            [util.coll :as coll])
   (:import [java.nio.file Files]
            [java.nio.file.attribute FileAttribute]))
 
@@ -40,6 +41,37 @@
       (let [before (slurp json :encoding "UTF-8")]
         (is (thrown? clojure.lang.ExceptionInfo (animation-io/write-document-file! json :json {})))
         (is (= before (slurp json :encoding "UTF-8"))))
+      (finally
+        (Files/deleteIfExists (.toPath json))
+        (Files/deleteIfExists (.toPath lua))
+        (Files/deleteIfExists directory)))))
+
+;; Both export formats must carry the engine's exact curves so Panthera seek/play agree, without rewriting authoring data or custom samples.
+(deftest runtime-easing-export-test
+  (let [directory (Files/createTempDirectory "gui-animation-runtime-" (make-array FileAttribute 0))
+        json (.toFile (.resolve directory "animation.json"))
+        lua (.toFile (.resolve directory "animation.lua"))
+        document (assoc-in (animation/new-document "/main.gui") [:data :animations]
+                           (mapv (fn [easing]
+                                   {:animation_id easing
+                                    :duration 1.0
+                                    :animation_keys [{:key_type "tween" :node_id "box" :property_id "position_x"
+                                                      :start_time 0.0 :duration 1.0 :start_value 100.0 :end_value 600.0
+                                                      :easing easing}]})
+                                 animation/supported-easings))]
+    (try
+      (doseq [[format file] [[:json json] [:lua lua]]]
+        (animation-io/write-document-file! file format document)
+        (let [exported (animation-io/read-document-file file identity)]
+          (doseq [easing animation/supported-easings
+                  time [0.0 0.17 0.4 0.5 0.73 1.0]]
+            (is (= (animation/evaluate document easing time) (animation/evaluate exported easing time))
+                (str format " " easing " at " time)))
+          (is (= exported (animation/runtime-document exported)))))
+      (is (= document (animation/read-json (animation/write-json document))))
+      (is (coll/every? #(nil? (:easing_custom (first (:animation_keys %)))) (get-in document [:data :animations])))
+      (let [custom (assoc-in document [:data :animations 0 :animation_keys 0 :easing_custom] [0.2 0.9 1.3])]
+        (is (= [0.2 0.9 1.3] (get-in (animation/runtime-document custom) [:data :animations 0 :animation_keys 0 :easing_custom]))))
       (finally
         (Files/deleteIfExists (.toPath json))
         (Files/deleteIfExists (.toPath lua))

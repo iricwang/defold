@@ -1,0 +1,834 @@
+{
+  "type": "animation_editor",
+  "format": "json",
+  "version": 1,
+  "data": {
+    "name": "GUI animations",
+    "nodes": {},
+    "animations": [
+      {
+        "animation_id": "idle",
+        "duration": 0.1,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 0.1,
+            "start_value": 220.0,
+            "end_value": 220.0,
+            "easing": "linear"
+          }
+        ]
+      },
+      {
+        "animation_id": "attack",
+        "duration": 1.0,
+        "initial_state": "idle",
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 220.0,
+            "end_value": 440.0,
+            "easing": "outquad"
+          },
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "scale_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 1.0,
+            "end_value": 1.35,
+            "easing": "outback"
+          },
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "color_r",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 0.2,
+            "end_value": 1.0,
+            "easing": "linear"
+          },
+          {
+            "end_value": 25.0,
+            "property_id": "damage",
+            "node_id": "box",
+            "start_time": 0.5,
+            "duration": 0.0,
+            "event_id": "damage",
+            "start_value": 0.0,
+            "key_type": "event",
+            "data": "attack:blade"
+          },
+          {
+            "key_type": "event",
+            "node_id": "",
+            "property_id": "sound",
+            "event_id": "sound",
+            "start_time": 0.0,
+            "duration": 0.0,
+            "end_value": 1.0,
+            "data": "swing"
+          }
+        ]
+      },
+      {
+        "animation_id": "nested",
+        "duration": 2.0,
+        "animation_keys": [
+          {
+            "key_type": "animation",
+            "node_id": "",
+            "property_id": "attack",
+            "start_time": 0.0,
+            "duration": 2.0,
+            "easing": "linear"
+          }
+        ]
+      },
+      {
+        "animation_id": "initial",
+        "duration": 1.0,
+        "initial_state": "idle",
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "color_a",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 1.0,
+            "end_value": 0.5,
+            "easing": "linear"
+          }
+        ]
+      },
+      {
+        "animation_id": "nested_warp",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "animation",
+            "node_id": "",
+            "property_id": "attack",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "easing": "outquad"
+          }
+        ]
+      },
+      {
+        "animation_id": "event_curve",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "end_value": 1.0,
+            "property_id": "progress",
+            "node_id": "box",
+            "start_time": 0.0,
+            "easing": "inelastic",
+            "duration": 1.0,
+            "event_id": "progress",
+            "start_value": 0.0,
+            "key_type": "event",
+            "data": "charge"
+          }
+        ]
+      },
+      {
+        "animation_id": "custom",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "end_value": 600.0,
+            "property_id": "position_x",
+            "node_id": "box",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 1.0,
+            "start_value": 100.0,
+            "easing_custom": [
+              0.0,
+              0.1,
+              0.8,
+              1.2,
+              1.0
+            ],
+            "key_type": "tween"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_linear",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "linear"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inquad",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inquad"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outquad",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outquad"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutquad",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutquad"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinquad",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinquad"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_incubic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "incubic"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outcubic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outcubic"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutcubic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutcubic"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outincubic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outincubic"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inquart",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inquart"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outquart",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outquart"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutquart",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutquart"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinquart",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinquart"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inquint",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inquint"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outquint",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outquint"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutquint",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutquint"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinquint",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinquint"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_insine",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "insine"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outsine",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outsine"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutsine",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutsine"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinsine",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinsine"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inexpo",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inexpo"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outexpo",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outexpo"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutexpo",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutexpo"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinexpo",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinexpo"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_incirc",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "incirc"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outcirc",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outcirc"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutcirc",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutcirc"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outincirc",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outincirc"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inback",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inback"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outback",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outback"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutback",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutback"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinback",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinback"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inbounce",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inbounce"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outbounce",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outbounce"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutbounce",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutbounce"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinbounce",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinbounce"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inelastic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inelastic"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outelastic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outelastic"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_inoutelastic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "inoutelastic"
+          }
+        ]
+      },
+      {
+        "animation_id": "ease_outinelastic",
+        "duration": 1.0,
+        "animation_keys": [
+          {
+            "key_type": "tween",
+            "node_id": "box",
+            "property_id": "position_x",
+            "start_time": 0.0,
+            "duration": 1.0,
+            "start_value": 100.0,
+            "end_value": 600.0,
+            "easing": "outinelastic"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "gui_path": "/features.gui",
+      "fps": 60,
+      "settings": {},
+      "gizmo_steps": {},
+      "template_animation_paths": {}
+    }
+  }
+}

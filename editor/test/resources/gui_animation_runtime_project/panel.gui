@@ -1,0 +1,2 @@
+material: "/builtins/materials/gui.material"
+nodes { id: "tile" type: TYPE_BOX position { x: 0 y: 0 } size { x: 80 y: 80 } color { x: 0.2 y: 0.8 z: 0.3 w: 1 } size_mode: SIZE_MODE_MANUAL }

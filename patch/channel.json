@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 27,
-  "version": "1.14.1-patch.27",
+  "revision": 28,
+  "version": "1.14.1-patch.28",
   "repository": "iricwang/defold",
-  "notes": "Add a top-left GUI scene toggle to collapse and reopen the animation editor, restore its height and playhead, and stop preview/recording while hidden."
+  "notes": "Make exported GUI animation easing agree with real Panthera runtime playback and seeking; add a reproducible game regression for numeric and trigger tracks, events, templates, nested clips, playback and input."
 }

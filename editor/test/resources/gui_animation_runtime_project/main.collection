@@ -1,0 +1,7 @@
+name: "main"
+embedded_instances {
+ id: "game"
+ data: "components { id: \"gui\" component: \"/features.gui\" position { x: 0 y: 0 z: 0 } rotation { x: 0 y: 0 z: 0 w: 1 } }\n"
+ position { x: 0 y: 0 z: 0 }
+ rotation { x: 0 y: 0 z: 0 w: 1 }
+}

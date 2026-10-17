@@ -1,0 +1,21 @@
+[project]
+title = Panthera Runtime Regression
+version = 1.0
+custom_resources = /features_panthera.json,/panel_panthera.json,/regression_panthera.json,/expected.json,/warp_expected.json
+[bootstrap]
+main_collection = /main.collectionc
+[display]
+width = 960
+height = 640
+vsync = 1
+update_frequency = 60
+[render]
+clear_color_red = 0.055
+clear_color_green = 0.067
+clear_color_blue = 0.09
+[script]
+shared_state = 1
+[panthera]
+hotreload_animations = 0
+[input]
+game_binding = /game.input_bindingc

@@ -23,7 +23,7 @@
 
 (defn write-document-file! [file format document]
   (let [text (case format
-               :json (animation/write-json document)
+               :json (animation/write-json (animation/runtime-document document))
                :lua (animation/write-lua document))]
     (spit file text :encoding "UTF-8")
     file))

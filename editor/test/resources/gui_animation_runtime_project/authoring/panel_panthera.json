@@ -1,0 +1,54 @@
+{
+  "type": "animation_editor",
+  "format": "json",
+  "version": 1,
+  "data": {
+    "name": "Panthera GUI feature validation",
+    "nodes": {},
+    "animations": [
+      {
+        "animation_id": "pulse",
+        "duration": 1,
+        "animation_keys": [
+          {
+            "end_value": 2,
+            "property_id": "scale_x",
+            "node_id": "tile",
+            "start_time": 0,
+            "easing": "linear",
+            "duration": 1,
+            "start_value": 1,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 2,
+            "property_id": "scale_y",
+            "node_id": "tile",
+            "start_time": 0,
+            "easing": "linear",
+            "duration": 1,
+            "start_value": 1,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.3,
+            "property_id": "color_a",
+            "node_id": "tile",
+            "start_time": 0,
+            "easing": "linear",
+            "duration": 1,
+            "start_value": 1,
+            "key_type": "tween"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "fps": 60,
+      "gui_path": "/panel.gui",
+      "settings": {},
+      "gizmo_steps": {},
+      "template_animation_paths": {}
+    }
+  }
+}

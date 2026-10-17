@@ -1,0 +1,262 @@
+-- Exercises unmodified Panthera Runtime against the editor's exported data.
+local panthera = require("panthera.panthera")
+local features = require("features_panthera")
+local regression = require("regression_panthera")
+local warp_expected = json.decode(sys.load_resource("/warp_expected.json"))
+local expected = json.decode(sys.load_resource("/expected.json"))
+
+local results = { platform = sys.get_sys_info().system_name, checks = {}, failures = 0 }
+local function check(name, actual, wanted, tolerance)
+ local passed
+ if type(wanted) == "number" then
+  passed = type(actual) == "number" and actual == actual and math.abs(actual - wanted) <= (tolerance or 0.002)
+ else
+  passed = actual == wanted
+ end
+ results.checks[#results.checks + 1] = { name = name, passed = passed, actual = tostring(actual), expected = tostring(wanted) }
+ if not passed then results.failures = results.failures + 1; print("REGRESSION_FAIL " .. name .. " actual=" .. tostring(actual) .. " expected=" .. tostring(wanted)) end
+end
+
+local numeric = {}
+for _, group in ipairs({"position", "scale", "size"}) do
+ for _, axis in ipairs({"x", "y", "z"}) do numeric[group .. "_" .. axis] = group .. "." .. axis end
+end
+for _, group in ipairs({"color", "outline", "shadow"}) do
+ for channel, axis in pairs({r="x",g="y",b="z",a="w"}) do numeric[group .. "_" .. channel] = group .. "." .. axis end
+end
+for channel, axis in pairs({left="x",top="y",right="z",bottom="w"}) do numeric["slice9_" .. channel] = "slice9." .. axis end
+for _, axis in ipairs({"x", "y", "z"}) do numeric["rotation_" .. axis] = "euler." .. axis end
+numeric.inner_radius = "inner_radius"; numeric.fill_angle = "fill_angle"
+numeric.text_tracking = "tracking"; numeric.text_leading = "leading"
+local getters = {text=gui.get_text,layer=gui.get_layer,texture=gui.get_texture,enabled=gui.is_enabled,visible=gui.get_visible,
+ inherit_alpha=gui.get_inherit_alpha,pivot=gui.get_pivot,blend_mode=gui.get_blend_mode,size_mode=gui.get_size_mode,
+ clipping_mode=gui.get_clipping_mode,clipping_visible=gui.get_clipping_visible,clipping_inverted=gui.get_clipping_inverted,
+ line_break=gui.get_line_break,outer_bounds=gui.get_outer_bounds,perimeter_verticies=gui.get_perimeter_vertices}
+local enums = {
+ pivot = {pivot_center=gui.PIVOT_CENTER,pivot_w=gui.PIVOT_W},
+ blend_mode = {alpha=gui.BLEND_ALPHA,add=gui.BLEND_ADD},size_mode={manual=gui.SIZE_MODE_MANUAL,auto=gui.SIZE_MODE_AUTO},
+ clipping_mode={none=gui.CLIPPING_MODE_NONE,stencil=gui.CLIPPING_MODE_STENCIL},
+ outer_bounds={ellipse=gui.PIEBOUNDS_ELLIPSE,rectangle=gui.PIEBOUNDS_RECTANGLE}}
+local function wanted_value(property, value)
+ if value == "true" then return true elseif value == "false" then return false end
+ if enums[property] then return enums[property][value] end
+ if property == "layer" then return hash(value) end
+ if property == "texture" then return hash(value:match("^([^/]+)")) end
+ if property == "perimeter_verticies" then return tonumber(value) end
+ return value
+end
+local function assert_values(sample, prefix)
+ for node_id, properties in pairs(sample.values) do
+  local node = gui.get_node(node_id)
+  for property, value in pairs(properties) do
+   local got = numeric[property] and gui.get(node, hash(numeric[property])) or getters[property](node)
+   check(prefix .. ":" .. node_id .. "." .. property, got, wanted_value(property, value), 0.002)
+   if property == "texture" then check(prefix .. ":flipbook",gui.get_flipbook(node),hash(value:match("/([^/]+)$"))) end
+  end
+ end
+end
+local function values_at(state, sample, prefix)
+ local ok, err = pcall(panthera.set_time, state, sample.clip, sample.time)
+ check(prefix .. ":sample", ok, true)
+ if not ok then print("REGRESSION_ERROR " .. tostring(err)); return end
+ assert_values(sample, prefix)
+end
+local function sample_suite()
+ for _, format in ipairs({"json", "lua"}) do
+  local states = {
+   features=panthera.create_gui(format == "json" and "/features_panthera.json" or features),
+   regression=panthera.create_gui(format == "json" and "/regression_panthera.json" or regression)}
+  check(format .. ":clip-count", #panthera.get_animations(states.regression), 48)
+  for i, sample in ipairs(expected) do values_at(states[sample.source], sample, format .. ":" .. sample.clip .. ":" .. sample.time .. ":" .. i) end
+  for _, state in pairs(states) do panthera.stop(state) end
+ end
+end
+local function reset_board(self)
+ gui.set_enabled(gui.get_node("box"), true); gui.set_visible(gui.get_node("box"), true)
+ gui.set_clipping_mode(gui.get_node("box"), gui.CLIPPING_MODE_NONE)
+ gui.set_size_mode(gui.get_node("box"), gui.SIZE_MODE_MANUAL)
+ gui.set_pivot(gui.get_node("box"), gui.PIVOT_CENTER)
+ gui.set_blend_mode(gui.get_node("box"), gui.BLEND_ALPHA)
+ gui.set_position(gui.get_node("box"), vmath.vector3(220,400,0))
+ gui.set_scale(gui.get_node("box"), vmath.vector3(1,1,1))
+ gui.set_euler(gui.get_node("box"), vmath.vector3())
+ gui.set_size(gui.get_node("box"), vmath.vector3(180,100,0))
+ gui.set_slice9(gui.get_node("box"), vmath.vector4())
+ gui.set_color(gui.get_node("box"), vmath.vector4(0.2,0.45,0.8,1))
+ gui.set_position(gui.get_node("pie"), vmath.vector3(650,400,0))
+ gui.set_text(gui.get_node("label"), "RUNTIME ARENA")
+ self.hp=100; self.score=0; self.busy=false
+ gui.set_text(gui.get_node("hud"), "HP 100   /   SCORE 0")
+end
+local function damage(self, event_id, node, data, value)
+ self.events[#self.events + 1] = {id=event_id,data=data,value=value}
+ if event_id == "damage" then
+  self.hp = self.hp - value; self.score = self.score + 10
+  gui.set_text(gui.get_node("hud"), "HP " .. self.hp .. "   /   SCORE " .. self.score)
+ end
+end
+local function save_results(self)
+ results.completed=true; results.frames=self.frames; results.passed=#results.checks-results.failures
+ local path=sys.get_config_string("regression.output", "runtime-results.json")
+ local file=assert(io.open(path,"w"));file:write(json.encode(results));file:close()
+ print("REGRESSION_COMPLETE " .. results.passed .. "/" .. #results.checks .. " failures=" .. results.failures .. " output=" .. path)
+ gui.set_text(gui.get_node("status"), "REGRESSION " .. results.passed .. "/" .. #results.checks .. "   FAIL " .. results.failures)
+ reset_board(self)
+ self.done=true
+ if sys.get_config_int("regression.exit",0)==1 then msg.post("@system:","exit",{code=results.failures == 0 and 0 or 1}) end
+end
+local function endpoint(source, clip)
+ local found
+ for _, sample in ipairs(expected) do if sample.source==source and sample.clip==clip and (not found or sample.time>found.time) then found=sample end end
+ return found
+end
+local function next_play(self)
+ local task=table.remove(self.tasks,1)
+ if not task then save_results(self); return end
+ self.state=self.states[task.format or "lua"][task.source or "regression"]
+ print("REGRESSION_PHASE " .. task.name)
+ self.phase=task.name;self.events={};self.sampled=false;self.play_frames=0
+ self.task=task
+ gui.set_text(gui.get_node("status"), "RUNNING: " .. task.name)
+ self.progress_values={};self.progress_complete=false;self.clip_complete=false
+ local callback=function(id)
+  check(task.name .. ":completion-id",id,task.clip)
+  self.clip_complete=true
+  if task.progress and not self.progress_complete then return end
+  if task.endpoint then assert_values(endpoint(task.source,task.clip),task.name .. ":endpoint") end
+  if task.reference then
+   check(task.name .. ":rendered-frames",self.reference_frames>=2,true)
+   check(task.name .. ":engine-curve",self.reference_error<=0.002,true)
+  end
+  if task.clip=="attack" or task.clip=="nested" then
+   check(task.name .. ":damage-once",self.hp,75)
+   check(task.name .. ":score",self.score,10)
+   check(task.name .. ":events",#self.events,2)
+   check(task.name .. ":event-order",self.events[1].id,"sound")
+   check(task.name .. ":event-payload",self.events[2].data,"attack:blade")
+   check(task.name .. ":end-position",gui.get_position(gui.get_node("box")).x,440)
+  end
+  if task.loop then
+   self.loops=self.loops+1
+   if self.loops<3 then return end
+   check(task.name .. ":three-callbacks",self.loops,3)
+  end
+  self.advance=true
+ end
+ self.loops=0
+ local options={is_loop=task.loop,speed=task.speed or 1,callback=callback,callback_event=function(event_id,node,data,value)
+  if task.progress then
+   check(task.name .. ":finite:" .. #self.progress_values,value==value and math.abs(value)<10,true)
+   check(task.name .. ":payload:" .. #self.progress_values,data,"charge")
+   self.progress_values[#self.progress_values+1]=value
+   if math.abs(value-1)<0.0001 then
+    self.progress_complete=true
+    check(task.name .. ":animated-progress",#self.progress_values>=3,true)
+    if self.clip_complete then self.advance=true end
+   end
+  else damage(self,event_id,node,data,value) end
+ end}
+ reset_board(self)
+ if task.sample_play then panthera.play_tweener(self.state,task.clip,options)
+ elseif task.reverse then
+  options.from=1; options.to=0
+  options.callback_event=nil
+  options.callback=function(id)
+   check(task.name .. ":completion-id",id,task.clip)
+   check(task.name .. ":end-position",gui.get_position(gui.get_node("box")).x,220)
+   self.advance=true
+  end
+  panthera.play_tweener(self.state,task.clip,options)
+ else panthera.play(self.state,task.clip,options) end
+ if task.reference then
+  self.reference_frames=0;self.reference_error=0
+  gui.set_position(self.reference,vmath.vector3(100,400,0))
+  local curve=task.custom and vmath.vector({0,0.1,0.8,1.2,1}) or gui["EASING_" .. string.upper(task.easing)]
+  gui.animate(self.reference,hash("position.x"),600,curve,1/(task.speed or 1))
+ end
+end
+function init(self)
+ msg.post(".","acquire_input_focus")
+ self.frames=0;self.events={}
+ sample_suite()
+ self.states={json={features=panthera.create_gui("/features_panthera.json"),regression=panthera.create_gui("/regression_panthera.json")},
+  lua={features=panthera.create_gui(features),regression=panthera.create_gui(regression)}}
+ self.reference=gui.clone(gui.get_node("box"));gui.set_visible(self.reference,false)
+ self.tasks={{name="real-json-play",clip="attack",format="json"},{name="real-lua-speed2",clip="attack",speed=2},
+  {name="nested-play",clip="nested"},{name="reverse",clip="attack",reverse=true},
+  {name="loop-three-times",clip="custom",speed=4,loop=true},
+  {name="stop-and-restart",clip="attack",stop_test=true}}
+ for _,format in ipairs({"json","lua"}) do
+  self.tasks[#self.tasks+1]={name=format .. ":warped-nested-sampled-play",format=format,clip="nested_warp",sample_play=true,endpoint=true,source="regression"}
+  self.tasks[#self.tasks+1]={name=format .. ":continuous-event",format=format,clip="event_curve",progress=true}
+  for _, clip in ipairs({"transform","size_color","text","pie","triggers","template","overlap","playback"}) do
+   self.tasks[#self.tasks+1]={name=format .. ":live:" .. clip,format=format,source="features",clip=clip,speed=4,endpoint=true}
+  end
+  for _, clip in ipairs(regression.data.animations) do
+   if clip.animation_id:match("^ease_") then
+    self.tasks[#self.tasks+1]={name=format .. ":live:" .. clip.animation_id,format=format,source="regression",clip=clip.animation_id,
+     speed=4,reference=true,easing=clip.animation_id:sub(6),endpoint=true}
+   end
+  end
+  self.tasks[#self.tasks+1]={name=format .. ":live:custom",format=format,source="regression",clip="custom",speed=4,reference=true,custom=true,endpoint=true}
+ end
+ self.advance=true
+end
+function update(self, dt)
+ self.frames=self.frames+1
+ self.elapsed=(self.elapsed or 0)+dt
+ if not self.done and self.elapsed>90 then check("watchdog-completion",self.phase,"complete");save_results(self);return end
+ if self.advance and not self.done then
+  self.advance=false
+  if self.state then panthera.stop(self.state) end
+  next_play(self)
+ end
+ if self.task and not self.done then
+  self.play_frames=self.play_frames+1
+  local time=panthera.get_time(self.state)
+   if self.task.sample_play and time>0 and time<1 then
+   local index=math.floor(time*1000)
+   local fraction=time*1000-index
+   local wanted=warp_expected[index+1]*(1-fraction)+warp_expected[index+2]*fraction
+   check(self.task.name .. ":pose:" .. self.play_frames,gui.get_position(gui.get_node("box")).x,wanted,0.01)
+  end
+  if self.task.reference and self.play_frames>1 then
+   self.reference_frames=self.reference_frames+1
+   self.reference_error=math.max(self.reference_error,math.abs(gui.get_position(gui.get_node("box")).x-gui.get_position(self.reference).x))
+  end
+  if self.task.stop_test and not self.stopped and time>0.2 then
+   check("stop:was-playing",panthera.is_playing(self.state),true)
+   self.stopped=true;panthera.stop(self.state)
+   check("stop:not-playing",panthera.is_playing(self.state),false)
+   self.stop_position=gui.get_position(gui.get_node("box")).x;self.stop_frame=self.frames
+  elseif self.task.stop_test and self.stopped and self.stop_frame and self.frames>=self.stop_frame+4 then
+   check("stop:pose-held",gui.get_position(gui.get_node("box")).x,self.stop_position)
+   self.stop_frame=nil;self.events={};reset_board(self)
+   panthera.play(self.state,"attack",{callback_event=function(...) damage(self,...) end,callback=function() check("restart:damage-once",self.hp,75);self.advance=true end})
+  end
+  if (self.task.clip=="attack" or self.task.clip=="nested") and not self.task.reverse and not self.sampled and time>0.25 and time<0.45 then
+   local x=gui.get_position(gui.get_node("box")).x
+   check(self.task.name .. ":real-intermediate-motion",x>220 and x<440,true)
+   self.sampled=true
+  end
+ end
+end
+function final(self)
+ if self.state then panthera.stop(self.state) end
+ msg.post(".","release_input_focus")
+end
+function on_input(self, action_id, action)
+ if not self.done or not action.pressed then return end
+ if action_id==hash("restart") then
+  panthera.stop(self.state);reset_board(self)
+  local file=assert(io.open("runtime-interaction.json","w"));file:write(json.encode({action="reset",hp=self.hp,score=self.score}));file:close()
+ elseif (action_id==hash("attack") or action_id==hash("touch")) and not self.busy then
+  if self.hp<=0 then reset_board(self) end
+  self.busy=true;self.events={}
+  local input=action_id==hash("attack") and "keyboard" or "mouse"
+  panthera.play(self.state,"attack",{callback_event=function(...) damage(self,...) end,callback=function()
+   self.busy=false
+   local file=assert(io.open("runtime-interaction.json","w"));file:write(json.encode({action=input,hp=self.hp,score=self.score,events=self.events,completed=true}));file:close()
+  end})
+ end
+end

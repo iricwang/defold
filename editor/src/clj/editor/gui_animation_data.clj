@@ -435,6 +435,27 @@
 (def ^:private engine-easings
   (edn/read-string (slurp (io/resource "gui_animation_easings.edn"))))
 
+(defn runtime-document
+  "Bake named engine curves into Panthera's portable sampled easing format.
+  Panthera's tweener-based seek and event paths otherwise use different curves
+  from gui.animate, including non-finite elastic samples in tweener 6. Editing
+  documents keep their named curves; existing custom curves are preserved."
+  [document]
+  (update-in (validate-document document) [:data :animations]
+             (fn [animations]
+               (mapv #(update % :animation_keys
+                              (fn [keys]
+                                (mapv (fn [key]
+                                        (if (and (nil? (:easing_custom key))
+                                                 (not= "linear" (:easing key))
+                                                 (contains? #{"tween" "event" "animation"} (key-kind key)))
+                                          (if-let [samples (get engine-easings (:easing key))]
+                                            (assoc key :easing_custom samples)
+                                            key)
+                                          key))
+                                      keys)))
+                     animations))))
+
 (defn ease
   "Sample the same 64-point built-in curves used by Defold's GUI runtime.
   Custom curves retain their own samples, including non-unit endpoints."
@@ -665,7 +686,7 @@
     :else (throw (ex-info "Unsupported value in Panthera Lua export." {:value value}))))
 
 (defn write-lua
-  "Export a Lua data module accepted by panthera.create_gui(require(...)). Lua
-  input is never executed or parsed by this editor; JSON is the editing source."
+  "Export a portable data module accepted by panthera.create_gui(require(...)).
+  Named curves are sampled without changing the JSON editing source."
   [document]
-  (str "return " (lua-value (assoc (validate-document document) :format "lua")) "\n"))
+  (str "return " (lua-value (assoc (runtime-document document) :format "lua")) "\n"))

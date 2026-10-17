@@ -1,0 +1,3 @@
+mouse_trigger { input: MOUSE_BUTTON_1 action: "touch" }
+key_trigger { input: KEY_SPACE action: "attack" }
+key_trigger { input: KEY_R action: "restart" }

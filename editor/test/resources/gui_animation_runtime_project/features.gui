@@ -1,0 +1,86 @@
+script: "/regression.gui_script"
+fonts {
+  name: "default_font"
+  font: "/builtins/fonts/default.font"
+}
+textures {
+  name: "qa"
+  texture: "/qa.atlas"
+}
+nodes {
+  position {
+    x: 220.0
+    y: 400.0
+  }
+  size {
+    x: 180.0
+    y: 100.0
+  }
+  color {
+    x: 0.2
+    y: 0.45
+    z: 0.8
+  }
+  type: TYPE_BOX
+  texture: "qa/particle_blob"
+  id: "box"
+}
+nodes {
+  position {
+    x: 520.0
+    y: 400.0
+  }
+  size {
+    x: 140.0
+    y: 140.0
+  }
+  color {
+    x: 0.9
+    y: 0.45
+    z: 0.15
+  }
+  type: TYPE_PIE
+  id: "pie"
+  perimeterVertices: 48
+}
+nodes {
+  position {
+    x: 400.0
+    y: 230.0
+  }
+  size {
+    x: 400.0
+    y: 80.0
+  }
+  type: TYPE_TEXT
+  text: "Panthera GUI preview"
+  font: "default_font"
+  id: "label"
+}
+nodes {
+  position {
+    x: 740.0
+    y: 400.0
+  }
+  type: TYPE_TEMPLATE
+  id: "panel"
+  template: "/panel.gui"
+}
+nodes {
+  type: TYPE_BOX
+  id: "panel/tile"
+  parent: "panel"
+  template_node_child: true
+}
+layers {
+  name: "front"
+}
+material: "/builtins/materials/gui.material"
+
+nodes { id: "title" type: TYPE_TEXT text: "PANTHERA / RUNTIME ARENA" font: "default_font" position { x: 480 y: 594 } size { x: 850 y: 60 } scale { x: 0.7 y: 0.7 z: 1 } }
+
+nodes { id: "hud" type: TYPE_TEXT text: "HP 100   /   SCORE 0" font: "default_font" position { x: 480 y: 548 } size { x: 850 y: 45 } scale { x: 0.7 y: 0.7 z: 1 } }
+
+nodes { id: "status" type: TYPE_TEXT text: "Loading runtime regression..." font: "default_font" position { x: 480 y: 100 } size { x: 880 y: 50 } scale { x: 0.7 y: 0.7 z: 1 } }
+
+nodes { id: "help" type: TYPE_TEXT text: "SPACE / click: attack    R: reset" font: "default_font" position { x: 480 y: 55 } size { x: 850 y: 40 } scale { x: 0.7 y: 0.7 z: 1 } }

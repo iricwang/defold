@@ -1,0 +1,19 @@
+{
+  "panthera": {
+    "commit": "3cf7557e045c2e1198bbdedbaf413c445505045a",
+    "url": "https://github.com/Insality/defold-panthera/archive/3cf7557e045c2e1198bbdedbaf413c445505045a.zip",
+    "files": {
+      "panthera/panthera.lua": "8d1ab2e06e2c267d78809b48d7ac69bf416accb666bf459069b99cf6d028aafd",
+      "panthera/panthera_internal.lua": "e1bd82d7ebfe2716b2c3b735a3a6d05622a69346e1ca1cba60aa41b477b3d91b",
+      "panthera/adapters/adapter_gui.lua": "1de5c1e20bf17a0be62b4bdb2fb3232dc32d1ecccf01aa15ab15880efb54d26a",
+      "panthera/adapters/adapter_go.lua": "6e9d82415bfa0357817b07d13fd3ccd34c530b22f5282e45ca40af010c8497f7"
+    }
+  },
+  "tweener": {
+    "commit": "18dc800a115d55bbf89391ba90bba1cd26135a8a",
+    "url": "https://github.com/Insality/defold-tweener/archive/18dc800a115d55bbf89391ba90bba1cd26135a8a.zip",
+    "files": {
+      "tweener/tweener.lua": "942b935fbce1a2c14c1550b2b57e20d9b664673882900c4263ccb1934140e2bf"
+    }
+  }
+}
