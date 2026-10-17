@@ -2000,6 +2000,8 @@
                 :command :photocraft.open}
                {:label (localization/message "command.photocraft.status")
                 :command :photocraft.status}
+               {:label (localization/message "command.photocraft.unbind")
+                :command :photocraft.unbind}
                menu-items/separator
                {:label (localization/message "command.file.new")
                 :id ::new

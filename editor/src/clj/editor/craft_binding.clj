@@ -109,11 +109,22 @@
         (recur (.getParent parent))))
     (.toFile target)))
 
+(defn- peers [state]
+  (cond-> (:peers state {})
+    (:active state) (assoc (get-in state [:active :id]) (:active state))))
+
+(defn- peer-for-token [state token]
+  (when-not (string/blank? token)
+    (coll/first-where #(= token (:token %)) (coll/vals (peers state)))))
+
+(defn- without-peer [state id]
+  (let [remaining (dissoc (peers state) id)]
+    (cond-> (assoc state :peers remaining)
+      (= id (get-in state [:active :id])) (assoc :active (first (sort-by :address (into [] (coll/vals remaining))))))))
+
 (defn- authorize! [service request]
-  (let [state @(:state service)
-        token (bearer request)]
-    (when-not (and token (= token (get-in state [:active :token])) (not (:incoming state)) (not (:outgoing state)))
-      (fail! "This application is not the bound peer"))))
+  (when-not (peer-for-token @(:state service) (bearer request))
+    (fail! "This application is not a bound peer")))
 
 (defn- require-loopback! [request]
   (when-not (when-let [address (:remote-address request)]
@@ -214,14 +225,19 @@
     (http-server/json-response {:ticket ticket :id (:id service)})))
 
 (defn- replace-peer! [service peer]
-  (let [state (:state service)
-        previous (:active @state)]
-    (swap! state #(-> % (assoc :active peer) (dissoc :error)))
-    (when (and previous (not= (:id previous) (:id peer)))
-      (future/io
-        (try
-          (call! (:address previous) "/binding/release" (:token previous) {})
-          (catch Exception _))))))
+  (swap! (:state service)
+         (fn [state]
+           ;; An endpoint can only host one live instance; reconnecting it must
+           ;; revoke its old credentials without releasing other endpoints.
+           (let [state (reduce (fn [state old]
+                                 (if (= (:address old) (:address peer))
+                                   (without-peer state (:id old))
+                                   state))
+                               state (coll/vals (peers state)))]
+             (-> state
+                 (assoc-in [:peers (:id peer)] peer)
+                 (assoc :active peer)
+                 (dissoc :error))))))
 
 (defn- referenced-resource? [service resource]
   (let [root (.toPath (.getCanonicalFile ^File (:root service)))
@@ -289,11 +305,13 @@
 
 (defn- base-routes [service]
   (let [eval-handler (get-in (ext.server/routes (:project service) (:editor-token service)) ["/eval" "POST"])]
-    {"/binding/status" {"POST" (fn [_] (http-server/json-response {:app "Defold" :id (:id service) :bound (get-in @(:state service) [:active :id])}))}
+    {"/binding/status" {"POST" (fn [_] (http-server/json-response {:app "Defold" :id (:id service) :bindingVersion 2
+                                                                     :bound (get-in @(:state service) [:active :id])
+                                                                     :boundPeers (mapv :id (coll/vals (peers @(:state service))))}))}
      "/binding/project" {"POST" (fn [request]
                                   (let [token (bearer request)
                                         state @(:state service)]
-                                    (when-not (and token (or (= token (get-in state [:active :token]))
+                                    (when-not (and token (or (peer-for-token state token)
                                                              (= token (get-in state [:incoming :ticket]))
                                                              (= token (:outgoing-ticket state))))
                                       (fail! "Project metadata requires a binding ticket")))
@@ -314,12 +332,12 @@
                                      (swap! (:state service) dissoc :incoming)))
                                  (http-server/json-response {:phase "bound" :id (:id service)}))}
      "/binding/committed" {"POST" (fn [request]
-                                    (http-server/json-response {:phase (if (and (bearer request) (= (bearer request) (get-in @(:state service) [:active :token]))) "bound" "pending")}))}
+                                    (http-server/json-response {:phase (if (and (bearer request) (peer-for-token @(:state service) (bearer request))) "bound" "pending")}))}
      "/binding/release" {"POST" (fn [request]
                                   (swap! (:state service)
                                          (fn [state]
-                                           (if (= (bearer request) (get-in state [:active :token]))
-                                             (dissoc state :active)
+                                           (if-let [peer (peer-for-token state (bearer request))]
+                                             (without-peer state (:id peer))
                                              state)))
                                   (http-server/json-response {:released true}))}
      "/binding/manifest" {"POST" (fn [request] (authorize! service request) (http-server/json-response (manifest service)))}
@@ -408,7 +426,10 @@
               status (call! target "/binding/status" "" {})]
           (when-not (= "PhotoCraft" (:app status))
             (fail! "This address is not PhotoCraft"))
-          (when-not (and (= (:id status) (get-in @state [:active :id])) (= (:bound status) (:id service)))
+          (when-not (and (contains? (peers @state) (:id status))
+                         (if (= 2 (:bindingVersion status))
+                           (contains? (set (:boundPeers status)) (:id service))
+                           (= (:bound status) (:id service))))
             (locking state
               (when (or (:incoming @state) (:outgoing @state) (pos? (:file-operations @state 0)))
                 (fail! "Wait for the current binding request or project file operation to finish"))
@@ -463,11 +484,9 @@
 
 (defn local-available? []
   (when-let [service @current]
-    (let [{:keys [local-peer incoming outgoing]} @(:state service)]
-      (and local-peer
-           (< (- (System/currentTimeMillis) (:seen-at local-peer)) 6500)
-           (not incoming)
-           (not outgoing)))))
+    (let [{:keys [local-peer]} @(:state service)]
+      (or (and local-peer (< (- (System/currentTimeMillis) (:seen-at local-peer)) 6500))
+          (coll/any? #(string/starts-with? (:address %) "127.0.0.1:") (coll/vals (peers @(:state service))))))))
 
 (defn- discover-local! [service]
   (let [status (try (call! "127.0.0.1:17655" "/binding/status" "" {}) (catch Exception _))
@@ -476,36 +495,42 @@
 
         _state (swap! (:state service)
                       (fn [state]
-                        (let [active (:active state)
+                        (let [active (coll/first-where #(= "127.0.0.1:17655" (:address %)) (coll/vals (peers state)))
                               state (assoc state :local-peer peer)]
                           (if (and peer
                                    (= "127.0.0.1:17655" (:address active))
                                    (not= (:id peer) (:id active))
-                                   (not (:bound status))
+                                   (or (= 2 (:bindingVersion status)) (not (:bound status)))
                                    (not (:incoming state))
                                    (not (:outgoing state))
                                    (zero? (:file-operations state 0)))
                             ;; A new instance owns the same listening socket; the previous one is gone.
-                            (dissoc state :active)
+                            (without-peer state (:id active))
                             state))))]
     ;; PhotoCraft initiates discovery offers to avoid simultaneous requests.
     nil))
 
+(declare ^:private select-peer)
+
 (defn open-local! [path on-opened!]
   (when-let [service @current]
-    (future/io
-      (when (.get ^CompletableFuture (bind! service "127.0.0.1:17655" false))
-        (try
-          (let [{:keys [address token]} (:active @(:state service))]
-            (call! address "/binding/open" token {:path path})
-            (ui/run-later (on-opened!)))
-          (catch Exception error
-            (swap! (:state service) assoc :error (ex-message error))
-            (ui/run-later
-              (dialogs/make-info-dialog (:localization service)
-                                       {:title (localization/message "dialog.craft-binding.title")
-                                        :header (localization/message "dialog.craft-binding.failed")
-                                        :content (ex-message error)}))))))))
+    (let [known (pos? (count (peers @(:state service))))
+          selected (when known (select-peer service (:localization service) nil))]
+      (when (or (not known) selected)
+        (future/io
+          (try
+            (let [target (or (:address selected) "127.0.0.1:17655")]
+              (when (.get ^CompletableFuture (bind! service target false))
+                (let [{:keys [address token]} (coll/first-where #(= target (:address %)) (coll/vals (peers @(:state service))))]
+                (call! address "/binding/open" token {:path path})
+                (ui/run-later (on-opened!)))))
+            (catch Exception error
+              (swap! (:state service) assoc :error (ex-message error))
+              (ui/run-later
+                (dialogs/make-info-dialog (:localization service)
+                                         {:title (localization/message "dialog.craft-binding.title")
+                                          :header (localization/message "dialog.craft-binding.failed")
+                                          :content (ex-message error)})))))))))
 
 (handler/defhandler :photocraft.bind :global
   (run [localization user-data]
@@ -513,20 +538,43 @@
       (when-let [target (or (:address user-data) (dialogs/make-target-ip-dialog "127.0.0.1:17655" (localization (localization/message "dialog.craft-binding.ip")) localization))]
         (bind! service target false)))))
 
+(defn- select-peer [service localization peer-id]
+  (let [connections (vec (sort-by :address (into [] (coll/vals (peers @(:state service))))))]
+    (cond
+      peer-id (get (peers @(:state service)) peer-id)
+      (= 1 (count connections)) (first connections)
+      (pos? (count connections))
+      (let [labels (mapv #(str (:address %) " · " (subs (:id %) 0 (min 8 (count (:id %))))) connections)
+            selected (first (dialogs/make-select-list-dialog labels localization
+                                                            {:title (localization/message "dialog.craft-binding.select")}))]
+        (coll/first-where #(= selected (str (:address %) " · " (subs (:id %) 0 (min 8 (count (:id %)))))) connections)))))
+
 (handler/defhandler :photocraft.status :global
   (run [localization]
     (when-let [service @current]
-      (dialogs/make-info-dialog localization
-                                {:title (localization/message "dialog.craft-binding.title")
-                                 :header (or (get-in @(:state service) [:active :address])
-                                             (localization (localization/message "dialog.craft-binding.disconnected")))
-                                 :content (or (:error @(:state service))
-                                              (localization (localization/message "dialog.craft-binding.ready")))}))))
+      (let [state @(:state service)
+            connections (sort-by :address (into [] (coll/vals (peers state))))
+            lines (into [(localization (localization/message "dialog.craft-binding.listener" {"port" (:port service)}))]
+                        (map :address) connections)]
+        (dialogs/make-info-dialog localization
+                                  {:title (localization/message "dialog.craft-binding.title")
+                                   :header (if (pos? (count connections))
+                                             (localization/message "dialog.craft-binding.count" {"count" (count connections)})
+                                             (localization/message "dialog.craft-binding.disconnected"))
+                                   :content (coll/join-to-string "\n" (cond-> lines (:error state) (conj (:error state))))})))))
+
+(handler/defhandler :photocraft.unbind :global
+  (run [localization user-data]
+    (when-let [service @current]
+      (when-let [peer (select-peer service localization (:peer-id user-data))]
+        (swap! (:state service) without-peer (:id peer))
+        (future/io
+          (try (call! (:address peer) "/binding/release" (:token peer) {}) (catch Exception _)))))))
 
 (handler/defhandler :photocraft.open :global
-  (run []
+  (run [localization user-data]
     (when-let [service @current]
-      (when-let [{:keys [address token]} (:active @(:state service))]
+      (when-let [{:keys [address token]} (select-peer service localization (:peer-id user-data))]
         (when-let [path ((:selected-path service))]
           (future/io (call! address "/binding/open" token {:path path})))))))
 
@@ -571,7 +619,12 @@
                  :idle? idle?
                  :selected-path selected-path}
         port (Integer/parseInt (System/getProperty "defold.craft.port" "17654"))
-        server (http-server/start! (http-server/router-handler (routes service)) :host "0.0.0.0" :port port)
+        server (try
+                 (http-server/start! (http-server/router-handler (routes service)) :host "0.0.0.0" :port port)
+                 (catch java.net.BindException error
+                   (if (System/getProperty "defold.craft.port")
+                     (throw error)
+                     (http-server/start! (http-server/router-handler (routes service)) :host "0.0.0.0" :port 0))))
         service (assoc service :port (http-server/port server) :server server)]
     (try
       (write-discovery! service)

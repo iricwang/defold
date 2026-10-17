@@ -19,7 +19,8 @@
             [editor.craft-binding :as binding]
             [editor.craft-project :as craft-project]
             [editor.editor-extensions.server :as ext.server]
-            [editor.ui :as ui])
+            [editor.ui :as ui]
+            [util.coll :as coll])
   (:import [java.io ByteArrayInputStream]
            [java.nio.charset StandardCharsets]
            [java.nio.file Files]
@@ -269,3 +270,56 @@
     (is (.isFile file))
     (#'binding/remove-discovery! (assoc service :id "new-session"))
     (is (not (.exists file)))))
+
+;; Adding and renewing one Craft keeps other live credentials valid, including while another handshake is pending.
+(deftest multiple-peers-have-independent-session-lifetimes
+  (let [service {:project nil :editor-token "editor" :state (atom {})}
+        a {:id "a" :address "127.0.0.1:19001" :token "token-a"}
+        b {:id "b" :address "127.0.0.1:19002" :token "token-b"}
+        routes (#'binding/routes service)]
+    (#'binding/replace-peer! service a)
+    (#'binding/replace-peer! service b)
+    (is (= #{"a" "b"} (set (coll/keys (#'binding/peers @(:state service))))))
+    (swap! (:state service) assoc :incoming {:ticket "pending"} :outgoing "another-request")
+    (doseq [token ["token-a" "token-b"]]
+      (is (nil? (#'binding/authorize! service (request token {})))))
+    (#'binding/replace-peer! service (assoc a :token "renewed-a"))
+    (is (thrown? Exception (#'binding/authorize! service (request "token-a" {}))))
+    (is (nil? (#'binding/authorize! service (request "token-b" {}))))
+    ((get-in routes ["/binding/release" "POST"]) (request "token-a" {}))
+    (is (= 2 (count (#'binding/peers @(:state service)))))
+    ((get-in routes ["/binding/release" "POST"]) (request "renewed-a" {}))
+    (is (= #{"b"} (set (coll/keys (#'binding/peers @(:state service))))))
+    (is (= b (:active @(:state service))))))
+
+;; The same Craft may bind two projects with different credentials; neither project accepts the other's ticket.
+(deftest multiple-project-bindings-do-not-share-credentials
+  (let [a {:state (atom {})}
+        b {:state (atom {})}]
+    (#'binding/replace-peer! a {:id "craft" :address "127.0.0.1:19001" :token "project-a"})
+    (#'binding/replace-peer! b {:id "craft" :address "127.0.0.1:19001" :token "project-b"})
+    (is (nil? (#'binding/authorize! a (request "project-a" {}))))
+    (is (nil? (#'binding/authorize! b (request "project-b" {}))))
+    (is (thrown? Exception (#'binding/authorize! a (request "project-b" {}))))
+    (is (thrown? Exception (#'binding/authorize! b (request "project-a" {}))))))
+
+;; Restarting a listener revokes only that endpoint's old identity and preserves other Craft instances.
+(deftest restarted-endpoint-does-not-replace-other-peers
+  (let [service {:state (atom {})}]
+    (#'binding/replace-peer! service {:id "old" :address "127.0.0.1:19001" :token "old"})
+    (#'binding/replace-peer! service {:id "other" :address "127.0.0.1:19002" :token "other"})
+    (#'binding/replace-peer! service {:id "new" :address "127.0.0.1:19001" :token "new"})
+    (is (= #{"new" "other"} (set (coll/keys (#'binding/peers @(:state service))))))
+    (is (thrown? Exception (#'binding/authorize! service (request "old" {}))))
+    (is (nil? (#'binding/authorize! service (request "other" {}))))))
+
+;; Losing the default local socket must remove that stale peer even when another Craft is selected.
+(deftest stale-unselected-local-session-does-not-disconnect-selected-peer
+  (let [service {:state (atom {})}]
+    (#'binding/replace-peer! service {:id "local-old" :address "127.0.0.1:17655" :token "old"})
+    (#'binding/replace-peer! service {:id "selected" :address "127.0.0.1:19155" :token "selected"})
+    (with-redefs-fn {#'binding/call! (fn [& _] {:app "PhotoCraft" :id "local-new" :bindingVersion 2 :bound "another-project"})}
+      (fn []
+        (#'binding/discover-local! service)
+        (is (= #{"selected"} (set (coll/keys (#'binding/peers @(:state service))))))
+        (is (= "selected" (get-in @(:state service) [:active :id])))))))

@@ -74,7 +74,9 @@ jobs:
             editor.patch-test editor.docking-test editor.game-preview-test \
             editor.gui-animation-data-test editor.gui-animation-features-test editor.gui-animation-io-test \
             editor.gui-animation-timeline-test editor.gui-animation-preview-test \
-            editor.scene-tools-animation-test editor.scene-test editor.ui-test integration.gui-animation-test
+            editor.scene-tools-animation-test editor.scene-test editor.ui-test integration.gui-animation-test \
+            editor.craft-binding-test editor.app-view-photocraft-test editor.craft-publish-test \
+            integration.craft-project-test integration.craft-publish-test
       - name: Test exported GUI animations in the game runtime
         run: |
           source tmp/macos-build-env.sh

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 28,
-  "version": "1.14.1-patch.28",
+  "revision": 29,
+  "version": "1.14.1-patch.29",
   "repository": "iricwang/defold",
-  "notes": "Make exported GUI animation easing agree with real Panthera runtime playback and seeking; add a reproducible game regression for numeric and trigger tracks, events, templates, nested clips, playback and input."
+  "notes": "Support many-to-many PhotoCraft project connections with scoped sessions, target selection and independent disconnects."
 }

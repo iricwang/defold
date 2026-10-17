@@ -2967,3 +2967,9 @@ gui-animation.template = Template
 
 gui-animation.toggle-editor = Animation
 gui-animation.toggle-editor-help = Show or hide the GUI animation editor
+
+command.photocraft.unbind = Disconnect PhotoCraft…
+dialog.craft-binding.select = Select PhotoCraft Connection
+dialog.craft-binding.count = {count} PhotoCraft connections
+
+dialog.craft-binding.listener = Defold listening port: {port}
