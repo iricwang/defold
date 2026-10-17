@@ -1,0 +1,37 @@
+{
+  "source": "unmodified Panthera 11 + tweener 6, before runtime export fix",
+  "failed_assertions": 350,
+  "total_assertions": 2226,
+  "examples": [
+    {
+      "passed": false,
+      "name": "json:attack:0.17:65:box.position_x",
+      "expected": "288.430586686",
+      "actual": "288.44198608398"
+    },
+    {
+      "passed": false,
+      "name": "json:attack:0.4:66:box.position_x",
+      "expected": "360.7911318",
+      "actual": "360.79998779297"
+    },
+    {
+      "passed": false,
+      "name": "json:attack:0.5:67:box.position_x",
+      "expected": "384.9861422",
+      "actual": "385"
+    },
+    {
+      "passed": false,
+      "name": "json:ease_outinbounce:0.17:345:box.position_x",
+      "expected": "318.94856975",
+      "actual": "318.55624389648"
+    },
+    {
+      "passed": false,
+      "name": "json:ease_inelastic:0.17:352:box.position_x",
+      "expected": "100.15186315",
+      "actual": "nan"
+    }
+  ]
+}

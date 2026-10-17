@@ -1,0 +1,125 @@
+INFO:DLIB: Log server started on port 56752
+INFO:ENGINE: Target listening with name: applemima1111deMac-mini.local - 127.0.0.1 - Darwin
+INFO:ENGINE: Engine service started on port 8001
+INFO:ENGINE: OpenAPI: http://127.0.0.1:8001/openapi.json
+INFO:GRAPHICS: Installed graphics device 'ADAPTER_FAMILY_METAL'
+INFO:ENGINE: Defold Engine 1.14.1 (5139343)
+INFO:PROFILER: Initialized Remotery (ws://127.0.0.1:17815/rmt)
+INFO:ENGINE: Loading data from: build/default
+INFO:SOUND:   DSP backend: Fallback
+INFO:SOUND: Sound
+INFO:SOUND:   nSamplesPerSec:   48000
+INFO:SOUND:        useThread:   1
+INFO:ENGINE: Initialised sound device 'default'
+INFO:PHYSICS: Created physics context: Box2D v2.2.1
+DEBUG:SCRIPT: REGRESSION_PHASE real-json-play
+DEBUG:SCRIPT: REGRESSION_PHASE real-lua-speed2
+DEBUG:SCRIPT: REGRESSION_PHASE nested-play
+DEBUG:SCRIPT: REGRESSION_PHASE reverse
+DEBUG:SCRIPT: REGRESSION_PHASE loop-three-times
+DEBUG:SCRIPT: REGRESSION_PHASE stop-and-restart
+DEBUG:SCRIPT: REGRESSION_PHASE json:warped-nested-sampled-play
+DEBUG:SCRIPT: REGRESSION_PHASE json:continuous-event
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:transform
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:size_color
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:text
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:pie
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:triggers
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:template
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:overlap
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:playback
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_linear
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inquad
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outquad
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutquad
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinquad
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_incubic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outcubic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutcubic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outincubic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inquart
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outquart
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutquart
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinquart
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inquint
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outquint
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutquint
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinquint
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_insine
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outsine
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutsine
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinsine
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inexpo
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outexpo
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutexpo
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinexpo
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_incirc
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outcirc
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutcirc
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outincirc
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inback
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outback
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutback
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinback
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inbounce
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outbounce
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutbounce
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinbounce
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inelastic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outelastic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_inoutelastic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:ease_outinelastic
+DEBUG:SCRIPT: REGRESSION_PHASE json:live:custom
+DEBUG:SCRIPT: REGRESSION_PHASE lua:warped-nested-sampled-play
+DEBUG:SCRIPT: REGRESSION_PHASE lua:continuous-event
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:transform
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:size_color
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:text
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:pie
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:triggers
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:template
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:overlap
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:playback
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_linear
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inquad
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outquad
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutquad
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinquad
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_incubic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outcubic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutcubic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outincubic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inquart
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outquart
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutquart
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinquart
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inquint
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outquint
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutquint
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinquint
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_insine
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outsine
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutsine
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinsine
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inexpo
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outexpo
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutexpo
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinexpo
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_incirc
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outcirc
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutcirc
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outincirc
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inback
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outback
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutback
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinback
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inbounce
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outbounce
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutbounce
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinbounce
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inelastic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outelastic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_inoutelastic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:ease_outinelastic
+DEBUG:SCRIPT: REGRESSION_PHASE lua:live:custom
+DEBUG:SCRIPT: REGRESSION_COMPLETE 3154/3154 failures=0 output=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-game-acceptance/run-1.json

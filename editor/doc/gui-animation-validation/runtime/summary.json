@@ -1,0 +1,49 @@
+{
+  "platform": "macOS arm64",
+  "engine": "Defold 1.14.1 (5139343)",
+  "source_commit": "b6a9b325c872b350b2b8455bacb08050eb73866b",
+  "runs": [
+    {
+      "run": "gpu-run-1",
+      "passed": 3154,
+      "failures": 0,
+      "frames": 2256
+    },
+    {
+      "run": "gpu-run-2",
+      "passed": 3151,
+      "failures": 0,
+      "frames": 2255
+    },
+    {
+      "run": "headless",
+      "passed": 3154,
+      "failures": 0,
+      "frames": 2254
+    },
+    {
+      "run": "embedded-120fps",
+      "passed": 3244,
+      "failures": 0,
+      "frames": 4166
+    },
+    {
+      "run": "installed-patch28-game",
+      "passed": 3267,
+      "failures": 0,
+      "frames": 4364
+    }
+  ],
+  "editor_tests": 49,
+  "editor_assertions": 5249,
+  "editor_failures": 0,
+  "input": "cljfx.plorer drives real Game pane, explicit game state completion signals",
+  "tolerance": {
+    "general": 0.002,
+    "warped_nested_interpolation_pixels": 0.01
+  },
+  "patch_installation": "local feed, download/install/restart passed, 168 files verified",
+  "installed_export_parity": "three documents, both formats passed from release AOT",
+  "resource_immutability": "26 files unchanged",
+  "clean_project_startup": "no ERROR"
+}

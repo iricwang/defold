@@ -1,0 +1,6 @@
+{'id': 'patch', 'out': ':passed mouse attack event and completion\n', 'session': 'd7c20211-6bd1-4c0e-8452-936a497146e7'}
+{'id': 'patch', 'out': ':passed keyboard attack event and completion\n', 'session': 'd7c20211-6bd1-4c0e-8452-936a497146e7'}
+{'id': 'patch', 'out': ':passed keyboard reset\n', 'session': 'd7c20211-6bd1-4c0e-8452-936a497146e7'}
+{'id': 'patch', 'out': ':embedded-checks 3244\n', 'session': 'd7c20211-6bd1-4c0e-8452-936a497146e7'}
+{'id': 'patch', 'ns': 'user', 'session': 'd7c20211-6bd1-4c0e-8452-936a497146e7', 'value': 'nil'}
+{'id': 'patch', 'session': 'd7c20211-6bd1-4c0e-8452-936a497146e7', 'status': ['done']}

@@ -23,7 +23,7 @@ Use `--platform x86_64-macos` with an Intel engine. CI uses `dmengine_headless` 
 To regenerate exports in the editor's live REPL, use absolute paths:
 
 ```clojure
-(load-file "/absolute/repository/editor/test/resources/gui_animation_runtime_project/gui_animation_runtime_export.clj")
+(load-file "/absolute/repository/editor/scripts/gui_animation_runtime_export.clj")
 (gui-animation-runtime-export/export! "/absolute/repository/editor/test/resources/gui_animation_runtime_project")
 ```
 

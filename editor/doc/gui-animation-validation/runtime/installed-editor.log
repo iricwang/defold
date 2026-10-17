@@ -1,0 +1,68 @@
+INFO:TOOLS: Launcher version 51393431e103733f798a8c997bd454c86283ae66
+DEBUG:TOOLS: arg 0: /Users/applemima1111/Documents/Dev/Defold/tmp/gui-runtime-upgrade/Defold.app/Contents/Resources/packages/jdk-25.0.4.1+1/bin/java
+DEBUG:TOOLS: arg 1: -cp
+DEBUG:TOOLS: arg 2: /Users/applemima1111/Documents/Dev/Defold/tmp/gui-runtime-upgrade/Defold.app/Contents/Resources/packages/defold-b6a9b325c872b350b2b8455bacb08050eb73866b.jar:/Users/applemima1111/Documents/Dev/Defold/editor/.m2/repository/nrepl/nrepl/1.7.0/nrepl-1.7.0.jar:/Users/applemima1111/Documents/Dev/Defold/editor/.m2/repository/io/github/cljfx/plorer/1.31/plorer-1.31.jar
+DEBUG:TOOLS: arg 3: -Xdock:icon=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-runtime-upgrade/Defold.app/Contents/Resources/logo.icns
+DEBUG:TOOLS: arg 4: -Xdock:name=Defold
+DEBUG:TOOLS: arg 5: -Dfile.encoding=UTF-8
+DEBUG:TOOLS: arg 6: -Djna.nosys=true
+DEBUG:TOOLS: arg 7: -Ddefold.launcherpath=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-runtime-upgrade/Defold.app/Contents/MacOS/Defold
+DEBUG:TOOLS: arg 8: -Ddefold.resourcespath=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-runtime-upgrade/Defold.app/Contents/Resources
+DEBUG:TOOLS: arg 9: -Ddefold.version=1.14.1
+DEBUG:TOOLS: arg 10: -Ddefold.editor.sha1=b6a9b325c872b350b2b8455bacb08050eb73866b
+DEBUG:TOOLS: arg 11: -Ddefold.engine.sha1=
+DEBUG:TOOLS: arg 12: -Ddefold.buildtime=2026-10-17T12:05:27.023229
+DEBUG:TOOLS: arg 13: -Ddefold.channel=dev
+DEBUG:TOOLS: arg 14: -Ddefold.archive.domain=d.defold.com
+DEBUG:TOOLS: arg 15: -Djava.net.preferIPv4Stack=true
+DEBUG:TOOLS: arg 16: -Ddefold.library.connectTimeoutMillis=10000
+DEBUG:TOOLS: arg 17: -Ddefold.library.hostProbeTimeoutMillis=10000
+DEBUG:TOOLS: arg 18: -Dsun.net.client.defaultConnectTimeout=30000
+DEBUG:TOOLS: arg 19: -Dsun.net.client.defaultReadTimeout=30000
+DEBUG:TOOLS: arg 20: -Djogl.windows.cpu_affinity_mode=0
+DEBUG:TOOLS: arg 21: -Djogl.texture.notexrect=true
+DEBUG:TOOLS: arg 22: -Dglass.accessible.force=false
+DEBUG:TOOLS: arg 23: -Ddefold.schema.check.disable=true
+DEBUG:TOOLS: arg 24: --add-opens=java.base/java.lang=ALL-UNNAMED
+DEBUG:TOOLS: arg 25: --add-opens=java.desktop/sun.awt=ALL-UNNAMED
+DEBUG:TOOLS: arg 26: --add-opens=java.desktop/sun.java2d.opengl=ALL-UNNAMED
+DEBUG:TOOLS: arg 27: --add-opens=java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED
+DEBUG:TOOLS: arg 28: --add-opens=java.base/sun.nio.fs=ALL-UNNAMED
+DEBUG:TOOLS: arg 29: --add-opens=java.desktop/sun.awt.image=ALL-UNNAMED
+DEBUG:TOOLS: arg 30: --enable-native-access=ALL-UNNAMED
+DEBUG:TOOLS: arg 31: -XX:+UseCompactObjectHeaders
+DEBUG:TOOLS: arg 32: --sun-misc-unsafe-memory-access=allow
+DEBUG:TOOLS: arg 33: -Xmx12884901888
+DEBUG:TOOLS: arg 34: clojure.main
+DEBUG:TOOLS: arg 35: /Users/applemima1111/Documents/Dev/Defold/tmp/gui-game-installed-start.clj
+DEBUG:TOOLS: arg 36: /Users/applemima1111/Documents/Dev/Defold/tmp/gui-game-installed-start.clj
+DEBUG:TOOLS: arg 37: (null)
+NOTE: Picked up JDK_JAVA_OPTIONS: -Ddefold.patch.directory=/Users/applemima1111/Documents/Dev/Defold/tmp/gui-runtime-feed
+Picked up JAVA_TOOL_OPTIONS: 
+Picked up _JAVA_OPTIONS: 
+2026-10-17 12:08:56.997 WARN  default    javafx - Unsupported JavaFX configuration: classes were loaded from 'unnamed module @70685322'
+2026-10-17 12:08:57.767 Defold[81797:2268659] Task policy set failed: 4 ((os/kern) invalid argument)
+2026-10-17 12:08:57.936 INFO  default    com.defold.libs.ResourceUnpacker - deleting old unpack dirs from /Users/applemima1111/Library/Application Support/Defold/unpack
+2026-10-17 12:08:57.949 INFO  default    com.defold.libs.ResourceUnpacker - Already unpacked for the editor version b6a9b325c872b350b2b8455bacb08050eb73866b
+2026-10-17 12:08:57.949 INFO  default    com.defold.libs.ResourceUnpacker - defold.unpack.path=/Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64
+2026-10-17 12:08:57.975 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'gluegen_rt' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libgluegen_rt.dylib
+2026-10-17 12:08:57.977 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'mouse_capture_shared' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libmouse_capture_shared.dylib
+2026-10-17 12:08:57.979 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_awt' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libnativewindow_awt.dylib
+2026-10-17 12:08:57.982 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_mobile' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libjogl_mobile.dylib
+2026-10-17 12:08:57.984 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'particle_shared' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libparticle_shared.dylib
+2026-10-17 12:08:57.987 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_desktop' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libjogl_desktop.dylib
+2026-10-17 12:08:57.988 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'newt_head' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libnewt_head.dylib
+2026-10-17 12:08:57.990 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_macosx' from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib/libnativewindow_macosx.dylib
+2026-10-17 12:08:57.990 INFO  default    com.defold.libs.ResourceUnpacker - preloaded 8 bundled native libraries from /Users/applemima1111/Library/Application Support/Defold/unpack/b6a9b325c872b350b2b8455bacb08050eb73866b-arm64/arm64-macos/lib
+2026-10-17 12:09:01.382 INFO  default    editor.updater - {:line 594, :message "Automatic updates disabled", :channel "dev", :sha1 "b6a9b325c872b350b2b8455bacb08050eb73866b"}
+2026-10-17 12:09:07.527 INFO  default    editor.boot - {:line 86, :message "Finished loading editor namespaces.", :namespace-counter 2905}
+2026-10-17 12:09:07.567 INFO  default    internal.low-memory - {:line 55, :message "Adding post-gc low-memory notification listener to tenured generation pool.", :threshold-megabytes 11059}
+2026-10-17 12:09:07.662 INFO  default    editor.defold-project - {:line nil, :message "Initial resource sync completed in 24.51 ms"}
+2026-10-17 12:09:08.337 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 37, :retained 37, :unretained 0, :limit 20000}
+2026-10-17 12:09:08.435 INFO  default    editor.defold-project - {:line nil, :message "Project loaded", :allocated "128.88 MB"}
+2026-10-17 12:09:09.061 INFO  default    util.http-server - {:line 311, :msg "Http server running", :local-url "http://localhost:57625"}
+2026-10-17 12:09:09.067 INFO  default    util.http-server - {:line 311, :msg "Http server running", :local-url "http://localhost:18734"}
+2026-10-17 12:09:09.113 INFO  default    editor.boot-open-project - {:line 524, :message "project loaded"}
+2026-10-17 12:09:09.114 INFO  default    editor.boot-open-project - {:line nil, :message "Project loading completed in 1.55 s"}
+2026-10-17 12:09:17.031 INFO  default    editor.defold-project - {:line 486, :message "Cached compiled build targets in system cache.", :total 360, :retained 66, :unretained 294, :limit 20000}
+2026-10-17 12:09:42.627 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 358, :retained 65, :unretained 293, :limit 20000}
