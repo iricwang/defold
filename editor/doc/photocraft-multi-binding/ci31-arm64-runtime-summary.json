@@ -1,0 +1,18 @@
+{
+  "runs": [
+    {
+      "passed": 2897,
+      "platform": "Darwin",
+      "failures": 0,
+      "completed": true,
+      "frames": 1302
+    },
+    {
+      "passed": 2869,
+      "platform": "Darwin",
+      "frames": 1317,
+      "completed": true,
+      "failures": 0
+    }
+  ]
+}

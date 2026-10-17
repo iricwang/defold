@@ -1,0 +1,10 @@
+{
+  "version": "1.14.1-patch.29",
+  "commit": "cdcf5837e84282e0e51e3a1c984874ce09c6c4bf",
+  "baseline_revision": 22,
+  "feed": "local http://127.0.0.1:8774/manifest.json",
+  "download_install_restart": "passed",
+  "verified_files": 168,
+  "mismatches": [],
+  "patch_sha256": "50f98f940c83d84c3cccfd01b330befcc0460c4702606c081b0db9c4605822b0"
+}

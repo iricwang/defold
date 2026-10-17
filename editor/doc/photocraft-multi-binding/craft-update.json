@@ -1,0 +1,10 @@
+{
+  "platform": "macos-aarch64",
+  "from": 3,
+  "to": 4,
+  "feed": "local http://127.0.0.1:18794/manifest-macos-aarch64.json",
+  "download_prepare_install_restart": "passed",
+  "startup_health_ack": true,
+  "exact_inventory_match": true,
+  "inventory_file": "inventory-4-macos-aarch64.json"
+}

@@ -1,0 +1,9 @@
+{
+  "selected_connection": "${DEFOLD_REPO}/tmp/craft-multi/project-b",
+  "published_project": "${DEFOLD_REPO}/tmp/craft-multi/project-a",
+  "node": "box-a",
+  "position_x": 420,
+  "project_b_unchanged": true,
+  "status": "GUI and artwork published to Defold",
+  "result": "passed"
+}

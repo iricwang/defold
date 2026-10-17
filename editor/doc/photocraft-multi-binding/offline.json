@@ -1,0 +1,74 @@
+[
+  {
+    "bindingVersion": 2,
+    "connected": false,
+    "error": null,
+    "id": "fd5041b97ac889fe6d8fe17e3c1ea15ea4305af76588ce570a7bbe7338405364",
+    "outgoing": null,
+    "peer": {
+      "address": "127.0.0.1:18751",
+      "id": "500172d6b62128cb5efa457c0e7d2d143ce4ef2e129b138b39f74f5c960ddfc2",
+      "project": "${DEFOLD_REPO}/tmp/craft-multi/project-b",
+      "root": "${DEFOLD_REPO}/tmp/craft-multi/project-b"
+    },
+    "peers": [
+      {
+        "connected": false,
+        "peer": {
+          "address": "127.0.0.1:18751",
+          "id": "500172d6b62128cb5efa457c0e7d2d143ce4ef2e129b138b39f74f5c960ddfc2",
+          "project": "${DEFOLD_REPO}/tmp/craft-multi/project-b",
+          "root": "${DEFOLD_REPO}/tmp/craft-multi/project-b"
+        }
+      },
+      {
+        "connected": true,
+        "peer": {
+          "address": "127.0.0.1:18750",
+          "id": "dfd562b1328ad2f2d91b819039624dfc4b153fa9a4390d914ce1ad35831c5576",
+          "project": "${DEFOLD_REPO}/tmp/craft-multi/project-a",
+          "root": "${DEFOLD_REPO}/tmp/craft-multi/project-a"
+        }
+      }
+    ],
+    "pending": null,
+    "port": 19155,
+    "working": false
+  },
+  {
+    "bindingVersion": 2,
+    "connected": false,
+    "error": null,
+    "id": "94bfba80bc577b2ed6892429ccac38577a536ff57b72b8cb7448abdf2cc81c61",
+    "outgoing": null,
+    "peer": {
+      "address": "127.0.0.1:18751",
+      "id": "500172d6b62128cb5efa457c0e7d2d143ce4ef2e129b138b39f74f5c960ddfc2",
+      "project": "${DEFOLD_REPO}/tmp/craft-multi/project-b",
+      "root": "${DEFOLD_REPO}/tmp/craft-multi/project-b"
+    },
+    "peers": [
+      {
+        "connected": false,
+        "peer": {
+          "address": "127.0.0.1:18751",
+          "id": "500172d6b62128cb5efa457c0e7d2d143ce4ef2e129b138b39f74f5c960ddfc2",
+          "project": "${DEFOLD_REPO}/tmp/craft-multi/project-b",
+          "root": "${DEFOLD_REPO}/tmp/craft-multi/project-b"
+        }
+      },
+      {
+        "connected": true,
+        "peer": {
+          "address": "127.0.0.1:18750",
+          "id": "dfd562b1328ad2f2d91b819039624dfc4b153fa9a4390d914ce1ad35831c5576",
+          "project": "${DEFOLD_REPO}/tmp/craft-multi/project-a",
+          "root": "${DEFOLD_REPO}/tmp/craft-multi/project-a"
+        }
+      }
+    ],
+    "pending": null,
+    "port": 19156,
+    "working": false
+  }
+]

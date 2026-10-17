@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-17",
+  "platform": "Apple Silicon macOS",
+  "defold_binding_unit": {
+    "tests": 28,
+    "assertions": 160,
+    "failures": 0,
+    "errors": 0
+  },
+  "defold_publication_integration": {
+    "tests": 13,
+    "assertions": 97,
+    "failures": 0,
+    "errors": 0
+  },
+  "python_patch_migration": {
+    "tests": 17,
+    "skipped": 3,
+    "failures": 0,
+    "errors": 0
+  },
+  "craft": {
+    "engine_integration_passed": 2140,
+    "engine_integration_ignored": 23,
+    "final_ui_passed": 3084,
+    "final_ui_ignored": 18,
+    "total_passed": 5224,
+    "total_ignored": 41,
+    "final_failures": 0,
+    "strict_all_targets_clippy": "passed",
+    "wasm": "passed",
+    "layer_checks_passed": 33,
+    "parity_live": 631,
+    "parity_total": 631,
+    "explicit_panic_hunt": "passed",
+    "release_feature": "heif",
+    "source": "744d4f340e15ba719ba86fb45efc41b0bbb14759"
+  },
+  "local_gui_game_runtime_assertions": [
+    3152,
+    3153
+  ]
+}

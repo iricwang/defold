@@ -1,0 +1,35 @@
+{
+  "documents": [
+    {
+      "dirty": true,
+      "height": 600,
+      "index": 0,
+      "name": "main.gui",
+      "path": "${DEFOLD_REPO}/tmp/craft-multi/project-a/main.gui",
+      "revision": 1,
+      "width": 800
+    },
+    {
+      "dirty": true,
+      "height": 32,
+      "index": 1,
+      "name": "Binding regression scratch",
+      "path": null,
+      "revision": 3,
+      "width": 32
+    },
+    {
+      "dirty": true,
+      "height": 600,
+      "index": 2,
+      "name": "main.gui",
+      "path": "${DEFOLD_REPO}/tmp/craft-multi/project-b/main.gui",
+      "revision": 1,
+      "width": 800
+    }
+  ],
+  "result": "passed",
+  "source_project": "b",
+  "selected_craft_port": 19155,
+  "selector_error_free": true
+}
