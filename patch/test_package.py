@@ -10,6 +10,36 @@ import package
 
 
 class PackageTest(unittest.TestCase):
+    # A custom local installation must converge to the CI target so its next ordinary patch has an exact baseline.
+    def test_local_migration_converges_to_ci_inventory(self):
+        import copy
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old = {'revision': 4, 'version': 'patch.4', 'channel': 'dev', 'repository': 'owner/repo'}
+            files = [{'path': path, 'sha256': digest * 64, 'kind': 'file', 'mode': 420}
+                     for path, digest in [('Contents/MacOS/Defold', 'a'), ('Contents/Resources/config', 'b'),
+                                          ('Contents/Resources/packages/defold-old.jar', 'c'),
+                                          ('Contents/Resources/packages/jdk-25/bin/java', 'd')]]
+            base = {'schema': 1, 'platform': 'arm64-macos', 'metadata': old,
+                    'runtime': {'version': '25', 'modules': ['java.base']}, 'files': files}
+            local = copy.deepcopy(base)
+            local['metadata']['revision'] = 2
+            local['files'][0]['sha256'] = 'f' * 64
+            payload = root / 'payload'
+            (payload / 'Contents/MacOS').mkdir(parents=True)
+            (payload / 'Contents/Resources/packages').mkdir(parents=True)
+            (payload / 'Contents/MacOS/Defold').write_bytes(b'CI launcher')
+            (payload / 'Contents/Resources/config').write_bytes(b'CI config')
+            new = {**old, 'revision': 5, 'version': 'patch.5'}
+            with zipfile.ZipFile(payload / 'Contents/Resources/packages/defold-new.jar', 'w') as jar:
+                jar.writestr('patch/build.json', json.dumps(new))
+            ci = package.create(base, payload, new, 'arm64-macos', '25', '', root / 'ci.zip')
+            migrated = package.create(local, payload, new, 'arm64-macos', '25', '', root / 'local.zip')
+            self.assertEqual(ci['files'], migrated['files'])
+            with zipfile.ZipFile(root / 'local.zip') as archive:
+                self.assertIn('files/Contents/MacOS/Defold', archive.namelist())
+                self.assertFalse(any('/jdk-' in name for name in archive.namelist()))
+
     # Windows uses root config/executable paths and a different initial revision, while preserving the JDK byte-for-byte.
     def test_windows_inventory_patch(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -133,3 +163,42 @@ class PackageTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+# Migration publication is separate from the ordinary chain and refuses a divergent CI target.
+class MigrationPublicationTest(unittest.TestCase):
+    def test_compatibility_feed_is_separate_and_verified(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / 'out'
+            output.mkdir()
+            data = {'schema': 1, 'revision': 31, 'version': 'patch.31', 'channel': 'dev', 'repository': 'owner/repo', 'notes': 'Migration'}
+            target = [{'path': 'Contents/Resources/config', 'sha256': 'a' * 64, 'kind': 'file', 'mode': 420}]
+            baseline = {**target[0], 'sha256': 'b' * 64}
+            pin = {'platform': 'arm64-macos', 'migration_target_revision': 31, 'metadata': {'revision': 22}, 'files': [baseline]}
+            manage.write_json(root / 'patch/baselines/arm64-macos-local22.json', pin)
+            for platform in manage.PLATFORMS:
+                manage.write_json(output / f'Defold-{platform}-state.json', {'platform': platform, 'metadata': {**data, 'commit': 'new'}, 'files': target})
+                with zipfile.ZipFile(output / f'Defold-{platform}-patch-27-to-31.zip', 'w') as archive:
+                    archive.writestr('patch.json', json.dumps({'base_revision': 27, 'revision': 31, 'target': target}))
+            migration = output / 'Defold-arm64-macos-patch-22-local-to-31.zip'
+            plan = {'base_revision': 22, 'revision': 31, 'base': [baseline], 'target': target}
+            with zipfile.ZipFile(migration, 'w') as archive:
+                archive.writestr('patch.json', json.dumps(plan))
+            calls = []
+            def gh(*args):
+                calls.append(args)
+                return json.dumps([[{'tag_name': 'patch-dev-27', 'draft': False}, {'tag_name': 'patch-dev', 'draft': False}]]) if args[0] == 'api' else ''
+            with patch.object(manage, 'ROOT', root), patch.object(manage, 'channel', return_value=data), patch.object(manage, 'gh', side_effect=gh):
+                manage.publish(output, 'new')
+                regular = json.loads((output / 'manifest.json').read_text())
+                special = json.loads((output / 'manifest-arm64-macos-local22.json').read_text())
+                self.assertEqual(27, regular['assets']['arm64-macos']['base_revision'])
+                self.assertEqual(22, special['assets']['arm64-macos']['base_revision'])
+                self.assertEqual(regular['states']['arm64-macos'], special['states']['arm64-macos'])
+                self.assertTrue(regular['compatibility']['arm64-macos'].endswith('manifest-arm64-macos-local22.json'))
+                calls.clear()
+                with zipfile.ZipFile(migration, 'w') as archive:
+                    archive.writestr('patch.json', json.dumps({**plan, 'target': []}))
+                with self.assertRaisesRegex(ValueError, 'exact baseline and CI target'):
+                    manage.publish(output, 'new')
+                self.assertFalse(any(call[:2] == ('release', 'create') for call in calls))

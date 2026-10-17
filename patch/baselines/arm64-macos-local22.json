@@ -1,0 +1,1062 @@
+{
+  "schema": 1,
+  "platform": "arm64-macos",
+  "metadata": {
+    "schema": 1,
+    "channel": "dev",
+    "revision": 22,
+    "version": "1.14.1-patch.22",
+    "repository": "iricwang/defold",
+    "notes": "Add subtle rounded corners to editor tabs and panel surfaces while preserving docking and selection indicators.",
+    "feed": "https://github.com/iricwang/defold/releases/download/patch-dev/manifest.json",
+    "commit": "c86aee74a8a45fc5df78cdcb11ee0c38db4aa550"
+  },
+  "runtime": {
+    "version": "25.0.4.1+1",
+    "modules": [
+      "java.base",
+      "java.datatransfer",
+      "java.xml",
+      "java.prefs",
+      "java.desktop",
+      "java.logging",
+      "java.management",
+      "java.security.sasl",
+      "java.naming",
+      "java.net.http",
+      "java.scripting",
+      "java.security.jgss",
+      "java.transaction.xa",
+      "java.sql",
+      "java.xml.crypto",
+      "jdk.crypto.ec",
+      "jdk.httpserver",
+      "jdk.internal.opt",
+      "jdk.jartool",
+      "jdk.security.jgss",
+      "jdk.unsupported",
+      "jdk.zipfs"
+    ]
+  },
+  "files": [
+    {
+      "path": "Contents/Info.plist",
+      "sha256": "6aa805f6faa608a3823435c093594eec8e3c487d9f35b38322e2134169a281ae",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/MacOS/Defold",
+      "sha256": "0eab60faea3811fbbe5c8666ee05415929d68090b251fa138b3902d357612c08",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/document_legacy.icns",
+      "sha256": "8cd55bff9a5f1ef06ef8a53217021749ed89eb73808ae6dbc82fb1c133175802",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/logo.icns",
+      "sha256": "c3e43a0f52cccb807b33a767b7f11f35a15212f27074eaad7fe0026287fbfae9",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/config",
+      "sha256": "19cdeefdf4583873f0d6073c3770b919cb5d8cafb42056e53ac5fa8c6913eb19",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/Assets.car",
+      "sha256": "a5090e904a5ce966dcc61e16957da6d9fbeb230eda7b767bd4a8dcd9cb8b2693",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/release",
+      "sha256": "19f307b0316924948fa3c45d31457711d1bb13606637f90f2ba331a439816a09",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/bin/jwebserver",
+      "sha256": "5df13c411b9b455df2aebdfb0a86ef895ce6962f730d412f7103ce53e5f1348b",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/bin/jarsigner",
+      "sha256": "3e1e0a714383b9d10eeb513788f6e43d55958c1c547b6942f0bd509017d652eb",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/bin/jar",
+      "sha256": "b33e2a4833433fdf954fc2cf48fa7858e6f641f1f7fe06c37a4db184720a30fb",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/bin/jrunscript",
+      "sha256": "e51651746fb51619968da7e1989a2279c15b47dd8e7cc25a01cbeff3634e2b22",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/bin/java",
+      "sha256": "83c9c5310d044e7c4262432854eb1bc5f49763d7c1e9971777a646c91b96c06d",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/bin/keytool",
+      "sha256": "e573280d13c9de9593d7f402f972277fdba04fe9e88bfc88cb91a841aa22a34b",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libnet.dylib",
+      "sha256": "72abe565b2e03486a3daa9b033ed4c9356709d71ce3804de0c67a91fe00e8caf",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libnio.dylib",
+      "sha256": "ac6182ea367a07a2fbdb44e163bb03aba23a0c47d3ccee93cb4fac8f5a4fc594",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libzip.dylib",
+      "sha256": "959d63abd4aea64caff3afdd0d68812d0f1331342a64772667d32aae1934924f",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/psfontj2d.properties",
+      "sha256": "cfb2f55fc4a22368567273c38f1afe3fc627ad56710a1d922ada68015710e53f",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/fontconfig.properties.src",
+      "sha256": "c8d20a4a39240665252306bdd3dbc8d71e1e246c8cd8c7985b32e4101658a148",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libfreetype.dylib",
+      "sha256": "2c1e0443b2434fdc37b37e16d75ddeeb3cf0af818d4a16bda84cfd2b0bdbcfd7",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libjli.dylib",
+      "sha256": "1c6514bdcf1d7fe963bf8b658c0c1fd922ac0d0509ff55a6db58dfa3efe205b8",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libsplashscreen.dylib",
+      "sha256": "c2ce46244eb12dfc17a2bc30178ab0ae5e861c704b04d7b81af749fb7140017b",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/jvm.cfg",
+      "sha256": "aa9efb969444c1484e29adecab55a122458090616e766b2f1230ef05bc3867e0",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libjimage.dylib",
+      "sha256": "0e8ba5f278b47ee87aaf282dfb3f1fde6ed638a307dec19c080c22ec985545be",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/shaders.metallib",
+      "sha256": "5bba5cc7c25aa23f90ae7b0bf72d4835bfdfd9760b279f7a8f018670a5f77deb",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libosxkrb5.dylib",
+      "sha256": "083b97ffb0fbd9b52f57c827f48024d2bd71c0fa5839aa5ddd147482addfb12c",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libosxui.dylib",
+      "sha256": "5996114005e0f5c12fbab644ac6426da5b3315397fe08b2c3a5ae6d798f23018",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/tzdb.dat",
+      "sha256": "5906b44e25a8a730131d7ba1beb5d15af27043f6536f1a169ca8a5d8b8bed8f8",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libawt_lwawt.dylib",
+      "sha256": "79a4517e5749c12ca45411ba4f924ce5ba0cd4857ea9268a4ecb780586fbd1bc",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libjavajpeg.dylib",
+      "sha256": "016b4d4b009b12dd674a4c5e4654d966cacabef1afd0e2000f6a3b60e976e954",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libmlib_image.dylib",
+      "sha256": "bb2aafc5aa57fa823e0a5ae949caa798aece139168a9eec2e39d286686a0154d",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libmanagement.dylib",
+      "sha256": "3c5f3e98d1031a2c39091b2f647284c9500e41a8d16b186caeffae132d9db661",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libjsound.dylib",
+      "sha256": "ec1915e22fae6b323f1ae1b0f1866ce02b41ce89ca4e5c49bb1313e87dd116ba",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libjsig.dylib",
+      "sha256": "cb4b4cc0ad43749478697f64f286b73c4e94c61a6076fc8b5bf7665c83787ec6",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libprefs.dylib",
+      "sha256": "53e35fce7d1f52cd3b1053b095b036cf5df433ae121f70afeb5ba90311ea0ce7",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libsyslookup.dylib",
+      "sha256": "4dde6a9cf5633bc470bb2948301464b952c62f31d04998bf3cd1e7102e2d5435",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libjawt.dylib",
+      "sha256": "7715a6ee4ce866fde9ca97b4044eeedbca00e6973583515b777c65cfc123df79",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/jrt-fs.jar",
+      "sha256": "0ab41b15684030fbb2dfce29b2f3d981c6c80edb3b3c58fd1b62e252805f4432",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libfontmanager.dylib",
+      "sha256": "609cf896df42532d82f7054f7144c72ea1bc6b5c01aa401cc3b3b0ebcc1d50e8",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/fontconfig.bfc",
+      "sha256": "5409952a218126c5c11cf0e4963665711aeeab50f5648264d70866fca705a950",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/jspawnhelper",
+      "sha256": "76151e6077980543b0e0f3930a2fb4a8c98183028c50305654da8507aa81dd16",
+      "mode": 493,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libosxsecurity.dylib",
+      "sha256": "9b3a9fdba0df850b7c3414dd5cc5eaf6aba26bb344666f27ce1b9832f1ca3122",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/liblcms.dylib",
+      "sha256": "37170930c5a33692a141a6e89d55ea49a48f1f0afacb451719e11bbf9d711b5e",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libverify.dylib",
+      "sha256": "fdbc4016d121a23876e9c8a5bb0c1071af190a2bfaa9964bcd9baf2281811541",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/psfont.properties.ja",
+      "sha256": "5a4bd51b969bf187ff86d94f4a71fdfbfa602762975fa3c73d264b4575f7c78f",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libj2gss.dylib",
+      "sha256": "defdd5efc683f5775583f95b15748e2cdca1cecf19e9980724b6b374420e9d69",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/modules",
+      "sha256": "cfac288e0b5549a3b6c2fa3687fa22d5c1f1f60d460355004652beac01dc4af8",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/classlist",
+      "sha256": "8c01b2c5fbd6689debd3abca5be0d8c342ccdbdb51fec11d77fd473019fcbaf5",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libjava.dylib",
+      "sha256": "489518dd40ec8eabe7b913ba2f3e5b68731e9eba1713444e2fff5a7e9a9b45d5",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libawt.dylib",
+      "sha256": "097f45a324cba7fa904485f09e881339d5a67e870c61a03001f20029a20ae3f8",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libosx.dylib",
+      "sha256": "72a07731d225a7f958563b94500ae3f05012028fa6ab62ecd4dd2acffa466d57",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/libosxapp.dylib",
+      "sha256": "5fb667ad9f20116869805e4d6ffddd19d9ebe9a99ea6b1f0fb18147a56875ba3",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/security/public_suffix_list.dat",
+      "sha256": "16b42002aa6f83a7763c4cdbd399ecf738460377d447e362884495545afd60a3",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/security/cacerts",
+      "sha256": "98d34a90fca2688ef5674862d2a484e09e5ca25d2f07c5d654aa28f1581f3419",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/security/blocked.certs",
+      "sha256": "96572f243f31c2ef81a6e627542e596f6a9295cff3c7ae095c1b595cb1457ded",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/server/libjvm.dylib",
+      "sha256": "c0c9cc842a9d33857be8262157d19ee9c1e15caf99a9bde784033b351b5dd117",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/lib/server/libjsig.dylib",
+      "sha256": "cb4b4cc0ad43749478697f64f286b73c4e94c61a6076fc8b5bf7665c83787ec6",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.security.jgss/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.security.jgss/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.security.jgss/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.management/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.management/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.management/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.security.sasl/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.security.sasl/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.security.sasl/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.zipfs/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.zipfs/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.zipfs/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/bcel.md",
+      "sha256": "cd578186ad93de46cca29ec8ace2b11f9da751987f3f140e6095c528596cc8c1",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xalan.md",
+      "sha256": "02bd013fc3f438dbb8fa41fa57888177e015efa6431d37fce6e794c6f353a6a1",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xmlspec.md",
+      "sha256": "afec263bf5dc67697ee33734ee243f86a878161335ef6298273e4041673b0544",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xmlxsd.md",
+      "sha256": "498a5fec63509a8f3949983bb6878ac5c95aaf1d5e3679272d93314371aa0211",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/dom.md",
+      "sha256": "6686e8877667584a3a7c07344baadca1a03e29f677162d87c3c0811e990d1148",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xhtml11.md",
+      "sha256": "4f99a390896f0f55a0b78376de89bfd2ac845713de85e67e37f884b77e0c3122",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xhtml10.md",
+      "sha256": "9a5cde47073ca80cf59127891420f4aed603eb65070738ad027bb19e76fb9319",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/schema10part2.md",
+      "sha256": "2350e35e91866d5ee5bd7ee7c303b3e424bbca335d36c71452588aac494eaa3e",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/schema10part1.md",
+      "sha256": "b220f891e5bfa3aa4b2a4b34dfab53a291553c2ae0fd0b15a4cb1116d4e97770",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/jcup.md",
+      "sha256": "8d5dcfdf50455a3c34c753a98f21e953248af200415a9084e3f102cb6c43b8bf",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xhtml11schema.md",
+      "sha256": "8cd69b1392e286538008f4cb003f85caea3a375c619e697813d820b69857cf74",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xhtml10schema.md",
+      "sha256": "7bc51d884aaae6ef27551ee78d404ba3116356790da3d06b665679eb2e1cc002",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml/xerces.md",
+      "sha256": "4a6bf6b367193ee68681cb2d9fed30ffc5d62dd2d477bd62e0271707d71b3244",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.prefs/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.prefs/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.prefs/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.logging/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.logging/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.logging/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/siphash.md",
+      "sha256": "5a792b5a74ad2a5f3d6a7ad8b7a841116e58a772c18bc6e392320a365b222c76",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/zlib.md",
+      "sha256": "c9c70c36a1f0325e8788771906202d42ba6ab4205caca44ec0f665707e83226b",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/public_suffix.md",
+      "sha256": "861de1e4992a7d28f1de25c73cd50d26a94779ebd749c0643fecfa56442c3429",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/cldr.md",
+      "sha256": "472e341c36efc1136860ed7a6461a2af4a53ae95d55d1126726340f5ba62b06a",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/icu.md",
+      "sha256": "be23ad20a8231d2241b37fcf401548febd8597de8373f89268882020cb7c8818",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/unicode.md",
+      "sha256": "5194d6760f2e7eccc07804196cc619f84e730fa9d10c0529b71416186f4d12dc",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/c-libutl.md",
+      "sha256": "bef40679922d6fdfb7e4ddb223ad6722300f6054ba737bbf6188d60fcec517f9",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.base/aes.md",
+      "sha256": "45c6d4da48325edfbff3dcf71c704e504c057904435ed23c6d57046d551eb69d",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.net.http/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.net.http/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.net.http/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.internal.opt/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.internal.opt/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.internal.opt/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.internal.opt/jopt-simple.md",
+      "sha256": "99bc67f93cf57d6d20e6047731c93fbb267d70fbdd4115d119e0f85c6efe5c05",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.security.jgss/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.security.jgss/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.security.jgss/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.httpserver/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.httpserver/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.httpserver/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.naming/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.naming/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.naming/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.jartool/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.jartool/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.jartool/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.unsupported/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.unsupported/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.unsupported/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.scripting/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.scripting/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.scripting/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.transaction.xa/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.transaction.xa/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.transaction.xa/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.sql/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.sql/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.sql/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.datatransfer/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.datatransfer/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.datatransfer/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/freetype.md",
+      "sha256": "e1f43089a3d7f846ac72709ba3f5e3dfe4a07955cbb1f5b580c3c41cf93792dd",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/mesa3d.md",
+      "sha256": "63f4e6f75caebbccb95d903fb43e46ac7111b3624d0a34f146b276d7d9e7b152",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/colorimaging.md",
+      "sha256": "04d61e3e8e71dd452ebe52008af5378d9f6640d14578aeb515dc5375973b0189",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/libpng.md",
+      "sha256": "f73afb394792f3aeecd959e89487603677a430e56b44eba596d8b572accfd540",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/xwd.md",
+      "sha256": "1d4ffa93c87f35084b02a7aa90a21084b4019db4fe1003c2e5ce775b4a384f59",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/giflib.md",
+      "sha256": "206aab89ec75968e48a6a1ed6df7d8b9bfb7aea12cbe4c9345d93e5d97460a25",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/harfbuzz.md",
+      "sha256": "5ec7cba7f8e7fc3a089213140aab6fa1b3bd5bf8a91bf8bddb3b8d315fc5f7d0",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/jpeg.md",
+      "sha256": "c1dfb9719a71ad9f861f8728550542d681e25c8ef40e6393606e6e2a0c1d653a",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/pipewire.md",
+      "sha256": "56a8fb1652c70ac204d13bb52ca4d678162e7d21a97d10209c2a633de8082de0",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.desktop/lcms.md",
+      "sha256": "6d409e73a4ce3c25479b4fb01d05fe79c0458bcd1dccc07f72d3e211d64ac8ce",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.crypto.ec/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.crypto.ec/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/jdk.crypto.ec/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml.crypto/LICENSE",
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml.crypto/ADDITIONAL_LICENSE_INFO",
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml.crypto/ASSEMBLY_EXCEPTION",
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/legal/java.xml.crypto/santuario.md",
+      "sha256": "d08690d25f660f145c73365d260ed522cd0aace8a0e1396706551b7a1ae8c9a3",
+      "mode": 292,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/jaxp-strict.properties.template",
+      "sha256": "3cc9b87633769414b22c24c97ecded8a15df630fe5ab12abca2398d88e31b32b",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/logging.properties",
+      "sha256": "8590633e1e8a7d88ffe74cc04189c5c61b1ed4703180cbc851dcd5575efcce74",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/sound.properties",
+      "sha256": "299c2360b6155eb28990ec49cd21753f97e43442fe8fab03e04f3e213df43a66",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/net.properties",
+      "sha256": "f0093906820c30e079cbf79bd744d761aaf32ae917598c7ce71fac7eae16f86d",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/jaxp.properties",
+      "sha256": "d4f45052a100e5aef02b6638a3b9c69b2bdd46155ceb58a52671e5d594c30100",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/security/java.security",
+      "sha256": "d1e02f8a1d202cfba2a99eb6ca6c15a305e2f0b5d98d9a22eb36e09604657dea",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/security/policy/README.txt",
+      "sha256": "6da0747334b0fea7592fd92614b2bbc8b126535e129b1fee483774d914e98eb5",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/security/policy/unlimited/default_US_export.policy",
+      "sha256": "758b930a526fc670ab7537f8c26321527050a31f5f42149a2dda623c56a0a1a9",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/security/policy/unlimited/default_local.policy",
+      "sha256": "8d8a318e6d90dfd7e26612d2b6385aa704f686ca6134c551f8928418d92b851a",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/security/policy/limited/default_US_export.policy",
+      "sha256": "758b930a526fc670ab7537f8c26321527050a31f5f42149a2dda623c56a0a1a9",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/security/policy/limited/exempt_local.policy",
+      "sha256": "8c3d7648abcd95a272ce12db870082937f4d7f6878d730d83cb7fbb31eb8b2c9",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/jdk-25.0.4.1+1/conf/security/policy/limited/default_local.policy",
+      "sha256": "2b2627548e61316150d47ffc3e6cad465ca05b3cccd4785eb7d21aa7baa0f441",
+      "mode": 420,
+      "kind": "file"
+    },
+    {
+      "path": "Contents/Resources/packages/defold-c86aee74a8a45fc5df78cdcb11ee0c38db4aa550.jar",
+      "sha256": "db88f2fa24aa579f30b44f6e433d3de0ed9a2d4e412c6a56f43cca1742ac88b2",
+      "mode": 420,
+      "kind": "file"
+    }
+  ],
+  "base_metadata": {
+    "schema": 1,
+    "channel": "dev",
+    "revision": 5,
+    "version": "1.14.1-patch.5",
+    "repository": "iricwang/defold",
+    "notes": "\u540e\u7eed\u66f4\u65b0\u4ec5\u751f\u6210\u589e\u91cf patch\uff0c\u4e0d\u518d\u6253\u5305\u5b8c\u6574\u5e94\u7528\uff1b\u4fdd\u7559\u73b0\u6709 JDK\uff0c\u652f\u6301\u8df3\u8fc7\u7248\u672c\u540e\u6309\u5386\u53f2\u8865\u4e01\u9010\u7248\u66f4\u65b0\u3002",
+    "feed": "https://github.com/iricwang/defold/releases/download/patch-dev/manifest.json",
+    "commit": "9ff5e73b26f4963b8206be0422ee0dc309ffa16c"
+  },
+  "migration_target_revision": 31
+}

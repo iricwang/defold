@@ -103,6 +103,30 @@ def publish(directory, commit):
                                              'size': path.stat().st_size}
                 assets.append(str(path))
             result['assets'][platform]['base_revision'] = base_revision
+        migration_file = ROOT / 'patch/baselines/arm64-macos-local22.json'
+        if migration_file.is_file():
+            migration = json.loads(migration_file.read_text())
+            if migration.get('migration_target_revision') == data['revision']:
+                platform = migration['platform']
+                base_revision = migration['metadata']['revision']
+                name = f'Defold-{platform}-patch-{base_revision}-local-to-{data["revision"]}.zip'
+                path = directory / name
+                with zipfile.ZipFile(path) as archive:
+                    plan = json.loads(archive.read('patch.json'))
+                target = json.loads((directory / f'Defold-{platform}-state.json').read_text())
+                if (plan['base_revision'] != base_revision or plan['revision'] != data['revision']
+                        or plan['base'] != migration['files']
+                        or {item['path']: item for item in plan['target']}
+                        != {item['path']: item for item in target['files']}):
+                    raise ValueError('Local migration does not match its exact baseline and CI target')
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                migration_manifest = directory / f'manifest-{platform}-local{base_revision}.json'
+                write_json(migration_manifest, {**data, 'installers': {},
+                           'assets': {platform: {'url': f'{base_url}/{name}', 'sha256': digest,
+                                                'size': path.stat().st_size, 'base_revision': base_revision}},
+                           'states': {platform: result['states'][platform]}})
+                result['compatibility'] = {platform: f'{base_url}/{migration_manifest.name}'}
+                assets.extend((str(path), str(migration_manifest)))
         write_json(manifest_path, result)
         notes_path = directory / "notes.txt"
         notes_path.write_text(data["notes"])

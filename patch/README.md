@@ -86,3 +86,23 @@ macOS 与 Windows 可以使用不同的初始基线，发布清单会分别记�
 Windows 重启助手使用安装目录之外的临时 Java 运行时，避免自身占用待替换文件。
 替换保留原安装备份，失败会恢复原目录。运行时版本和文件保持不变。
 构建命令为 `python -X utf8 scripts/windows/build-patch.py`，只生成增量包。
+
+## 本地 patch.22 一次性接入 CI 更新链
+
+旧的本地 Apple Silicon patch.22 与同版本 CI 产物可能有不同的启动器和 JAR 哈希。
+patch.31 会同时发布 `Defold-arm64-macos-patch-22-local-to-31.zip` 和
+`manifest-arm64-macos-local22.json`，针对仓库记录的精确本地基线生成增量包。
+迁移的目标文件清单与正式 CI patch.31 完全一致，后续可继续使用常规 GitHub 更新源。
+普通 CI 安装仍使用原有更新链。
+
+保存项目并完全退出 `/Applications/Defold.app`，然后在仓库根目录运行：
+
+```sh
+python3.12 patch/migrate_local22.py
+```
+
+其他安装目录使用 `--app /absolute/path/Defold.app`。
+脚本检查运行进程和全部基线文件，启动一次兼容更新会话；在欢迎页选择 **Patch Updates**，
+或使用 **帮助 → 检查更新**，下载并安装。原进程退出后，脚本原子恢复常规更新源，
+重启后的应用继续使用常规源。迁移不替换 JDK，也不生成完整应用或 DMG。
+该专用包仅在 patch.31 生成；已发布的历史迁移包会保留。

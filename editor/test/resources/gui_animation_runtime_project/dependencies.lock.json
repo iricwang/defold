@@ -1,7 +1,7 @@
 {
   "panthera": {
     "commit": "3cf7557e045c2e1198bbdedbaf413c445505045a",
-    "url": "https://github.com/Insality/defold-panthera/archive/3cf7557e045c2e1198bbdedbaf413c445505045a.zip",
+    "url": "https://github.com/Insality/panthera/archive/3cf7557e045c2e1198bbdedbaf413c445505045a.zip",
     "files": {
       "panthera/panthera.lua": "8d1ab2e06e2c267d78809b48d7ac69bf416accb666bf459069b99cf6d028aafd",
       "panthera/panthera_internal.lua": "e1bd82d7ebfe2716b2c3b735a3a6d05622a69346e1ca1cba60aa41b477b3d91b",

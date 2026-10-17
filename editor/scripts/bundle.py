@@ -493,6 +493,18 @@ def create_patch(jdk, platform, options):
         patch_name = 'Defold-%s-patch-%s-to-%s.zip' % (platform, base['metadata']['revision'], metadata['revision'])
         state = patch_package.create(base, payload, metadata, platform, java_version,
                                      Path('jlink-options').read_text(), output / patch_name)
+        migration_file = Path('../patch/baselines') / (platform + '-local22.json')
+        if migration_file.is_file():
+            migration = json.loads(migration_file.read_text())
+            if migration.get('migration_target_revision') == metadata['revision']:
+                migration_name = 'Defold-%s-patch-%s-local-to-%s.zip' % (
+                    platform, migration['metadata']['revision'], metadata['revision'])
+                migrated = patch_package.create(migration, payload, metadata, platform, java_version,
+                                               Path('jlink-options').read_text(), output / migration_name)
+                if ({item['path']: item for item in migrated['files']}
+                        != {item['path']: item for item in state['files']}):
+                    raise ValueError('Local migration must produce the exact released inventory')
+                log('Created local baseline migration: %s' % (output / migration_name))
         if windows:
             helper = Path(temporary) / 'patch-helper.jar'
             with zipfile.ZipFile(helper, 'w', zipfile.ZIP_DEFLATED) as archive:
