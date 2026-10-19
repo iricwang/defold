@@ -14,7 +14,8 @@
 
 (ns editor.gui-animation-preview
   (:require [dynamo.graph :as g]
-            [editor.math :as math])
+            [editor.math :as math]
+            [internal.cache :as cache])
   (:import [javax.vecmath Quat4d]))
 
 (set! *warn-on-reflection* true)
@@ -73,8 +74,14 @@
                     node-overrides)]
     (if (zero? (count steps))
       (apply-preview scene node-overrides)
-      (let [report (g/transact {:dry-run true} steps)
-            context (g/make-evaluation-context {:basis (:basis report)})
+      (let [base-cache (g/cache)
+            report (g/transact {:dry-run true} steps)
+            ;; The dry-run basis differs from the live basis, so the default
+            ;; context has no cache. Reuse unaffected outputs (notably shaders),
+            ;; removing every endpoint invalidated by the preview transaction.
+            ;; This private context is never merged back into the live cache.
+            context (g/make-evaluation-context {:basis (:basis report)
+                                               :cache (cache/cache-invalidate base-cache (:outputs-modified report))})
             preview (g/node-value (:node-id scene) :scene context)]
         (if (g/error? preview)
           (throw (ex-info "The animated GUI properties cannot be rendered." {}))

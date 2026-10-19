@@ -13,7 +13,8 @@
 ;; specific language governing permissions and limitations under the License.
 
 (ns editor.docking
-  (:require [editor.localization :as localization]
+  (:require [editor.dock-windows :as dock-windows]
+            [editor.localization :as localization]
             [editor.prefs :as prefs]
             [editor.ui :as ui]
             [util.coll :as coll])
@@ -28,6 +29,9 @@
 (set! *warn-on-reflection* true)
 
 (def default-layout {:left [:assets] :right [:inspector :preview] :bottom [:tools] :center [:game]})
+
+(defn refresh-windows! [scene evaluation-context]
+  (dock-windows/refresh! scene evaluation-context))
 
 (defn valid-layout? [layout]
   (and (map? layout)
@@ -48,10 +52,16 @@
     (reduce-kv (fn [result zone panels] (if (contains? (set panels) panel) (reduced zone) result)) fallback @layout)
     fallback))
 
+(defn floating-zone? [scene zone]
+  (when-let [{:keys [layout floating]} (ui/user-data scene ::manager)]
+    (let [ids (get @layout zone)]
+      (and (pos? (count ids)) (coll/every? #(contains? @floating %) ids)))))
+
 (defn find-split [^Scene scene id]
   (or (.lookup scene (str "#" id)) (get-in (ui/user-data scene ::manager) [:splits id])))
 
 (defn reset-layout! [scene]
+  (dock-windows/restore-all! scene)
   (when-let [reset! (:reset! (ui/user-data scene ::manager))] (reset!)))
 
 (defn split-panel
@@ -99,6 +109,8 @@
   (let [saved (prefs/get preferences [:window :panel-layout])
         saved (if (and saved (not (contains? saved :center))) (assoc saved :center [:game]) saved)
         layout (atom (if (valid-layout? saved) saved default-layout))
+        floating (atom #{})
+        home-sizes (atom nil)
         bodies {:assets (.lookup scene "#assets-split")
                 :inspector (.lookup scene "#right-split")
                 :tools (.lookup scene "#tool-tabs")
@@ -143,7 +155,7 @@
                                  (when title (VBox/setVgrow body Priority/ALWAYS))
                                  (StackPane/setAlignment menu Pos/TOP_RIGHT)
                                  (StackPane/setMargin menu (Insets. 0.0 0.0 0.0 0.0))
-                                 [id {:node panel :menu menu}]))) bodies)
+                                 [id {:node panel :menu menu :popup (ContextMenu.)}]))) bodies)
         root ^StackPane (.getRoot scene)
         indicator (doto (Rectangle.)
                     (.setId "dock-drop-indicator")
@@ -156,25 +168,30 @@
         gesture (volatile! nil)]
     (.add (.getChildren root) indicator)
     (letfn [(render! [sizes]
-              (set-zone-visible! :center (pos? (count (:center @layout))))
+              (set-zone-visible! :center (coll/any? #(not (contains? @floating %)) (:center @layout)))
               (doseq [[_ ^SplitPane split] zones] (.clear (.getItems split)))
               (doseq [[zone ids] @layout]
-                (let [^SplitPane split (zones zone)]
+                (let [ids (filterv #(not (contains? @floating %)) ids)
+                      ^SplitPane split (zones zone)]
                   (.setAll (.getItems split) ^java.util.Collection (mapv #(get-in panels [% :node]) ids))
                   (when (and sizes (> (count ids) 1))
-                    (.setDividerPositions split
-                                          (double-array (:positions (reduce (fn [{:keys [total positions]} id]
-                                                                              (let [next-total (+ total (get-in sizes [zone id]))]
-                                                                                {:total next-total :positions (conj positions next-total)}))
-                                                                            {:total 0.0 :positions []} (pop ids)))))))))
+                    (let [total (transduce (map #(get-in sizes [zone %] 1.0)) + ids)
+                          positions (:positions
+                                      (reduce (fn [{:keys [offset positions]} id]
+                                                (let [next-offset (+ offset (/ (get-in sizes [zone id] 1.0) total))]
+                                                  {:offset next-offset :positions (conj positions next-offset)}))
+                                              {:offset 0.0 :positions []} (pop ids)))]
+                      (.setDividerPositions split (double-array positions)))))))
             (capture-sizes []
               (into {} (map (fn [[zone ids]]
-                              (let [^SplitPane split (zones zone)
+                              (let [ids (filterv #(not (contains? @floating %)) ids)
+                                    ^SplitPane split (zones zone)
                                     boundaries (conj (into [0.0] (.getDividerPositions split)) 1.0)]
                                 [zone (into {} (map-indexed (fn [index id]
                                                               [id (- (boundaries (inc index)) (boundaries index))])) ids)]))) @layout))
             (save! [] (prefs/set! preferences [:window :panel-layout] @layout))
             (move! [id zone]
+              (dock-windows/restore-slot! (get-in panels [id :node]))
               (swap! layout move-panel id zone)
               (save!)
               (set-zone-visible! zone true)
@@ -202,18 +219,17 @@
                                                                 (panel-rectangle (zone planned-layout) (zone sizes) source
                                                                                  (.getWidth split) (.getHeight split) (= :bottom zone))))
                                                        (merge {:zone zone :target id :node panel} half)))))
-                                        result))) nil (zone @layout))
+                                        result))) nil (filterv #(not (contains? @floating %)) (zone @layout)))
                           (when (zero? (count (zone @layout)))
                             {:zone zone :node split :x 0.0 :y 0.0
                              :width (.getWidth split) :height (.getHeight split)})))
                     result)) nil zones))]
-      (doseq [[id {:keys [^Node node ^Button menu]}] panels]
-        (let [popup (ContextMenu.)]
-          (.setOnAction menu (ui/event-handler _ (.show popup menu Side/BOTTOM 0.0 0.0)))
-          (doseq [zone [:left :right :bottom :center]]
-            (let [item (doto (MenuItem.) (localization/localize! localization (localization/message (str "dock.to-" (name zone)))))]
-              (.setOnAction item (ui/event-handler _ (move! id zone)))
-              (.add (.getItems popup) item))))
+      (doseq [[id {:keys [^Node node ^Button menu ^ContextMenu popup]}] panels]
+        (.setOnAction menu (ui/event-handler _ (.show popup menu Side/BOTTOM 0.0 0.0)))
+        (doseq [zone [:left :right :bottom :center]]
+          (let [item (doto (MenuItem.) (localization/localize! localization (localization/message (str "dock.to-" (name zone)))))]
+            (.setOnAction item (ui/event-handler _ (move! id zone)))
+            (.add (.getItems popup) item)))
         ;; Reuse the existing title/tab row. The overlay menu consumes no content space.
         (.addEventFilter node MouseEvent/MOUSE_PRESSED
           (ui/event-handler event
@@ -262,6 +278,7 @@
             (.consume event))))
       (ui/user-data! scene ::manager
                      {:layout layout
+                      :floating floating
                       :splits {"assets-split" (:assets bodies) "right-split" (:inspector bodies)}
                       :reset! (fn []
                                 (cancel!)
@@ -270,6 +287,18 @@
                                 (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true))
                                 (render! nil))})
       (render! nil)
+      (doseq [[id {:keys [node ^ContextMenu popup]}] panels]
+        (dock-windows/register! node (localization (localization/message (str "dock." (name id))))
+                               {:persistent-key [:panel id]
+                                :menu-items (.getItems popup)
+                                :home-visible! (fn [visible]
+                                                 (when (zero? (count @floating))
+                                                   (reset! home-sizes (capture-sizes)))
+                                                 (swap! floating (if visible disj conj) id)
+                                                 (render! @home-sizes)
+                                                 (doseq [[zone ids] @layout]
+                                                   (when (contains? (set ids) id)
+                                                     (set-zone-visible! zone (coll/any? #(not (contains? @floating %)) ids)))))}))
       (.applyCss root)
       (.layout root)
       {:panels (into {} (map (fn [[id value]] [id (:node value)])) panels)})))

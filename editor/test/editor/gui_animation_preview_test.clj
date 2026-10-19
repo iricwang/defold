@@ -14,7 +14,9 @@
 
 (ns editor.gui-animation-preview-test
   (:require [clojure.test :refer [deftest is testing]]
-            [editor.gui-animation-preview :as preview]))
+            [dynamo.graph :as g]
+            [editor.gui-animation-preview :as preview]
+            [internal.system :as system]))
 
 ;; Verifies preview alpha is recomputed from local values, including a zero-alpha parent.
 (deftest inherited-alpha-preview-test
@@ -110,3 +112,37 @@
     (is (< (Math/abs (- 90.0 (double (get channels "rotation_z")))) 1.0e-6))
     (is (< (Math/abs (double (get channels "rotation_x"))) 1.0e-6))
     (is (< (Math/abs (double (get channels "rotation_y"))) 1.0e-6))))
+
+(g/defnode PreviewDependency
+  (property calls g/Any)
+  (property source g/Str (default "original"))
+  (output shader g/Str :cached (g/fnk [calls source] (swap! calls inc) source)))
+
+(g/defnode PreviewScene
+  (input shader g/Str)
+  (property value g/Num (default 0))
+  (output scene g/Any :cached (g/fnk [_node-id shader value]
+                              {:node-id _node-id :shader shader :value value})))
+
+;; Preview must reuse unaffected dependencies, invalidate changed outputs, and never pollute live state/cache.
+(deftest disposable-preview-cache-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (let [calls (atom 0)
+          [dependency node] (g/tx-nodes-added (g/transact [(g/make-node PreviewDependency :calls calls)
+                                                        (g/make-node PreviewScene)]))]
+      (g/transact (g/connect dependency :shader node :shader))
+      (let [scene (g/node-value node :scene)
+            basis (g/now)
+            cache (g/cache)]
+        (doseq [value [1 2 0 3]]
+          (is (= (assoc scene :value value)
+                 (preview/apply-full-preview scene {node {:graph-properties {:value value}}}))))
+        (is (= 1 @calls))
+        (is (identical? basis (g/now)))
+        (is (identical? cache (g/cache)))
+        (is (= scene (g/node-value node :scene)))
+        (is (= 0 (g/node-value node :value))))
+      (g/transact (g/set-property dependency :source "edited"))
+      (let [scene (g/node-value node :scene)]
+        (is (= "edited" (:shader (preview/apply-full-preview scene {node {:graph-properties {:value 4}}}))))
+        (is (= 2 @calls))))))

@@ -2932,6 +2932,9 @@ gui-animation.data = Animation data
 gui-animation.save-file = Save
 gui-animation.curves = Keyframe curves
 gui-animation.events = Events / Segments
+gui-animation.select-segment = Select an event or segment on the timeline. Right-click a track to add one.
+gui-animation.add-event = Add event key
+gui-animation.add-trigger = Add trigger key
 gui-animation.events-empty = No events. Imported events are preserved; preview does not trigger them.
 gui-animation.frame-display = Frame display
 gui-animation.fullscreen = Expand animation workspace
@@ -2973,3 +2976,21 @@ dialog.craft-binding.select = Select PhotoCraft Connection
 dialog.craft-binding.count = {count} PhotoCraft connections
 
 dialog.craft-binding.listener = Defold listening port: {port}
+
+gui-animation.event-log = Event log
+gui-animation.clear-event-log = Clear log
+gui-animation.copy-callback = Copy Lua callback template
+gui-animation.callback-copied = Lua callback template copied. Export Lua and check the module path before running.
+gui-animation.event-log-hint = Current clip only · newest first · last 200 entries. Playback records event entry; scrubbing does not. Click a record to pause and select its key. Business callbacks run in the game.
+gui-animation.export-needed = Not exported yet. Export the animation before using the callback template.
+gui-animation.export-stale = Animation changed. Export again before running the game.
+gui-animation.exported = Animation matches the last export.
+
+dock.return = Return to original position
+dock.game = Game
+dock.gui-scene = GUI Scene
+dock.gui-animation = GUI Animation
+dock.editors = Editors
+
+dock.float = Open in a separate window
+dock.drag-help = Drag to combine panels; double-click to return

@@ -116,7 +116,11 @@ Panthera 的 `create_gui` 接口。
 
 支持 41 种内置缓动：`linear`，以及 `quad`、`cubic`、`quart`、`quint`、`sine`、`expo`、`circ`、`back`、`bounce`、`elastic` 的 `in`、`out`、`inout`、`outin` 形式。内置曲线使用 Defold 引擎相同的 64 点采样数据。选择关键帧后拖拽底部的小曲线即可编辑自定义采样点；也可以从关键帧旁的 **… → 自定义曲线** 开始。自定义曲线保存为 Panthera 的 `easing_custom`，随关键帧移动、复制和导出保留。
 
-**事件 / 片段** 页使用应用原生列表、输入框和下拉框，可创建四类片段：
+在帧轨道内右键，选择 **添加 event 关键帧** 或 **添加 trigger 关键帧**。开始时间按鼠标横向位置吸附到当前采样率的帧，并自动选中新关键帧、打开底部 **事件 / 片段** 页。节点优先取右键所在轨道；空白区域使用当前节点。未选择节点时仍可添加全局 event，但 trigger 菜单不可用。
+
+**事件 / 片段** 页只显示当前选中的片段，不再列出全部事件。点击时间轴条带或左侧对应片段可切换编辑对象；点击轨道空白处清空选择。多选时显示当前活动片段，只有一个片段的拖动、粘贴和键盘移动也会继续显示它。可编辑四类片段：
+
+选中事件或片段会自动打开 **事件 / 片段** 页；选中数值关键帧会打开 **关键帧曲线** 页。单次 `event` 只显示类型、可选节点、时间、事件 ID、数据和时长；时长大于 0 时才展开起止数值与插值。`trigger` 只显示类型、节点、属性、时间、初始数据和目标数据：布尔属性使用勾选框，轴心、混合模式、尺寸模式、裁剪模式和饼图外边界使用下拉框，文字、图层、贴图等使用输入框。未识别的已有枚举值保留在选项中，不会因打开表单而改写。
 
 | 类型 | 编辑内容 | 预览 |
 | --- | --- | --- |
@@ -127,7 +131,7 @@ Panthera 的 `create_gui` 接口。
 
 触发属性包括文字、图层、贴图、启用、可见、继承透明度、轴心、混合模式、尺寸模式、裁剪模式、裁剪可见性/反转、自动换行、饼图外边界和顶点数。布尔数据填写 `true` / `false`；文字与贴图填写 Panthera 对应字符串。
 
-点击 **新关键帧** 清除当前片段选择，填写字段后点击 **应用**。选择列表条目可修改原片段，**删除关键帧** 删除当前条目。原始片段在时间轴中显示为条带，可以拖动开始时间；关键帧重叠、间隔和跳变保持原样，不会被自动展平。此类数值轨道的菱形编辑不会强行重写片段，使用原始片段编辑区修改。
+右键添加的 event 默认为单次事件，事件 ID 为 `event`；trigger 默认属性为 `visible`，起始和目标数据均为 `true`。选中片段后填写字段，点击 **应用** 修改当前片段；**删除关键帧** 删除当前片段。修改支持撤销、重做，保存及导出流程保持不变。原始片段在时间轴中显示为条带，可以拖动开始时间；关键帧重叠、间隔和跳变保持原样，不会被自动展平。此类数值轨道的菱形编辑不会强行重写片段，使用原始片段编辑区修改。
 
 勾选 **仅编辑器** 会保留 `is_editor_only`：内嵌编辑器显示该姿态，Panthera Runtime 按其导出/预处理规则处理。未知数据和扩展字段原样保留，无法解释的类型会显示明确的预览错误。
 
@@ -150,6 +154,30 @@ Panthera 的 `create_gui` 接口。
 
 ## 验证记录
 
+底部 **事件记录** 页签显示当前片段播放经过的事件起点、事件 ID 和参数，最新在前，最多保留 200 条。拖动播放头不记日志；点击记录暂停并定位、选中对应事件关键帧。持续事件仅记录进入点，不模拟游戏中的逐帧业务回调。修改动画或切换片段会清空旧记录，避免定位到已变更的关键帧。
+
+在该页签点击 **复制 Lua 回调模板**，将模板合并到 GUI 脚本，核对导出 Lua 模块的 `require` 路径，并在对应事件函数中填写业务逻辑。模板使用 Panthera 的 `callback_event(event_id, node, data, value)`；编辑器本身不执行这些函数。成功导出后保存内容指纹；再次修改会提示 **动画已修改，需要重新导出**，重新导出或撤销回已导出内容后提示消失。
+
+patch.34 优化播放头拖动：高频鼠标输入在界面刷新时合并处理，复用轨道数据和当前姿态；临时场景只清除受动画影响的缓存，避免 Trigger 预览反复编译着色器。预览不写入 GUI 或动画文件。
+
 [patch.26 功能清单、测试与截图](gui-animation-validation/patch26/README.md)。截图来自实际编辑器界面，测试场景位于 `editor/test/resources/gui_animation_project/`。
 
 实现参考 [Panthera 官方编辑器说明](https://github.com/Insality/panthera/blob/main/docs_editor/getting_started.md)、[快捷键](https://github.com/Insality/panthera/blob/main/docs_editor/hotkeys.md) 和官方 Runtime 数据语义。这里集成的是 GUI 动效工作区；GUI 原始布局、资源、工程与窗口管理继续使用 Defold 编辑器本身。
+
+
+## Floating windows and panel composition
+
+Resource editor pages, the GUI scene, and the GUI animation workspace have a **… → Float** menu action. The GUI scene and animation workspace can float separately; the resource page menu floats the whole editor. Assets, Inspector, Resource Preview, Tools, and Game can also float.
+
+Drag a floating panel's title into another floating panel:
+
+- The middle creates a tab group.
+- The left/right edges create a horizontal split.
+- The top/bottom edges create a vertical split.
+- Release outside a target to create another window.
+
+Splits can be nested and resized. Drag individual tab titles to rearrange them. Double-click a floating title, choose **… → Return** in its panel menu, or close the floating window to return panels to their original positions. Closing a resource tab still closes that resource and releases its floating panels. Reset Panel Layout returns floating panels as well.
+
+For a second monitor, float the GUI scene and animation workspace, drag the animation title onto the bottom edge of the scene window, then move the combined window to that monitor. Preview, key editing, event history, and editor shortcuts operate on the same document. Floating windows are remembered per project. Reopening the project restores their positions, sizes, maximized state, tab groups, selected tabs, and nested split proportions. If a monitor is disconnected, windows are fitted onto a connected screen. Missing or renamed resource panels are skipped; the remaining groups still restore. Returning a panel or resetting the panel layout updates the saved arrangement. Layout data is stored in local project preferences, not in GUI or animation resources.
+
+Floating removes the original panel from its split instead of leaving a return-button placeholder. Remaining panels expand into the released space; returning restores the panel order and divider proportions. If both GUI subpanels float, their empty editor area also collapses. Selecting the resource tab again returns its panels.

@@ -14,9 +14,19 @@
 
 (ns editor.gui-animation-io
   "UTF-8 file boundaries shared by native file dialogs and round-trip tests."
-  (:require [editor.gui-animation-data :as animation]))
+  (:require [editor.gui-animation-data :as animation])
+  (:import [org.apache.commons.codec.digest DigestUtils]))
 
 (set! *warn-on-reflection* true)
+
+(defn export-signature [document]
+  (DigestUtils/sha256Hex ^String
+    (animation/write-json (update-in document [:data :metadata] dissoc :editor_export_signature))))
+
+(defn export-status [document]
+  (if-let [exported (get-in document [:data :metadata :editor_export_signature])]
+    (if (= exported (export-signature document)) :exported :export-stale)
+    :export-needed))
 
 (defn read-document-file [file resolve-template]
   (animation/read-source (slurp file :encoding "UTF-8") resolve-template))

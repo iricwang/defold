@@ -2546,6 +2546,8 @@
 
         (refresh-menubar-state menu-bar current-command-contexts evaluation-context)))))
 
+(declare inside-hidden-tab?)
+
 (defn- refresh-toolbars!
   [^Scene scene localization evaluation-context]
   (let [command-contexts (current-command-contexts scene evaluation-context)
@@ -2553,8 +2555,12 @@
         app-view (-> command-contexts first :env :app-view)
         ^Tab active-tab (g/maybe-node-value app-view :active-tab evaluation-context)]
     (doseq [td (vals (user-data root ::toolbars))]
-      (let [control (:control td)
-            visible (or (nil? active-tab) (nodes-along-path? control (.getContent active-tab) root))]
+      (let [^Node control (:control td)
+            control-scene (.getScene control)
+            detached (and control-scene (not (identical? scene control-scene)))
+            command-contexts (if detached (current-command-contexts control-scene evaluation-context) command-contexts)
+            visible (or (and detached (not (inside-hidden-tab? control)))
+                        (nil? active-tab) (nodes-along-path? control (.getContent active-tab) root))]
         (refresh-toolbar td visible command-contexts localization evaluation-context)))))
 
 (defn- refresh-accelerators! [scene keymap]

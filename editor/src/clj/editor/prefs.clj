@@ -193,6 +193,7 @@
               :panel-layout {:type :object-of
                              :key {:type :keyword}
                              :val {:type :array :item {:type :keyword}}}
+              :floating-layout {:type :string :default "" :scope :project}
               :split-positions {:type :object-of
                                 :key {:type :keyword}
                                 :val {:type :array :item {:type :number}}}

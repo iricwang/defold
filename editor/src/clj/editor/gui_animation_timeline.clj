@@ -161,3 +161,52 @@
                            :label (str (animation/key-kind key) " · " (get key :node_id "") " "
                                        (get key :event_id (get key :property_id "")))})))
         (animation/animation-keys document animation-id)))
+
+(defn playback-events
+  "Return the latest 200 current-clip event entries crossed during playback.
+  Unfolding the playhead into a phase handles wraparound and multiple loops.
+  Duration events log entry only; this is a preview trace, not runtime dispatch."
+  [document animation-id time dt loop-enabled mode direction include-start]
+  (let [duration (double (animation/animation-duration document animation-id))
+        period (* duration (if (= :ping-pong mode) 2.0 1.0))
+        start (case mode
+                :reverse (- duration (double time))
+                :ping-pong (if (neg? (long direction)) (- period (double time)) (double time))
+                (double time))
+        end (+ start (max 0.0 (double dt)))
+        end (if loop-enabled end (min period end))]
+    (into []
+          (comp (take 200) (map #(dissoc % :phase :cycle)))
+          (sort-by (juxt :phase :cycle :key-index) coll/descending-order
+                   (into []
+                         (mapcat
+                           (fn [[index key]]
+                             (if-not (= "event" (animation/key-kind key))
+                               []
+                               (let [event-time (double (get key :start_time 0))
+                                     positions (case mode
+                                                 :reverse [[(- duration event-time) -1]]
+                                                 :ping-pong (cond
+                                                              (zero? period) [[0.0 1]]
+                                                              (zero? event-time) (if loop-enabled [[0.0 -1]] [[0.0 1] [period -1]])
+                                                              (== duration event-time) [[event-time 1]]
+                                                              :else [[event-time 1] [(- period event-time) -1]])
+                                                 [[event-time 1]])]
+                                 (into []
+                                       (mapcat
+                                         (fn [[position event-direction]]
+                                           (let [position (double position)
+                                                 last-cycle (if (and loop-enabled (pos? period))
+                                                              (long (Math/floor (/ (- end position) period))) 0)
+                                                 first-cycle (max 0 (- last-cycle 200))]
+                                             (into []
+                                                   (keep (fn [cycle]
+                                                           (let [phase (+ position (* (double cycle) period))]
+                                                             (when (and (<= phase end)
+                                                                        (or (> phase start) (and include-start (== phase start))))
+                                                               {:phase phase :cycle cycle :key-index index :time event-time
+                                                                :event-id (:event_id key) :data (:data key)
+                                                                :direction event-direction}))))
+                                                   (range first-cycle (inc last-cycle))))))
+                                       positions)))))
+                         (mapv vector (range) (animation/animation-keys document animation-id)))))))

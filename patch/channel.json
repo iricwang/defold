@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 31,
-  "version": "1.14.1-patch.31",
+  "revision": 39,
+  "version": "1.14.1-patch.39",
   "repository": "iricwang/defold",
-  "notes": "Support independent many-to-many PhotoCraft connections, validate native target selection, repair CI runtime dependency downloads and migrate the exact local macOS baseline to the CI patch chain"
+  "notes": "Remember per-project floating window bounds and composed layouts, restore on project open"
 }

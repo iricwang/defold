@@ -690,3 +690,31 @@
   Named curves are sampled without changing the JSON editing source."
   [document]
   (str "return " (lua-value (assoc (runtime-document document) :format "lua")) "\n"))
+
+(defn callback-template [document animation-id module-name]
+  (let [ids (into [] (comp (filter #(= "event" (key-kind %)))
+                           (map :event_id) (distinct))
+                  (animation-keys document animation-id))]
+    (str "-- Merge these functions into your GUI script.\n"
+         "-- Export Lua first and change the module path to your exported file.\n"
+         "-- Business callbacks run in the game, never in the editor preview.\n"
+         "local panthera = require(\"panthera.panthera\")\n"
+         "local animation_data = require(" (lua-string module-name) ")\n\n"
+         "local event_handlers = {\n"
+         (transduce (map #(str "    [" (lua-string %) "] = function(self, node, data, value)\n"
+                              "        -- TODO: handle this event; data is the configured payload.\n"
+                              "        -- Duration events may call repeatedly with an interpolated value.\n"
+                              "    end,\n")) str ids)
+         "}\n\n"
+         "function init(self)\n"
+         "    self.animation = panthera.create_gui(animation_data)\n"
+         "    panthera.play(self.animation, " (lua-string animation-id) ", {\n"
+         "        callback_event = function(event_id, node, data, value)\n"
+         "            local handler = event_handlers[event_id]\n"
+         "            if handler then handler(self, node, data, value) end\n"
+         "        end,\n"
+         "    })\n"
+         "end\n\n"
+         "function final(self)\n"
+         "    if self.animation then panthera.stop(self.animation) end\n"
+         "end\n")))

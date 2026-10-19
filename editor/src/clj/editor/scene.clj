@@ -1391,9 +1391,10 @@
   (let [basis (g/now)
         node (g/node-by-id basis node-id)
         image-view (g/raw-property-value* basis node :image-view)]
+    (when-let [{:keys [refresh-fn visible?]} (g/user-data node-id ::view-augmentation)]
+      (when (or (not (ui/inside-hidden-tab? image-view)) (and visible? (visible?)))
+        (refresh-fn dt)))
     (when-not (ui/inside-hidden-tab? image-view)
-      (when-let [refresh-fn (:refresh-fn (g/user-data node-id ::view-augmentation))]
-        (refresh-fn dt))
       (let [drawable (g/raw-property-value* basis node :drawable)
             async-copy-state-atom (g/raw-property-value* basis node :async-copy-state)]
         (when (and (some? drawable)

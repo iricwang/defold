@@ -39,6 +39,7 @@
             [editor.dialogs :as dialogs]
             [editor.disk :as disk]
             [editor.disk-availability :as disk-availability]
+            [editor.dock-windows :as dock-windows]
             [editor.docking :as docking]
             [editor.editor-extensions :as extensions]
             [editor.editor-localization-bundle :as editor-localization-bundle]
@@ -177,14 +178,14 @@
                                          (- 1.0 (/ size (split-pane-length split))))
                                        1.0))]
         (ui/user-data! split user-data-key nil)
-        (.add (.getItems split) index pane)
+        (.add (.getItems split) (int (min index (count (.getItems split)))) pane)
         (.setDividerPosition split divider-index divider-position)
         (.layout split))
 
       (and (some? pane) (not visible?))
       (let [user-data-key (keyword "hidden-pane" pane-id)
             divider-index (max 0 (dec index))
-            divider-position (get (.getDividerPositions split) divider-index)
+            divider-position (get (.getDividerPositions split) divider-index (if (zero? index) 1.0 0.0))
             size (if (zero? index)
                    (Math/floor (* divider-position (split-pane-length split)))
                    (Math/ceil (* (- 1.0 divider-position) (split-pane-length split))))
@@ -745,12 +746,13 @@
 
 (defn store-hidden-panes! [^Scene scene prefs]
   (let [hidden-panes (into #{}
-                           (remove (partial pane-visible? scene))
+                           (remove #(or (pane-visible? scene %) (docking/floating-zone? scene %)))
                            (keys split-info-by-pane-kw))]
     (prefs/set! prefs prefs-hidden-panes hidden-panes)))
 
 (defn store-window-state! [^Stage stage prefs]
   (let [scene (.getScene stage)]
+    (dock-windows/save-layout! scene)
     (store-window-dimensions stage prefs)
     (store-split-positions! scene prefs)
     (store-hidden-panes! scene prefs)))
@@ -2258,7 +2260,8 @@
 
 (defn- refresh-menus-and-toolbars! [app-view ^Scene scene evaluation-context]
   (ui/user-data! scene :keymap (g/node-value app-view :keymap evaluation-context))
-  (ui/refresh scene evaluation-context))
+  (ui/refresh scene evaluation-context)
+  (docking/refresh-windows! scene evaluation-context))
 
 (defn- refresh-views! [app-view evaluation-context]
   (let [basis (:basis evaluation-context)
@@ -2314,6 +2317,10 @@
       (.selectedItemProperty)
       (^[ChangeListener] ObservableValue/.addListener
         (fn on-selected-item-changed! [_observable _old-val new-val]
+          (when new-val
+            (dock-windows/restore-slot! (.getContent ^Tab new-val))
+            (when-let [restore! (ui/user-data new-val :editor.dock-windows/restore-content!)]
+              (restore!)))
           (g/let-ec [active-tab-pane (g/node-value app-view :active-tab-pane evaluation-context)]
             (on-active-tab-changed! app-view prefs new-val (= active-tab-pane tab-pane))))))
 
@@ -2341,7 +2348,8 @@
 
           ;; This needs to happen last, since it queries the view hierarchy that
           ;; we may alter above.
-          (recent-files/save-open-tabs! prefs app-view))))
+          (recent-files/save-open-tabs! prefs app-view)
+          (dock-windows/refresh-tab-homes! (g/node-value app-view :editor-tabs-split)))))
 
   (.addEventFilter tab-pane MouseEvent/MOUSE_PRESSED (ui/event-handler event (handle-tab-pane-mouse-pressed! tab-pane event)))
   (ui/register-tab-pane-context-menu tab-pane ::tab-menu))
@@ -2438,7 +2446,8 @@
                                   (ui/show-requested-context-menu!)
                                   ;; Scene views are always refreshed, since they may play animations.
                                   ;; This performs graph mutations, so needs to manage its own evaluation-contexts.
-                                  (refresh-scene-views! app-view dt)))))]
+                                  (refresh-scene-views! app-view dt)
+                                  (dock-windows/autosave! app-scene)))))]
         (ui/timer-stop-on-closed! stage refresh-timer)
         [app-view refresh-timer]))))
 
@@ -2530,7 +2539,13 @@
               (editor-tab/set-view-type! view-type)
               (editor-tab/set-instance-key! instance-key))
         undo-stack-revisions-before (g/undo-stack-revisions)
-        view (make-view-fn parent (assoc opts :app-view app-view :tab tab))]
+        focus-view! (fn []
+                      (let [preferences (or (:prefs opts)
+                                            (get-in (ui/user-data (.getRoot ^Scene (g/node-value app-view :scene))
+                                                                  :editor.ui/context)
+                                                    [:env :prefs]))]
+                        (on-active-tab-changed! app-view preferences tab true)))
+        view (make-view-fn parent (assoc opts :app-view app-view :tab tab :focus-view! focus-view!))]
     (assert (= undo-stack-revisions-before (g/undo-stack-revisions))
             (format "The editor tab :make-view-fn created undo steps for '%s'."
                     (.getText tab)))
@@ -2545,6 +2560,22 @@
         (g/connect view :view-dirty app-view :open-dirty-views)
         (g/connect view :view-sidebar-panes app-view :open-sidebar-panes)))
     (editor-tab/set-view-node-id! tab view)
+    (ui/user-data! parent :editor.dock-windows/focus! focus-view!)
+
+    (let [content (.getContent tab)
+          slot (doto (StackPane.) (.setMinSize 0.0 0.0))]
+      (.setContent tab nil)
+      (.add (.getChildren slot) content)
+      (.setContent tab slot)
+      (let [{:keys [dispose!]} (dock-windows/register! slot (.getText tab)
+                                                     {:persistent-key (if-let [data (g/with-auto-evaluation-context evaluation-context
+                                                                                      (editor-tab/prefs-data tab evaluation-context))]
+                                                                        (into [:resource] data)
+                                                                        (when instance-key [:view (pr-str instance-key)]))
+                                                      :focus! focus-view!
+                                                      :bottom true
+                                                      :home-visible! #(dock-windows/set-tab-empty! tab (not %))})]
+        (ui/on-closed! tab (fn [_] (dispose!)))))
 
     ;; Hidden tab content must not resize its scene viewport and GL surfaces.
     (.bind (.managedProperty (.getContent tab)) (.selectedProperty tab))

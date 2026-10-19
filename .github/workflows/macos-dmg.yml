@@ -71,9 +71,10 @@ jobs:
           # boundaries in editor tests. Retain the release output, then test sources.
           mv target/classes target/release-classes
           LEIN_HOME="$PWD/build/lein" bash scripts/lein do javac, test \
-            editor.patch-test editor.docking-test editor.game-preview-test \
+            editor.patch-test editor.docking-test editor.dock-windows-test editor.game-preview-test \
             editor.gui-animation-data-test editor.gui-animation-features-test editor.gui-animation-io-test \
             editor.gui-animation-timeline-test editor.gui-animation-preview-test \
+            editor.gui-animation-events-test editor.gui-animation-inspector-test \
             editor.scene-tools-animation-test editor.scene-test editor.ui-test integration.gui-animation-test \
             editor.craft-binding-test editor.app-view-photocraft-test editor.craft-publish-test \
             integration.craft-project-test integration.craft-publish-test

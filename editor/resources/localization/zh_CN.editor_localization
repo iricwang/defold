@@ -2110,6 +2110,9 @@ gui-animation.data = 动画数据
 gui-animation.save-file = 保存
 gui-animation.curves = 关键帧曲线
 gui-animation.events = 事件 / 片段
+gui-animation.select-segment = 选中时间轴上的事件或片段进行编辑。右键轨道可添加关键帧。
+gui-animation.add-event = 添加 event 关键帧
+gui-animation.add-trigger = 添加 trigger 关键帧
 gui-animation.events-empty = 未定义事件。导入的事件数据会原样保留，预览时不触发事件。
 gui-animation.frame-display = 帧显示
 gui-animation.fullscreen = 展开动画工作区
@@ -2151,3 +2154,21 @@ dialog.craft-binding.select = 选择 PhotoCraft 连接
 dialog.craft-binding.count = 已连接 {count} 个 PhotoCraft
 
 dialog.craft-binding.listener = 当前 Defold 监听端口：{port}
+
+gui-animation.event-log = 事件记录
+gui-animation.clear-event-log = 清空记录
+gui-animation.copy-callback = 复制 Lua 回调模板
+gui-animation.callback-copied = 已复制 Lua 回调模板。请先导出 Lua，并核对模板中的模块路径。
+gui-animation.event-log-hint = 当前片段 · 最新在前 · 保留最近 200 条。播放经过事件起点时记录，拖动不记录。点击记录暂停并选中关键帧；业务回调在游戏中执行。
+gui-animation.export-needed = 尚未导出，请先导出动画再接入回调模板。
+gui-animation.export-stale = 动画已修改，需要重新导出。
+gui-animation.exported = 动画与上次导出一致。
+
+dock.return = 返回原位置
+dock.game = 游戏
+dock.gui-scene = GUI 画布
+dock.gui-animation = GUI 动画
+dock.editors = 编辑区域
+
+dock.float = 在独立窗口中打开
+dock.drag-help = 拖到中央合并标签页，拖到四边分栏；双击返回原位置

@@ -31,6 +31,7 @@
             [editor.dialogs :as dialogs]
             [editor.disk :as disk]
             [editor.doc :as doc]
+            [editor.dock-windows :as dock-windows]
             [editor.docking :as docking]
             [editor.editor-extensions :as extensions]
             [editor.editor-extensions.server :as ext.server]
@@ -504,6 +505,8 @@
           (prune-resource-prefs! prefs workspace)
 
           (ui/timer-start! ui-timer)
+          ;; Resource tabs and their skins must exist before their panels can be reparented.
+          (ui/run-later (dock-windows/start! scene prefs))
           (slog/smoke-log "stage-loaded"))))
 
     root))
