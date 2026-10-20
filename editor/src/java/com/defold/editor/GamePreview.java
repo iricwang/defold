@@ -43,6 +43,12 @@ public final class GamePreview implements AutoCloseable {
     private final VBox root = new VBox();
     private final StackPane viewport = new StackPane();
     private final ImageView image = new ImageView();
+    private final Label previewMode = new Label();
+    private Runnable idleRefresh;
+    private Runnable idleDispose;
+    private Image idleImage;
+    private String idleStatusKey = "game-preview.edit-empty";
+    private long lastIdleRefresh;
     private final Label status = new Label();
     private final CheckBox embedded = new CheckBox();
     private final ComboBox<Integer> frameRate = new ComboBox<>();
@@ -94,7 +100,11 @@ public final class GamePreview implements AutoCloseable {
         frameRate.valueProperty().addListener((p, old, value) -> targetFrameRate = value);
         frameRate.setTooltip(new Tooltip());
         localize.accept(frameRate.getTooltip(), "game-preview.frame-rate");
-        HBox toolbar = new HBox(5, title, spacer, embedded, frameRate, run, stop);
+        previewMode.setId("game-preview-mode");
+        previewMode.setMouseTransparent(true);
+        previewMode.setTooltip(new Tooltip());
+        localize.accept(previewMode.getTooltip(), "game-preview.edit-hint");
+        HBox toolbar = new HBox(5, title, previewMode, spacer, embedded, frameRate, run, stop);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setMinHeight(26);
         toolbar.getStyleClass().add("game-preview-toolbar");
@@ -122,8 +132,12 @@ public final class GamePreview implements AutoCloseable {
             buttons = (e.isPrimaryButtonDown() ? 1 : 0) | (e.isSecondaryButtonDown() ? 2 : 0) | (e.isMiddleButtonDown() ? 4 : 0);
             e.consume();
         });
-        viewport.addEventFilter(ScrollEvent.SCROLL, e -> { wheel += (int)Math.signum(e.getDeltaY()); e.consume(); });
+        viewport.addEventFilter(ScrollEvent.SCROLL, e -> {
+            if (session == null) return;
+            wheel += (int)Math.signum(e.getDeltaY()); e.consume();
+        });
         viewport.addEventFilter(KeyEvent.ANY, e -> {
+            if (session == null) return;
             int code = keyCode(e.getCode());
             if (code >= 0) keys[code] = (byte)(e.getEventType() == KeyEvent.KEY_PRESSED ? 1 : 0);
             if (e.getEventType() == KeyEvent.KEY_TYPED && text.size() < 128)
@@ -137,6 +151,34 @@ public final class GamePreview implements AutoCloseable {
     }
 
     public Node getNode() { return root; }
+
+    /** Called on the FX thread. Idle rendering never creates a game process. */
+    public void setIdleRenderer(Runnable refresh, Runnable dispose) {
+        if (idleDispose != null) idleDispose.run();
+        idleRefresh = refresh;
+        idleDispose = dispose;
+    }
+
+    public double getPreviewWidth() { return viewport.getWidth(); }
+    public double getPreviewHeight() { return viewport.getHeight(); }
+
+    public void setIdleImage(Image value, String modeKey) {
+        idleImage = value;
+        idleStatusKey = switch (modeKey) {
+            case "game-preview.edit-loading", "game-preview.edit-unavailable" -> modeKey;
+            default -> "game-preview.edit-empty";
+        };
+        localize.accept(previewMode, modeKey);
+        if (session == null) showIdleImage();
+    }
+
+    private void showIdleImage() {
+        image.setImage(idleImage);
+        image.setScaleY(-1);
+        previewMode.setVisible(true);
+        status.setVisible(idleImage == null);
+        if (idleImage == null) localize.accept(status, idleStatusKey);
+    }
 
     // Maps letterboxed panel coordinates to game coordinates (HID uses a top-left origin).
     public static double[] gamePoint(double panelW, double panelH, double gameW, double gameH, double x, double y) {
@@ -168,7 +210,8 @@ public final class GamePreview implements AutoCloseable {
         view.stop();
         Session next = new Session(view.targetFrameRate);
         view.session = next;
-        Platform.runLater(() -> { view.showGame.run(); view.sequence = 0; view.image.setImage(null); view.pixels = null;
+        Platform.runLater(() -> { view.showGame.run(); view.sequence = 0; view.image.setImage(null); view.image.setScaleY(1); view.pixels = null;
+            view.previewMode.setVisible(false);
             view.releaseInput(); view.status.setVisible(true); view.localize.accept(view.status, "game-preview.starting"); });
         return next;
     }
@@ -179,7 +222,7 @@ public final class GamePreview implements AutoCloseable {
         session = null;
         if (old != null) {
             old.close();
-            Platform.runLater(() -> { localize.accept(status, "game-preview.stopped"); status.setVisible(true); });
+            Platform.runLater(() -> { if (session == null) showIdleImage(); });
         }
     }
 
@@ -187,7 +230,16 @@ public final class GamePreview implements AutoCloseable {
         Session current = session;
         stop.setDisable(current == null);
         frameRate.setDisable(current != null);
-        if (current == null) return;
+        if (current == null) {
+            long now = System.nanoTime();
+            if (idleRefresh != null && now - lastIdleRefresh >= 33_333_333L
+                    && com.sun.javafx.scene.NodeHelper.isTreeShowing(root)
+                    && viewport.getWidth() > 1 && viewport.getHeight() > 1) {
+                lastIdleRefresh = now;
+                idleRefresh.run();
+            }
+            return;
+        }
         if (root.getScene() == null || root.getScene().getWindow() == null) {
             if (current.window != null) current.window.hide();
             return;
@@ -241,7 +293,12 @@ public final class GamePreview implements AutoCloseable {
         status.setVisible(false);
     }
 
-    @Override public void close() { timer.stop(); stop(); VIEWS.remove(project, this); }
+    @Override public void close() {
+        timer.stop(); stop(); VIEWS.remove(project, this);
+        if (idleDispose != null) idleDispose.run();
+        idleDispose = null; idleRefresh = null; idleImage = null;
+        image.setImage(null);
+    }
 
     public static final class Session implements AutoCloseable {
         private final Path path;

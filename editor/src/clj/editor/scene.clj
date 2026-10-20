@@ -535,6 +535,109 @@
            :width display-width
            :height display-height})))))
 
+(defn game-preview-camera
+  "Uses the selected camera, then the first authored camera. GUI and camera-less
+  scenes use the default render script's bottom-left orthographic projection."
+  [scene-render-data gui-dims display-dims]
+  (let [camera-renderables (into []
+                                (comp (mapcat val)
+                                      (filter camera-renderable?)
+                                      (distinct))
+                                (:renderables scene-render-data))
+        camera-renderable (or (coll/first-where :selected camera-renderables)
+                              (first camera-renderables))
+        [width height] (or gui-dims display-dims)
+        aspect (/ (double width) (double height))]
+    (if (and (nil? gui-dims) camera-renderable)
+      (when (valid-camera-inset-orthographic-zoom? camera-renderable)
+        (when-let [aspect (camera-inset-aspect-ratio camera-renderable)]
+          {:camera (make-camera-inset-camera camera-renderable aspect)
+           :aspect aspect
+           :mode "game-preview.edit-camera"}))
+      {:camera (assoc (c/make-camera :orthographic identity {:fov-x width :fov-y height})
+                 :position (Point3d. (/ width 2.0) (/ height 2.0) 0.0)
+                 :z-near -1.0
+                 :z-far 1.0)
+       :aspect aspect
+       :mode (if gui-dims "game-preview.edit-gui" "game-preview.edit-default")})))
+
+(defn- delete-game-preview-target! [{:keys [^GLAutoDrawable drawable framebuffer renderbuffers]}]
+  (when (and drawable
+             (some-> ^GLAutoDrawable drawable .getContext .isCreated))
+    (gl/with-drawable-as-current drawable
+      (.glDeleteFramebuffers gl 1 ^ints framebuffer 0)
+      (.glDeleteRenderbuffers gl 2 ^ints renderbuffers 0))))
+
+(defn- make-game-preview-target! [^GL3 gl drawable width height]
+  (let [framebuffer (int-array 1)
+        renderbuffers (int-array 2)]
+    (.glGenFramebuffers gl 1 framebuffer 0)
+    (.glGenRenderbuffers gl 2 renderbuffers 0)
+    (try
+      (.glBindFramebuffer gl GL3/GL_FRAMEBUFFER (aget framebuffer 0))
+      (doseq [[index format attachment] [[0 GL3/GL_RGBA8 GL3/GL_COLOR_ATTACHMENT0]
+                                         [1 GL3/GL_DEPTH24_STENCIL8 GL3/GL_DEPTH_STENCIL_ATTACHMENT]]]
+        (.glBindRenderbuffer gl GL3/GL_RENDERBUFFER (aget renderbuffers index))
+        (.glRenderbufferStorage gl GL3/GL_RENDERBUFFER format width height)
+        (.glFramebufferRenderbuffer gl GL3/GL_FRAMEBUFFER attachment GL3/GL_RENDERBUFFER (aget renderbuffers index)))
+      (when-not (= GL3/GL_FRAMEBUFFER_COMPLETE (.glCheckFramebufferStatus gl GL3/GL_FRAMEBUFFER))
+        (throw (ex-info "Game preview framebuffer is incomplete" {:width width :height height})))
+      {:drawable drawable :framebuffer framebuffer :renderbuffers renderbuffers :size [width height]}
+      (catch Throwable error
+        (.glDeleteFramebuffers gl 1 framebuffer 0)
+        (.glDeleteRenderbuffers gl 2 renderbuffers 0)
+        (throw error)))))
+
+(defn make-game-preview-renderer
+  "Shares the active scene's GPU caches, but owns a separate framebuffer. Creating
+  a second context would compile shaders and upload the same textures twice on
+  first open. Only the owning SceneView prunes caches or destroys the context."
+  []
+  (let [target-ref (volatile! nil)
+        image-ref (volatile! nil)
+        buffer-ref (atom nil)]
+    {:render! (fn [scene-render-data updatable-states camera width height clear-color drawable]
+                (when (and @target-ref
+                           (or (not (identical? drawable (:drawable @target-ref)))
+                               (not= [width height] (:size @target-ref))))
+                  (delete-game-preview-target! @target-ref)
+                  (vreset! target-ref nil))
+                (let [viewport (types/->Region 0 width 0 height)
+                      renderables (into {}
+                                        (map (fn [[pass items]]
+                                               [pass (into [] (remove #(contains? (:tags %) :gui-bounds)) items)]))
+                                        (make-camera-inset-renderables scene-render-data camera))
+                      args (pass->render-args-with-preview-lights
+                             viewport camera camera-inset-passes
+                             (scene-render-data->preview-lights scene-render-data camera)
+                             (get-in scene-render-data [:preview-light-data :ambient-light]))]
+                  (gl/with-drawable-as-current drawable
+                    (let [bindings (int-array 3)
+                          old-viewport (int-array 4)]
+                      (.glGetIntegerv gl GL3/GL_DRAW_FRAMEBUFFER_BINDING bindings 0)
+                      (.glGetIntegerv gl GL3/GL_READ_FRAMEBUFFER_BINDING bindings 1)
+                      (.glGetIntegerv gl GL3/GL_RENDERBUFFER_BINDING bindings 2)
+                      (.glGetIntegerv gl GL3/GL_VIEWPORT old-viewport 0)
+                      (try
+                        (let [target (or @target-ref
+                                         (vreset! target-ref (make-game-preview-target! gl drawable width height)))]
+                          (.glBindFramebuffer gl GL3/GL_FRAMEBUFFER (aget ^ints (:framebuffer target) 0))
+                          (render! gl-context :camera-inset renderables updatable-states viewport args clear-color)
+                          (vreset! image-ref (SwingFXUtils/toFXImage (read-to-buffered-image buffer-ref width height) @image-ref)))
+                        (finally
+                          (.glActiveTexture gl GL/GL_TEXTURE0)
+                          (.glBindTexture gl GL/GL_TEXTURE_2D 0)
+                          (.glUseProgram gl 0)
+                          (.glBindFramebuffer gl GL3/GL_DRAW_FRAMEBUFFER (aget bindings 0))
+                          (.glBindFramebuffer gl GL3/GL_READ_FRAMEBUFFER (aget bindings 1))
+                          (.glBindRenderbuffer gl GL3/GL_RENDERBUFFER (aget bindings 2))
+                          (.glViewport gl (aget old-viewport 0) (aget old-viewport 1) (aget old-viewport 2) (aget old-viewport 3))))))))
+     :dispose! (fn []
+                 (delete-game-preview-target! @target-ref)
+                 (vreset! target-ref nil)
+                 (vreset! image-ref nil)
+                 (reset! buffer-ref nil))}))
+
 (defn- apply-pass-overrides
   [pass renderable]
   ;; No nested :pass-overrides like {... :pass-overrides {pass/outline {:pass-overrides {...}}}}
@@ -927,6 +1030,20 @@
   (output camera-type g/Keyword (g/fnk [camera] (:type camera)))
   (output internal-renderables g/Any :cached produce-internal-renderables)
   (output scene-render-data g/Any :cached produce-scene-render-data)
+  (output game-render-data g/Any :cached
+          (g/fnk [scene-render-data scene preview-overrides animation-preview-overrides selection
+                  local-camera hidden-renderable-tags hidden-node-outline-key-paths]
+            (if (and (coll/empty? hidden-node-outline-key-paths)
+                     (set/subset? hidden-renderable-tags #{:grid :dev-visibility-bounds}))
+              scene-render-data
+              (produce-scene-render-data
+                {:scene scene
+                 :preview-overrides preview-overrides
+                 :animation-preview-overrides animation-preview-overrides
+                 :selection selection
+                 :hidden-renderable-tags #{}
+                 :hidden-node-outline-key-paths #{}
+                 :local-camera local-camera}))))
   (output aux-render-data g/Any :cached produce-aux-render-data)
 
   (output selected-renderables g/Any (g/fnk [scene-render-data] (:selected-renderables scene-render-data)))

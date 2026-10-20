@@ -36,6 +36,7 @@
             [editor.editor-extensions :as extensions]
             [editor.editor-extensions.server :as ext.server]
             [editor.engine-profiler :as engine-profiler]
+            [editor.game-preview :as game-preview]
             [editor.git :as git]
             [editor.hot-reload :as hot-reload]
             [editor.html-view :as html-view]
@@ -242,6 +243,7 @@
                                   (reify java.util.function.BiConsumer
                                     (accept [_ control key]
                                       (localization/localize! control localization (localization/message key)))))
+          _ (game-preview/attach! game-pane app-view project)
           dock (docking/init! scene prefs localization (:node preview-pane) (.getNode game-pane)
                               #(app-view/set-pane-visible! scene %1 %2))
           breakpoints-view (breakpoints-view/make-breakpoints-view workspace project open-resource prefs (.lookup root "#breakpoints-container"))

@@ -19,6 +19,7 @@
             [editor.code.lang.java-properties :as java-properties]
             [editor.fs :as fs]
             [editor.localization :as localization]
+            [editor.ui :as ui]
             [integration.test-util :as test-util]
             [internal.java :as java]
             [internal.util :as util]
@@ -110,6 +111,24 @@
     (localization/await-for-updates localization)
     (is (= "Hi, User!" (.getText label)))))
 
+;; Verifies that a queued bundle refresh cannot leave a reused label showing its
+;; previous message after a new message has been registered.
+(deftest relocalize-during-bundle-refresh-test
+  (let [localization (make {"en" "loading = Loading\nready = Ready"})
+        label (Label.)]
+    (localization/localize! label localization (localization/message "loading"))
+    (localization/await-for-updates localization)
+    (ui/run-now
+      (localization/set-bundle! localization :test (bundle {"en" "loading = Waiting\nready = Preview"}))
+      (localization/localize! label localization (localization/message "ready")))
+    (localization/await-for-updates localization)
+    (is (= "Preview" (.getText label)))
+    (ui/run-now
+      (localization/set-bundle! localization :test (bundle {"en" "ready = Changed"}))
+      (localization/localize! label localization "Fixed text"))
+    (localization/await-for-updates localization)
+    (is (= "Fixed text" (.getText label)))))
+
 ;; Verifies that listener registration, removal, and unchanged locale or bundle
 ;; updates do not notify watches and trigger unrelated UI refreshes.
 (deftest watches-ignore-unchanged-state-test
@@ -180,17 +199,18 @@
               (apply-localization [_ _]
                 (swap! update-count inc)))]
     (localization/localize! obj localization (localization/message "hello" {"name" "User"}))
-    (is (= 1 @update-count))
+    (localization/await-for-updates localization)
+    (is (= 2 @update-count))
     (localization/set-bundle! localization :test (bundle {"en" "hello = Hi, {name}!"}))
     (localization/await-for-updates localization)
     ;; just need to keep the reference until after the update
     (some? obj)
-    (is (= 2 @update-count))
+    (is (= 3 @update-count))
     (System/gc)
     (localization/set-bundle! localization :test (bundle {"en" "hello = Hey there, {name}!"}))
     (localization/await-for-updates localization)
     ;; no more updates: obj is garbage-collected
-    (is (= 2 @update-count))))
+    (is (= 3 @update-count))))
 
 (deftest ellipsis-test
   (let [errors (util/group-into

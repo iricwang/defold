@@ -3012,3 +3012,12 @@ gui-animation.scene-recording = ● RECORDING — scene edits create keys
 gui-animation.scene-draft = Unrecorded changes — Set Keys to keep them
 gui-animation.scene-preview = Animation preview — Record to capture scene edits
 gui-animation.snap-help = Snap dragged keys to frames. Hold Alt while dragging for free timing.
+
+game-preview.edit = Edit preview
+game-preview.edit-gui = GUI preview
+game-preview.edit-camera = Camera preview
+game-preview.edit-default = Default projection
+game-preview.edit-unavailable = Preview unavailable
+game-preview.edit-empty = Open a GUI, collection or game object to preview it here.
+game-preview.edit-hint = Edit preview follows the open resource. Scripts, runtime camera selection and custom render scripts require running the game.
+game-preview.edit-loading = Preparing preview…

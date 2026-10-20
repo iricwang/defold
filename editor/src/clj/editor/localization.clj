@@ -235,11 +235,19 @@
 (defn- impl-localize! [^LocalizationState state object message-pattern]
   (assert (Platform/isFxApplicationThread))
   (.put ^WeakHashMap (.-listeners state) object message-pattern)
+  ;; A queued locale refresh may have reapplied the previous pattern after the
+  ;; immediate update in localize!. Restore the newly registered pattern.
+  (apply-localization object (impl-format state message-pattern))
   state)
 
 (defn- impl-unlocalize! [^LocalizationState state object]
   (assert (Platform/isFxApplicationThread))
   (.remove ^WeakHashMap (.-listeners state) object)
+  state)
+
+(defn- impl-localize-literal! [state object value]
+  (impl-unlocalize! state object)
+  (apply-localization object value)
   state)
 
 (defn- refresh-listeners! [^LocalizationState state]
@@ -333,7 +341,7 @@
    (apply-localization object (impl-format @localization pattern))
    (if (message-pattern? pattern)
      (send-without-thread-binding-reset javafx-executor (.-agent localization) impl-localize! object pattern)
-     (send-without-thread-binding-reset javafx-executor (.-agent localization) impl-unlocalize! object))
+     (send-without-thread-binding-reset javafx-executor (.-agent localization) impl-localize-literal! object (str pattern)))
    object))
 
 (defn unlocalize!

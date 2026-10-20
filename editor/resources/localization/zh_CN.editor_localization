@@ -2190,3 +2190,12 @@ gui-animation.scene-recording = ● 正在录制：场景修改将写入关键�
 gui-animation.scene-draft = 修改尚未打帧：点击补帧保留修改
 gui-animation.scene-preview = 动画预览：开启录制可记录场景修改
 gui-animation.snap-help = 拖动关键帧时吸附到帧；按住 Alt 可临时自由移动。
+
+game-preview.edit = 编辑预览
+game-preview.edit-gui = 编辑预览 · GUI
+game-preview.edit-camera = 编辑预览 · 相机
+game-preview.edit-default = 编辑预览 · 默认投影
+game-preview.edit-unavailable = 预览不可用
+game-preview.edit-empty = 打开 GUI、场景或游戏对象，在此预览游戏画面。
+game-preview.edit-hint = 编辑预览跟随当前资源。脚本逻辑、运行时相机切换和自定义渲染需运行游戏查看。
+game-preview.edit-loading = 正在准备预览…
