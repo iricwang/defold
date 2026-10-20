@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 48,
-  "version": "1.14.1-patch.48",
+  "revision": 55,
+  "version": "1.14.1-patch.55",
   "repository": "iricwang/defold",
-  "notes": "Separate Outline and Properties; support persistent mixed-direction panel layouts, layout presets, drag-to-float and animation keyframe batch editing"
+  "notes": "Fix embedded black screen by selecting show-requested game windows instead of hidden GLFW helpers"
 }

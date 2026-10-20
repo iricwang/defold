@@ -129,7 +129,7 @@ public class ResourceUnpacker {
             Platform platform = Platform.getHostPlatform();
             try {
                 deleteOldUnpackDirs(unpackPath);
-                String sha1 = System.getProperty(DEFOLD_EDITOR_SHA1_KEY);
+                String sha1 = editorCacheKey();
                 Path unpackShaPath = unpackPath.resolve("editor-sha.txt");
                 boolean alreadyUnpacked = sha1 != null
                         && Files.exists(unpackShaPath)
@@ -478,6 +478,15 @@ public class ResourceUnpacker {
         }
     }
 
+    private static String editorCacheKey() {
+        String sha1 = System.getProperty(DEFOLD_EDITOR_SHA1_KEY);
+        String version = System.getProperty("defold.version");
+        // Local patches can share a Git commit while shipping different resources.
+        // Include the patch version in both the directory and completion marker.
+        return sha1 == null || version == null ? sha1
+                : sha1 + "-" + version.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
     private static Path getUnpackPath() throws IOException {
         String unpackPath = System.getProperty(DEFOLD_UNPACK_PATH_KEY);
         if (unpackPath == null) {
@@ -488,7 +497,7 @@ public class ResourceUnpacker {
             return ensureDirectory(Paths.get(unpackPath));
         }
 
-        String sha1 = System.getProperty(DEFOLD_EDITOR_SHA1_KEY);
+        String sha1 = editorCacheKey();
         if (sha1 != null) {
             var arch = Platform.getHostPlatform().getArch();
             return ensureDirectory(Editor.getSupportPath().resolve(Paths.get("unpack", sha1 + "-" + arch)));

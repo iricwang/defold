@@ -38,20 +38,24 @@
   (is (= 155 (GamePreview/keyCode KeyCode/F12)))
   (is (= -1 (GamePreview/keyCode KeyCode/UNDEFINED))))
 
-;; Selected FPS belongs to each run, and stopping a run removes its private frame file.
+;; Selected FPS belongs to each run; Windows uses a native child and macOS cleans its shared file.
 (deftest preview-session-frame-rate-and-cleanup
   @(fx/on-fx-thread
      (with-open [view (GamePreview. "frame-rate-test" (fn []) (fn [])
                                     (reify BiConsumer (accept [_ _ _])))]
        (let [^ComboBox selector (.lookup (.getNode view) "#game-frame-rate")
              first-session (GamePreview/prepare "frame-rate-test" true)
-             first-path (Path/of (.getPath first-session) (make-array String 0))]
+             first-path (when-let [path (.getPath first-session)]
+                          (Path/of path (make-array String 0)))]
          (is (= 120 (.getFrameRate first-session)))
          (.setValue selector (int 144))
          (is (= 120 (.getFrameRate first-session)))
          (with-open [next-session (GamePreview/prepare "frame-rate-test" true)]
            (is (= 144 (.getFrameRate next-session)))
-           (is (not (Files/exists first-path (make-array java.nio.file.LinkOption 0))))
+           (if first-path
+             (is (not (Files/exists first-path (make-array java.nio.file.LinkOption 0))))
+             (is (nil? (.getPath next-session))))
            (.stop view)
-           (is (not (Files/exists (Path/of (.getPath next-session) (make-array String 0))
-                                  (make-array java.nio.file.LinkOption 0)))))))))
+           (when-let [path (.getPath next-session)]
+             (is (not (Files/exists (Path/of path (make-array String 0))
+                                   (make-array java.nio.file.LinkOption 0))))))))))

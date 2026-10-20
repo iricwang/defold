@@ -136,7 +136,7 @@ jobs:
           key: windows-patch-${{ hashFiles('editor/project.clj', 'editor/scripts/lein') }}
       - name: Test patch packaging
         run: python -X utf8 -m unittest discover -s patch -p 'test_*.py'
-      - name: Build incremental Windows patch
+      - name: Build and verify Windows patch resources and cache upgrades
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -X utf8 scripts/windows/build-patch.py

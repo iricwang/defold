@@ -24,7 +24,7 @@
             [editor.protobuf :as protobuf]
             [editor.resource :as resource]
             [editor.system :as system])
-  (:import [com.defold.editor GamePreview]
+  (:import [com.defold.editor GamePreview WindowsGameProcess]
            [com.dynamo.bob Platform]
            [com.dynamo.render.proto Render$Resize]
            [com.dynamo.resource.proto Resource$Reload]
@@ -305,8 +305,10 @@
 
 (defn launch! [^File engine project-directory prefs debug instance-index focus]
   (let [game-session (GamePreview/prepare (.getAbsolutePath ^File project-directory)
-                                          (and system/mac? (zero? instance-index)
-                                               (.startsWith (.getAbsolutePath engine) (system/defold-unpack-path))))
+                                          (and (zero? instance-index)
+                                               (or (.isWindows (Platform/getHostPlatform))
+                                                   (and system/mac?
+                                                        (.startsWith (.getAbsolutePath engine) (system/defold-unpack-path))))))
         defold-log-dir (some-> (system/defold-log-dir)
                                (File.)
                                (.getAbsolutePath))
@@ -343,7 +345,7 @@
              "_NT_ALT_SYMBOL_PATH" (.getAbsolutePath (.getParentFile engine))
              "MESA_GL_VERSION_OVERRIDE" nil
              "MESA_LOADER_DRIVER_OVERRIDE" nil}
-        env (cond-> env game-session
+        env (cond-> env (and game-session system/mac?)
               (assoc "DM_EDITOR_GAME_FILE" (.getPath game-session)
                      "DM_EDITOR_GAME_PARENT" (str (.pid (ProcessHandle/current)))
                      "DM_QUIT_ON_ESC" "0"))
@@ -356,7 +358,9 @@
         ;; buffer filling up, stopping the process.
         ;; https://www.securecoding.cert.org/confluence/display/java/FIO07-J.+Do+not+let+external+processes+block+on+IO+buffers
         p (try
-            (apply process/start! opts command args)
+            (if (and game-session (.isWindows (Platform/getHostPlatform)))
+              (WindowsGameProcess/start (into [command] args) project-directory env)
+              (apply process/start! opts command args))
             (catch Exception e
               (when game-session (.close game-session))
               (throw e)))]

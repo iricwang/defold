@@ -187,9 +187,24 @@ public final class GamePreview implements AutoCloseable {
         Session current = session;
         stop.setDisable(current == null);
         frameRate.setDisable(current != null);
-        if (current == null || root.getScene() == null || root.getScene().getWindow() == null) return;
+        if (current == null) return;
+        if (root.getScene() == null || root.getScene().getWindow() == null) {
+            if (current.window != null) current.window.hide();
+            return;
+        }
         if (current.process != null && !current.process.isAlive()) {
             localize.accept(status, "game-preview.stopped"); status.setVisible(true); stop(); return;
+        }
+        if (current.window != null) {
+            try {
+                status.setVisible(!current.window.update(current.process, viewport));
+            } catch (RuntimeException error) {
+                error.printStackTrace();
+                stop();
+                localize.accept(status, "game-preview.connection-closed");
+                status.setVisible(true);
+            }
+            return;
         }
         try (FileLock lock = current.channel.tryLock()) {
             if (lock == null) return;
@@ -232,18 +247,27 @@ public final class GamePreview implements AutoCloseable {
         private final Path path;
         private final FileChannel channel;
         private final MappedByteBuffer data;
+        private final WindowsGameWindow window;
         private volatile Process process;
         private boolean closed;
         private final int frameRate;
         private Session(int frameRate) throws IOException {
             this.frameRate = frameRate;
+            if (com.sun.jna.Platform.isWindows()) {
+                window = new WindowsGameWindow();
+                path = null;
+                channel = null;
+                data = null;
+                return;
+            }
+            window = null;
             path = Files.createTempFile("defold-game-", ".shm", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
             channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
             data = channel.map(FileChannel.MapMode.READ_WRITE, 0, CAPACITY);
             data.order(ByteOrder.nativeOrder()); data.putInt(0, MAGIC);
         }
         public int getFrameRate() { return frameRate; }
-        public String getPath() { return path.toString(); }
+        public String getPath() { return path == null ? null : path.toString(); }
         public synchronized void attach(Process process) {
             this.process = process;
             if (closed) process.destroy();
@@ -251,6 +275,7 @@ public final class GamePreview implements AutoCloseable {
         @Override public synchronized void close() {
             if (closed) return;
             closed = true;
+            if (window != null) window.hide();
             if (process != null && process.isAlive()) {
                 process.destroy();
                 ProcessHandle handle = process.toHandle();
@@ -258,7 +283,9 @@ public final class GamePreview implements AutoCloseable {
                     if (handle.isAlive()) handle.destroyForcibly();
                 });
             }
-            try { channel.close(); Files.deleteIfExists(path); } catch (IOException ignored) { path.toFile().deleteOnExit(); }
+            if (channel != null) {
+                try { channel.close(); Files.deleteIfExists(path); } catch (IOException ignored) { path.toFile().deleteOnExit(); }
+            }
         }
     }
 }

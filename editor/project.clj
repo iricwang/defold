@@ -122,17 +122,21 @@
 
   :resource-paths    ["resources" "generated-resources"]
 
-  :proto-paths       ["../engine/ddf/src"
-                      "../engine/engine/proto"
-                      "../engine/gameobject/proto"
-                      "../engine/gamesys/proto"
-                      "../engine/graphics/proto"
-                      "../engine/input/proto"
-                      "../engine/particle/proto/particle"
-                      "../engine/render/proto"
-                      "../engine/resource/proto"
-                      "../engine/rig/proto"
-                      "../engine/script/src"]
+  ;; Archived Bob contains protocol classes matching its compiler and native tools.
+  ;; Regenerating these from another engine revision shadows Bob's compatible classes.
+  :proto-paths       ~(if (= "1" (System/getenv "DM_EDITOR_USE_BOB_PROTOCOLS"))
+                       []
+                       ["../engine/ddf/src"
+                        "../engine/engine/proto"
+                        "../engine/gameobject/proto"
+                        "../engine/gamesys/proto"
+                        "../engine/graphics/proto"
+                        "../engine/input/proto"
+                        "../engine/particle/proto/particle"
+                        "../engine/render/proto"
+                        "../engine/resource/proto"
+                        "../engine/rig/proto"
+                        "../engine/script/src"])
 
   :protobuf-includes ["../engine/gameobject/proto"
                       "../engine/gamesys/proto"

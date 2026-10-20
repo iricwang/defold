@@ -1,5 +1,23 @@
 # Game preview
 
+On Windows, the local engine's native game window is parented into the Game
+viewport. It receives keyboard and mouse input directly, resizes with the panel,
+and is reparented when the panel moves into another editor window. Stopping the
+preview terminates only that game process. This backend does not require the
+macOS shared-frame engine bridge and also supports local custom engines with
+native extensions.
+Embedded Windows runs use `CREATE_NO_WINDOW`; stdout and stderr remain connected
+to the editor Console. External runs retain their existing launch behavior.
+The embedded process starts suspended while a process-scoped window creation
+guard is installed. Its game window remains hidden/off-screen through repeated
+show calls until the Game viewport adopts it. The guard is released when that
+process exits; it does not watch other applications.
+The guard marks windows when the engine requests that they become visible.
+Discovery accepts that mark (or an already visible window), never a caption alone:
+GLFW message helpers and OpenGL context windows can also have captions. The
+packaged regression puts a hidden helper first in enumeration and verifies that
+discovery still selects the requested game window.
+
 On macOS, the Game panel runs the bundled engine beside the scene editor. Use ▶
 to build and run the project, and ■ to stop it. Click the game image to direct
 keyboard and mouse input to the game. Leaving the panel releases held keys.
@@ -10,9 +28,10 @@ use a separate game window. Select 60, 120 (default), or 144 FPS before running.
 Drag the Game title to another panel to dock it, or use its top-right menu.
 The Scene/Game split and panel placement are saved with the editor layout.
 
-This first implementation supports one local bundled engine. Custom engines
-built with native extensions, multiple instances and remote targets continue to
-use their existing windows. It does not synchronize scene edits into runtime
+This implementation embeds the first local engine instance. On macOS, custom engines
+built with native extensions continue to use their existing windows. Additional
+instances and remote targets use their existing windows on both platforms.
+It does not synchronize scene edits into runtime
 objects. The game's configured resolution is letterboxed into the panel;
 preview frames are limited to 2048 × 2048. Embedded runs use the selected update
 frequency and disable presentation vsync, High-DPI and fullscreen. Physics keeps
@@ -24,7 +43,7 @@ JavaFX accepts up to 144 animation pulses per second (an explicit
 ## Bridge
 
 `GamePreview` owns the panel, process session and input state. `editor.engine`
-selects the embedded session only for the bundled macOS engine. The private
+selects the embedded session for the bundled macOS engine or a local Windows engine. The private
 `editor_game_bridge.h` reads input after hardware polling and captures the final
 frame before presentation. The bridge is excluded from release engines.
 
