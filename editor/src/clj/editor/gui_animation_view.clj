@@ -49,6 +49,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
+(defonce ^:private key-clipboard (atom {:points [] :segments []}))
+
 (def ^:private properties animation/supported-properties)
 
 (defn- cache-last [f]
@@ -88,8 +90,8 @@
 
 (defn- x-time
   ^double [^Canvas canvas state x]
-  (double (timeline/snap-time (:document state) (:animation-id state)
-                              (timeline/x->time x (:offset state) (:zoom state) (.getWidth canvas)))))
+  (let [time (timeline/x->time x (:offset state) (:zoom state) (.getWidth canvas))]
+    (double (if (:snap state true) (timeline/snap-time (:document state) (:animation-id state) time) (max 0.0 time)))))
 
 (defn- replace-items! [^java.util.List items values]
   (.clear items)
@@ -121,8 +123,9 @@
         (.fillRect gc 0.0 top width 28.0)
         (when (= kind :segment)
           (let [key (:key row)
-                x0 (time-x canvas state (get key :start_time 0))
-                x1 (time-x canvas state (+ (double (get key :start_time 0)) (double (get key :duration 0))))]
+                delta (if (contains? (:selected-raws state) (:key-index row)) (double (get state :drag-offset 0.0)) 0.0)
+                x0 (time-x canvas state (+ (double (get key :start_time 0)) delta))
+                x1 (time-x canvas state (+ (double (get key :start_time 0)) (double (get key :duration 0)) delta))]
             (.setFill gc (Color/web (if (or (= (:selected-raw state) (:key-index row)) (contains? (:selected-raws state) (:key-index row))) "#83b7fb" "#41798c")))
             (.fillRoundRect gc x0 (+ top 6.0) (max 8.0 (- x1 x0)) 16.0 3.0 3.0)
             (.setFill gc (Color/web "#eeeeee"))
@@ -130,8 +133,8 @@
         (when property-id
           (doseq [keyframe (:keyframes row)]
             (let [key-id [node-name property-id (:time keyframe)]
-                  dragging (= dragging-key key-id)
-                  x (time-x canvas state (if dragging time (:time keyframe)))
+                  dragging (and dragging-key (contains? selected-keys key-id))
+                  x (time-x canvas state (+ (double (:time keyframe)) (if dragging (double (get state :drag-offset 0.0)) 0.0)))
                   active (or dragging (= selected key-id) (contains? selected-keys key-id))]
               (.setFill gc (Color/web (if active "#d4e8ff" "#83b7fb")))
               (.fillPolygon gc (double-array [x (+ x 5.0) x (- x 5.0)])
@@ -229,11 +232,12 @@
 (defn- edit-document! [project path edit-fn]
   (when-let [node-id (animation-resource-node project path)]
     (let [document (edit-fn (read-document node-id))]
-      (g/transact
+      (when (not= document (read-document node-id))
+        (g/transact
         (into [] cat
               [(g/operation-label "Edit GUI animation")
                (g/set-property node-id :modified-lines
-                 (code-data/string->lines (animation/write-json document)))])))))
+                 (code-data/string->lines (animation/write-json document)))]))))))
 
 (defn attach!
   "Adds a Panthera timeline to a GUI scene. Only the JSON resource is edited;
@@ -245,7 +249,7 @@
         state (atom {:document (animation/new-document gui-path)
                      :animation-id "default" :time 0.0 :playing false :preview false
                      :recording false :draft {} :collapsed #{} :zoom 1.0 :offset 0.0
-                     :muted #{} :frame-display true :direction 1 :rows []
+                     :muted #{} :snap true :frame-display true :direction 1 :rows []
                      :selected nil :selected-keys #{} :selected-raws #{} :clipboard {:points [] :segments []} :speed 1.0 :last-lines nil :last-selection nil :exists false})
         updating (atom false)
         tool-controller-id (g/node-value view-id :tool-controller-id)
@@ -284,6 +288,8 @@
         name-field (doto (TextField.) (.setId "gui-animation-name") (.setPrefWidth 110.0))
         preview-check (doto (CheckBox.) (.setId "gui-animation-preview"))
         record-button (doto (ToggleButton.) (.setId "gui-animation-record"))
+        snap-button (doto (ToggleButton.) (.setId "gui-animation-snap") (.setSelected true))
+        scene-mode (doto (Label.) (.setId "gui-animation-scene-mode") (.setMouseTransparent true))
         loop-check (doto (ToggleButton.) (.setId "gui-animation-loop"))
         mode-label (doto (Label.) (.setId "gui-animation-mode") (.setWrapText true))
         fps-choice (doto (ComboBox.) (.setId "gui-animation-fps") (ui/items! (mapv int [24 30 60 120])) (.setValue (int 60)))
@@ -520,9 +526,9 @@
                         (when (pos? (+ (count points) (count indices)))
                           (commit! #(animation/delete-selection % (:animation-id @state) points indices))
                           (swap! state assoc :selected nil :selected-keys #{} :selected-raw nil :selected-raws #{}))))
-        copy-keys! (fn [] (swap! state assoc :clipboard (animation/copy-selection (:document @state) (:animation-id @state) (selection) (raw-selection))))
+        copy-keys! (fn [] (reset! key-clipboard (animation/copy-selection (:document @state) (:animation-id @state) (selection) (raw-selection))))
         paste-keys! (fn []
-                      (let [{:keys [points segments] :as clipboard} (:clipboard @state)
+                      (let [{:keys [points segments] :as clipboard} @key-clipboard
                             times (into (mapv #(double (:time %)) points) (map #(double (get % :start_time 0))) segments)]
                         (when (pos? (count times))
                           (let [offset (- (double (:time @state)) (double (reduce min times)))]
@@ -541,6 +547,7 @@
                                                                                        (.getValue easing-choice))) document channels)) document draft)))
                            (swap! state assoc :draft {})
                            (update-preview!)))
+        ^Button scene-key-button (button "commit-all" "gui-animation-scene-commit" commit-drafts!)
         reset-drafts! (fn [] (swap! state assoc :draft {}) (update-preview!))
         key-inspector (inspector/create! {:state state :commit! commit! :set-time! set-time! :localize! localize! :guard guarded :resolve-document! resolved-document!
                                           :node-names #(vec (sort (into [] (coll/keys (g/node-value resource-node :node-ids)))))
@@ -691,7 +698,7 @@
         path-label (doto (Label. path) (.setAlignment Pos/CENTER_RIGHT) (.setMinWidth 0.0) (.setId "gui-animation-path") (.setMaxWidth Double/MAX_VALUE))
         more-menu (doto (MenuButton. "…") (.setId "gui-animation-more") (ui/add-style! "button-icon"))
         header (doto (HBox. 8.0) (.setMinWidth 0.0) (.setMaxHeight 26.0) (.setAlignment Pos/CENTER_LEFT) (ui/add-style! "animation-header")
-                     (ui/children! [animation-choice path-label
+                     (ui/children! [animation-choice scene-mode path-label
                                     (button "save-file" "gui-animation-save-file" save!) more-menu]))
         welcome (doto (FlowPane. 8.0 6.0) (ui/add-style! "animation-welcome")
                       (ui/children! [(doto (Label.) (localize! "empty"))
@@ -715,7 +722,7 @@
                                      (transport-button "next" "gui-animation-next" "M0 0 L11 8 L0 16 Z M13 0 L15 0 L15 16 L13 16 Z" #(navigate! :next-key))
                                      (transport-button "last" "gui-animation-last" "M0 0 L11 8 L0 16 Z M11 0 L20 8 L11 16 Z" #(navigate! :last))
                                      frame-field (Label. "s") time-field fps-choice (Separator.)
-                                     preview-check record-button (Separator.) loop-check frame-display toolbar-spacer
+                                     preview-check record-button snap-button (Separator.) loop-check frame-display toolbar-spacer
                                      zoom-out zoom-in zoom-slider fit zoom-choice fullscreen]))
         toolbar-scroll (doto (ScrollPane. toolbar) (.setFitToHeight true) (.setFitToWidth true) (.setMinWidth 0.0) (.setPrefWidth 0.0)
                              (ui/add-style! "animation-toolbar-scroll"))
@@ -808,8 +815,12 @@
                                     ^Button key-button (last (.getChildren row))]
                                 (.setDisable field (:playing @state))
                                 (ui/set-style! row "active" (= active-track track))
-                                (.setText key-button (if (coll/any? #(< (Math/abs (- (double time) (double (:time %)))) 1.0e-9)
-                                                                    (get keyframes track)) "◆" "◇"))
+                                (let [key-state (timeline/property-key-state (get keyframes track) time (contains? (get (:draft @state) node-name) property-id))]
+                                  (.setText key-button (case key-state :draft "◆+" :keyed "◆" "◇"))
+                                  (.setStyle field (case key-state :draft "-fx-text-fill: #f7bb67;" :keyed "-fx-text-fill: #83b7fb;" ""))
+                                  (when (not= key-state (ui/user-data key-button ::key-state))
+                                    (ui/user-data! key-button ::key-state key-state)
+                                    (.setTooltip key-button (doto (Tooltip.) (localize! (case key-state :draft "key-draft" :keyed "key-current" "key-add"))))))
                                 (when (and (number? value) (not (.isFocused field)))
                                   (.setText field (format "%.4f" (double value))))))))]
     (localize! workspace-tab "title")
@@ -953,6 +964,15 @@
     (.setOnAction speed-choice (ui/event-handler _ (swap! state assoc :speed (double (.getValue speed-choice)))))
     (localize! preview-check "preview")
     (localize! record-button "record")
+    (localize! snap-button "snap")
+    (.setStyle snap-button "-fx-min-width: 80px; -fx-pref-width: 80px; -fx-max-width: 80px;")
+    (.setTooltip snap-button (doto (Tooltip.) (localize! "snap-help")))
+    (.setOnAction snap-button (ui/event-handler _ (swap! state assoc :snap (.isSelected snap-button))))
+    (.add (.getChildren scene-pane) scene-key-button)
+    (.setMaxSize scene-key-button Region/USE_PREF_SIZE Region/USE_PREF_SIZE)
+    (StackPane/setAlignment scene-key-button Pos/BOTTOM_LEFT)
+    (StackPane/setMargin scene-key-button (Insets. 10.0 10.0 10.0 10.0))
+    (.setMinWidth scene-mode 0.0)
     (localize! loop-check "loop")
     (.setText play-button "")
     (.setGraphic play-button (glyph "M0 0 L16 9 L0 18 Z"))
@@ -1105,6 +1125,13 @@
           (let [code (.getCode ^KeyEvent event)
                 shortcut (.isShortcutDown ^KeyEvent event)]
             (cond
+              (and shortcut (contains? #{KeyCode/Z KeyCode/Y} code))
+              (do (swap! state assoc :playing false :draft {})
+                  (ui/execute-command (ui/contexts (.getScene root) true)
+                                      (if (or (= KeyCode/Y code) (.isShiftDown ^KeyEvent event)) :edit.redo :edit.undo) nil)
+                  (refresh-document!) (update-preview!) (.consume event))
+              (= KeyCode/ESCAPE code)
+              (do (reset! drag nil) (swap! state dissoc :drag-offset :dragging-key :marquee) (draw-timeline! canvas @state) (.consume event))
               (and shortcut (= KeyCode/A code)) (do (swap! state assoc :selected-keys (all-keys) :selected-raws (into #{} (map :key-index) (timeline/segment-rows (:document @state) (:animation-id @state)))) (.consume event))
               (and shortcut (= KeyCode/C code)) (do ((guarded copy-keys!) nil) (.consume event))
               (and shortcut (= KeyCode/X code)) (do ((guarded #(do (copy-keys!) (delete-key!))) nil) (.consume event))
@@ -1130,7 +1157,8 @@
               (contains? #{KeyCode/LEFT KeyCode/RIGHT} code)
               (do ((guarded #(let [fps (timeline/frames-per-second (:document @state))
                                   delta (/ (* (if (= KeyCode/LEFT code) -1.0 1.0) (if (.isShiftDown ^KeyEvent event) 10.0 1.0)) (double fps))
-                                  keys (selection) raws (raw-selection)]
+                                  keys (selection) raws (raw-selection)
+                                  delta (double (timeline/selection-offset (:document @state) (:animation-id @state) keys raws delta))]
                               (when (pos? (+ (count keys) (count raws)))
                                 (commit! (fn [document] (animation/move-selection document (:animation-id @state) keys raws delta)))
                                 (swap! state assoc :selected-keys (into #{} (map (fn [[name property time]] [name property (+ (double time) delta)])) keys)
@@ -1168,23 +1196,28 @@
                                         y (.getY ^MouseEvent event)]
                                     (if-let [[node-name property-id keyframe] (timeline-key canvas @state x y)]
                                       (do (let [id [node-name property-id (:time keyframe)]
-                                                keys (if (.isShiftDown ^MouseEvent event)
-                                                       (if (contains? (:selected-keys @state) id) (disj (:selected-keys @state) id) (conj (:selected-keys @state) id))
-                                                       (if (contains? (:selected-keys @state) id) (:selected-keys @state) #{id}))]
+                                                index (:raw-index keyframe)
+                                                additive (or (.isShiftDown ^MouseEvent event) (.isShortcutDown ^MouseEvent event))
+                                                hit-selected (if index (contains? (raw-selection) index) (contains? (selection) id))
+                                                keep-existing (or additive hit-selected)
+                                                points (if keep-existing (selection) #{})
+                                                raws (if keep-existing (raw-selection) #{})]
                                             (set-time! (:time keyframe))
-                                            (swap! state assoc :selected id :selected-keys keys))
-                                          (if-let [index (:raw-index keyframe)]
-                                            (let [previous (:selected-raws @state)
-                                                  raw-keys (if (.isShiftDown ^MouseEvent event)
-                                                             (if (contains? previous index) (disj previous index) (conj previous index))
-                                                             (if (contains? previous index) previous #{index}))]
-                                              ((:select! key-inspector) index)
-                                              (swap! state assoc :selected nil :selected-keys #{} :selected-raw index :selected-raws raw-keys))
-                                            (do (swap! state assoc :selected-raw nil :selected-raws #{}) (select-track! node-name property-id)
-                                                (.setValue easing-choice (:easing keyframe))))
+                                            (if index
+                                              (let [raws ((if (and additive hit-selected) disj conj) raws index)]
+                                                (swap! state assoc :selected nil :selected-keys points
+                                                       :selected-raw (when (contains? raws index) index) :selected-raws raws))
+                                              (let [points ((if (and additive hit-selected) disj conj) points id)]
+                                                (swap! state assoc :selected (when (contains? points id) id) :selected-keys points
+                                                       :selected-raw nil :selected-raws raws)
+                                                (select-track! node-name property-id)
+                                                (.setValue easing-choice (:easing keyframe)))))
                                           (reset! drag {:node-name node-name :property-id property-id :keyframe keyframe :x x :keys (selection) :raws (raw-selection)}))
-                                      (do (reset! drag (when (.isShiftDown ^MouseEvent event) {:marquee true :x x :y y :keys (selection)}))
-                                          (when-not (.isShiftDown ^MouseEvent event)
+                                      (do (reset! drag (when (>= y (+ (double (get @state :ruler-y 0.0)) 32.0))
+                                                        {:marquee true :x x :y y
+                                                         :keys (if (or (.isShiftDown ^MouseEvent event) (.isShortcutDown ^MouseEvent event)) (selection) #{})
+                                                         :raws (if (or (.isShiftDown ^MouseEvent event) (.isShortcutDown ^MouseEvent event)) (raw-selection) #{})}))
+                                          (when-not (or (.isShiftDown ^MouseEvent event) (.isShortcutDown ^MouseEvent event))
                                             (swap! state assoc :selected-keys #{} :selected-raws #{} :selected-raw nil)
                                             (set-time! (x-time canvas @state x)))
                                           (when-let [{:keys [node-name property-id]}
@@ -1197,33 +1230,31 @@
     (.setOnMouseDragged canvas
       (ui/event-handler event
         (when (.isPrimaryButtonDown ^MouseEvent event)
-          (if-let [{:keys [x y keys]} (and (:marquee @drag) @drag)]
-            (let [x1 (.getX ^MouseEvent event) y1 (.getY ^MouseEvent event)
-                  selected (into keys
-                                 (mapcat (fn [[index {:keys [node-name property-id]}]]
-                                           (let [cy (+ 46.0 (* 28.0 (double index)))]
-                                             (if (and property-id (<= (min (double y) y1) cy (max (double y) y1)))
-                                               (into [] (comp (filter #(<= (min (double x) x1) (time-x canvas @state (:time %)) (max (double x) x1)))
-                                                              (map #(vector node-name property-id (:time %))))
-                                                     (timeline/display-keyframes (:document @state) (:animation-id @state) node-name property-id)) []))))
-                                 (mapv vector (range) (:rows @state)))]
-              (swap! state assoc :marquee [x y x1 y1] :selected-keys selected)
-              (draw-timeline! canvas @state))
-            (do (when-let [{:keys [node-name property-id keyframe]} @drag]
-                  (swap! state assoc :dragging-key [node-name property-id (:time keyframe)]))
-                ((guarded #(set-time! (x-time canvas @state (.getX ^MouseEvent event)))) nil))))))
+          (if-let [{:keys [x y keys raws]} (and (:marquee @drag) @drag)]
+            (let [rectangle [x y (.getX ^MouseEvent event) (.getY ^MouseEvent event)]
+                  selected (timeline/box-selection (:rows @state) (:offset @state) (:zoom @state) (.getWidth canvas) rectangle)]
+              (swap! state assoc :marquee rectangle :selected nil :selected-raw nil
+                     :selected-keys (into keys (:keys selected)) :selected-raws (into raws (:raws selected))))
+            (if-let [{:keys [node-name property-id keyframe keys raws]} @drag]
+              (let [time (x-time canvas (cond-> @state (.isAltDown ^MouseEvent event) (assoc :snap false)) (.getX ^MouseEvent event))
+                    delta (timeline/selection-offset (:document @state) (:animation-id @state) keys raws
+                                                     (- (double time) (double (:time keyframe))))]
+                (swap! state assoc :dragging-key [node-name property-id (:time keyframe)] :drag-offset delta))
+              ((guarded #(set-time! (x-time canvas @state (.getX ^MouseEvent event)))) nil)))
+        (draw-timeline! canvas @state))))
     (.setOnMouseReleased canvas
       (ui/event-handler event
         (when-let [{:keys [node-name property-id keyframe x keys raws marquee]} @drag]
           (reset! drag nil)
           (swap! state dissoc :dragging-key :marquee)
           (when (and (not marquee) (> (Math/abs (- (.getX ^MouseEvent event) (double x))) 4.0))
-            ((guarded #(let [new-time (:time @state) offset (- (double new-time) (double (:time keyframe)))]
+            ((guarded #(let [offset (double (get @state :drag-offset 0.0)) new-time (+ (double (:time keyframe)) offset)]
                          (commit! (fn [document] (animation/move-selection document (:animation-id @state) keys raws offset)))
                          (swap! state assoc :selected (when property-id [node-name property-id new-time])
                                 :selected-keys (into #{} (map (fn [[name property time]] [name property (+ (double time) offset)])) keys)
                                 :selected-raws (let [total (count (animation/animation-keys (:document @state) (:animation-id @state)))]
-                                                 (set (range (- total (count raws)) total)))))) nil)))))
+                                                 (set (range (- total (count raws)) total)))))) nil))
+          (swap! state dissoc :drag-offset))))
     (ui/user-data! (:tab opts) :editor.dock-windows/restore-content!
                    #(do (dock-windows/restore-slot! scene-pane)
                         (dock-windows/restore-slot! title)))
@@ -1305,6 +1336,8 @@
                                duration (double (animation/animation-duration document animation-id))
                                maximum (max 0.0 (- duration (timeline/visible-span zoom)))
                                mode (cond recording "recording" (pos? (count draft)) "draft" preview "previewing" :else "layout")]
+                           (.setVisible scene-key-button (pos? (count draft)))
+                           (.setManaged scene-key-button (pos? (count draft)))
                            (.setMax time-scroll maximum)
                            (.setVisibleAmount time-scroll (timeline/visible-span zoom))
                            (.setUnitIncrement time-scroll (/ 1.0 (double (timeline/frames-per-second document))))
@@ -1331,6 +1364,12 @@
                            (when (not= mode (:mode-label @state))
                              (swap! state assoc :mode-label mode)
                              (localize! mode-label mode)
+                             (localize! scene-mode (case mode "recording" "scene-recording" "draft" "scene-draft" "previewing" "scene-preview" "layout"))
+                             (.setVisible scene-mode (not= mode "layout"))
+                             (.setManaged scene-mode (not= mode "layout"))
+                             (.setStyle scene-mode (str "-fx-padding: 5 9; -fx-background-radius: 4; -fx-background-color: "
+                                                        (if recording "#88362f" "#303c48") "; -fx-text-fill: white;"))
+                             (.setStyle record-button (if recording "-fx-background-color: #a43c36; -fx-text-fill: white;" ""))
                              (.setTextFill mode-label (paint (cond recording colors/defold-orange preview colors/defold-light-blue :else colors/bright-grey-light)))))
                          (update-preview!)
                          (draw-timeline! canvas @state)

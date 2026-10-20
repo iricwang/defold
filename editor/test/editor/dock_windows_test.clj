@@ -16,6 +16,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [editor.dock-windows :as dock]
             [editor.docking :as docking]
+            [editor.localization :as localization]
             [editor.prefs :as prefs]
             [editor.ui :as ui])
   (:import [javafx.scene Scene]
@@ -153,3 +154,37 @@
       (is (not (docking/floating-zone? scene :bottom)))
       (swap! floating conj :preview)
       (is (docking/floating-zone? scene :right)))))
+
+
+;; Named layouts are project scoped, trim names, overwrite intentionally, and retain docked arrangements.
+(deftest named-layout-library-test
+  (ui/run-now
+    (let [directory (.toFile (java.nio.file.Files/createTempDirectory "named-layout" (make-array java.nio.file.attribute.FileAttribute 0)))
+          preferences (prefs/make :schemas [:default] :scopes {:project (java.io.File. directory "project.edn")})
+          scene (Scene. (StackPane.))
+          persistence (atom {:prefs preferences :restoring false :last-check 0})
+          snapshot {:layout docking/default-layout :sizes {}}
+          reset-count (atom 0)]
+      (ui/user-data! scene :editor.dock-windows/manager
+                     {:scene scene :panels (atom {}) :windows (atom {}) :persistence persistence})
+      (ui/user-data! scene :editor.docking/manager {:snapshot! (constantly snapshot) :reset! #(swap! reset-count inc)})
+      (is (nil? (dock/save-named-layout! scene "  ")))
+      (is (nil? (dock/save-named-layout! scene (apply str (repeat 81 "x")))))
+      (is (true? (dock/save-named-layout! scene "  Dual Screen  ")))
+      (is (= snapshot (:docked (dock/read-layout (get (prefs/get preferences [:window :named-layouts]) "Dual Screen")))))
+      (is (true? (dock/save-named-layout! scene "Dual Screen")))
+      (is (= 1 (count (prefs/get preferences [:window :named-layouts]))))
+      (is (nil? (dock/apply-named-layout! scene "missing")))
+      (dock/reset-default-layout! scene)
+      (is (= 1 @reset-count))
+      (is (= [] (:windows (dock/read-layout (prefs/get preferences [:window :floating-layout])))))
+      (is (= 1 (count (prefs/get preferences [:window :named-layouts]))))
+      (let [other-project (prefs/make :schemas [:default] :scopes {:project (java.io.File. directory "other.edn")})]
+        (is (= {} (prefs/get other-project [:window :named-layouts]))))
+      (ui/user-data! scene :localization (localization/make-editor preferences #(throw %)))
+      (let [menu (dock/layout-menu scene)
+            switch (second (.getItems menu))]
+        (.handle (.getOnShowing menu) (javafx.event.Event. javafx.scene.control.Menu/ON_SHOWING))
+        (is (= ["Dual Screen"] (mapv #(.getText ^javafx.scene.control.MenuItem %) (.getItems ^javafx.scene.control.Menu switch)))))
+      (swap! persistence assoc :restoring true)
+      (is (nil? (dock/save-named-layout! scene "During restoration"))))))

@@ -210,3 +210,35 @@
                                                    (range first-cycle (inc last-cycle))))))
                                        positions)))))
                          (mapv vector (range) (animation/animation-keys document animation-id)))))))
+
+
+(defn selection-offset
+  "Clamp the whole selection at frame zero, preserving distances between keys."
+  [document animation-id points indices offset]
+  (let [times (into (mapv #(double (nth % 2)) points)
+                    (map #(double (get (nth (animation/animation-keys document animation-id) %) :start_time 0))) indices)]
+    (if (zero? (count times)) 0.0 (max (double offset) (- (double (reduce min times)))))))
+
+(defn box-selection [rows offset zoom width rectangle]
+  (let [[x0 y0 x1 y1] (mapv double rectangle)
+        left (min (double x0) (double x1)) right (max (double x0) (double x1))
+        top (min (double y0) (double y1)) bottom (max (double y0) (double y1))]
+    (reduce (fn [selection [index {:keys [node-name property-id kind key key-index keyframes]}]]
+              (let [y (+ 46.0 (* 28.0 (double index)))]
+                (if (<= top y bottom)
+                  (if (= :segment kind)
+                    (let [start (time->x (get key :start_time 0) offset zoom width)
+                          end (time->x (+ (double (get key :start_time 0)) (double (get key :duration 0))) offset zoom width)]
+                      (if (and (<= start right) (>= (max (+ start 8.0) end) left))
+                        (update selection :raws conj key-index) selection))
+                    (update selection :keys into
+                            (comp (filter #(<= left (time->x (:time %) offset zoom width) right))
+                                  (map #(vector node-name property-id (:time %)))) keyframes))
+                  selection)))
+            {:keys #{} :raws #{}} (mapv vector (range) rows))))
+
+(defn property-key-state [keyframes time draft]
+  (cond
+    draft :draft
+    (coll/any? #(< (Math/abs (- (double time) (double (:time %)))) 1.0e-7) keyframes) :keyed
+    :else :unkeyed))

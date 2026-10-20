@@ -24,11 +24,12 @@
            [javafx.scene.input KeyCode KeyEvent MouseEvent]
            [javafx.scene.layout AnchorPane Priority StackPane VBox]
            [javafx.scene.paint Color]
-           [javafx.scene.shape Rectangle]))
+           [javafx.scene.shape Rectangle]
+           [javafx.stage Stage]))
 
 (set! *warn-on-reflection* true)
 
-(def default-layout {:left [:assets] :right [:inspector :preview] :bottom [:tools] :center [:game]})
+(def default-layout {:left [:assets] :right [:outline :inspector :preview] :bottom [:tools] :center [:game]})
 
 (defn refresh-windows! [scene evaluation-context]
   (dock-windows/refresh! scene evaluation-context))
@@ -37,12 +38,21 @@
   (and (map? layout)
        (= #{:left :right :bottom :center} (set (coll/keys layout)))
        (coll/every? vector? (coll/vals layout))
-       (= {:assets 1 :inspector 1 :preview 1 :tools 1 :game 1}
+       (= {:assets 1 :outline 1 :inspector 1 :preview 1 :tools 1 :game 1}
           (frequencies (into [] cat (coll/vals layout))))))
+
+(defn migrate-layout [layout]
+  (if (and (map? layout)
+           (coll/every? vector? (coll/vals layout))
+           (= {:assets 1 :inspector 1 :preview 1 :tools 1 :game 1}
+              (frequencies (into [] cat (coll/vals layout)))))
+    (into {} (map (fn [[zone panels]]
+                    [zone (into [] (mapcat #(if (= :inspector %) [:outline :inspector] [%])) panels)])) layout)
+    layout))
 
 (defn move-panel [layout panel zone]
   (assert (valid-layout? layout))
-  (assert (contains? #{:assets :inspector :preview :tools :game} panel))
+  (assert (contains? #{:assets :outline :inspector :preview :tools :game} panel))
   (assert (contains? default-layout zone))
   (update (into {} (map (fn [[key panels]] [key (filterv #(not= panel %) panels)])) layout)
           zone conj panel))
@@ -105,13 +115,74 @@
       {:x (* width offset) :y 0.0 :width (* width share) :height height}
       {:x 0.0 :y (* height offset) :width width :height (* height share)})))
 
+(defn layout-trees [layout]
+  (into {} (map (fn [[zone ids]]
+                  [zone (case (count ids)
+                          0 nil
+                          1 {:tabs ids}
+                          {:axis (if (= :bottom zone) :horizontal :vertical)
+                           :children (mapv #(hash-map :tabs [%]) ids)})])) layout))
+
+(defn valid-trees? [trees layout]
+  (letfn [(valid-node? [tree depth]
+            (and (< depth 12)
+                 (or (nil? tree)
+                     (and (map? tree)
+                          (if (:tabs tree)
+                            (and (vector? (:tabs tree)) (= 1 (count (:tabs tree))))
+                            (and (contains? #{:horizontal :vertical} (:axis tree))
+                                 (vector? (:children tree))
+                                 (<= 2 (count (:children tree)) 6)
+                                 (coll/every? #(and % (valid-node? % (inc depth))) (:children tree))
+                                 (or (nil? (:dividers tree))
+                                     (and (vector? (:dividers tree))
+                                          (= (dec (count (:children tree))) (count (:dividers tree)))
+                                          (coll/every? #(and (number? %) (< 0.0 % 1.0)) (:dividers tree))
+                                          (apply < 0.0 (:dividers tree))))))))))]
+    (and (map? trees)
+         (= (set (coll/keys layout)) (set (coll/keys trees)))
+         (coll/every? (fn [[zone tree]]
+                       (and (valid-node? tree 0)
+                            (= (get layout zone) (dock-windows/panel-ids tree)))) trees))))
+
+(defn split-trees [trees panel zone target edge]
+  (let [remaining (into {} (map (fn [[key tree]] [key (dock-windows/remove-panel tree panel)])) trees)]
+    (update remaining zone dock-windows/insert-panel panel target edge)))
+
+(defn drop-quarter [width height x y]
+  (let [horizontal (> (Math/abs (- (/ x width) 0.5))
+                      (Math/abs (- (/ y height) 0.5)))
+        half (drop-half width height horizontal x y)]
+    (assoc half :edge (if horizontal
+                       (if (:before half) :left :right)
+                       (if (:before half) :top :bottom)))))
+
+(defn- split-positions [^Scene scene]
+  (into {} (keep (fn [id]
+                   (when-let [^SplitPane split (.lookup scene (str "#" id))]
+                     [id (vec (.getDividerPositions split))])))
+        ["main-split" "workbench-split" "center-split" "scene-game-split"]))
+
+(defn- apply-split-positions! [^Scene scene positions]
+  (doseq [[id values] positions
+          :when (and (string? id) (vector? values) (coll/every? #(and (number? %) (< 0 % 1)) values))]
+    (when-let [^SplitPane split (.lookup scene (str "#" id))]
+      (.setDividerPositions split (double-array values)))))
+
 (defn init! [^Scene scene preferences localization ^Node preview ^Node game set-zone-visible!]
   (let [saved (prefs/get preferences [:window :panel-layout])
         saved (if (and saved (not (contains? saved :center))) (assoc saved :center [:game]) saved)
+        saved (migrate-layout saved)
         layout (atom (if (valid-layout? saved) saved default-layout))
+        trees (atom (layout-trees @layout))
         floating (atom #{})
+        reserved (atom #{})
         home-sizes (atom nil)
-        bodies {:assets (.lookup scene "#assets-split")
+        default-positions (split-positions scene)
+        outline-split (or (ui/user-data (.lookup scene "#right-split") ::outline-split)
+                          (doto (SplitPane.) (.setId "outline-dock-split") (.setMinSize 0.0 0.0)))
+        bodies {:outline outline-split
+                :assets (.lookup scene "#assets-split")
                 :inspector (.lookup scene "#right-split")
                 :tools (.lookup scene "#tool-tabs")
                 :preview preview
@@ -167,36 +238,92 @@
                     (.setStrokeWidth 2.0))
         gesture (volatile! nil)]
     (.add (.getChildren root) indicator)
-    (letfn [(render! [sizes]
-              (set-zone-visible! :center (coll/any? #(not (contains? @floating %)) (:center @layout)))
-              (doseq [[_ ^SplitPane split] zones] (.clear (.getItems split)))
-              (doseq [[zone ids] @layout]
-                (let [ids (filterv #(not (contains? @floating %)) ids)
-                      ^SplitPane split (zones zone)]
-                  (.setAll (.getItems split) ^java.util.Collection (mapv #(get-in panels [% :node]) ids))
-                  (when (and sizes (> (count ids) 1))
-                    (let [total (transduce (map #(get-in sizes [zone %] 1.0)) + ids)
-                          positions (:positions
-                                      (reduce (fn [{:keys [offset positions]} id]
-                                                (let [next-offset (+ offset (/ (get-in sizes [zone id] 1.0) total))]
-                                                  {:offset next-offset :positions (conj positions next-offset)}))
-                                              {:offset 0.0 :positions []} (pop ids)))]
-                      (.setDividerPositions split (double-array positions)))))))
+    (letfn [(clear-split! [^SplitPane split]
+              (doseq [child (vec (.getItems split))
+                      :when (instance? SplitPane child)]
+                (clear-split! child))
+              (.clear (.getItems split)))
+            (build-tree [tree]
+              (if-let [id (first (:tabs tree))]
+                (when (or (contains? @reserved id) (not (contains? @floating id)))
+                  (get-in panels [id :node]))
+                (let [children (into [] (keep build-tree) (:children tree))]
+                  (case (count children)
+                    0 nil
+                    1 (first children)
+                    (let [split (doto (SplitPane.)
+                                  (.setMinSize 80.0 60.0)
+                                  (.setStyle "-fx-padding: 0; -fx-background-insets: 0;")
+                                  (.setOrientation (if (= :horizontal (:axis tree)) Orientation/HORIZONTAL Orientation/VERTICAL)))]
+                      (.setAll (.getItems split) ^java.util.Collection children)
+                      (.setDividerPositions split
+                                            (double-array (mapv #(/ % (double (count children)))
+                                                                (range 1 (count children)))))
+                      (when (= (count children) (count (:children tree)))
+                        (ui/user-data! split ::tree-ids (dock-windows/panel-ids tree))
+                        (when-let [dividers (:dividers tree)]
+                          (.setDividerPositions split (double-array dividers))))
+                      split)))))
+            (capture-trees! []
+              (let [positions (into {} (keep (fn [^Node node]
+                                              (when-let [ids (ui/user-data node ::tree-ids)]
+                                                [ids (vec (.getDividerPositions ^SplitPane node))])))
+                                    (into [] (mapcat #(.lookupAll ^Node % ".split-pane")) (coll/vals zones)))]
+                (letfn [(capture [tree]
+                          (if (:children tree)
+                            (cond-> (update tree :children #(mapv capture %))
+                              (get positions (dock-windows/panel-ids tree))
+                              (assoc :dividers (get positions (dock-windows/panel-ids tree))))
+                            tree))]
+                  (swap! trees #(into {} (map (fn [[zone tree]] [zone (capture tree)])) %)))))
+            (render! [_sizes]
+              (doseq [[_ split] zones] (clear-split! split))
+              (doseq [[zone tree] @trees]
+                (let [^SplitPane split (zones zone)
+                      node (build-tree tree)]
+                  (when node (.add (.getItems split) node))
+                  (set-zone-visible! zone (boolean node)))))
             (capture-sizes []
-              (into {} (map (fn [[zone ids]]
-                              (let [ids (filterv #(not (contains? @floating %)) ids)
-                                    ^SplitPane split (zones zone)
-                                    boundaries (conj (into [0.0] (.getDividerPositions split)) 1.0)]
-                                [zone (into {} (map-indexed (fn [index id]
-                                                              [id (- (boundaries (inc index)) (boundaries index))])) ids)]))) @layout))
+              (capture-trees!)
+              nil)
+            (refresh-home! [id]
+              (capture-trees!)
+              (render! @home-sizes)
+              (doseq [[zone ids] @layout
+                      :when (contains? (set ids) id)]
+                (set-zone-visible! zone (coll/any? #(or (contains? @reserved %) (not (contains? @floating %))) ids))))
+            (reserve-home! [id]
+              (when-not (contains? @reserved id)
+                (let [^StackPane slot (get-in panels [id :node])]
+                  (swap! reserved conj id)
+                  (ui/user-data! slot :editor.dock-windows/reserved-home true)
+                  (.add (.getChildren slot)
+                        (doto (Label. (localization (localization/message (str "dock." (name id)))))
+                          (.setMouseTransparent true)
+                          (.setStyle "-fx-opacity: 0.45;")))
+                  (refresh-home! id))))
+            (release-home! [id]
+              (when (contains? @reserved id)
+                (let [^StackPane slot (get-in panels [id :node])]
+                  (swap! reserved disj id)
+                  (ui/user-data! slot :editor.dock-windows/reserved-home false)
+                  (.clear (.getChildren slot))
+                  (refresh-home! id))))
             (save! [] (prefs/set! preferences [:window :panel-layout] @layout))
             (move! [id zone]
               (dock-windows/restore-slot! (get-in panels [id :node]))
+              (capture-trees!)
+              (swap! trees #(into {} (map (fn [[key tree]] [key (dock-windows/remove-panel tree id)])) %))
+              (swap! trees update zone
+                     #(if % {:axis (if (= :bottom zone) :horizontal :vertical)
+                             :children [% {:tabs [id]}]} {:tabs [id]}))
               (swap! layout move-panel id zone)
               (save!)
               (set-zone-visible! zone true)
               (render! nil))
             (cancel! []
+              (when (:stage @gesture)
+                (dock-windows/restore-slot! (get-in panels [(:panel @gesture) :node])))
               (vreset! gesture nil)
               (.setVisible indicator false))
             (target-at [source x y]
@@ -208,69 +335,125 @@
                                     (let [^Node panel (get-in panels [id :node])
                                           point (.sceneToLocal panel (double x) (double y))]
                                       (if (.contains panel point)
-                                        (reduced (when (not= source id)
-                                                   (let [half (drop-half (.getWidth (.getLayoutBounds panel))
-                                                                         (.getHeight (.getLayoutBounds panel))
-                                                                         (= :bottom zone) (.getX point) (.getY point))]
-                                                     (if (contains? (set (zone @layout)) source)
-                                                       (let [{planned-layout :layout sizes :sizes}
-                                                             (split-panel @layout (capture-sizes) source zone id (:before half))]
-                                                         (merge {:zone zone :target id :node split :before (:before half)}
-                                                                (panel-rectangle (zone planned-layout) (zone sizes) source
-                                                                                 (.getWidth split) (.getHeight split) (= :bottom zone))))
-                                                       (merge {:zone zone :target id :node panel} half)))))
-                                        result))) nil (filterv #(not (contains? @floating %)) (zone @layout)))
+                                        (reduced (if (= source id)
+                                                   (when (contains? @reserved id)
+                                                     {:home true :zone zone :node panel :x 0.0 :y 0.0
+                                                      :width (.getWidth (.getLayoutBounds panel))
+                                                      :height (.getHeight (.getLayoutBounds panel))})
+                                                   (merge {:zone zone :target id :node panel}
+                                                          (drop-quarter (.getWidth (.getLayoutBounds panel))
+                                                                        (.getHeight (.getLayoutBounds panel))
+                                                                        (.getX point) (.getY point)))))
+                                        result))) nil (filterv #(or (contains? @reserved %) (not (contains? @floating %))) (zone @layout)))
                           (when (zero? (count (zone @layout)))
                             {:zone zone :node split :x 0.0 :y 0.0
                              :width (.getWidth split) :height (.getHeight split)})))
                     result)) nil zones))]
-      (doseq [[id {:keys [^Node node ^Button menu ^ContextMenu popup]}] panels]
-        (.setOnAction menu (ui/event-handler _ (.show popup menu Side/BOTTOM 0.0 0.0)))
-        (doseq [zone [:left :right :bottom :center]]
-          (let [item (doto (MenuItem.) (localization/localize! localization (localization/message (str "dock.to-" (name zone)))))]
-            (.setOnAction item (ui/event-handler _ (move! id zone)))
-            (.add (.getItems popup) item)))
-        ;; Reuse the existing title/tab row. The overlay menu consumes no content space.
-        (.addEventFilter node MouseEvent/MOUSE_PRESSED
-          (ui/event-handler event
-            (when (and (.isPrimaryButtonDown ^MouseEvent event)
-                       (< (.getY (.sceneToLocal node (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event))) 28.0)
-                       (nil? (ui/closest-node-where #(or (instance? javafx.scene.control.ButtonBase %)
-                                                         (identical? menu %)) (.getTarget event))))
-              (vreset! gesture {:panel id :x (.getSceneX ^MouseEvent event) :y (.getSceneY ^MouseEvent event)}))))
-        (.addEventFilter node MouseEvent/MOUSE_DRAGGED
-          (ui/event-handler event
-            (when-let [{:keys [panel x y active]} @gesture]
-              (let [dx (- (.getSceneX ^MouseEvent event) x)
-                    dy (- (.getSceneY ^MouseEvent event) y)]
-                (when (or active (> (+ (* dx dx) (* dy dy)) 36.0))
-                  (when-not active (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true)))
-                  (let [{:keys [^Node node x y width height] :as target}
-                        (target-at panel (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event))]
-                    (vswap! gesture assoc :active true :target target)
-                    (.setVisible indicator (boolean target))
-                    (when target
-                      (let [point (.sceneToLocal root (.localToScene node (double x) (double y)))]
-                        (.setX indicator (+ 1.0 (.getX point)))
-                        (.setY indicator (+ 1.0 (.getY point)))
-                        (.setWidth indicator (max 0.0 (- width 2.0)))
-                        (.setHeight indicator (max 0.0 (- height 2.0)))
-                        (.toFront indicator))))
-                  (.consume event))))))
-        (.addEventFilter node MouseEvent/MOUSE_RELEASED
-          (ui/event-handler event
-            (let [{:keys [panel active target]} @gesture]
-              (cancel!)
-              (when active
-                (when-let [{:keys [zone target before]} target]
-                  (if target
-                    (let [{new-layout :layout sizes :sizes}
-                          (split-panel @layout (capture-sizes) panel zone target before)]
-                      (reset! layout new-layout)
-                      (save!)
-                      (render! sizes))
-                    (move! panel zone)))
-                (.consume event))))))
+      (render! nil)
+      (doseq [[id {:keys [node ^ContextMenu popup]}] panels]
+        (dock-windows/register! node (localization (localization/message (str "dock." (name id))))
+                               {:persistent-key [:panel id]
+                                :menu-items (.getItems popup)
+                                :reserve-home! #(reserve-home! id)
+                                :release-home! #(release-home! id)
+                                :home-visible! (fn [visible]
+                                                 (when (zero? (count @floating))
+                                                   (reset! home-sizes (capture-sizes)))
+                                                 (swap! floating (if visible disj conj) id)
+                                                 (if visible
+                                                   (do (swap! reserved disj id)
+                                                       (ui/user-data! node :editor.dock-windows/reserved-home false)
+                                                       (refresh-home! id))
+                                                   (if (= id (:panel @gesture))
+                                                     (reserve-home! id)
+                                                     (refresh-home! id))))}))
+      (let [drag-handler
+            (ui/event-handler event
+              (when-let [{:keys [panel x y active stage]} @gesture]
+                (let [point (.screenToLocal root (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event))
+                      mouse-x (.getX point)
+                      mouse-y (.getY point)
+                      dx (- mouse-x x)
+                      dy (- mouse-y y)]
+                  (when (or active (> (+ (* dx dx) (* dy dy)) 36.0))
+                    (when-not active (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true)))
+                    (let [{:keys [^Node node x y width height] :as target}
+                          (target-at panel mouse-x mouse-y)]
+                      (if stage
+                        (do (.setX ^Stage stage (- (.getScreenX ^MouseEvent event) 24.0))
+                            (.setY ^Stage stage (- (.getScreenY ^MouseEvent event) 12.0)))
+                        (let [^Node source (get-in panels [panel :node])]
+                          (when (and (nil? target)
+                                     (not (.contains source (.sceneToLocal source mouse-x mouse-y))))
+                            (let [^Stage window (dock-windows/float-slot! source (- (.getScreenX ^MouseEvent event) 24.0) (- (.getScreenY ^MouseEvent event) 12.0))]
+                              (vswap! gesture assoc :stage window)
+                              (.addEventFilter (.getScene window) KeyEvent/KEY_PRESSED
+                                (ui/event-handler key-event
+                                  (when (and @gesture (= KeyCode/ESCAPE (.getCode ^KeyEvent key-event)))
+                                    (cancel!)
+                                    (.consume key-event))))))))
+                      (vswap! gesture assoc :active true :target target)
+                      (.setVisible indicator (boolean target))
+                      (when target
+                        (let [point (.sceneToLocal root (.localToScene node (double x) (double y)))]
+                          (.setX indicator (+ 1.0 (.getX point)))
+                          (.setY indicator (+ 1.0 (.getY point)))
+                          (.setWidth indicator (max 0.0 (- width 2.0)))
+                          (.setHeight indicator (max 0.0 (- height 2.0)))
+                          (.toFront indicator))))
+                    (.consume event)))))
+
+            release-handler
+            (ui/event-handler event
+              (let [{:keys [panel active target stage]} @gesture]
+                (vreset! gesture nil)
+                (.setVisible indicator false)
+                (when active
+                  (if-let [{:keys [zone target edge home]} target]
+                    (do
+                      (when stage (dock-windows/restore-slot! (get-in panels [panel :node])))
+                      (when-not home
+                      (if target
+                      (do
+                        (capture-trees!)
+                        (swap! trees split-trees panel zone target edge)
+                        (reset! layout (into {} (map (fn [[zone tree]] [zone (dock-windows/panel-ids tree)])) @trees))
+                        (save!)
+                        (render! nil))
+                      (move! panel zone))))
+                    (when-not stage
+                      (let [^Node source (get-in panels [panel :node])]
+                      (when-not (.contains source (.sceneToLocal source (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event)))
+                        (dock-windows/float-slot! source (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event))))))
+                  (release-home! panel)
+                  (.consume event))))]
+        ;; Reparenting the body can end JavaFX mouse capture in the old scene.
+        ;; Keep the same gesture reachable from both scenes while its window moves.
+        (.addEventFilter scene MouseEvent/MOUSE_DRAGGED drag-handler)
+        (.addEventFilter scene MouseEvent/MOUSE_RELEASED release-handler)
+        (doseq [[id {:keys [^Node node ^Button menu ^ContextMenu popup]}] panels]
+          (.setOnAction menu (ui/event-handler _ (.show popup menu Side/BOTTOM 0.0 0.0)))
+          (doseq [zone [:left :right :bottom :center]]
+            (let [item (doto (MenuItem.) (localization/localize! localization (localization/message (str "dock.to-" (name zone)))))]
+              (.setOnAction item (ui/event-handler _ (move! id zone)))
+              (.add (.getItems popup) item)))
+          ;; Reuse the existing title/tab row. The overlay menu consumes no content space.
+          (.addEventFilter node MouseEvent/MOUSE_PRESSED
+            (ui/event-handler event
+              (when (and (.isPrimaryButtonDown ^MouseEvent event)
+                         (or (< (.getY (.sceneToLocal node (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event))) 28.0)
+                             (ui/closest-node-where
+                               #(or (.contains (.getStyleClass ^Node %) "fake-titled-pane-label")
+                                    (.contains (.getStyleClass ^Node %) "title")
+                                    (.contains (.getStyleClass ^Node %) "tab-header-area"))
+                               (.getTarget event)))
+                         (nil? (ui/closest-node-where #(or (instance? javafx.scene.control.ButtonBase %)
+                                                           (identical? menu %)) (.getTarget event))))
+                (vreset! gesture {:panel id :x (.getSceneX ^MouseEvent event) :y (.getSceneY ^MouseEvent event)}))))
+          (.addEventFilter ^Node (first (.getChildren ^StackPane node)) MouseEvent/MOUSE_DRAGGED
+            drag-handler)
+          (.addEventFilter ^Node (first (.getChildren ^StackPane node)) MouseEvent/MOUSE_RELEASED
+            release-handler)))
       (.addEventFilter scene KeyEvent/KEY_PRESSED
         (ui/event-handler event
           (when (and @gesture (= KeyCode/ESCAPE (.getCode ^KeyEvent event)))
@@ -278,27 +461,42 @@
             (.consume event))))
       (ui/user-data! scene ::manager
                      {:layout layout
+                      :trees trees
                       :floating floating
-                      :splits {"assets-split" (:assets bodies) "right-split" (:inspector bodies)}
+                      :reserved reserved
+                      :splits {"assets-split" (:assets bodies) "right-split" (:inspector bodies) "outline-dock-split" (:outline bodies)}
+                      :snapshot! (fn [] (capture-trees!)
+                                    {:layout @layout :trees @trees
+                                        :positions (split-positions scene)
+                                        :hidden (into #{} (filter #(and (nil? (.lookup scene (str "#" (name %) "-pane")))
+                                                                       (not (floating-zone? scene %))))
+                                                      [:left :right :bottom :center])})
+                      :restore-visibility! (fn [snapshot]
+                                             (doseq [zone (:hidden snapshot)
+                                                     :when (contains? default-layout zone)]
+                                               (set-zone-visible! zone false)))
+                      :apply! (fn [snapshot]
+                                (when (valid-layout? (migrate-layout (:layout snapshot)))
+                                  (cancel!)
+                                  (reset! layout (migrate-layout (:layout snapshot)))
+                                  (reset! trees (if (valid-trees? (:trees snapshot) @layout)
+                                                  (:trees snapshot)
+                                                  (layout-trees @layout)))
+                                  (reset! home-sizes (:sizes snapshot))
+                                  (save!)
+                                  (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true))
+                                  (render! (:sizes snapshot))
+                                  (apply-split-positions! scene (:positions snapshot))))
                       :reset! (fn []
                                 (cancel!)
                                 (reset! layout default-layout)
+                                (reset! trees (layout-trees default-layout))
+                                (reset! home-sizes nil)
                                 (save!)
                                 (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true))
-                                (render! nil))})
+                                (render! nil)
+                                (apply-split-positions! scene default-positions))})
       (render! nil)
-      (doseq [[id {:keys [node ^ContextMenu popup]}] panels]
-        (dock-windows/register! node (localization (localization/message (str "dock." (name id))))
-                               {:persistent-key [:panel id]
-                                :menu-items (.getItems popup)
-                                :home-visible! (fn [visible]
-                                                 (when (zero? (count @floating))
-                                                   (reset! home-sizes (capture-sizes)))
-                                                 (swap! floating (if visible disj conj) id)
-                                                 (render! @home-sizes)
-                                                 (doseq [[zone ids] @layout]
-                                                   (when (contains? (set ids) id)
-                                                     (set-zone-visible! zone (coll/any? #(not (contains? @floating %)) ids)))))}))
       (.applyCss root)
       (.layout root)
       {:panels (into {} (map (fn [[id value]] [id (:node value)])) panels)})))

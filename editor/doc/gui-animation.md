@@ -181,3 +181,62 @@ Splits can be nested and resized. Drag individual tab titles to rearrange them. 
 For a second monitor, float the GUI scene and animation workspace, drag the animation title onto the bottom edge of the scene window, then move the combined window to that monitor. Preview, key editing, event history, and editor shortcuts operate on the same document. Floating windows are remembered per project. Reopening the project restores their positions, sizes, maximized state, tab groups, selected tabs, and nested split proportions. If a monitor is disconnected, windows are fitted onto a connected screen. Missing or renamed resource panels are skipped; the remaining groups still restore. Returning a panel or resetting the panel layout updates the saved arrangement. Layout data is stored in local project preferences, not in GUI or animation resources.
 
 Floating removes the original panel from its split instead of leaving a return-button placeholder. Remaining panels expand into the released space; returning restores the panel order and divider proportions. If both GUI subpanels float, their empty editor area also collapses. Selecting the resource tab again returns its panels.
+
+
+### Named workspace layouts
+
+Every panel's **… → Layouts** menu offers **Save Layout As…**, **Switch Layout**,
+**Recall All Floating Windows**, and **Restore Default Layout**. Names are trimmed
+and limited to 80 characters; saving an existing name replaces that preset.
+Presets belong to the current project and survive reopening it. They retain floating
+window bounds, tab groups, selected tabs, split ratios, and the main panel arrangement.
+Switching a preset restores panels whose resources are currently open; missing or
+closed resource panels are skipped. Recall returns floating panels to their homes.
+Restore Default also resets main panel placement. Neither operation deletes presets.
+
+### Batch editing and recording feedback
+
+Drag empty track space to box-select scalar keys and event/trigger segments together.
+Shift or Ctrl/Cmd adds or toggles selection. Dragging a selected key moves the whole
+selection; all selected keys preview their destinations, and releasing creates one
+undo step. The group stops at time zero without changing relative spacing. Escape
+cancels a drag. The ruler continues to scrub the playhead.
+
+Copy, cut and paste use Ctrl/Cmd+C/X/V and share a key clipboard across animation
+views. Paste aligns the earliest copied key with the playhead. Left/Right nudges one
+frame; Shift+Left/Right nudges ten. **Snap to Frames** controls mouse snapping; Alt
+while dragging temporarily disables it. Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y)
+use the editor's global undo/redo history.
+
+The animation workspace title shows preview and recording status, with a red badge
+while recording. The GUI canvas stays clear of this status text. In preview mode, unrecorded
+scene or property edits show an amber value and a **◆+** marker; **◆** means a key
+exists at the current time, and **◇** means no key exists there. Click the property's
+diamond to key that value, or the scene's **Set all keys** button to commit the pending
+pose in one edit. Moving the playhead still discards unrecorded preview changes.
+
+Outline and Properties are separate panels. Each has its own **…** menu and can
+float, dock, or join another window independently. Selecting a node in Outline
+continues to update Properties across windows. Saved layouts retain each panel's
+placement; older layouts place Outline immediately before Properties.
+
+Docked panels support nested splits in either direction: drop near a panel's
+left/right edge to place panels side by side, or its top/bottom edge to stack them.
+Floating windows use the same four edges, with their center reserved for tab grouping.
+Mixed horizontal and vertical splits and their divider positions are saved with layouts.
+
+Drag the Assets, Outline, Properties, or tool-tab headers to another docked panel to rearrange
+them. Dragging outside the source panel and dock targets immediately floats the real window
+and keeps it under the pointer until release. Drag back over a dock target to redock,
+or press Escape to cancel and return it home. Property
+headers and the full tool-tab header strip also act as drag handles.
+
+Main panels reserve their original dock slot only while dragging, labelled with
+the panel name. Drag back into this slot to restore the original position. Releasing
+elsewhere removes the placeholder and gives its space to the remaining panels.
+Dragging a floating tab later temporarily restores its home target again. Escape
+also removes the temporary placeholder and cancels the active drag.
+
+Moving the last panel out of a dock region removes the empty outer region as well
+as its placeholder. Adjacent panels automatically expand into the released width
+or height after the drop; the temporary return target remains during dragging.

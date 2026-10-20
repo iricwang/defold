@@ -134,3 +134,29 @@
   (is (= 0.25 (timeline/pan-offset 5.0 2.0 1032.0 0.0 -500.0)))
   (is (= 0.0 (timeline/pan-offset 0.5 1.0 1032.0 0.0 -500.0)))
   (is (= 0.0 (timeline/pan-offset 5.0 0.125 1032.0 0.0 -500.0))))
+
+
+;; A mixed group clamps as one unit at zero instead of flattening its relative key times.
+(deftest mixed-selection-offset-test
+  (let [document (animation/replace-key (animation/new-document "/main.gui") "default" nil
+                                         {:key_type "event" :event_id "hit" :start_time 0.1 :duration 0})]
+    (is (= -0.1 (timeline/selection-offset document "default" #{["box" "position_x" 0.3]} #{0} -1.0)))
+    (is (= 0.5 (timeline/selection-offset document "default" #{["box" "position_x" 0.3]} #{0} 0.5)))
+    (is (= 0.0 (timeline/selection-offset document "default" #{} #{} -1.0)))))
+
+;; Box selection includes event/trigger segments as well as points, with either drag direction and zoom.
+(deftest mixed-box-selection-test
+  (let [rows [{:node-name "box" :property-id "position_x" :keyframes [{:time 0.25} {:time 0.75}]}
+              {:kind :segment :key-index 3 :key {:key_type "event" :start_time 0.25 :duration 0}}
+              {:kind :segment :key-index 4 :key {:key_type "trigger" :start_time 0.75 :duration 0}}]
+        expected {:keys #{["box" "position_x" 0.25]} :raws #{3}}]
+    (is (= expected (timeline/box-selection rows 0.0 1.0 1032.0 [250 32 280 90])))
+    (is (= expected (timeline/box-selection rows 0.0 1.0 1032.0 [280 90 250 32])))
+    (is (= expected (timeline/box-selection rows 0.2 2.0 1032.0 [100 32 140 90])))
+    (is (= {:keys #{} :raws #{}} (timeline/box-selection rows 0.0 1.0 1032.0 [0 0 900 20])))))
+
+;; Draft values take precedence over existing key markers until explicitly committed.
+(deftest property-key-state-test
+  (is (= :draft (timeline/property-key-state [{:time 0.25}] 0.25 true)))
+  (is (= :keyed (timeline/property-key-state [{:time 0.25}] 0.25000000001 false)))
+  (is (= :unkeyed (timeline/property-key-state [{:time 0.25}] 0.3 false))))

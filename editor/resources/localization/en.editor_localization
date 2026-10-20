@@ -2845,7 +2845,8 @@ resource-preview.empty = Select a resource in Assets to preview it.
 resource-preview.unsupported = No preview provider for this resource type.
 resource-preview.failed = Preview unavailable
 dock.assets = Assets
-dock.inspector = Inspector
+dock.inspector = Properties
+dock.outline = Outline
 dock.tools = Tools
 dock.preview = Resource Preview
 dock.to-left = Dock Left
@@ -2994,3 +2995,20 @@ dock.editors = Editors
 
 dock.float = Open in a separate window
 dock.drag-help = Drag to combine panels; double-click to return
+
+dock.layouts = Layouts
+dock.layout-save = Save Layout As…
+dock.layout-switch = Switch Layout
+dock.layout-recall = Recall All Floating Windows
+dock.layout-default = Restore Default Layout
+dock.layout-name = Layout name (1–80 characters)
+dock.layout-overwrite = An existing name will be overwritten.
+
+gui-animation.snap = Snap to Frames
+gui-animation.key-draft = Unrecorded change — click to key this value
+gui-animation.key-current = Key at current frame — click to update
+gui-animation.key-add = Add a key at the current frame
+gui-animation.scene-recording = ● RECORDING — scene edits create keys
+gui-animation.scene-draft = Unrecorded changes — Set Keys to keep them
+gui-animation.scene-preview = Animation preview — Record to capture scene edits
+gui-animation.snap-help = Snap dragged keys to frames. Hold Alt while dragging for free timing.

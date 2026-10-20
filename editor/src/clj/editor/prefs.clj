@@ -194,6 +194,7 @@
                              :key {:type :keyword}
                              :val {:type :array :item {:type :keyword}}}
               :floating-layout {:type :string :default "" :scope :project}
+              :named-layouts {:type :object-of :key {:type :string} :val {:type :string} :scope :project}
               :split-positions {:type :object-of
                                 :key {:type :keyword}
                                 :val {:type :array :item {:type :number}}}

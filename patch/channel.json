@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 39,
-  "version": "1.14.1-patch.39",
+  "revision": 48,
+  "version": "1.14.1-patch.48",
   "repository": "iricwang/defold",
-  "notes": "Remember per-project floating window bounds and composed layouts, restore on project open"
+  "notes": "Separate Outline and Properties; support persistent mixed-direction panel layouts, layout presets, drag-to-float and animation keyframe batch editing"
 }

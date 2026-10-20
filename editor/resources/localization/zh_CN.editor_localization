@@ -2023,7 +2023,8 @@ resource-preview.empty = 在资产窗口中选择资源以查看预览。
 resource-preview.unsupported = 此类资源暂未提供预览。
 resource-preview.failed = 无法预览
 dock.assets = 资产
-dock.inspector = 检查器
+dock.inspector = 属性
+dock.outline = 大纲
 dock.tools = 工具
 dock.preview = 资源预览
 dock.to-left = 停靠到左侧
@@ -2172,3 +2173,20 @@ dock.editors = 编辑区域
 
 dock.float = 在独立窗口中打开
 dock.drag-help = 拖到中央合并标签页，拖到四边分栏；双击返回原位置
+
+dock.layouts = 布局
+dock.layout-save = 保存布局为…
+dock.layout-switch = 切换布局
+dock.layout-recall = 召回全部浮窗
+dock.layout-default = 恢复默认布局
+dock.layout-name = 布局名称（1–80 个字符）
+dock.layout-overwrite = 同名布局将被覆盖。
+
+gui-animation.snap = 帧吸附
+gui-animation.key-draft = 修改尚未打帧，点击记录当前属性值
+gui-animation.key-current = 当前帧已有关键帧，点击更新
+gui-animation.key-add = 在当前帧添加关键帧
+gui-animation.scene-recording = ● 正在录制：场景修改将写入关键帧
+gui-animation.scene-draft = 修改尚未打帧：点击补帧保留修改
+gui-animation.scene-preview = 动画预览：开启录制可记录场景修改
+gui-animation.snap-help = 拖动关键帧时吸附到帧；按住 Alt 可临时自由移动。

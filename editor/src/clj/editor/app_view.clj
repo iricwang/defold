@@ -344,7 +344,7 @@
   (and (not (g/error-value? outline-pane-desc))
        (coll/any? #(= :outline-pane %) (get open-sidebar-panes active-view))))
 
-(g/defnk produce-right-split-desc [right-split active-sidebar ^:try outline-pane-desc outline-active]
+(g/defnk produce-right-split-desc [right-split outline-split active-sidebar ^:try outline-pane-desc outline-active]
   {:fx/type fxui/ext-dedupe-identical-desc
    :desc {:fx/type fx/ext-let-refs
           ;; If outline is active (requested by the view), we want to ensure
@@ -358,19 +358,26 @@
           :refs (if outline-active
                   {:outline-pane outline-pane-desc}
                   {})
-          :desc {:fx/type ext-with-split-pane-props
-                 :desc {:fx/type ui/ext-value :value right-split}
-                 :props {:items (or (coll/not-empty
-                                      (coll/into-> active-sidebar []
-                                        (remove g/error-value?)
-                                        (map split-pane-item)))
-                                    [(split-pane-item {:fx/type fx.region/lifecycle})])}}}})
+          :desc {:fx/type fx/ext-let-refs
+                 :refs {:outline-host {:fx/type ext-with-split-pane-props
+                                       :desc {:fx/type ui/ext-value :value outline-split}
+                                       :props {:items (if outline-active
+                                                        [(split-pane-item {:fx/type fx/ext-get-ref :ref :outline-pane})]
+                                                        [(split-pane-item {:fx/type fx.region/lifecycle})])}}}
+                 :desc {:fx/type ext-with-split-pane-props
+                        :desc {:fx/type ui/ext-value :value right-split}
+                        :props {:items (or (coll/not-empty
+                                             (coll/into-> active-sidebar []
+                                               (remove #(or (g/error-value? %) (= :outline-pane (:ref %))))
+                                               (map split-pane-item)))
+                                           [(split-pane-item {:fx/type fx.region/lifecycle})])}}}}})
 
 (g/defnode AppView
   (property stage Stage)
   (property scene Scene)
   (property editor-tabs-split SplitPane)
   (property right-split SplitPane)
+  (property outline-split SplitPane)
   (property active-tab Tab)
   (property tool-tab-pane TabPane)
   (property auto-pulls g/Any)
@@ -2366,7 +2373,9 @@
 
 (defn make-app-view [project ^Stage stage ^MenuBar menu-bar ^SplitPane editor-tabs-split right-split ^TabPane tool-tab-pane prefs localization]
   (let [app-scene (.getScene stage)
-        editor-tab-pane (TabPane.)]
+        editor-tab-pane (TabPane.)
+        outline-split (doto (SplitPane.) (.setId "outline-dock-split") (.setMinSize 0.0 0.0))]
+    (ui/user-data! right-split :editor.docking/outline-split outline-split)
     (ui/disable-menu-alt-key-mnemonic! menu-bar)
     (ui/init-tab-pane! tool-tab-pane)
     (.setUseSystemMenuBar menu-bar true)
@@ -2382,6 +2391,7 @@
                            :scene app-scene
                            :editor-tabs-split editor-tabs-split
                            :right-split right-split
+                           :outline-split outline-split
                            :tool-tab-pane tool-tab-pane
                            :active-tool :move
                            :manip-space :world
@@ -2428,7 +2438,7 @@
                             (fn [_animation-timer _elapsed dt]
                               (when-not (ui/ui-disabled?)
                                 (let [refresh-requested? (ui/user-data app-scene ::ui/refresh-requested?)]
-                                  (when (NodeHelper/isTreeShowing right-split)
+                                  (when (or (NodeHelper/isTreeShowing right-split) (NodeHelper/isTreeShowing outline-split))
                                     (refresh-right-split! app-view))
                                   (when refresh-requested?
                                     (ui/user-data! app-scene ::ui/refresh-requested? false)

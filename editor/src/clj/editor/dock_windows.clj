@@ -14,13 +14,14 @@
 
 (ns editor.dock-windows
   (:require [clojure.edn :as edn]
+            [clojure.string :as string]
             [editor.localization :as localization]
             [editor.prefs :as prefs]
             [editor.ui :as ui]
             [util.coll :as coll])
   (:import [javafx.geometry Orientation Pos]
            [javafx.scene Node Scene]
-           [javafx.scene.control Label MenuButton MenuItem SplitPane Tab TabPane TabPane$TabClosingPolicy Tooltip]
+           [javafx.scene.control Label Menu MenuButton MenuItem SeparatorMenuItem SplitPane TextInputDialog Tab TabPane TabPane$TabClosingPolicy Tooltip]
            [javafx.scene.input KeyCode KeyEvent MouseEvent]
            [javafx.scene.layout BorderPane StackPane]
            [javafx.stage Screen Stage]))
@@ -40,7 +41,8 @@
       (case (count children)
         0 nil
         1 (first children)
-        (assoc tree :children children)))))
+        (cond-> (assoc tree :children children)
+          (not= (count children) (count (:children tree))) (dissoc :dividers))))))
 
 (defn insert-panel [tree id target edge]
   (if (:tabs tree)
@@ -55,12 +57,13 @@
     (update tree :children #(mapv (fn [child] (insert-panel child id target edge)) %))))
 
 (defn drop-edge [width height x y]
-  (cond
-    (< x (* width 0.22)) :left
-    (> x (* width 0.78)) :right
-    (< y (* height 0.22)) :top
-    (> y (* height 0.78)) :bottom
-    :else :tab))
+  (let [nx (/ x width)
+        ny (/ y height)]
+    (if (and (< 0.22 nx 0.78) (< 0.22 ny 0.78))
+      :tab
+      (if (> (Math/abs (- nx 0.5)) (Math/abs (- ny 0.5)))
+        (if (< nx 0.5) :left :right)
+        (if (< ny 0.5) :top :bottom)))))
 
 (defn remap-tree
   "Resolve panel identities and collapse branches whose resources are no longer open."
@@ -202,30 +205,39 @@
     (doseq [^Node child (.getItems ^SplitPane node)]
       (clear-content! child))))
 
-(defn- cancel-drag! [{:keys [drag]}]
+(defn- cancel-drag! [{:keys [drag panels]}]
   (when-let [^Node node (:highlight @drag)] (.setStyle node ""))
+  (when-let [release-home! (:release-home! (@panels (:id @drag)))]
+    (release-home!))
   (reset! drag nil))
 
-(defn- target-at [{:keys [windows]} source x y]
-  (coll/some
-    (fn [[window-id {:keys [^BorderPane host]}]]
+(defn- target-at [{:keys [panels windows]} source x y]
+  (or (let [^Node slot (:slot (@panels source))]
+        (when (ui/user-data slot ::reserved-home)
+          (when-let [point (.screenToLocal slot (double x) (double y))]
+            (when (.contains slot point)
+              {:home source :highlight slot}))))
       (coll/some
-        (fn [^TabPane group]
-          (when-let [point (.screenToLocal group (double x) (double y))]
-            (when (.contains group point)
-              (let [selected (ui/user-data group ::panel)
-                    target (if (not= source selected) selected
-                               (coll/first-where #(not= source %) (ui/user-data group ::panels)))]
-                (when target
-                  {:window window-id :target target :highlight group
-                   :edge (drop-edge (.getWidth group) (.getHeight group) (.getX point) (.getY point))})))))
-        (.lookupAll host ".floating-dock-group")))
-    @windows))
+        (fn [[window-id {:keys [^BorderPane host]}]]
+          (coll/some
+            (fn [^TabPane group]
+              (when-let [point (.screenToLocal group (double x) (double y))]
+                (when (.contains group point)
+                  (let [selected (ui/user-data group ::panel)
+                        target (if (not= source selected) selected
+                                   (coll/first-where #(not= source %) (ui/user-data group ::panels)))]
+                    (when target
+                      {:window window-id :target target :highlight group
+                       :edge (drop-edge (.getWidth group) (.getHeight group) (.getX point) (.getY point))})))))
+            (.lookupAll host ".floating-dock-group")))
+        @windows)))
 
 (defn- install-drag! [{:keys [drag windows] :as manager} ^Node handle id]
   (.setOnMousePressed handle
     (ui/event-handler event
       (when (.isPrimaryButtonDown ^MouseEvent event)
+        (when-let [reserve-home! (:reserve-home! (@(:panels manager) id))]
+          (reserve-home!))
         (reset! drag {:id id :x (.getScreenX ^MouseEvent event) :y (.getScreenY ^MouseEvent event)}))))
   (.setOnMouseDragged handle
     (ui/event-handler event
@@ -244,14 +256,16 @@
       (let [{:keys [active target]} @drag]
         (cancel-drag! manager)
         (when active
-          (if-let [{:keys [window target edge]} target]
-            (do
-              (capture! manager)
-              (swap! windows (fn [entries]
-                               (into {} (map (fn [[key entry]]
-                                               [key (update entry :tree remove-panel id)])) entries)))
-              (swap! windows update-in [window :tree] insert-panel id target edge)
-              (render! manager))
+          (if-let [{:keys [window target edge home]} target]
+            (if home
+              (restore! manager id)
+              (do
+                (capture! manager)
+                (swap! windows (fn [entries]
+                                 (into {} (map (fn [[key entry]]
+                                                 [key (update entry :tree remove-panel id)])) entries)))
+                (swap! windows update-in [window :tree] insert-panel id target edge)
+                (render! manager)))
             (float-panel! manager id (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event)))
           (.consume event))))))
 
@@ -358,11 +372,14 @@
     (when-not floating (home-visible! false))
     (when (and (not floating) floating!) (floating! true))
     (ui/user-data! stage ::normal-bounds {:x (double x) :y (double y) :width 960.0 :height 640.0})
-    (when-not (:restoring @persistence) (.show stage))))
+    (when-not (:restoring @persistence) (.show stage))
+    stage))
+
+(declare layout-menu)
 
 (defn register!
   "Register a stable home slot. Its body is moved, never copied; dispose before deleting the view."
-  [^StackPane slot title {:keys [focus! floating! menu-items home-visible! bottom persistent-key]}]
+  [^StackPane slot title {:keys [focus! floating! menu-items home-visible! reserve-home! release-home! bottom persistent-key]}]
   (let [manager (manager (ui/main-scene))
         id (random-uuid)
         body (doto (StackPane.) (.setMinSize 0.0 0.0))
@@ -398,6 +415,7 @@
       (.add (.getChildren body) button)
       (StackPane/setAlignment button (if bottom Pos/BOTTOM_RIGHT Pos/TOP_RIGHT)))
     (.add ^java.util.List menu-items item)
+    (.add ^java.util.List menu-items (layout-menu (:scene manager)))
     (localization/localize! item localization (localization/message "dock.float"))
     (ui/user-data! body ::focus! focus!)
     (when focus!
@@ -406,6 +424,7 @@
                                      :floating! (fn [floating]
                                                   (localization/localize! item localization (localization/message (if floating "dock.return" "dock.float")))
                                                   (when floating! (floating! floating)))
+                                     :reserve-home! reserve-home! :release-home! release-home!
                                      :home-visible! (or home-visible! #(set-home-visible! slot %))})
     (.setOnAction item
       (ui/event-handler _
@@ -414,6 +433,7 @@
           (let [point (.localToScreen body 20.0 20.0)]
             (float-panel! manager id (.getX point) (.getY point))))))
     (ui/user-data! slot ::dispose! dispose!)
+    (ui/user-data! slot ::float! #(float-panel! manager id %1 %2))
     (ui/user-data! slot ::restore! #(when (and (not (:restoring @(:persistence manager)))
                                             (:floating (@(:panels manager) id)))
                                     (restore! manager id)))
@@ -428,12 +448,18 @@
 (defn restore-slot! [slot]
   (when-let [restore! (ui/user-data slot ::restore!)] (restore!)))
 
+(defn float-slot! [slot x y]
+  (when-let [float! (ui/user-data slot ::float!)]
+    (float! x y)))
+
 (defn save-layout! [scene]
   (when-let [{:keys [panels windows persistence] :as manager} (ui/user-data scene ::manager)]
     (when-let [preferences (when-not (:restoring @persistence) (:prefs @persistence))]
       (capture! manager)
       (let [identities (into {} (keep (fn [[id panel]] (when-let [key (:persistent-key panel)] [id key]))) @panels)
             layout {:version 1
+                    :docked (when-let [snapshot! (:snapshot! (ui/user-data scene :editor.docking/manager))]
+                              (snapshot!))
                     :windows (into [] (keep (fn [[_ {:keys [tree ^Stage stage]}]]
                                               (when-let [tree (remap-tree tree identities)]
                                                 (let [bounds (if (or (.isMaximized stage) (.isIconified stage))
@@ -471,6 +497,8 @@
                            :width (.getWidth bounds) :height (.getHeight bounds)})) (Screen/getScreens))]
     (swap! persistence assoc :restoring true)
     (try
+      (when-let [apply! (:apply! (ui/user-data scene :editor.docking/manager))]
+        (apply! (:docked layout)))
       (doseq [{:keys [tree bounds maximized]} (:windows layout)
               :let [tree (remap-tree tree identities)]
               :when tree]
@@ -503,6 +531,8 @@
             (.applyCss root)
             (.layout root)
             (restore-dividers! tree (.getCenter host))))
+        (when-let [restore-visibility! (:restore-visibility! (ui/user-data scene :editor.docking/manager))]
+          (restore-visibility! (:docked layout)))
         (finally (swap! persistence assoc :restoring false :prefs preferences)))
       (save-layout! scene))))
 
@@ -512,3 +542,76 @@
       (let [floating-scene (.getScene stage)]
         (ui/user-data! floating-scene :keymap (ui/user-data scene :keymap))
         (ui/refresh floating-scene evaluation-context)))))
+
+
+(defn save-named-layout! [scene name]
+  (let [{:keys [persistence]} (manager scene)
+        preferences (:prefs @persistence)
+        name (string/trim name)]
+    (when (and preferences (not (:restoring @persistence)) (<= 1 (count name) 80))
+      (save-layout! scene)
+      (let [layout (assoc (read-layout (prefs/get preferences [:window :floating-layout]))
+                         :docked (when-let [snapshot! (:snapshot! (ui/user-data scene :editor.docking/manager))]
+                                   (snapshot!)))]
+        (prefs/set! preferences [:window :named-layouts]
+                    (assoc (prefs/get preferences [:window :named-layouts]) name (pr-str layout)))
+        true))))
+
+(defn apply-named-layout! [scene name]
+  (let [{:keys [persistence]} (manager scene)
+        preferences (:prefs @persistence)]
+    (when (and preferences (not (:restoring @persistence)))
+      (when-let [layout (read-layout (get (prefs/get preferences [:window :named-layouts]) name ""))]
+        (restore-all! scene)
+        (when-let [apply! (:apply! (ui/user-data scene :editor.docking/manager))]
+          (apply! (:docked layout)))
+        (prefs/set! preferences [:window :floating-layout] (pr-str layout))
+        (start! scene preferences)
+        (ui/run-later
+          (when-let [restore-visibility! (:restore-visibility! (ui/user-data scene :editor.docking/manager))]
+            (restore-visibility! (:docked layout))))
+        true))))
+
+(defn reset-default-layout! [scene]
+  (restore-all! scene)
+  (when-let [reset! (:reset! (ui/user-data scene :editor.docking/manager))] (reset!))
+  (save-layout! scene))
+
+(defn layout-menu [^Scene scene]
+  (let [localize (ui/user-data scene :localization)
+        label #(localize (localization/message %))
+        menu (doto (Menu. (label "dock.layouts")) (.setId "dock-layouts"))
+        save (doto (MenuItem. (label "dock.layout-save")) (.setId "dock-layout-save"))
+        switch (doto (Menu. (label "dock.layout-switch")) (.setId "dock-layout-switch"))
+        recall (doto (MenuItem. (label "dock.layout-recall")) (.setId "dock-layout-recall"))
+        defaults (doto (MenuItem. (label "dock.layout-default")) (.setId "dock-layout-default"))]
+    (.setOnAction save
+      (ui/event-handler _
+        (let [dialog (TextInputDialog.)
+              pane (.getDialogPane dialog)]
+          (.initOwner dialog (.getWindow scene))
+          (.setTitle dialog (label "dock.layout-save"))
+          (.setHeaderText dialog (label "dock.layout-name"))
+          (.setContentText dialog (label "dock.layout-overwrite"))
+          (.setAll (.getStylesheets pane) ^java.util.Collection (.getStylesheets scene))
+          (.addAll (.getStylesheets pane) ^java.util.Collection (.getStylesheets (.getRoot scene)))
+          (.setStyle pane (.getStyle (.getRoot scene)))
+          (let [result (.showAndWait dialog)]
+            (when (.isPresent result) (save-named-layout! scene (.get result)))))))
+    (.setOnAction recall (ui/event-handler _ (restore-all! scene) (save-layout! scene)))
+    (.setOnAction defaults (ui/event-handler _ (reset-default-layout! scene)))
+    (.setOnShowing menu
+      (ui/event-handler _
+        (let [state @(:persistence (manager scene))
+              preferences (:prefs state)
+              busy (or (nil? preferences) (:restoring state))
+              names (when preferences (sort (into [] (coll/keys (prefs/get preferences [:window :named-layouts])))))]
+          (doseq [^MenuItem item [save switch recall defaults]] (.setDisable item (boolean busy)))
+          (.clear (.getItems switch))
+          (doseq [name names]
+            (let [item (MenuItem. name)]
+              (.setOnAction item (ui/event-handler _ (apply-named-layout! scene name)))
+              (.add (.getItems switch) item)))
+          (when (zero? (count names)) (.setDisable switch true)))))
+    (.addAll (.getItems menu) ^java.util.Collection (vector save switch (SeparatorMenuItem.) recall defaults))
+    menu))
