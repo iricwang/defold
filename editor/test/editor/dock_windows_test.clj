@@ -166,7 +166,7 @@
           snapshot {:layout docking/default-layout :sizes {}}
           reset-count (atom 0)]
       (ui/user-data! scene :editor.dock-windows/manager
-                     {:scene scene :panels (atom {}) :windows (atom {}) :persistence persistence})
+                     {:scene scene :panels (atom {}) :windows (atom {}) :drag (atom nil) :persistence persistence})
       (ui/user-data! scene :editor.docking/manager {:snapshot! (constantly snapshot) :reset! #(swap! reset-count inc)})
       (is (nil? (dock/save-named-layout! scene "  ")))
       (is (nil? (dock/save-named-layout! scene (apply str (repeat 81 "x")))))

@@ -1269,10 +1269,12 @@
                                                         (str (resource/proj-path gui-resource) " — " (localization (localization/message key)))
                                                         {:persistent-key [:gui (resource/proj-path gui-resource) key]
                                                          :focus! (:focus-view! opts) :floating! floating!
+                                                         :drag-handle (when (= "dock.gui-animation" key) workspace-tabs)
                                                          :home-visible! (fn [visible]
                                                                           (when (and (not visible) (.isSelected fullscreen))
                                                                             (.fire fullscreen))
-                                                                          (dock-windows/set-home-visible! slot visible))
+                                                                          (dock-windows/set-home-visible! slot visible)
+                                                                          (dock-windows/set-tab-empty! (:tab opts) (zero? (count (.getItems scene-split)))))
                                                          :menu-items menu-items}))
                                [[scene-pane "dock.gui-scene" nil] [title "dock.gui-animation" (.getItems more-menu)]])
           refresh! (fn [dt]

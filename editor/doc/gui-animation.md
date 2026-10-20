@@ -226,16 +226,22 @@ Floating windows use the same four edges, with their center reserved for tab gro
 Mixed horizontal and vertical splits and their divider positions are saved with layouts.
 
 Drag the Assets, Outline, Properties, or tool-tab headers to another docked panel to rearrange
-them. Dragging outside the source panel and dock targets immediately floats the real window
-and keeps it under the pointer until release. Drag back over a dock target to redock,
-or press Escape to cancel and return it home. Property
-headers and the full tool-tab header strip also act as drag handles.
+them. The real panel detaches into a native floating window as soon as the pointer leaves
+the click threshold and follows the pointer. The destination half is outlined before release.
+Releasing outside dock targets leaves an independently movable and resizable window.
+Drag a floating tab over a main-panel dock target to redock it. Windows samples the physical
+primary button and logical screen coordinates throughout the gesture, so reparenting and
+native-window activation cannot interrupt the drag when JavaFX loses mouse capture.
 
-Main panels reserve their original dock slot only while dragging, labelled with
-the panel name. Drag back into this slot to restore the original position. Releasing
-elsewhere removes the placeholder and gives its space to the remaining panels.
-Dragging a floating tab later temporarily restores its home target again. Escape
-also removes the temporary placeholder and cancels the active drag.
+The resource editor tabs and GUI animation title use the same controller. Resource tabs
+reorder within their existing tab strip; dragging out of the strip floats the page, and dropping
+back on the strip returns it. Normal clicks, close buttons, and controls do not float panels.
+
+Main panels reserve their original dock slot only while dragging, labelled with the panel
+name and a dashed frame. Floating groups retain their original split and a placeholder when
+a tab is torn out. Drag back into the reserved area to return. Releasing elsewhere removes
+the placeholder and gives its space to the remaining panels. Escape restores the original
+window, composition, selection, bounds, and main slot without saving an intermediate layout.
 
 Moving the last panel out of a dock region removes the empty outer region as well
 as its placeholder. Adjacent panels automatically expand into the released width

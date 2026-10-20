@@ -21,11 +21,10 @@
   (:import [javafx.geometry Insets Orientation Pos Side]
            [javafx.scene Node Scene]
            [javafx.scene.control Button ContextMenu Label MenuItem SplitPane]
-           [javafx.scene.input KeyCode KeyEvent MouseEvent]
+           [javafx.scene.input MouseEvent]
            [javafx.scene.layout AnchorPane Priority StackPane VBox]
            [javafx.scene.paint Color]
-           [javafx.scene.shape Rectangle]
-           [javafx.stage Stage]))
+           [javafx.scene.shape Rectangle]))
 
 (set! *warn-on-reflection* true)
 
@@ -235,8 +234,7 @@
                     (.setVisible false)
                     (.setFill (Color/web "#4b9fe1" 0.12))
                     (.setStroke (Color/web "#4b9fe1"))
-                    (.setStrokeWidth 2.0))
-        gesture (volatile! nil)]
+                    (.setStrokeWidth 2.0))]
     (.add (.getChildren root) indicator)
     (letfn [(clear-split! [^SplitPane split]
               (doseq [child (vec (.getItems split))
@@ -299,15 +297,20 @@
                   (ui/user-data! slot :editor.dock-windows/reserved-home true)
                   (.add (.getChildren slot)
                         (doto (Label. (localization (localization/message (str "dock." (name id)))))
+                          (.setId (str "dock-home-" (name id)))
+                          (ui/add-style! "dock-home-placeholder")
+                          (.setMaxSize Double/MAX_VALUE Double/MAX_VALUE)
                           (.setMouseTransparent true)
-                          (.setStyle "-fx-opacity: 0.45;")))
+                          (.setStyle "-fx-opacity: 0.65; -fx-background-color: derive(-fx-base, 5%); -fx-border-color: -fx-box-border; -fx-border-style: segments(4, 4); -fx-border-insets: 3;")))
                   (refresh-home! id))))
             (release-home! [id]
               (when (contains? @reserved id)
                 (let [^StackPane slot (get-in panels [id :node])]
                   (swap! reserved disj id)
                   (ui/user-data! slot :editor.dock-windows/reserved-home false)
-                  (.clear (.getChildren slot))
+                  (.removeIf (.getChildren slot)
+                             (reify java.util.function.Predicate
+                               (test [_ child] (.contains (.getStyleClass ^Node child) "dock-home-placeholder"))))
                   (refresh-home! id))))
             (save! [] (prefs/set! preferences [:window :panel-layout] @layout))
             (move! [id zone]
@@ -322,19 +325,17 @@
               (set-zone-visible! zone true)
               (render! nil))
             (cancel! []
-              (when (:stage @gesture)
-                (dock-windows/restore-slot! (get-in panels [(:panel @gesture) :node])))
-              (vreset! gesture nil)
+              (dock-windows/cancel-drag! scene)
               (.setVisible indicator false))
             (target-at [source x y]
               (reduce-kv
                 (fn [result zone ^SplitPane split]
-                  (if (and (.getScene split) (.contains split (.sceneToLocal split (double x) (double y))))
+                  (if (and (.getScene split) (.contains split (.screenToLocal split (double x) (double y))))
                     (reduced
                       (or (reduce (fn [result id]
                                     (let [^Node panel (get-in panels [id :node])
-                                          point (.sceneToLocal panel (double x) (double y))]
-                                      (if (.contains panel point)
+                                          point (.screenToLocal panel (double x) (double y))]
+                                      (if (and point (.contains panel point))
                                         (reduced (if (= source id)
                                                    (when (contains? @reserved id)
                                                      {:home true :zone zone :node panel :x 0.0 :y 0.0
@@ -348,7 +349,27 @@
                           (when (zero? (count (zone @layout)))
                             {:zone zone :node split :x 0.0 :y 0.0
                              :width (.getWidth split) :height (.getHeight split)})))
-                    result)) nil zones))]
+                    result)) nil zones))
+            (show-target! [{:keys [^Node node x y width height] :as target}]
+              (.setVisible indicator (boolean target))
+              (when target
+                (let [point (.sceneToLocal root (.localToScene node (double x) (double y)))]
+                  (.setX indicator (+ 1.0 (.getX point)))
+                  (.setY indicator (+ 1.0 (.getY point)))
+                  (.setWidth indicator (max 0.0 (- width 2.0)))
+                  (.setHeight indicator (max 0.0 (- height 2.0)))
+                  (.toFront indicator))))
+            (drop! [panel {:keys [zone target edge home]}]
+              (dock-windows/restore-slot! (get-in panels [panel :node]))
+              (when-not home
+                (if target
+                  (do
+                    (capture-trees!)
+                    (swap! trees split-trees panel zone target edge)
+                    (reset! layout (into {} (map (fn [[zone tree]] [zone (dock-windows/panel-ids tree)])) @trees))
+                    (save!)
+                    (render! nil))
+                  (move! panel zone))))]
       (render! nil)
       (doseq [[id {:keys [node ^ContextMenu popup]}] panels]
         (dock-windows/register! node (localization (localization/message (str "dock." (name id))))
@@ -360,77 +381,10 @@
                                                  (when (zero? (count @floating))
                                                    (reset! home-sizes (capture-sizes)))
                                                  (swap! floating (if visible disj conj) id)
-                                                 (if visible
-                                                   (do (swap! reserved disj id)
-                                                       (ui/user-data! node :editor.dock-windows/reserved-home false)
-                                                       (refresh-home! id))
-                                                   (if (= id (:panel @gesture))
-                                                     (reserve-home! id)
-                                                     (refresh-home! id))))}))
-      (let [drag-handler
-            (ui/event-handler event
-              (when-let [{:keys [panel x y active stage]} @gesture]
-                (let [point (.screenToLocal root (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event))
-                      mouse-x (.getX point)
-                      mouse-y (.getY point)
-                      dx (- mouse-x x)
-                      dy (- mouse-y y)]
-                  (when (or active (> (+ (* dx dx) (* dy dy)) 36.0))
-                    (when-not active (doseq [zone [:left :right :bottom :center]] (set-zone-visible! zone true)))
-                    (let [{:keys [^Node node x y width height] :as target}
-                          (target-at panel mouse-x mouse-y)]
-                      (if stage
-                        (do (.setX ^Stage stage (- (.getScreenX ^MouseEvent event) 24.0))
-                            (.setY ^Stage stage (- (.getScreenY ^MouseEvent event) 12.0)))
-                        (let [^Node source (get-in panels [panel :node])]
-                          (when (and (nil? target)
-                                     (not (.contains source (.sceneToLocal source mouse-x mouse-y))))
-                            (let [^Stage window (dock-windows/float-slot! source (- (.getScreenX ^MouseEvent event) 24.0) (- (.getScreenY ^MouseEvent event) 12.0))]
-                              (vswap! gesture assoc :stage window)
-                              (.addEventFilter (.getScene window) KeyEvent/KEY_PRESSED
-                                (ui/event-handler key-event
-                                  (when (and @gesture (= KeyCode/ESCAPE (.getCode ^KeyEvent key-event)))
-                                    (cancel!)
-                                    (.consume key-event))))))))
-                      (vswap! gesture assoc :active true :target target)
-                      (.setVisible indicator (boolean target))
-                      (when target
-                        (let [point (.sceneToLocal root (.localToScene node (double x) (double y)))]
-                          (.setX indicator (+ 1.0 (.getX point)))
-                          (.setY indicator (+ 1.0 (.getY point)))
-                          (.setWidth indicator (max 0.0 (- width 2.0)))
-                          (.setHeight indicator (max 0.0 (- height 2.0)))
-                          (.toFront indicator))))
-                    (.consume event)))))
-
-            release-handler
-            (ui/event-handler event
-              (let [{:keys [panel active target stage]} @gesture]
-                (vreset! gesture nil)
-                (.setVisible indicator false)
-                (when active
-                  (if-let [{:keys [zone target edge home]} target]
-                    (do
-                      (when stage (dock-windows/restore-slot! (get-in panels [panel :node])))
-                      (when-not home
-                      (if target
-                      (do
-                        (capture-trees!)
-                        (swap! trees split-trees panel zone target edge)
-                        (reset! layout (into {} (map (fn [[zone tree]] [zone (dock-windows/panel-ids tree)])) @trees))
-                        (save!)
-                        (render! nil))
-                      (move! panel zone))))
-                    (when-not stage
-                      (let [^Node source (get-in panels [panel :node])]
-                      (when-not (.contains source (.sceneToLocal source (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event)))
-                        (dock-windows/float-slot! source (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event))))))
-                  (release-home! panel)
-                  (.consume event))))]
-        ;; Reparenting the body can end JavaFX mouse capture in the old scene.
-        ;; Keep the same gesture reachable from both scenes while its window moves.
-        (.addEventFilter scene MouseEvent/MOUSE_DRAGGED drag-handler)
-        (.addEventFilter scene MouseEvent/MOUSE_RELEASED release-handler)
+                                                 (when visible
+                                                   (swap! reserved disj id)
+                                                   (ui/user-data! node :editor.dock-windows/reserved-home false))
+                                                 (refresh-home! id))}))
         (doseq [[id {:keys [^Node node ^Button menu ^ContextMenu popup]}] panels]
           (.setOnAction menu (ui/event-handler _ (.show popup menu Side/BOTTOM 0.0 0.0)))
           (doseq [zone [:left :right :bottom :center]]
@@ -448,19 +402,17 @@
                                     (.contains (.getStyleClass ^Node %) "tab-header-area"))
                                (.getTarget event)))
                          (nil? (ui/closest-node-where #(or (instance? javafx.scene.control.ButtonBase %)
+                                                           (instance? javafx.scene.control.ComboBoxBase %)
+                                                           (instance? javafx.scene.control.TextInputControl %)
+                                                           (instance? javafx.scene.control.Slider %)
                                                            (identical? menu %)) (.getTarget event))))
-                (vreset! gesture {:panel id :x (.getSceneX ^MouseEvent event) :y (.getSceneY ^MouseEvent event)}))))
-          (.addEventFilter ^Node (first (.getChildren ^StackPane node)) MouseEvent/MOUSE_DRAGGED
-            drag-handler)
-          (.addEventFilter ^Node (first (.getChildren ^StackPane node)) MouseEvent/MOUSE_RELEASED
-            release-handler)))
-      (.addEventFilter scene KeyEvent/KEY_PRESSED
-        (ui/event-handler event
-          (when (and @gesture (= KeyCode/ESCAPE (.getCode ^KeyEvent event)))
-            (cancel!)
-            (.consume event))))
+                (dock-windows/start-slot-drag! node (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event))))))
+
       (ui/user-data! scene ::manager
                      {:layout layout
+                      :target-at target-at
+                      :show-target! show-target!
+                      :drop! drop!
                       :trees trees
                       :floating floating
                       :reserved reserved

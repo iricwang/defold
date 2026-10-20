@@ -2299,21 +2299,24 @@
       (prefs/set-pref-entry-in! prefs [:scene :resource-settings] path-key [:camera]
                                 (camera/camera->prefs-value camera)))))
 
-(let [TabHeaderSkin (Class/forName "javafx.scene.control.skin.TabPaneSkin$TabHeaderSkin")
-      getTab (.getDeclaredMethod TabHeaderSkin "getTab" (into-array Class []))]
-  (.setAccessible getTab true)
-  (defn- handle-tab-pane-mouse-pressed!
-    [^TabPane tab-pane ^MouseEvent event]
-    (when (= MouseButton/SECONDARY (.getButton event))
-      (when-let [node (ui/closest-node-where #(instance? TabHeaderSkin %) (.getTarget event))]
-        (->> (.invoke getTab node (into-array Object []))
-             (.select (.getSelectionModel tab-pane)))))))
+(defn- handle-tab-pane-mouse-pressed! [^TabPane tab-pane ^MouseEvent event]
+  (when-let [{:keys [^Tab tab]} (dock-windows/tab-header (.getTarget event))]
+    (when (identical? tab-pane (.getTabPane tab))
+      (cond
+        (= MouseButton/SECONDARY (.getButton event))
+        (.select (.getSelectionModel tab-pane) tab)
+
+        (and (.isPrimaryButtonDown event)
+             (nil? (ui/closest-node-with-style "tab-close-button" (.getTarget event))))
+        (do
+          (.select (.getSelectionModel tab-pane) tab)
+          (dock-windows/start-slot-drag! (.getContent tab) (.getScreenX event) (.getScreenY event)))))))
 
 (defn- configure-editor-tab-pane! [^TabPane tab-pane app-view prefs]
   (ui/init-tab-pane! tab-pane)
   (apply-tab-pane-active-style! tab-pane false)
   (.setTabClosingPolicy tab-pane TabPane$TabClosingPolicy/ALL_TABS)
-  (.setTabDragPolicy tab-pane TabPane$TabDragPolicy/REORDER)
+  (.setTabDragPolicy tab-pane TabPane$TabDragPolicy/FIXED)
 
   ;; We track changes to the active editor tab in response to focus changes in
   ;; the handle-focus-owner-change! function. However, when switching between
@@ -2583,6 +2586,7 @@
                                                                         (into [:resource] data)
                                                                         (when instance-key [:view (pr-str instance-key)]))
                                                       :focus! focus-view!
+                                                      :tab tab
                                                       :bottom true
                                                       :home-visible! #(dock-windows/set-tab-empty! tab (not %))})]
         (ui/on-closed! tab (fn [_] (dispose!)))))

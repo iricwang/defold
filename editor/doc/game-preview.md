@@ -28,8 +28,10 @@ use a separate game window. Select 60, 120 (default), or 144 FPS before running.
 Drag the Game title to another panel to dock it, or use its top-right menu.
 The Scene/Game split and panel placement are saved with the editor layout.
 
-This implementation embeds the first local engine instance. On macOS, custom engines
-built with native extensions continue to use their existing windows. Additional
+This implementation embeds the first local engine instance. macOS native-extension
+builds include an editor-only bridge in their build inputs and cache key. The bridge
+is inactive for external runs; existing cached engines rebuild once to include it.
+Arbitrary development-engine overrides still use their existing windows. Additional
 instances and remote targets use their existing windows on both platforms.
 It does not synchronize scene edits into runtime
 objects. The game's configured resolution is letterboxed into the panel;
@@ -43,7 +45,7 @@ JavaFX accepts up to 144 animation pulses per second (an explicit
 ## Bridge
 
 `GamePreview` owns the panel, process session and input state. `editor.engine`
-selects the embedded session for the bundled macOS engine or a local Windows engine. The private
+selects the embedded session for bundled/editor-built macOS engines or a local Windows engine. The private
 `editor_game_bridge.h` reads input after hardware polling and captures the final
 frame before presentation. The bridge is excluded from release engines.
 
@@ -67,6 +69,12 @@ and upload can overlap without tearing or holding the lock during GPU work. Key 
 32–126 use ASCII, and 128–155 map navigation/modifier/function keys explicitly
 in both implementations. A future transport/backend must negotiate a new magic
 before changing this layout.
+
+Native macOS builds use the same protocol through
+`_defold/editor_game_bridge/src/bridge.mm`, registered with the public extension SDK.
+Its update callback injects input before the engine processes game input, and its
+post-render callback captures the final frame. Process-local Cocoa hooks keep the
+game window and Dock entry hidden without hiding or manipulating other applications.
 
 Validation includes keyboard-code collisions, letterboxed pointer coordinates,
 docking invariants, and a live editor/engine exercise for input, held-key release,

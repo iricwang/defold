@@ -1,0 +1,5 @@
+name: DefoldEditorGameBridge
+platforms:
+  osx:
+    context:
+      frameworks: [AppKit]

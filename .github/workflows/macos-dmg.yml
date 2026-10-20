@@ -71,7 +71,7 @@ jobs:
           # boundaries in editor tests. Retain the release output, then test sources.
           mv target/classes target/release-classes
           LEIN_HOME="$PWD/build/lein" bash scripts/lein do javac, test \
-            editor.patch-test editor.docking-test editor.dock-windows-test editor.game-preview-test \
+            editor.patch-test editor.docking-test editor.dock-windows-test editor.game-preview-test editor.engine-game-test \
             editor.gui-animation-data-test editor.gui-animation-features-test editor.gui-animation-io-test \
             editor.gui-animation-timeline-test editor.gui-animation-preview-test \
             editor.gui-animation-events-test editor.gui-animation-inspector-test \
@@ -146,6 +146,25 @@ jobs:
           python -X utf8 -c "import pathlib,zipfile; p=next(pathlib.Path('editor/target/editor').glob('Defold-x86_64-win32-patch-*.zip')); z=zipfile.ZipFile(p); n=next(n for n in z.namelist() if n.startswith('files/packages/defold-') and n.endswith('.jar')); pathlib.Path('tmp/windows-test-editor.jar').write_bytes(z.read(n))"
           $env:DEFOLD_PATCH_TEST_JAR = "$PWD/tmp/windows-test-editor.jar"
           python -X utf8 -m unittest discover -s patch -p 'test_windows.py'
+      - name: Test Windows panel drag and redocking events
+        shell: bash
+        run: |
+          python -X utf8 - <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+
+          root = Path.cwd()
+          editor = root / 'editor'
+          shutil.move(editor / 'target/classes', editor / 'target/release-classes')
+          env = dict(os.environ, DYNAMO_HOME=str(root / 'tmp/windows-patch-home'),
+                     DM_BOB_JAR=str(root / 'tmp/windows-patch-home/share/java/bob-editor.jar'),
+                     DM_EDITOR_USE_BOB_PROTOCOLS='1', LEIN_HOME=str(editor / 'build/lein'))
+          code = "(javafx.application.Platform/startup (fn [] (javafx.application.Platform/setImplicitExit false))) (require 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test) (let [r (clojure.test/run-tests 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test)] (System/exit (if (zero? (+ (:fail r) (:error r))) 0 1)))"
+          subprocess.run(['bash', 'scripts/lein', 'with-profile', '+offline', 'run',
+                          '-m', 'clojure.main', '-e', code], cwd=editor, env=env, check=True)
+          PY
       - name: Upload patch and baseline inventory
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:

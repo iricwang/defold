@@ -282,7 +282,20 @@
         (pos? (count (global-resource-nodes-by-upload-path project evaluation-context))))))
 
 (defn- make-extender-resources [project platform evaluation-context]
-  (let [global-resource-nodes (global-resource-nodes-by-upload-path project evaluation-context)]
+  (let [global-resource-nodes (global-resource-nodes-by-upload-path project evaluation-context)
+        resources (doto (ArrayList.)
+                    (.add (make-app-manifest-resource (get global-resource-nodes app-manifest-upload-path) evaluation-context)))]
+    ;; These editor-only sources participate in the cache key. Existing native
+    ;; engines must rebuild instead of silently retaining a bridge-less binary.
+    (when (contains? #{"arm64-macos" "x86_64-macos"} platform)
+      (doseq [path ["ext.manifest" "src/bridge.mm"]]
+        (let [content (with-open [input (io/input-stream (io/resource (str "_defold/editor_game_bridge/" path)))]
+                        (.readAllBytes input))]
+          (.add resources
+                (reify ExtenderResource
+                  (getPath [_] (str "__defold_editor_game_bridge/" path))
+                  (getContent [_] content)
+                  (getLastModified [_] 0))))))
     (reduce-kv
       (fn [^ArrayList acc upload-path resource-node]
         (doto acc
@@ -292,8 +305,7 @@
                     (resource-node-content resource-node evaluation-context))
                   (getLastModified [_]
                     (resource-node-last-modified resource-node evaluation-context))))))
-      (doto (ArrayList.)
-        (.add (make-app-manifest-resource (get global-resource-nodes app-manifest-upload-path) evaluation-context)))
+      resources
       (merge (dissoc global-resource-nodes app-manifest-upload-path)
              (extension-resource-nodes-by-upload-path project evaluation-context platform)
              (get-main-manifest-file-upload-resource project evaluation-context platform)))))

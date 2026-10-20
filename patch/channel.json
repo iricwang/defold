@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 55,
-  "version": "1.14.1-patch.55",
+  "revision": 58,
+  "version": "1.14.1-patch.58",
   "repository": "iricwang/defold",
-  "notes": "Fix embedded black screen by selecting show-requested game windows instead of hidden GLFW helpers"
+  "notes": "完善窗口实时拖拽：原位占位、独立浮窗、浮窗分组和四向分区、资源标签与 GUI 动效面板拖出，Esc 恢复；Windows 使用原生鼠标状态保持跨窗口拖动。"
 }

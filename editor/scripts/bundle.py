@@ -478,7 +478,7 @@ def create_patch(jdk, platform, options):
         config = configparser.ConfigParser()
         config.read('bundle-resources/config')
         for key, value in {'editor_sha1': options.editor_sha1, 'engine_sha1': options.engine_sha1 or '',
-                           'version': options.version, 'time': datetime.datetime.now().isoformat(),
+                           'version': metadata['version'], 'time': datetime.datetime.now().isoformat(),
                            'archive_domain': options.archive_domain, 'channel': options.channel or ''}.items():
             config.set('build', key, value)
         if not config.get('launcher', 'jdk').endswith('/jdk-' + java_version):

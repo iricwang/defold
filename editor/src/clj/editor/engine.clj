@@ -303,12 +303,19 @@
           (str port)))
       (catch Exception _))))
 
+(defn mac-preview-engine?
+  "Bundled and editor-built native engines support Game; arbitrary development binaries do not."
+  [^File engine ^File project-directory ^File unpack-directory]
+  (let [path (.normalize (.toAbsolutePath (.toPath engine)))]
+    (or (.startsWith path (.normalize (.toAbsolutePath (.toPath unpack-directory))))
+        (.startsWith path (.normalize (.toAbsolutePath (.toPath (io/file project-directory "build"))))))))
+
 (defn launch! [^File engine project-directory prefs debug instance-index focus]
   (let [game-session (GamePreview/prepare (.getAbsolutePath ^File project-directory)
                                           (and (zero? instance-index)
                                                (or (.isWindows (Platform/getHostPlatform))
                                                    (and system/mac?
-                                                        (.startsWith (.getAbsolutePath engine) (system/defold-unpack-path))))))
+                                                        (mac-preview-engine? engine project-directory (io/file (system/defold-unpack-path)))))))
         defold-log-dir (some-> (system/defold-log-dir)
                                (File.)
                                (.getAbsolutePath))
@@ -333,6 +340,7 @@
 
                game-session
                (into ["--config=display.fullscreen=0"
+                      "--config=display.focus_on_show=0"
                       "--config=display.high_dpi=0"
                       "--config=display.vsync=0"
                       (str "--config=display.update_frequency=" (.getFrameRate game-session))
