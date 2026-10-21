@@ -56,7 +56,7 @@ def verify_patch(patch, jdk):
         jar = Path(directory) / 'editor.jar'
         with zipfile.ZipFile(patch) as archive:
             entries = [name for name in archive.namelist()
-                       if name.startswith('files/packages/defold-') and name.endswith('.jar')]
+                       if name.startswith(('files/packages/defold-', 'Defold/packages/defold-')) and name.endswith('.jar')]
             if len(entries) != 1:
                 raise ValueError('Expected exactly one editor JAR in the patch')
             jar.write_bytes(archive.read(entries[0]))
@@ -96,7 +96,7 @@ def build_windows_native(source, destination):
         subprocess.run(['cmd', '/d', '/c', str(script)], cwd=build, check=True)
 
 
-def main():
+def main(*, baseline=None, full=False):
     os.chdir(ROOT)
     home = ROOT / 'tmp/windows-patch-home'
     os.environ['DYNAMO_HOME'] = str(home)
@@ -126,12 +126,13 @@ def main():
         destination = home / ('bin' if name in ('launcher.exe', 'dmengine.pdb') else 'lib') / 'x86_64-win32' / name
         download(f'{archive_url}/engine/x86_64-win32/{name}', destination)
     subprocess.run([sys.executable, 'patch/manage.py', 'stage'], check=True)
-    subprocess.run([sys.executable, 'patch/manage.py', 'prepare-base', '--directory', 'tmp/patch-base', '--platform', 'x86_64-win32'], check=True)
+    if not full and baseline is None:
+        subprocess.run([sys.executable, 'patch/manage.py', 'prepare-base', '--directory', 'tmp/patch-base', '--platform', 'x86_64-win32'], check=True)
     metadata = json.loads((ROOT / 'patch/channel.json').read_text())
     os.chdir(ROOT / 'editor')
     sys.path.insert(0, str(ROOT / 'editor/scripts'))
     import bundle
-    options = SimpleNamespace(patch_base=str(ROOT / 'tmp/patch-base/Defold-x86_64-win32-state.json'),
+    options = SimpleNamespace(patch_base=str(baseline or ROOT / 'tmp/patch-base/Defold-x86_64-win32-state.json'),
         editor_sha1=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
         engine_sha1=None, version=metadata['version'], channel=metadata['channel'],
         archive_domain='d.defold.com', launcher=str(home / 'bin/x86_64-win32/launcher.exe'), codesign=False)
@@ -143,12 +144,17 @@ def main():
     bundle.invoke_lein(['run', '-m', 'editor.ns-batch-builder', 'resources/sorted_clojure_ns_list.edn'], jdk_path=jdk)
     bundle.invoke_lein(['prerelease'], jdk_path=jdk)
     options.engine_sha1 = ENGINE
+    if full:
+        # create_bundle uses editor/tmp as its staging directory.
+        staging = ROOT / 'editor/tmp'
+        if staging.is_symlink() or staging.resolve().parent != (ROOT / 'editor').resolve():
+            raise ValueError('Full bundle staging must remain inside editor/')
+        bundle.create_bundle(jdk, 'x86_64-win32', options)
+        verify_patch(ROOT / 'editor/target/editor/Defold-x86_64-win32.zip', jdk)
+        return
     bundle.create_patch(jdk, 'x86_64-win32', options)
-    patches = list((ROOT / 'editor/target/editor').glob(
-        f"Defold-x86_64-win32-patch-*-to-{metadata['revision']}.zip"))
-    if len(patches) != 1:
-        raise ValueError('Expected exactly one patch for the current revision')
-    verify_patch(patches[0], jdk)
+    base_revision = json.loads(Path(options.patch_base).read_text())['metadata']['revision']
+    verify_patch(ROOT / 'editor/target/editor' / f"Defold-x86_64-win32-patch-{base_revision}-to-{metadata['revision']}.zip", jdk)
 
 
 if __name__ == '__main__':
