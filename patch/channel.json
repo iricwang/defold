@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 60,
-  "version": "1.14.1-patch.60",
+  "revision": 69,
+  "version": "1.14.1-patch.69",
   "repository": "iricwang/defold",
-  "notes": "Game 未运行时实时预览 GUI 游戏画面与场景相机；共享场景 GPU 缓存优化首次预览，静态画面停止重复渲染，修复预览状态文字同步。"
+  "notes": "Compact native GUI Rect Transform inspector with anchor and pivot preset menus, original property controls and override actions, synchronized rectangle tool state, and persistent native toolbar command."
 }

@@ -1,0 +1,2 @@
+material: "/builtins/materials/gui.material"
+nodes { id: "inner" type: TYPE_BOX position { x: 5 y: 5 } size { x: 35 y: 40 } color { x: 0.5 y: 0.3 z: 1 } size_mode: SIZE_MODE_MANUAL adjust_mode: ADJUST_MODE_ZOOM }

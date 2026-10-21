@@ -372,8 +372,11 @@
                   (move! panel zone))))]
       (render! nil)
       (doseq [[id {:keys [node ^ContextMenu popup]}] panels]
+        (when-let [items (.get (.getProperties ^Node (bodies id)) "dock-menu-items")]
+          (.addAll (.getItems popup) ^java.util.Collection items))
         (dock-windows/register! node (localization (localization/message (str "dock." (name id))))
                                {:persistent-key [:panel id]
+                                :title-property (.get (.getProperties ^Node (bodies id)) "dock-title")
                                 :menu-items (.getItems popup)
                                 :reserve-home! #(reserve-home! id)
                                 :release-home! #(release-home! id)

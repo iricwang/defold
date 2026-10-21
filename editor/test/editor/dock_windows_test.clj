@@ -23,6 +23,36 @@
            [javafx.scene.control SplitPane]
            [javafx.scene.layout StackPane]))
 
+;; Resource title changes follow the floating tab and native window without rebuilding or moving content.
+(deftest floating-resource-title-test
+  (ui/run-now
+    (let [preferences (prefs/make :schemas [:default])
+          localize (localization/make-editor preferences #(throw %))
+          slot (StackPane. (into-array javafx.scene.Node [(javafx.scene.control.Label. "Preview")]))
+          root (doto (StackPane. (into-array javafx.scene.Node [slot])) (.setId "workbench"))
+          scene (Scene. root 600.0 400.0)
+          owner (doto (javafx.stage.Stage.) (.setScene scene) (.setX -10000.0) (.setY -10000.0))
+          title (javafx.beans.property.SimpleStringProperty. "Game")
+          previous-main-stage (ui/main-stage)]
+      (ui/user-data! scene :localization localize)
+      (try
+        (.show owner)
+        (ui/set-main-stage owner)
+        (dock/register! slot "Game" {:title-property title})
+        (dock/float-slot! slot -10000.0 -10000.0)
+        (let [manager (ui/user-data scene :editor.dock-windows/manager)
+              window (val (first @(:windows manager)))
+              stage ^javafx.stage.Stage (:stage window)
+              group ^javafx.scene.control.TabPane (.getCenter ^javafx.scene.layout.BorderPane (:host window))
+              label ^javafx.scene.control.Label (.getGraphic (.get (.getTabs group) 0))]
+          (.set title "Game · screen.gui")
+          (is (= "Game · screen.gui" (.getTitle stage)))
+          (is (= "Game · screen.gui" (.getText label)))
+          (.set title "Game")
+          (is (= "Game" (.getTitle stage)))
+          (is (= "Game" (.getText label))))
+        (finally (dock/restore-all! scene) (.hide owner) (ui/set-main-stage previous-main-stage))))))
+
 ;; Moving panels must neither duplicate them nor discard other nested panels.
 (deftest nested-layout-test
   (doseq [edge [:left :right :top :bottom :tab]]

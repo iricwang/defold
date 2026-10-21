@@ -13,6 +13,80 @@ import zipfile
 @unittest.skipUnless(os.name == 'nt' and os.environ.get('DEFOLD_PATCH_TEST_JAR'),
                      'Windows editor JAR required')
 class EditorPipelineTest(unittest.TestCase):
+    # Fresh patch cache paths must not consume session-wide DLL hook slots or lose native errors.
+    def test_game_startup_across_fresh_native_cache_paths(self):
+        root = Path(__file__).resolve().parents[1]
+        spec = importlib.util.spec_from_file_location('windows_build', root / 'scripts/windows/build-patch.py')
+        builder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder)
+        with tempfile.TemporaryDirectory(prefix='game-cache-probe-', dir=root / 'tmp') as directory:
+            probe = Path(directory) / 'probe.exe'
+            builder.build_windows_native(root / 'patch/game-window-probe.c', probe)
+            code = f"""(com.defold.libs.ResourceUnpacker/unpackResources)
+                      (let [original (System/getProperty "defold.unpack.path")
+                            source (java.io.File. original "x86_64-win32/lib/game_window_hook.dll")]
+                        (try
+                          (dotimes [i 40]
+                            (let [cache (java.io.File. {json.dumps(directory)} (str "cache 路径 " i))
+                                  dll (java.io.File. cache "x86_64-win32/lib/game_window_hook.dll")]
+                              (.mkdirs (.getParentFile dll))
+                              (clojure.java.io/copy source dll)
+                              (System/setProperty "defold.unpack.path" (.getPath cache))
+                              (let [native (com.sun.jna.NativeLibrary/getInstance (.getPath dll))]
+                                (assert (= 6 (.invokeInt (.getFunction native "StartGuardedGameProcess")
+                                             (object-array [nil nil]))) "Native error must survive the call"))
+                              (let [p (com.defold.editor.WindowsGameProcess/start
+                                        [{json.dumps(str(probe))}] (java.io.File. {json.dumps(directory)}) {{}})
+                                    output (with-open [stream (.getInputStream p)] (slurp stream))]
+                                (assert (= 0 (.waitFor p)) output)
+                                (assert (.contains output "HIDDEN_STARTUP_AND_ADOPTION_OK") output)
+                                (assert (not (.isAlive p))))))
+                          (println "FRESH_CACHE_STARTS_OK 40")
+                          (finally (System/setProperty "defold.unpack.path" original))))"""
+            result = subprocess.run(
+                [str(Path(os.environ['JAVA_HOME']) / 'bin/java.exe'),
+                 '--enable-native-access=ALL-UNNAMED',
+                 f'-Djdk.net.unixdomain.tmpdir={root / "tmp"}',
+                 '-cp', os.environ['DEFOLD_PATCH_TEST_JAR'], 'clojure.main', '-e', code],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                encoding='utf-8', errors='replace', timeout=120,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+            self.assertEqual(0, result.returncode, result.stdout)
+            self.assertIn('FRESH_CACHE_STARTS_OK 40', result.stdout)
+
+    # Simulator ships its device classes, bounded resource cache and matching native safe-area symbols together.
+    def test_simulator_and_preview_cache_in_shipped_jar(self):
+        code = """(require 'cljfx.api '[editor.game-preview :as preview])
+                  (com.defold.libs.ResourceUnpacker/unpackResources)
+                  (let [device (com.defold.editor.SimulatorDevice. "Test" 100 200 20 3 10 7 8 20 10 5)
+                        entries (reduce preview/retain-preview []
+                                  (mapv (fn [i] {:view i :bytes (* 5 1024 1024)}) (range 20)))
+                        directory (System/getProperty "defold.unpack.path")
+                        library (com.sun.jna.NativeLibrary/getInstance
+                                  (str directory "/x86_64-win32/lib/game_window_hook.dll"))
+                        resolve-symbol (.getFunction library "SimulatorSafeAreaRva")]
+                    (assert (= [7 20 3 10] (vec (.insets device 1))))
+                    (assert (= [19 18 17 16 15 14] (mapv :view entries)))
+                    (assert (pos? (.invokeLong resolve-symbol
+                      (object-array [(com.sun.jna.WString. (str directory "/x86_64-win32/bin/dmengine.exe"))]))))
+                    (assert (zero? (.invokeLong resolve-symbol
+                      (object-array [(com.sun.jna.WString. (str directory "/missing-engine.exe"))])))))
+                  (shutdown-agents) (System/exit 0)"""
+        result = subprocess.run(
+            [str(Path(os.environ['JAVA_HOME']) / 'bin/java.exe'),
+             '--enable-native-access=ALL-UNNAMED', '-Dglass.platform=headless', '-Dprism.order=sw',
+             '--add-opens=java.base/java.lang=ALL-UNNAMED',
+             '--add-opens=java.base/sun.nio.fs=ALL-UNNAMED',
+             '--add-opens=java.desktop/sun.awt=ALL-UNNAMED',
+             '--add-opens=java.desktop/sun.awt.image=ALL-UNNAMED',
+             '--add-opens=java.desktop/sun.java2d.opengl=ALL-UNNAMED',
+             '--add-opens=java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED',
+             f'-Djdk.net.unixdomain.tmpdir={Path.cwd() / "tmp"}',
+             '-cp', os.environ['DEFOLD_PATCH_TEST_JAR'], 'clojure.main', '-e', code],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            encoding='utf-8', errors='replace', timeout=120)
+        self.assertEqual(0, result.returncode, result.stdout)
+
     # Show requests stay hidden until adoption; hidden helpers must never be selected as the game.
     def test_game_window_hidden_until_adopted(self):
         root = Path(__file__).resolve().parents[1]

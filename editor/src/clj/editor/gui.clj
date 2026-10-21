@@ -1326,11 +1326,13 @@
   (output scene-renderable g/Any (g/constantly nil))
   (output scene-outline-renderable g/Any (g/constantly nil))
   (output color+alpha types/Color (g/fnk [color alpha] (assoc color 3 alpha)))
-  (output scene g/Any :cached (g/fnk [_node-id id aabb pose scene-children scene-renderable scene-outline-renderable scene-updatable]
+  (output game-preview-node-data g/Any (g/fnk [type] {:type type}))
+  (output scene g/Any :cached (g/fnk [_node-id id aabb pose scene-children scene-renderable scene-outline-renderable scene-updatable game-preview-node-data]
                                 (cond-> {:node-id _node-id
                                          :node-outline-key id
                                          :aabb aabb
                                          :pose pose
+                                         :gui-layout game-preview-node-data
                                          :renderable scene-renderable}
 
                                   scene-outline-renderable
@@ -1627,6 +1629,10 @@
 
 (g/defnode VisualNode
   (inherits GuiNode)
+
+  (output game-preview-node-data g/Any
+          (g/fnk [type adjust-mode x-anchor y-anchor]
+            {:type type :adjust-mode adjust-mode :x-anchor x-anchor :y-anchor y-anchor}))
 
   (property visible g/Bool (default (protobuf/default Gui$NodeDesc :visible))
             (dynamic edit-type (layout-property-edit-type visible {:type g/Bool}))
@@ -3982,6 +3988,13 @@
                                (let [node-tree-scene default-scene]
                                  (:children node-tree-scene))))
   (output scene g/Any :cached produce-scene)
+  (output game-preview-config g/Any :cached
+          (g/fnk [node-msgs project-settings display-profiles layout-names adjust-reference]
+            {:nodes node-msgs
+             :settings project-settings
+             :profiles display-profiles
+             :layouts layout-names
+             :adjust-reference adjust-reference}))
   (output scene-dims g/Any :cached
           (g/fnk [display-profiles project-settings trivial-gui-scene-info]
             (let [current-layout (:current-layout trivial-gui-scene-info)]

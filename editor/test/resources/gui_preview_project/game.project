@@ -1,0 +1,14 @@
+[project]
+title = GUI adaptation regression
+[display]
+width = 320
+height = 240
+display_profiles = /layouts.display_profilesc
+[bootstrap]
+main_collection = /parent.collectionc
+[render]
+clear_color_red = 0.05
+clear_color_green = 0.1
+clear_color_blue = 0.15
+[gui]
+safe_area_mode = both

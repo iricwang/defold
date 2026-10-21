@@ -446,12 +446,14 @@
                   (.setTabClosingPolicy TabPane$TabClosingPolicy/UNAVAILABLE)
                   (ui/add-style! "floating-dock-group"))]
       (doseq [id ids]
-        (let [{:keys [^Node body title]} (@panels id)
+        (let [{:keys [^Node body title title-property]} (@panels id)
               label (doto (Label. title)
                       (ui/add-style! "floating-dock-tab-label")
                       (.setTooltip (doto (Tooltip.)
                                      (localization/localize! (ui/user-data scene :localization) (localization/message "dock.drag-help")))))
               tab (doto (Tab.) (.setGraphic label) (.setContent (or (get reserved-bodies id) body)))]
+          (when title-property
+            (.bind (.textProperty label) ^javafx.beans.value.ObservableValue title-property))
           (install-drag! manager label id)
           (.setOnMouseClicked label (ui/event-handler event
                                      (when (and (= 2 (.getClickCount ^MouseEvent event))
@@ -497,7 +499,7 @@
     (when (and floating floating!) (floating! false))))
 
 (defn float-panel! [{:keys [^Scene scene panels windows persistence] :as manager} id x y]
-  (let [{:keys [^StackPane slot title floating! floating home-visible!]} (@panels id)
+  (let [{:keys [^StackPane slot title title-property floating! floating home-visible!]} (@panels id)
         localization (ui/user-data scene :localization)
         host (BorderPane.)
         indicator (doto (Rectangle.)
@@ -517,6 +519,8 @@
                 (.setX (double x))
                 (.setY (double y)))
         window-id (random-uuid)]
+    (when title-property
+      (.bind (.titleProperty stage) ^javafx.beans.value.ObservableValue title-property))
     (when-not (:restoring @persistence) (capture! manager))
     (.setAll (.getStylesheets floating-scene) ^java.util.Collection (.getStylesheets scene))
     (.setAll (.getStylesheets root) ^java.util.Collection (.getStylesheets (.getRoot scene)))
@@ -558,7 +562,7 @@
 
 (defn register!
   "Register a stable home slot. Its body is moved, never copied; dispose before deleting the view."
-  [^StackPane slot title {:keys [focus! floating! menu-items home-visible! reserve-home! release-home! bottom persistent-key drag-handle tab]}]
+  [^StackPane slot title {:keys [focus! floating! menu-items title-property home-visible! reserve-home! release-home! bottom persistent-key drag-handle tab]}]
   (let [manager (manager (ui/main-scene))
         id (random-uuid)
         body (doto (StackPane.) (.setMinSize 0.0 0.0))
@@ -627,7 +631,7 @@
     (ui/user-data! body ::focus! focus!)
     (when focus!
       (.addEventFilter body MouseEvent/MOUSE_PRESSED (ui/event-handler _ (focus!))))
-    (swap! (:panels manager) assoc id {:body body :slot slot :title title :persistent-key persistent-key :tab tab
+    (swap! (:panels manager) assoc id {:body body :slot slot :title title :title-property title-property :persistent-key persistent-key :tab tab
                                      :floating! (fn [floating]
                                                   (localization/localize! item localization (localization/message (if floating "dock.return" "dock.float")))
                                                   (when floating! (floating! floating)))

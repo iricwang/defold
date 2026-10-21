@@ -344,7 +344,12 @@
                       "--config=display.high_dpi=0"
                       "--config=display.vsync=0"
                       (str "--config=display.update_frequency=" (.getFrameRate game-session))
-                      "--config=engine.run_while_iconified=1"]))
+                      "--config=engine.run_while_iconified=1"])
+
+               (and game-session (.isSimulator game-session))
+               (into ["--graphics-adapter=opengl"
+                      (str "--config=display.window_width=" (.getDeviceWidth game-session))
+                      (str "--config=display.window_height=" (.getDeviceHeight game-session))]))
         env {"DM_SERVICE_PORT" (or (validate-service-port (System/getenv "DM_SERVICE_PORT"))
                                    "dynamic")
              "DM_QUIT_ON_ESC" (if (prefs/get prefs [:run :quit-on-escape])
@@ -353,7 +358,7 @@
              "_NT_ALT_SYMBOL_PATH" (.getAbsolutePath (.getParentFile engine))
              "MESA_GL_VERSION_OVERRIDE" nil
              "MESA_LOADER_DRIVER_OVERRIDE" nil}
-        env (cond-> env (and game-session system/mac?)
+        env (cond-> env (and game-session (or system/mac? (.isSimulator game-session)))
               (assoc "DM_EDITOR_GAME_FILE" (.getPath game-session)
                      "DM_EDITOR_GAME_PARENT" (str (.pid (ProcessHandle/current)))
                      "DM_QUIT_ON_ESC" "0"))

@@ -538,7 +538,7 @@
 (defn game-preview-camera
   "Uses the selected camera, then the first authored camera. GUI and camera-less
   scenes use the default render script's bottom-left orthographic projection."
-  [scene-render-data gui-dims display-dims]
+  [scene-render-data gui-dims display-dims device-dims]
   (let [camera-renderables (into []
                                 (comp (mapcat val)
                                       (filter camera-renderable?)
@@ -547,14 +547,20 @@
         camera-renderable (or (coll/first-where :selected camera-renderables)
                               (first camera-renderables))
         [width height] (or gui-dims display-dims)
-        aspect (/ (double width) (double height))]
+        [device-width device-height] (or device-dims [width height])
+        aspect (/ (double device-width) (double device-height))
+        scale (min (/ (double device-width) width) (/ (double device-height) height))]
     (if (and (nil? gui-dims) camera-renderable)
       (when (valid-camera-inset-orthographic-zoom? camera-renderable)
-        (when-let [aspect (camera-inset-aspect-ratio camera-renderable)]
-          {:camera (make-camera-inset-camera camera-renderable aspect)
-           :aspect aspect
+        (when-let [camera-aspect (camera-inset-aspect-ratio camera-renderable)]
+          {:camera (make-camera-inset-camera camera-renderable
+                     (if (and device-dims (or (get-in camera-renderable [:user-data :auto-aspect-ratio])
+                                             (get-in camera-renderable [:user-data :is-orthographic])))
+                       aspect
+                       camera-aspect))
+           :aspect (if device-dims aspect camera-aspect)
            :mode "game-preview.edit-camera"}))
-      {:camera (assoc (c/make-camera :orthographic identity {:fov-x width :fov-y height})
+      {:camera (assoc (c/make-camera :orthographic identity {:fov-x (/ device-width scale) :fov-y (/ device-height scale)})
                  :position (Point3d. (/ width 2.0) (/ height 2.0) 0.0)
                  :z-near -1.0
                  :z-far 1.0)
@@ -594,9 +600,8 @@
   first open. Only the owning SceneView prunes caches or destroys the context."
   []
   (let [target-ref (volatile! nil)
-        image-ref (volatile! nil)
         buffer-ref (atom nil)]
-    {:render! (fn [scene-render-data updatable-states camera width height clear-color drawable]
+    {:render! (fn [scene-render-data updatable-states camera width height clear-color drawable image]
                 (when (and @target-ref
                            (or (not (identical? drawable (:drawable @target-ref)))
                                (not= [width height] (:size @target-ref))))
@@ -623,7 +628,13 @@
                                          (vreset! target-ref (make-game-preview-target! gl drawable width height)))]
                           (.glBindFramebuffer gl GL3/GL_FRAMEBUFFER (aget ^ints (:framebuffer target) 0))
                           (render! gl-context :camera-inset renderables updatable-states viewport args clear-color)
-                          (vreset! image-ref (SwingFXUtils/toFXImage (read-to-buffered-image buffer-ref width height) @image-ref)))
+                          ;; toFXImage accepts an oversized destination without shrinking it.
+                          ;; Device switches and panel resizes must not retain that old canvas.
+                          (SwingFXUtils/toFXImage (read-to-buffered-image buffer-ref width height)
+                            (when (and image
+                                       (== width (.getWidth ^WritableImage image))
+                                       (== height (.getHeight ^WritableImage image)))
+                              image)))
                         (finally
                           (.glActiveTexture gl GL/GL_TEXTURE0)
                           (.glBindTexture gl GL/GL_TEXTURE_2D 0)
@@ -635,7 +646,6 @@
      :dispose! (fn []
                  (delete-game-preview-target! @target-ref)
                  (vreset! target-ref nil)
-                 (vreset! image-ref nil)
                  (reset! buffer-ref nil))}))
 
 (defn- apply-pass-overrides
@@ -923,7 +933,7 @@
      :selected-renderables []
      :scene-aabb geom/empty-bounding-box}
     (let [preview-overrides (merge-with coll/merge animation-preview-overrides preview-overrides)
-          scene (if-let [preview-fn (and (coll/not-empty animation-preview-overrides)
+          scene (if-let [preview-fn (and (coll/not-empty preview-overrides)
                                          (:animation-preview-fn scene))]
                   (preview-fn scene preview-overrides)
                   scene)

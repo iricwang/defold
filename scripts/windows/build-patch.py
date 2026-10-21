@@ -76,7 +76,7 @@ def build_windows_native(source, destination):
     gcc = shutil.which('gcc')
     if gcc:
         subprocess.run([gcc, *(['-shared'] if shared else []), '-O2', '-static-libgcc', '-o', str(destination),
-                        str(source), '-luser32'], check=True)
+                        str(source), '-luser32', '-lgdi32', '-lopengl32', '-ldbghelp'], check=True)
         return
     vswhere = Path(os.environ['ProgramFiles(x86)']) / 'Microsoft Visual Studio/Installer/vswhere.exe'
     installation = subprocess.check_output(
@@ -92,7 +92,7 @@ def build_windows_native(source, destination):
         script.write_text(
             f'@call "{vcvars}" >nul\r\n@if errorlevel 1 exit /b 1\r\n'
             f'@cl /nologo {"/LD" if shared else ""} /O2 /MT "{source}" /Fo:"{build / "hook.obj"}" '
-            f'/Fe:"{destination}" user32.lib /link /IMPLIB:"{build / "hook.lib"}"\r\n')
+            f'/Fe:"{destination}" user32.lib gdi32.lib opengl32.lib dbghelp.lib /link /IMPLIB:"{build / "hook.lib"}"\r\n')
         subprocess.run(['cmd', '/d', '/c', str(script)], cwd=build, check=True)
 
 

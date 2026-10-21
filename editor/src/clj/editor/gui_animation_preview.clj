@@ -63,15 +63,29 @@
   [scene node-overrides]
   (apply-preview-impl scene node-overrides 1.0))
 
+(defn graph-property-steps
+  "Apply transient GUI properties to the evaluated layout, including existing
+  named-layout overrides. Layout edits carry their source layout; animation
+  values use the requested layout, or the node's current layout when nil."
+  [node-overrides evaluation-context layout]
+  (into []
+        (mapcat (fn [[node-id overrides]]
+                  (let [layout (when (g/has-property? (g/node-type* (:basis evaluation-context) node-id) :layout->prop->override)
+                                 (or (:layout overrides) layout
+                                     (:current-layout (g/node-value node-id :trivial-gui-scene-info evaluation-context))))]
+                    (into []
+                          (mapcat (fn [[property value]]
+                                    (if (or (nil? layout) (= "" layout))
+                                      (g/set-property node-id property value)
+                                      (g/update-property node-id :layout->prop->override assoc-in [layout property] value))))
+                          (:graph-properties overrides)))))
+        node-overrides))
+
 (defn apply-full-preview
   "Re-evaluate geometry/text/trigger changes against a disposable graph basis.
   No transaction is committed and the preview context never enters the system cache."
   [scene node-overrides]
-  (let [steps (into []
-                    (mapcat (fn [[node-id overrides]]
-                              (into [] (mapcat (fn [[property value]] (g/set-property node-id property value)))
-                                    (:graph-properties overrides))))
-                    node-overrides)]
+  (let [steps (graph-property-steps node-overrides (g/make-evaluation-context) nil)]
     (if (zero? (count steps))
       (apply-preview scene node-overrides)
       (let [base-cache (g/cache)

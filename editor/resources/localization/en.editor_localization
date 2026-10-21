@@ -2869,6 +2869,26 @@ game-preview.resolution-limit = Game preview supports up to 2048 × 2048. Reduce
 game-preview.connection-closed = Game connection closed. Stop and run again.
 
 game-preview.frame-rate = Preview frame rate (takes effect on the next run)
+game-preview.simulator = Simulator
+game-preview.simulator-timeout = No runtime frame received. Check the Console; Simulator needs OpenGL and the engine's matching dmengine.pdb.
+game-preview.safe-area = Safe area
+game-preview.custom-device = Customize…
+game-preview.import-devices = Import .device folder…
+game-preview.rotate-device = Rotate the device clockwise / portrait
+game-preview.simulator-ready = Run to preview this device using the real game renderer. Panel size changes only the display scale. Green lines show the safe area.
+game-preview.search-device = Search devices
+game-preview.device-hint = Dimensions are physical pixels (64–4096). Insets and cutouts are editable test values; calibrate them against your target device. The game receives the safe area through window.get_safe_area().
+game-preview.device-invalid = Enter whole pixel values. Width/height: 64–4096. Insets must leave a positive safe area; cutout and radius must fit inside the screen.
+game-preview.device-width = Width (px)
+game-preview.device-height = Height (px)
+game-preview.device-top = Top inset
+game-preview.device-right = Right inset
+game-preview.device-bottom = Bottom inset
+game-preview.device-left = Left inset
+game-preview.device-radius = Corner radius
+game-preview.device-cutout-width = Cutout width
+game-preview.device-cutout-height = Cutout height
+game-preview.device-cutout-top = Cutout top offset
 
 # PhotoCraft IP binding
 command.photocraft.bind = Bind PhotoCraft by IP…
@@ -3019,5 +3039,31 @@ game-preview.edit-camera = Camera preview
 game-preview.edit-default = Default projection
 game-preview.edit-unavailable = Preview unavailable
 game-preview.edit-empty = Open a GUI, collection or game object to preview it here.
-game-preview.edit-hint = Edit preview follows the open resource. Scripts, runtime camera selection and custom render scripts require running the game.
+game-preview.edit-hint = Edit preview follows GUI, Collection and GO resources. Lock keeps the current resource. Run to verify scripts, custom rendering and device adaptation.
 game-preview.edit-loading = Preparing preview…
+
+game-preview.lock = Lock preview
+
+gui-layout.title = GUI Layout
+gui-layout.current-layout = Layout:
+gui-layout.default-layout = Default
+gui-layout.anchor = Anchors
+gui-layout.pivot = Pivot
+gui-layout.keep-appearance = Keep appearance when changing pivot
+gui-layout.native-anchors = Anchors use viewport edges. The middle preset means None. Rect edits affect the current layout.
+gui-layout.rect-tool = Rect
+gui-layout.drag-help = Drag inside to move, edges to resize. Ctrl-drag the yellow pivot to snap to nine points. Shift: aspect ratio or movement axis. Escape: cancel. Auto size becomes Manual on resize. Exit animation preview to edit layout.
+gui-layout.operation = Edit GUI layout
+gui-layout.layout-only = Exit animation preview before editing layout.
+
+gui-layout.rect-transform = Rect Transform
+gui-layout.no-anchor = None
+gui-layout.pivot-nw = Top Left
+gui-layout.pivot-n = Top
+gui-layout.pivot-ne = Top Right
+gui-layout.pivot-w = Left
+gui-layout.pivot-center = Center
+gui-layout.pivot-e = Right
+gui-layout.pivot-sw = Bottom Left
+gui-layout.pivot-s = Bottom
+gui-layout.pivot-se = Bottom Right

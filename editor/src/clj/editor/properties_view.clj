@@ -25,6 +25,7 @@
             [editor.field-expression :as field-expression]
             [editor.fxui :as fxui]
             [editor.fxui.combo-box :as fxui.combo-box]
+            [editor.gui-layout :as gui-layout]
             [editor.handler :as handler]
             [editor.localization :as localization]
             [editor.markdown-view :as markdown-view]
@@ -38,7 +39,6 @@
             [editor.workspace :as workspace]
             [util.coll :as coll :refer [pair]]
             [util.defonce :as defonce]
-            [util.eduction :as e]
             [util.id-vec :as iv])
   (:import [editor.properties Curve CurveSpread]
            [javafx.beans.value ChangeListener]
@@ -735,74 +735,78 @@
     (.requestFocus ^Node (.getSource e))
     (.consume e)))
 
+(defn- property-grid [category-properties context localization-state selection-provider]
+  {:fx/type fxui/grid
+   :on-key-pressed handle-grid-key-pressed
+   :column-constraints [{:fx/type fx.column-constraints/lifecycle}
+                        {:fx/type fx.column-constraints/lifecycle
+                         :hgrow :always}]
+   :spacing :small
+   :children
+   (coll/into-> category-properties []
+     (coll/mapcat-indexed
+       (fn [i [property-keyword property]]
+         (let [overridden (properties/overridden? property)]
+           (pair
+             {:fx/type fxui/menu-button
+              :min-width :use-pref-size
+              :style-class (cond-> ["property-label"] overridden (conj "overridden"))
+              :grid-pane/column 0
+              :grid-pane/row i
+              :grid-pane/fill-width true
+              :grid-pane/valignment :top
+              :mnemonic-parsing false
+              :focus-traversable false
+              :text (localization-state (properties/label property))
+              :tooltip {:fx/type fxui/tooltip
+                        :content-display :graphic-only
+                        :style {:-fx-padding 0}
+                        :graphic {:fx/type markdown-view/view
+                                  :content (localization-state
+                                             (localization/message
+                                               "property.tooltip"
+                                               {"help" (properties/tooltip property)
+                                                "id" (string/replace (name property-keyword) \- \_)}))
+                                  :max-width 350.0
+                                  :project (:project context)}}
+              prop-resource-reveal-filter #(reveal-property-resource! property context %)
+              prop-button-menu ::property-menu
+              prop-mouse-pressed-handler focus-mouse-event-source!
+              prop-property-context [(assoc context :property property) selection-provider]}
+             {:fx/type fxui/ext-error-boundary
+              :fx/key property-keyword
+              :grid-pane/column 1
+              :grid-pane/row i
+              :grid-pane/fill-width true
+              :desc {:fx/type control-view
+                     :property property
+                     :context context
+                     :localization-state localization-state}
+              :catch {:fx/type error-view}})))))})
+
 (defn- grid-view [{:keys [localization-state properties context]}]
   (let [properties (properties/coalesce properties)
-        selection-provider (->SelectionProvider (:original-node-ids properties))]
+        selection-provider (->SelectionProvider (:original-node-ids properties))
+        render-grid (fn [pairs]
+                      (assoc (property-grid pairs context localization-state selection-provider)
+                             :fx/key [(:original-node-ids properties) (mapv first pairs)]))
+        layout-inspector (gui-layout/inspector-view properties (assoc context :render-property-grid render-grid) localization-state)]
     {:fx/type fxui/vertical
      :padding :small
      :spacing :small
      :children
-     (->> properties
-          category-property-edit-types
-          (e/mapcat
-            (fn [[category-title category-properties]]
-              (when-not (coll/empty? category-properties)
-                (-> []
-                    (cond->
-                      category-title
-                      (conj {:fx/type fxui/label
-                             :text (localization-state category-title)
-                             :style-class "property-category"}))
-                    (conj
-                      {:fx/type fxui/grid
-                       :fx/key (:original-node-ids properties)
-                       :on-key-pressed handle-grid-key-pressed
-                       :column-constraints [{:fx/type fx.column-constraints/lifecycle}
-                                            {:fx/type fx.column-constraints/lifecycle
-                                             :hgrow :always}]
-                       :spacing :small
-                       :children
-                       (coll/into-> category-properties []
-                         (coll/mapcat-indexed
-                           (fn [i [property-keyword property]]
-                             (let [overridden (properties/overridden? property)]
-                               (pair
-                                 {:fx/type fxui/menu-button
-                                  :min-width :use-pref-size
-                                  :style-class (cond-> ["property-label"] overridden (conj "overridden"))
-                                  :grid-pane/column 0
-                                  :grid-pane/row i
-                                  :grid-pane/fill-width true
-                                  :grid-pane/valignment :top
-                                  :mnemonic-parsing false
-                                  :focus-traversable false
-                                  :text (localization-state (properties/label property))
-                                  :tooltip {:fx/type fxui/tooltip
-                                            :content-display :graphic-only
-                                            :style {:-fx-padding 0}
-                                            :graphic {:fx/type markdown-view/view
-                                                      :content (localization-state
-                                                                 (localization/message
-                                                                   "property.tooltip"
-                                                                   {"help" (properties/tooltip property)
-                                                                    "id" (string/replace (name property-keyword) \- \_)}))
-                                                      :max-width 350.0
-                                                      :project (:project context)}}
-                                  prop-resource-reveal-filter #(reveal-property-resource! property context %)
-                                  prop-button-menu ::property-menu
-                                  prop-mouse-pressed-handler focus-mouse-event-source!
-                                  prop-property-context [(assoc context :property property) selection-provider]}
-                                 {:fx/type fxui/ext-error-boundary
-                                  :fx/key property-keyword
-                                  :grid-pane/column 1
-                                  :grid-pane/row i
-                                  :grid-pane/fill-width true
-                                  :desc {:fx/type control-view
-                                         :property property
-                                         :context context
-                                         :localization-state localization-state}
-                                  :catch {:fx/type error-view}})))))})))))
-          (into []))}))
+     (into (if layout-inspector [layout-inspector] [])
+           (mapcat
+             (fn [[category-title category-properties]]
+               (let [category-properties (cond->> category-properties
+                                           layout-inspector (into [] (remove #(contains? gui-layout/inspector-properties (first %)))))]
+                 (when (coll/not-empty category-properties)
+                   (cond-> []
+                     category-title (conj {:fx/type fxui/label
+                                           :text (localization-state category-title)
+                                           :style-class "property-category"})
+                     true (conj (render-grid category-properties)))))))
+           (category-property-edit-types properties))}))
 
 (def ^:private properties-message (localization/message "pane.properties"))
 
@@ -819,13 +823,14 @@
                        :properties displayed-node-properties}}})
 
 (g/defnk produce-pane-desc
-  [workspace project app-view search-results-view displayed-node-properties prefs localization]
+  [workspace project app-view active-tool search-results-view displayed-node-properties prefs localization]
   {:fx/type fxui/ext-dedupe-identical-desc
    :desc {:fx/type properties-pane-view
           :localization localization
           :context {:workspace workspace
                     :project project
                     :app-view app-view
+                    :active-tool active-tool
                     :prefs prefs
                     :localization localization
                     :search-results-view search-results-view}
@@ -838,6 +843,7 @@
   (input localization g/Any)
   (input project g/Any)
   (input app-view g/NodeID)
+  (input active-tool g/Keyword)
   (input search-results-view g/NodeID)
   (input displayed-node-properties g/Any)
 
@@ -853,4 +859,5 @@
           (g/connect workspace :localization view :localization)
           (g/connect project :_node-id view :project)
           (g/connect app-view :_node-id view :app-view)
+          (g/connect app-view :active-tool view :active-tool)
           (g/connect search-results-view :_node-id view :search-results-view))))))

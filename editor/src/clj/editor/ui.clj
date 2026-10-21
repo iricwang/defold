@@ -2401,8 +2401,9 @@
    :value state
    prop-toolbar-choice-box-value-changed #(execute-toolbar-command! %1 (:command %2) (:user-data %2))})
 
-(defn- toolbar-button [{:keys [localization-state graphic-fn icon label tooltip command user-data state enabled]}]
+(defn- toolbar-button [{:keys [id localization-state graphic-fn icon label tooltip command user-data state enabled]}]
   (cond-> {:fx/type fx.toggle-button/lifecycle
+           :id (some-> id name)
            :text (if (or graphic-fn icon) "" (localization-state label))
            :selected (boolean state)}
     tooltip (assoc :tooltip {:fx/type fx.tooltip/lifecycle :text (localization-state tooltip)})

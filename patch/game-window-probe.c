@@ -26,6 +26,19 @@ int main(int argc, char** argv)
     HWND game = CreateWindowExW(0, L"STATIC", L"Game startup regression", WS_OVERLAPPEDWINDOW,
                                -32000, -32000, 320, 240, NULL, NULL, GetModuleHandleW(NULL), NULL);
     if (!game) return 1;
+    /* Even a visible-on-create window must be hidden and identifiable before
+     * the first ShowWindow call, including the first window after a patch. */
+    HWND visible = CreateWindowExW(0, L"STATIC", L"Visible-on-create regression", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                                  100, 100, 320, 240, NULL, NULL, GetModuleHandleW(NULL), NULL);
+    if (!visible || IsWindowVisible(visible) || !GetPropW(visible, L"DefoldEditorGameShowRequested"))
+    {
+        puts("VISIBLE_CREATION_NOT_GUARDED");
+        if (visible) DestroyWindow(visible);
+        DestroyWindow(game);
+        DestroyWindow(helper);
+        return 5;
+    }
+    DestroyWindow(visible);
     for (int attempt = 0; attempt < 4; ++attempt)
     {
         ShowWindow(game, SW_SHOWNOACTIVATE);

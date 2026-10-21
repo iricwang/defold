@@ -1,0 +1,4324 @@
+{
+  "source": "Unity Device Simulator Devices 1.0.1",
+  "sourceUrl": "https://docs.unity3d.com/Packages/com.unity.device-simulator.devices@1.0/manual/index.html",
+  "devices": [
+    {
+      "name": "Apple iPad (5th gen)",
+      "width": 1536,
+      "height": 2048,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad (7th gen)",
+      "width": 1620,
+      "height": 2160,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1620.0,
+            2160.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1620.0,
+            2160.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2160.0,
+            1620.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2160.0,
+            1620.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad (6th gen)",
+      "width": 1536,
+      "height": 2048,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Air (4th generation)",
+      "width": 1640,
+      "height": 2360,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            40.0,
+            1640.0,
+            2272.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            40.0,
+            1640.0,
+            2320.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            40.0,
+            2360.0,
+            1552.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            40.0,
+            2360.0,
+            1600.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Air 2",
+      "width": 1536,
+      "height": 2048,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2008.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1496.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Air",
+      "width": 1536,
+      "height": 2048,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Mini 2",
+      "width": 1536,
+      "height": 2048,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Mini 4",
+      "width": 1536,
+      "height": 2048,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1536.0,
+            2048.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2048.0,
+            1536.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Pro 10.15",
+      "width": 1668,
+      "height": 2224,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1668.0,
+            2224.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1668.0,
+            2224.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2224.0,
+            1668.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2224.0,
+            1668.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Pro 11",
+      "width": 1668,
+      "height": 2388,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            40.0,
+            1668.0,
+            2348.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            40.0,
+            1668.0,
+            2348.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            40.0,
+            2388.0,
+            1628.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            40.0,
+            2388.0,
+            1628.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPad Pro 12.9 (2018)",
+      "width": 2048,
+      "height": 2732,
+      "dpi": 264.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            40.0,
+            2048.0,
+            2692.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            40.0,
+            2048.0,
+            2692.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            40.0,
+            2732.0,
+            2008.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            40.0,
+            2732.0,
+            2008.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 11",
+      "width": 828,
+      "height": 1792,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            68.0,
+            828.0,
+            1636.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            88.0,
+            42.0,
+            1616.0,
+            786.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            88.0,
+            42.0,
+            1616.0,
+            786.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 12 mini",
+      "width": 1080,
+      "height": 2338,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            97.0,
+            1080.0,
+            2096.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            144.0,
+            1080.0,
+            2096.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            144.0,
+            60.0,
+            2050.0,
+            1019.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            144.0,
+            60.0,
+            2050.0,
+            1019.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 12 Pro Max",
+      "width": 1284,
+      "height": 2778,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1284.0,
+            2535.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            141.0,
+            1284.0,
+            2535.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            141.0,
+            63.0,
+            2496.0,
+            1221.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            141.0,
+            63.0,
+            2496.0,
+            1221.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 12 Pro",
+      "width": 1170,
+      "height": 2532,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1170.0,
+            2289.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            141.0,
+            1170.0,
+            2289.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            141.0,
+            63.0,
+            2250.0,
+            1107.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            141.0,
+            63.0,
+            2250.0,
+            1107.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 12",
+      "width": 1170,
+      "height": 2532,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1170.0,
+            2289.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            141.0,
+            1170.0,
+            2289.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            141.0,
+            63.0,
+            2250.0,
+            1107.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            141.0,
+            63.0,
+            2250.0,
+            1107.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 13 Pro Max",
+      "width": 1284,
+      "height": 2778,
+      "dpi": 458.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1284.0,
+            2535.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            141.0,
+            1284.0,
+            2535.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            141.0,
+            63.0,
+            2496.0,
+            1221.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            141.0,
+            63.0,
+            2496.0,
+            1221.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 13 Pro",
+      "width": 1170,
+      "height": 2532,
+      "dpi": 460.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1170.0,
+            2289.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            141.0,
+            1170.0,
+            2289.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            141.0,
+            63.0,
+            2250.0,
+            1107.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            141.0,
+            63.0,
+            2250.0,
+            1107.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 6",
+      "width": 750,
+      "height": 1334,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 6S",
+      "width": 750,
+      "height": 1334,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 7 Plus",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 401.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 7",
+      "width": 750,
+      "height": 1334,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 8 Plus",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 401.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone 8",
+      "width": 750,
+      "height": 1334,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone SE (2nd generation)",
+      "width": 750,
+      "height": 1334,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            750.0,
+            1334.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1334.0,
+            750.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone X",
+      "width": 1125,
+      "height": 2436,
+      "dpi": 458.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1125.0,
+            2202.0
+          ],
+          "cutouts": [
+            [
+              250.0,
+              2346.0,
+              625.0,
+              90.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            132.0,
+            63.0,
+            2172.0,
+            1062.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              250.0,
+              90.0,
+              625.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            132.0,
+            63.0,
+            2172.0,
+            1062.0
+          ],
+          "cutouts": [
+            [
+              2346.0,
+              250.0,
+              90.0,
+              625.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone XR",
+      "width": 828,
+      "height": 1792,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            68.0,
+            828.0,
+            1636.0
+          ],
+          "cutouts": [
+            [
+              184.0,
+              1726.0,
+              460.0,
+              66.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            88.0,
+            42.0,
+            1616.0,
+            786.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              184.0,
+              66.0,
+              460.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            88.0,
+            42.0,
+            1616.0,
+            786.0
+          ],
+          "cutouts": [
+            [
+              1726.0,
+              184.0,
+              66.0,
+              460.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone XS Max",
+      "width": 1242,
+      "height": 2688,
+      "dpi": 458.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1242.0,
+            2454.0
+          ],
+          "cutouts": [
+            [
+              308.0,
+              2598.0,
+              626.0,
+              90.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            132.0,
+            63.0,
+            2424.0,
+            1179.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              308.0,
+              90.0,
+              626.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            132.0,
+            63.0,
+            2424.0,
+            1179.0
+          ],
+          "cutouts": [
+            [
+              2598.0,
+              308.0,
+              90.0,
+              626.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Apple iPhone XS",
+      "width": 1125,
+      "height": 2436,
+      "dpi": 458.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            102.0,
+            1125.0,
+            2202.0
+          ],
+          "cutouts": [
+            [
+              250.0,
+              2346.0,
+              625.0,
+              90.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            132.0,
+            63.0,
+            2172.0,
+            1062.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              250.0,
+              90.0,
+              625.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            132.0,
+            63.0,
+            2172.0,
+            1062.0
+          ],
+          "cutouts": [
+            [
+              2346.0,
+              250.0,
+              90.0,
+              625.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Apple iPod Touch 6th Gen",
+      "width": 640,
+      "height": 1136,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            640.0,
+            1136.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            640.0,
+            1136.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1136.0,
+            640.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1136.0,
+            640.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Apple iPod Touch 7th Gen",
+      "width": 640,
+      "height": 1136,
+      "dpi": 326.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            640.0,
+            1136.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            640.0,
+            1136.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1136.0,
+            640.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1136.0,
+            640.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Asus ROG Phone",
+      "width": 1080,
+      "height": 2160,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2160.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2160.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2160.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2160.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "LG Nexus 4",
+      "width": 768,
+      "height": 1280,
+      "dpi": 320.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            768.0,
+            1280.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            768.0,
+            1280.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1280.0,
+            768.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1280.0,
+            768.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Google Pixel 2 XL",
+      "width": 1440,
+      "height": 2880,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2880.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2880.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2880.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2880.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Google Pixel 2",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 420.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Google Pixel 3",
+      "width": 1080,
+      "height": 2160,
+      "dpi": 440.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2160.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2160.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2160.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Google Pixel 4",
+      "width": 1080,
+      "height": 2280,
+      "dpi": 440.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2280.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2280.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2280.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2280.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Google Pixel 5",
+      "width": 1080,
+      "height": 2340,
+      "dpi": 440.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2204.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              2204.0,
+              136.0,
+              136.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            136.0,
+            1080.0,
+            2204.0
+          ],
+          "cutouts": [
+            [
+              944.0,
+              0.0,
+              136.0,
+              136.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            136.0,
+            0.0,
+            2204.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              0.0,
+              136.0,
+              136.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2204.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              2204.0,
+              944.0,
+              136.0,
+              136.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Google Pixel XL",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 476.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "HTC 10",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 640.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "HTC One M9",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Huawei P40 Pro",
+      "width": 1200,
+      "height": 2640,
+      "dpi": 530.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1200.0,
+            2499.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              2499.0,
+              392.0,
+              141.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            141.0,
+            1200.0,
+            2499.0
+          ],
+          "cutouts": [
+            [
+              808.0,
+              0.0,
+              392.0,
+              141.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            141.0,
+            0.0,
+            2499.0,
+            1200.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              0.0,
+              141.0,
+              392.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2499.0,
+            1200.0
+          ],
+          "cutouts": [
+            [
+              2499.0,
+              808.0,
+              141.0,
+              392.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Huawei P9",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Lenovo Phab2 Pro",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "LG G4",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 640.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "LG Nexus 5",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "LG G3",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 640.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Motorola Moto E",
+      "width": 540,
+      "height": 960,
+      "dpi": 240.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            540.0,
+            960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            540.0,
+            960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            960.0,
+            540.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            960.0,
+            540.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Motorola Moto G7 Power",
+      "width": 720,
+      "height": 1520,
+      "dpi": 320.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            720.0,
+            1467.0
+          ],
+          "cutouts": [
+            [
+              230.0,
+              1467.0,
+              260.0,
+              53.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            53.0,
+            0.0,
+            1467.0,
+            720.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              230.0,
+              53.0,
+              260.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1467.0,
+            720.0
+          ],
+          "cutouts": [
+            [
+              1467.0,
+              230.0,
+              53.0,
+              260.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Motorola Nexus 6",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Nvidia Shield Tablet",
+      "width": 1200,
+      "height": 1920,
+      "dpi": 320.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1200.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1200.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1200.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1200.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "OnePlus 6T",
+      "width": 1080,
+      "height": 2340,
+      "dpi": 420.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2261.0
+          ],
+          "cutouts": [
+            [
+              372.0,
+              2261.0,
+              334.0,
+              79.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            79.0,
+            1080.0,
+            2261.0
+          ],
+          "cutouts": [
+            [
+              374.0,
+              0.0,
+              334.0,
+              79.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            79.0,
+            0.0,
+            2261.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              372.0,
+              79.0,
+              334.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2261.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              2261.0,
+              374.0,
+              79.0,
+              334.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OnePlus 7 Pro",
+      "width": 1440,
+      "height": 3120,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            3120.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            3120.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            3120.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            3120.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Razer Phone",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy J7 (2017)",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 420.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Note10",
+      "width": 1080,
+      "height": 2280,
+      "dpi": 420.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2190.0
+          ],
+          "cutouts": [
+            [
+              504.0,
+              2190.0,
+              72.0,
+              90.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            90.0,
+            1080.0,
+            2190.0
+          ],
+          "cutouts": [
+            [
+              504.0,
+              0.0,
+              72.0,
+              90.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            90.0,
+            0.0,
+            2190.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              504.0,
+              90.0,
+              72.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2190.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              2190.0,
+              504.0,
+              90.0,
+              72.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Note10+ 5G",
+      "width": 1440,
+      "height": 3040,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2927.0
+          ],
+          "cutouts": [
+            [
+              639.0,
+              2927.0,
+              162.0,
+              113.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            113.0,
+            0.0,
+            2927.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              639.0,
+              113.0,
+              162.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2927.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              2927.0,
+              639.0,
+              113.0,
+              162.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Note20 Ultra 5G",
+      "width": 1440,
+      "height": 3088,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2999.0
+          ],
+          "cutouts": [
+            [
+              685.0,
+              2999.0,
+              70.0,
+              89.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            89.0,
+            1440.0,
+            2999.0
+          ],
+          "cutouts": [
+            [
+              685.0,
+              0.0,
+              70.0,
+              89.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            89.0,
+            0.0,
+            2999.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              685.0,
+              89.0,
+              70.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2999.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              2999.0,
+              685.0,
+              89.0,
+              70.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Note8",
+      "width": 1440,
+      "height": 2960,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Note9",
+      "width": 1440,
+      "height": 2960,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S10 5G",
+      "width": 1440,
+      "height": 3040,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2901.0
+          ],
+          "cutouts": [
+            [
+              1013.0,
+              2901.0,
+              427.0,
+              139.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            139.0,
+            1440.0,
+            2901.0
+          ],
+          "cutouts": [
+            [
+              1.0,
+              0.0,
+              426.0,
+              139.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            139.0,
+            0.0,
+            2901.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              1013.0,
+              139.0,
+              427.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2901.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              2901.0,
+              0.0,
+              139.0,
+              427.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S10+",
+      "width": 1440,
+      "height": 3040,
+      "dpi": 560.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2898.0
+          ],
+          "cutouts": [
+            [
+              1114.0,
+              2898.0,
+              326.0,
+              142.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            142.0,
+            1440.0,
+            2898.0
+          ],
+          "cutouts": [
+            [
+              1.0,
+              0.0,
+              325.0,
+              142.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            142.0,
+            0.0,
+            2898.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              1114.0,
+              142.0,
+              326.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2898.0,
+            1440.0
+          ],
+          "cutouts": [
+            [
+              2898.0,
+              0.0,
+              142.0,
+              326.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S10e",
+      "width": 1080,
+      "height": 2280,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2164.0
+          ],
+          "cutouts": [
+            [
+              931.0,
+              2164.0,
+              149.0,
+              116.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            116.0,
+            1080.0,
+            2164.0
+          ],
+          "cutouts": [
+            [
+              1.0,
+              0.0,
+              148.0,
+              116.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            116.0,
+            0.0,
+            2164.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              931.0,
+              116.0,
+              149.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2164.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              2164.0,
+              0.0,
+              116.0,
+              149.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S5 Mini",
+      "width": 720,
+      "height": 1280,
+      "dpi": 320.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            720.0,
+            1280.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            720.0,
+            1280.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1280.0,
+            720.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1280.0,
+            720.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S5 Neo",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S7",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 640.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S8",
+      "width": 1440,
+      "height": 2960,
+      "dpi": 640.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy S9",
+      "width": 1440,
+      "height": 2960,
+      "dpi": 640.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2960.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2960.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Z Flip3 5G",
+      "width": 1080,
+      "height": 2640,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2546.0
+          ],
+          "cutouts": [
+            [
+              505.0,
+              2546.0,
+              71.0,
+              94.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            94.0,
+            1080.0,
+            2546.0
+          ],
+          "cutouts": [
+            [
+              504.0,
+              0.0,
+              71.0,
+              94.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            94.0,
+            0.0,
+            2546.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              505.0,
+              94.0,
+              71.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2546.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              2546.0,
+              504.0,
+              94.0,
+              71.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Z Fold2 5G (Phone)",
+      "width": 960,
+      "height": 2658,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            960.0,
+            2566.0
+          ],
+          "cutouts": [
+            [
+              444.0,
+              2566.0,
+              72.0,
+              92.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            92.0,
+            960.0,
+            2566.0
+          ],
+          "cutouts": [
+            [
+              444.0,
+              0.0,
+              72.0,
+              92.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            92.0,
+            0.0,
+            2566.0,
+            960.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              444.0,
+              92.0,
+              72.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2566.0,
+            960.0
+          ],
+          "cutouts": [
+            [
+              2566.0,
+              444.0,
+              92.0,
+              72.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Samsung Galaxy Z Fold2 5G (Tablet)",
+      "width": 1768,
+      "height": 2208,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1768.0,
+            2120.0
+          ],
+          "cutouts": [
+            [
+              1309.0,
+              2120.0,
+              75.0,
+              88.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            88.0,
+            1768.0,
+            2120.0
+          ],
+          "cutouts": [
+            [
+              384.0,
+              0.0,
+              75.0,
+              88.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            88.0,
+            0.0,
+            2120.0,
+            1768.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              1309.0,
+              88.0,
+              75.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2120.0,
+            1768.0
+          ],
+          "cutouts": [
+            [
+              2120.0,
+              384.0,
+              88.0,
+              75.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sony Xperia XZ Premium",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Sony Xperia Z2 Tablet",
+      "width": 1200,
+      "height": 1920,
+      "dpi": 240.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1200.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1200.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1200.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1200.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "vivo NEX 3 5G",
+      "width": 1080,
+      "height": 2256,
+      "dpi": 440.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2256.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2256.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2256.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2256.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Mi 4i",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Mi 5",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Mi A3",
+      "width": 720,
+      "height": 1560,
+      "dpi": 320.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            720.0,
+            1507.0
+          ],
+          "cutouts": [
+            [
+              270.0,
+              1507.0,
+              180.0,
+              53.0
+            ]
+          ]
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            53.0,
+            720.0,
+            1507.0
+          ],
+          "cutouts": [
+            [
+              270.0,
+              0.0,
+              180.0,
+              53.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            53.0,
+            0.0,
+            1507.0,
+            720.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              270.0,
+              53.0,
+              180.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1507.0,
+            720.0
+          ],
+          "cutouts": [
+            [
+              1507.0,
+              270.0,
+              53.0,
+              180.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Mi Max",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Mi Note Pro",
+      "width": 1440,
+      "height": 2560,
+      "dpi": 640.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1440.0,
+            2560.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2560.0,
+            1440.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Redmi 4",
+      "width": 720,
+      "height": 1280,
+      "dpi": 320.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            720.0,
+            1280.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1280.0,
+            720.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1280.0,
+            720.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Redmi 6 Pro",
+      "width": 1080,
+      "height": 2280,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2191.0
+          ],
+          "cutouts": [
+            [
+              313.0,
+              2191.0,
+              455.0,
+              89.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            89.0,
+            0.0,
+            2191.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              313.0,
+              89.0,
+              455.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2191.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              2191.0,
+              312.0,
+              89.0,
+              455.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Redmi Note 3",
+      "width": 1080,
+      "height": 1920,
+      "dpi": 480.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 2,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            1920.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "cutouts": []
+        }
+      ]
+    },
+    {
+      "name": "Xiaomi Redmi Note 7",
+      "width": 1080,
+      "height": 2340,
+      "dpi": 440.0,
+      "orientations": [
+        {
+          "rotation": 0,
+          "safeArea": [
+            0.0,
+            0.0,
+            1080.0,
+            2260.0
+          ],
+          "cutouts": [
+            [
+              450.0,
+              2260.0,
+              180.0,
+              80.0
+            ]
+          ]
+        },
+        {
+          "rotation": 3,
+          "safeArea": [
+            80.0,
+            0.0,
+            2260.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              0.0,
+              450.0,
+              80.0,
+              180.0
+            ]
+          ]
+        },
+        {
+          "rotation": 1,
+          "safeArea": [
+            0.0,
+            0.0,
+            2260.0,
+            1080.0
+          ],
+          "cutouts": [
+            [
+              2260.0,
+              450.0,
+              80.0,
+              180.0
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

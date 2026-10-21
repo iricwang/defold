@@ -17,8 +17,6 @@ package com.defold.editor;
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
-import com.sun.jna.Pointer;
-import com.sun.jna.win32.StdCallLibrary;
 import com.defold.libs.ResourceUnpacker;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinBase;
@@ -34,19 +32,13 @@ import java.util.concurrent.*;
 
 /** A console-free embedded game process, with merged output retained by the editor. */
 public final class WindowsGameProcess extends Process {
-    private interface ThreadControl extends StdCallLibrary {
-        ThreadControl INSTANCE = (ThreadControl) Native.loadLibrary("kernel32", ThreadControl.class);
-        int ResumeThread(HANDLE thread);
-    }
-    private final NativeLibrary hookLibrary;
     private final HANDLE process;
     private final long pid;
     private final ProcessHandle processHandle;
     private final InputStream output;
     private final CompletableFuture<Integer> exit = new CompletableFuture<>();
 
-    private WindowsGameProcess(HANDLE process, long pid, HANDLE output, Pointer hook, NativeLibrary hookLibrary) {
-        this.hookLibrary = hookLibrary;
+    private WindowsGameProcess(HANDLE process, long pid, HANDLE output) {
         this.process = process;
         this.pid = pid;
         this.processHandle = ProcessHandle.of(pid).orElse(null);
@@ -80,7 +72,6 @@ public final class WindowsGameProcess extends Process {
             IntByReference code = new IntByReference();
             synchronized (this) {
                 Kernel32.INSTANCE.GetExitCodeProcess(process, code);
-                hookLibrary.getFunction("CloseGameHook").invokeVoid(new Object[]{hook});
                 // Complete before closing so destroy() never uses a recycled handle.
                 exit.complete(code.getValue());
                 Kernel32.INSTANCE.CloseHandle(process);
@@ -112,11 +103,17 @@ public final class WindowsGameProcess extends Process {
         catch (java.net.URISyntaxException error) { throw new IOException(error); }
         NativeLibrary hookLibrary = NativeLibrary.getInstance(new File(
                 System.getProperty("defold.unpack.path"), "x86_64-win32/lib/game_window_hook.dll").getAbsolutePath());
+        var startGuarded = hookLibrary.getFunction("StartGuardedGameProcess");
         TreeMap<String, String> environment = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         environment.putAll(System.getenv());
         overrides.forEach((key, value) -> {
             if (value == null) environment.remove(key); else environment.put(key, value);
         });
+        if (overrides.get("DM_EDITOR_GAME_FILE") != null) {
+            long address = hookLibrary.getFunction("SimulatorSafeAreaRva").invokeLong(new Object[]{new com.sun.jna.WString(command.getFirst())});
+            if (address == 0) throw new IOException("Simulator requires the matching dmengine.pdb beside the game engine for native GUI safe-area adaptation.");
+            environment.put("DM_EDITOR_GAME_SAFE_AREA_RVA", Long.toHexString(address));
+        }
         StringBuilder block = new StringBuilder();
         environment.forEach((key, value) -> block.append(key).append('=').append(value).append('\0'));
         block.append('\0');
@@ -151,17 +148,17 @@ public final class WindowsGameProcess extends Process {
             if (!Kernel32.INSTANCE.CreateProcessW(command.getFirst(), Native.toCharArray(line),
                     null, null, true, new DWORD(0x08000404), nativeEnvironment,
                     directory.getAbsolutePath(), startup, info)) throw failure("Start embedded game");
-            Pointer hook = hookLibrary.getFunction("HookGameProcess").invokePointer(new Object[]{info.dwProcessId.intValue()});
-            if (hook == null || ThreadControl.INSTANCE.ResumeThread(info.hThread) == -1) {
-                IOException error = failure("Guard embedded game startup");
+            int guardError = startGuarded.invokeInt(
+                    new Object[]{info.hProcess.getPointer(), info.hThread.getPointer()});
+            if (guardError != 0) {
+                IOException error = new IOException("Prepare embedded game window failed: " + guardError);
                 Kernel32.INSTANCE.TerminateProcess(info.hProcess, 1);
                 Kernel32.INSTANCE.CloseHandle(info.hThread);
                 Kernel32.INSTANCE.CloseHandle(info.hProcess);
-                if (hook != null) hookLibrary.getFunction("CloseGameHook").invokeVoid(new Object[]{hook});
                 throw error;
             }
             Kernel32.INSTANCE.CloseHandle(info.hThread);
-            WindowsGameProcess result = new WindowsGameProcess(info.hProcess, info.dwProcessId.longValue(), read.getValue(), hook, hookLibrary);
+            WindowsGameProcess result = new WindowsGameProcess(info.hProcess, info.dwProcessId.longValue(), read.getValue());
             transferred = true;
             return result;
         } finally {

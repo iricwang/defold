@@ -563,6 +563,19 @@
       (g/set-property app-view :active-tool :scale)))
   (state [app-view evaluation-context] (= (g/node-value app-view :active-tool evaluation-context) :scale)))
 
+(handler/defhandler :scene.select-gui-rect-tool :workbench
+  (active? [app-view evaluation-context]
+    (when-let [r (g/node-value app-view :active-resource evaluation-context)]
+      (= "gui" (resource/type-ext r))))
+  (enabled? [app-view evaluation-context]
+    (when-let [view (g/node-value app-view :active-view evaluation-context)]
+      (and (g/has-property? (g/node-type* view) :animation-preview-active)
+           (not (g/node-value view :animation-preview-active evaluation-context)))))
+  (run [app-view]
+    (g/transact {:undoable false} (g/set-property app-view :active-tool :gui-rect)))
+  (state [app-view evaluation-context]
+    (= :gui-rect (g/node-value app-view :active-tool evaluation-context))))
+
 (handler/defhandler :scene.select-rotate-tool :workbench
   (run [app-view]
     (g/transact
@@ -647,6 +660,10 @@
     :tooltip "Scale tool"
     :icon "icons/45/Icons_T_04_Scale.png"
     :command :scene.select-scale-tool}
+   {:id :gui-layout-toolbar
+    :label (localization/message "gui-layout.rect-tool")
+    :tooltip (localization/message "gui-layout.drag-help")
+    :command :scene.select-gui-rect-tool}
    menu-items/separator
    {:id :grid
     :tooltip "Grid"

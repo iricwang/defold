@@ -14,7 +14,9 @@
 
 (ns editor.game-preview
   (:require [dynamo.graph :as g]
+            [editor.defold-project :as project]
             [editor.error-reporting :as error-reporting]
+            [editor.gui-preview :as gui-preview]
             [editor.resource :as resource]
             [editor.scene :as scene]
             [editor.ui :as ui])
@@ -27,9 +29,24 @@
         scale (min 1.0 (/ 1536.0 height))]
     [(max 1 (int (* width scale))) (max 1 (int (* height scale)))]))
 
+(defn retain-preview
+  "Most-recent images first; bound both image memory and retained graph snapshots."
+  [entries entry]
+  (loop [remaining (into [entry] (remove #(= (:view entry) (:view %))) entries)
+         retained []
+         bytes 0]
+    (if-let [candidate (first remaining)]
+      (let [next-bytes (+ bytes (:bytes candidate))]
+        (if (or (= 8 (count retained)) (> next-bytes (* 32 1024 1024)))
+          retained
+          (recur (subvec remaining 1) (conj retained candidate) next-bytes)))
+      retained)))
+
 (defn attach! [^GamePreview pane app-view project]
   (let [{:keys [render! dispose!]} (scene/make-game-preview-renderer)
         previous (volatile! nil)
+        selected (volatile! nil)
+        images (volatile! [])
         last-error (volatile! nil)]
     (.setIdleRenderer
       pane
@@ -37,8 +54,16 @@
         (when-not (ui/ui-disabled?)
           (try
             (g/with-auto-evaluation-context ec
-              (let [view (g/node-value app-view :active-view ec)
-                    resource (g/node-value app-view :active-resource ec)
+              ;; Never retain a closed SceneView or its graph/render data in the cache.
+              (vswap! images #(filterv (fn [entry] (g/node-exists? (:basis ec) (:view entry))) %))
+              (when (and (:view @selected) (not (g/node-exists? (:basis ec) (:view @selected))))
+                (vreset! selected nil)
+                (.unlockPreview pane))
+              (when (or (not (.isPreviewLocked pane)) (nil? (:view @selected)))
+                (vreset! selected {:view (g/node-value app-view :active-view ec)
+                                   :resource (g/node-value app-view :active-resource ec)
+                                   :resource-node (g/node-value app-view :active-resource-node ec)}))
+              (let [{:keys [view resource resource-node]} @selected
                     ext (some-> resource resource/ext)
                     supported (and (contains? #{"gui" "collection" "go"} ext)
                                    view
@@ -46,37 +71,71 @@
                     source-image (when supported (g/node-value view :image-view ec))]
                 (cond
                   (not supported)
-                  (when-not (= :empty @previous)
-                    (vreset! previous :empty)
-                    (.setIdleImage pane nil "game-preview.edit"))
+                  (do
+                    (.unlockPreview pane)
+                    (when-not (= :empty @previous)
+                      (vreset! previous :empty)
+                      (.setPreviewResource pane "")
+                      (.setIdleImage pane nil "game-preview.edit")))
 
                   (nil? (.getImage ^ImageView source-image))
                   (when-not (= [:waiting view] @previous)
                     (vreset! previous [:waiting view])
+                    (.setPreviewResource pane (resource/proj-path resource))
                     (.setIdleImage pane nil "game-preview.edit-loading"))
 
                   :else
-                  (let [resource-node (g/node-value app-view :active-resource-node ec)
+                  (let [started (System/nanoTime)
                         gui-dims (when (= "gui" ext)
                                    (let [{:keys [width height]} (g/node-value resource-node :scene-dims ec)]
                                      [(max 1 width) (max 1 height)]))
                         display-dims [(max 1 (g/node-value project :display-width ec))
                                       (max 1 (g/node-value project :display-height ec))]
+                        device-dims (some-> (.getPreviewDeviceSize pane) vec)
+                        safe-insets (vec (.getPreviewSafeInsets pane))
+                        gui-config (when gui-dims (g/node-value resource-node :game-preview-config ec))
+                        profile-node (when gui-config
+                                       (project/get-resource-node project
+                                         (get-in gui-config [:settings ["display" "display_profiles"]]
+                                                 "/builtins/render/default.display_profiles") ec))
+                        auto-layout (if profile-node (g/node-value profile-node :auto-layout-selection ec) true)
+                        physical-size (or device-dims display-dims)
                         data (g/node-value view :game-render-data ec)
                         states (g/node-value view :updatable-states ec)
                         drawable (g/node-value view :drawable ec)
                         clear-color (g/node-value project :render-clear-color ec)
-                        panel-width (.getPreviewWidth pane)
-                        panel-height (.getPreviewHeight pane)
-                        signature [view data states gui-dims display-dims clear-color drawable panel-width panel-height]]
+                        {:keys [camera aspect mode]} (when-not (or (g/error-value? data) (:error data))
+                                                     (scene/game-preview-camera data (when gui-dims physical-size) display-dims device-dims))
+                        size (when aspect (render-size (.getPreviewWidth pane) (.getPreviewHeight pane) aspect))
+                        signature [view data states gui-config auto-layout safe-insets gui-dims display-dims device-dims clear-color drawable size]]
                     (when-not (= signature @previous)
-                      (vreset! previous signature)
-                      (let [{:keys [camera aspect mode]} (when-not (or (g/error-value? data) (:error data))
-                                                         (scene/game-preview-camera data gui-dims display-dims))]
-                        (if-not (and camera drawable)
-                          (.setIdleImage pane nil "game-preview.edit-unavailable")
-                          (let [[width height] (render-size panel-width panel-height aspect)]
-                            (.setIdleImage pane (render! data states camera width height clear-color drawable) mode))))))))
+                      (.setPreviewResource pane (resource/proj-path resource))
+                      (if-not (and camera drawable)
+                        (.setIdleImage pane nil "game-preview.edit-unavailable")
+                        (let [cached (reduce (fn [_ entry] (when (= view (:view entry)) (reduced entry))) nil @images)
+                              hit (= signature (:signature cached))
+                              [width height] size
+                              render-data (if hit
+                                            nil
+                                            (if gui-config
+                                              (gui-preview/render-data resource-node view gui-config physical-size safe-insets auto-layout ec)
+                                              data))
+                              info (if hit (:gui-preview-info cached) (:gui-preview-info render-data))
+                              image (if hit
+                                      (:image cached)
+                                      (render! render-data
+                                               states camera width height clear-color drawable (:image cached)))
+                              entry {:view view :signature signature :image image :bytes (* 4 width height)
+                                     :gui-preview-info info}]
+                          (vswap! images retain-preview entry)
+                          (.setIdleImage pane image mode)
+                          (let [[reference-width reference-height] (:reference-size info)
+                                [device-width device-height] (:device-size info)]
+                            (.setPreviewLayout pane (or (:layout info) "")
+                                               (int (or reference-width 0)) (int (or reference-height 0))
+                                               (int (or device-width 0)) (int (or device-height 0))))
+                          (.recordPreviewFrame pane hit (transduce (map :bytes) + 0 @images) (- (System/nanoTime) started))))
+                      (vreset! previous signature)))))
               (vreset! last-error nil))
             (catch Exception error
               (.setIdleImage pane nil "game-preview.edit-unavailable")
@@ -84,4 +143,8 @@
                 (when-not (= signature @last-error)
                   (vreset! last-error signature)
                   (error-reporting/report-exception! error)))))))
-      dispose!)))
+      (fn []
+        (vreset! images [])
+        (vreset! selected nil)
+        (vreset! previous nil)
+        (dispose!)))))

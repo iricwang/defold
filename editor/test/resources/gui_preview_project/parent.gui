@@ -1,0 +1,12 @@
+adjust_reference: ADJUST_REFERENCE_PARENT
+material: "/builtins/materials/gui.material"
+nodes { id: "fit" type: TYPE_BOX position { x: 80 y: 80 } size { x: 45 y: 35 } color { x: 1 y: 0 z: 0 } size_mode: SIZE_MODE_MANUAL  }
+nodes { id: "anchor" type: TYPE_BOX position { x: 270 y: 195 } size { x: 45 y: 25 } color { x: 0 y: 1 z: 0 } size_mode: SIZE_MODE_MANUAL xanchor: XANCHOR_RIGHT yanchor: YANCHOR_TOP }
+nodes { id: "zoom" type: TYPE_BOX position { x: 180 y: 150 } size { x: 30 y: 25 } color { x: 0 y: 0 z: 1 } size_mode: SIZE_MODE_MANUAL adjust_mode: ADJUST_MODE_ZOOM }
+nodes { id: "parent" type: TYPE_BOX position { x: 120 y: 220 } size { x: 60 y: 40 } color { x: 1 y: 1 z: 0 } size_mode: SIZE_MODE_MANUAL adjust_mode: ADJUST_MODE_STRETCH rotation { z: 28 } scale { x: 1.3 y: 0.8 z: 1 } }
+nodes { id: "child" type: TYPE_BOX position { x: 25 y: 10 } size { x: 25 y: 20 } color { x: 1 y: 0 z: 1 } size_mode: SIZE_MODE_MANUAL parent: "parent" adjust_mode: ADJUST_MODE_FIT rotation { z: -35 } }
+nodes { id: "clip" type: TYPE_BOX position { x: 50 y: 340 } size { x: 60 y: 50 } color { x: 0 y: 1 z: 1 } size_mode: SIZE_MODE_MANUAL clipping_mode: CLIPPING_MODE_STENCIL clipping_visible: false }
+nodes { id: "clipped" type: TYPE_BOX position { x: 22 y: 0 } size { x: 80 y: 20 } color { x: 1 y: 0.5 z: 0 } size_mode: SIZE_MODE_MANUAL parent: "clip" }
+nodes { id: "template" type: TYPE_TEMPLATE template: "/template.gui" position { x: 220 y: 300 } scale { x: 1.2 y: 0.7 z: 1 } rotation { z: 15 } }
+layouts { name: "portrait" }
+layouts { name: "landscape" nodes { id: "fit" position { x: 80 y: 70 } overridden_fields: 1 } nodes { id: "anchor" position { x: 580 y: 320 } overridden_fields: 1 } }

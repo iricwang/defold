@@ -2047,6 +2047,26 @@ game-preview.resolution-limit = Game 预览支持最高 2048 × 2048，请降低
 game-preview.connection-closed = Game 连接已关闭，请停止后重新运行。
 
 game-preview.frame-rate = 预览帧率（下次运行生效）
+game-preview.simulator = 设备模拟器
+game-preview.simulator-timeout = 未收到游戏画面。请查看控制台；模拟器需要 OpenGL 和与引擎匹配的 dmengine.pdb。
+game-preview.safe-area = 显示安全区
+game-preview.custom-device = 自定义…
+game-preview.import-devices = 导入 .device 文件夹…
+game-preview.rotate-device = 顺时针横屏 / 竖屏
+game-preview.simulator-ready = 点击运行，以游戏实际渲染结果预览此设备。面板大小只影响显示比例，绿色虚线表示安全区。
+game-preview.search-device = 搜索设备
+game-preview.device-hint = 尺寸单位为物理像素（64–4096）。安全区和挖孔是可编辑的测试参数，请按目标设备校准。游戏通过 window.get_safe_area() 获取安全区。
+game-preview.device-invalid = 请输入整数像素。宽高范围 64–4096；安全区不能为空；挖孔和圆角不能超出屏幕。
+game-preview.device-width = 屏幕宽度（px）
+game-preview.device-height = 屏幕高度（px）
+game-preview.device-top = 顶部安全边距
+game-preview.device-right = 右侧安全边距
+game-preview.device-bottom = 底部安全边距
+game-preview.device-left = 左侧安全边距
+game-preview.device-radius = 屏幕圆角半径
+game-preview.device-cutout-width = 刘海 / 挖孔宽度
+game-preview.device-cutout-height = 刘海 / 挖孔高度
+game-preview.device-cutout-top = 刘海 / 挖孔顶部偏移
 
 # PhotoCraft IP binding
 command.photocraft.bind = 通过 IP 绑定 PhotoCraft…
@@ -2197,5 +2217,31 @@ game-preview.edit-camera = 编辑预览 · 相机
 game-preview.edit-default = 编辑预览 · 默认投影
 game-preview.edit-unavailable = 预览不可用
 game-preview.edit-empty = 打开 GUI、场景或游戏对象，在此预览游戏画面。
-game-preview.edit-hint = 编辑预览跟随当前资源。脚本逻辑、运行时相机切换和自定义渲染需运行游戏查看。
+game-preview.edit-hint = 编辑预览跟随 GUI、Collection 和 GO 资源；锁定后保持当前资源。脚本、自定义渲染和设备适配请运行验证。
 game-preview.edit-loading = 正在准备预览…
+
+game-preview.lock = 锁定预览
+
+gui-layout.title = GUI 布局
+gui-layout.current-layout = 当前布局：
+gui-layout.default-layout = 默认
+gui-layout.anchor = 锚点
+gui-layout.pivot = 轴心
+gui-layout.keep-appearance = 修改轴心时保持外观
+gui-layout.native-anchors = 锚点参照视口边缘，中间表示无锚定。矩形操作只修改当前布局。
+gui-layout.rect-tool = 矩形
+gui-layout.drag-help = 拖动内部移动，边角调整尺寸；Ctrl 拖黄色轴心吸附九点；Shift 保持比例或限制移动轴；Esc 取消。自动尺寸拖拽后改为手动，编辑布局前请退出动画预览。
+gui-layout.operation = 编辑 GUI 布局
+gui-layout.layout-only = 编辑布局前请退出动画预览。
+
+gui-layout.rect-transform = 矩形变换
+gui-layout.no-anchor = 无锚定
+gui-layout.pivot-nw = 左上
+gui-layout.pivot-n = 上
+gui-layout.pivot-ne = 右上
+gui-layout.pivot-w = 左
+gui-layout.pivot-center = 中心
+gui-layout.pivot-e = 右
+gui-layout.pivot-sw = 左下
+gui-layout.pivot-s = 下
+gui-layout.pivot-se = 右下

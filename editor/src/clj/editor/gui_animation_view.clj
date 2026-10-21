@@ -27,6 +27,7 @@
             [editor.gui-animation-properties :as animation-properties]
             [editor.gui-animation-preview :as preview]
             [editor.gui-animation-timeline :as timeline]
+            [editor.gui-layout :as gui-layout]
             [editor.localization :as localization]
             [editor.resource :as resource]
             [editor.ui :as ui]
@@ -255,6 +256,7 @@
         tool-controller-id (g/node-value view-id :tool-controller-id)
         manipulation-handler (atom nil)
         scene-content (first (.getChildrenUnmodifiable parent))
+        layout-tools (gui-layout/attach! scene-content view-id resource-node opts)
         root (BorderPane.)
         content (doto (VBox. 0.0) (.setMinWidth 0.0) (ui/add-style! "gui-animation-workspace") (.setPrefHeight 468.0))
         content-scroll (doto (ScrollPane. content) (.setFitToWidth true) (.setFitToHeight true)
@@ -1278,6 +1280,7 @@
                                                          :menu-items menu-items}))
                                [[scene-pane "dock.gui-scene" nil] [title "dock.gui-animation" (.getItems more-menu)]])
           refresh! (fn [dt]
+                     ((:refresh! layout-tools))
                      (when (.isVisible title)
                        (try
                          (refresh-document!)
@@ -1380,6 +1383,7 @@
                            (.setText status (.getMessage error))))))]
       {:refresh-fn refresh!
        :visible? (:visible? (second floating-panels))
-       :dispose-fn #(do (doseq [panel floating-panels] ((:dispose! panel)))
+       :dispose-fn #(do ((:dispose! layout-tools))
+                         (doseq [panel floating-panels] ((:dispose! panel)))
                          (.hide timeline-menu)
                          (swap! state assoc :playing false :preview false))})))
