@@ -18,7 +18,8 @@
             [editor.docking :as docking]
             [editor.localization :as localization]
             [editor.prefs :as prefs]
-            [editor.ui :as ui])
+            [editor.ui :as ui]
+            [integration.test-util :as test-util])
   (:import [javafx.scene Scene]
            [javafx.scene.control SplitPane]
            [javafx.scene.layout StackPane]))
@@ -26,7 +27,7 @@
 ;; Resource title changes follow the floating tab and native window without rebuilding or moving content.
 (deftest floating-resource-title-test
   (ui/run-now
-    (let [preferences (prefs/make :schemas [:default])
+    (let [preferences (test-util/make-test-prefs)
           localize (localization/make-editor preferences #(throw %))
           slot (StackPane. (into-array javafx.scene.Node [(javafx.scene.control.Label. "Preview")]))
           root (doto (StackPane. (into-array javafx.scene.Node [slot])) (.setId "workbench"))

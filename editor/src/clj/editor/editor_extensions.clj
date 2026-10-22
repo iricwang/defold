@@ -756,6 +756,30 @@
        :watched-files [{:pattern "**/.luacheckrc"}]
        :launcher launcher}}))
 
+(defn- built-in-emmy-language-servers [project-root annotations-sync-hash]
+  (let [unpack-path (system/defold-unpack-path)
+        library [(str (path/of unpack-path "shared" "lua-annotations"))
+                 (str (path/of project-root ".internal" "lua-annotations"))]
+        launcher {:command [(str (path/of unpack-path (.getPair (Platform/getHostPlatform)) "bin" "lsp" "emmylua"
+                                                         (if (os/is-win32?) "emmylua_ls.exe" "emmylua_ls")))]}]
+    (into #{}
+          (map (fn [[extensions version ignored]]
+                 {:languages #{"lua"}
+                  :extensions extensions
+                  :defold-lifecycle true
+                  :configuration {:emmylua {:runtime {:version version
+                                                     :extensions (mapv #(str "." %) (sort extensions))
+                                                     :requirePattern ["?.lua" "?/init.lua"]}
+                                            :workspace {:library library
+                                                        :ignoreDir [".git" "build" ".internal" ".defold"]
+                                                        :ignoreGlobs ignored}
+                                            :diagnostics {:globals ["init" "final" "update" "late_update" "fixed_update" "on_message" "on_input" "on_reload"]}}}
+                  :watched-files [{:pattern "**/.emmyrc.json"} {:pattern "**/.luarc.json"}]
+                  ::sync-hash (if (g/error-value? annotations-sync-hash) 0 annotations-sync-hash)
+                  :launcher launcher}))
+          [[#{"lua" "script" "gui_script" "render_script"} "Lua5.1" ["**/*.editor_script"]]
+           [#{"editor_script"} "Lua5.2" ["**/*.lua" "**/*.script" "**/*.gui_script" "**/*.render_script"]]])))
+
 (def language-servers-coercer
   (coerce/vector-of
     (coerce/hash-map
@@ -793,7 +817,8 @@
                  workspace (project/workspace project evaluation-context)
                  project-root (g/raw-property-value (:basis evaluation-context) workspace :root)
                  server-definitions {:extension-language-servers ext-language-servers
-                                     :lua-language-servers (built-in-lua-language-servers project-root sync-hash)}]
+                                     :lua-language-servers (built-in-lua-language-servers project-root sync-hash)
+                                     :emmy-language-servers (built-in-emmy-language-servers project-root sync-hash)}]
         (ui/run-now
           (project/update-language-servers! project prefs server-definitions))))))
 

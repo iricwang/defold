@@ -3067,3 +3067,11 @@ gui-layout.pivot-e = Right
 gui-layout.pivot-sw = Bottom Left
 gui-layout.pivot-s = Bottom
 gui-layout.pivot-se = Bottom Right
+
+prefs.label.code.lua-language-server = Lua language service
+
+prefs.label.code.signature-help = Function parameter hints
+
+prefs.label.code.semantic-highlighting = Semantic highlighting
+
+prefs.label.code.inlay-hints = Inline type hints

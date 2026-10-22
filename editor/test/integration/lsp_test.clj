@@ -249,6 +249,9 @@
                  {:text-document-sync {:open-close true
                                        :change :incremental}
                   :pull-diagnostics :none
+                  :signature-help false
+                  :semantic-tokens nil
+                  :inlay-hints false
                   :goto-definition false
                   :find-references false
                   :document-symbol false

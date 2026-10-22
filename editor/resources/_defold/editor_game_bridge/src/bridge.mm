@@ -26,8 +26,13 @@
 #include <signal.h>
 
 static const uint32_t HEADER = 4096;
-static const uint32_t SLOT = 2048 * 2048 * 4;
-static const uint32_t CAPACITY = HEADER + 2 * SLOT;
+static uint32_t g_Slot = 2048 * 2048 * 4;
+static size_t g_Capacity = HEADER + 2 * g_Slot;
+static bool g_Simulator;
+static uint32_t g_SettingsSequence;
+static uint32_t g_Served;
+
+namespace dmGraphics { void SetWindowSize(HContext context, uint32_t width, uint32_t height); }
 static int g_File = -1;
 static uint32_t* g_Data;
 static uint32_t g_Input[256];
@@ -59,16 +64,17 @@ static BOOL ActivationPolicy(id application, SEL selector, NSApplicationActivati
 
 static ExtensionResult Frame(dmExtension::Params*)
 {
-    if (!g_Data) return EXTENSION_RESULT_OK;
+    if (!g_Data || g_Data[14] == 1) return EXTENSION_RESULT_OK;
+    if (g_Simulator && (!g_Data[265] || g_Data[267] == g_Served)) return EXTENSION_RESULT_OK;
     uint32_t w = dmGraphics::GetWindowWidth(g_Graphics);
     uint32_t h = dmGraphics::GetWindowHeight(g_Graphics);
-    if (w == 0 || h == 0 || w > 2048 || h > 2048)
+    if (w == 0 || h == 0 || w > 4096 || h > 4096 || (uint64_t)w * h * 4 > g_Slot)
     {
         if (Lock(F_WRLCK)) { g_Data[4] = 0xffffffff; Lock(F_UNLCK); }
         return EXTENSION_RESULT_OK;
     }
     uint32_t slot = g_Data[11] ^ 1;
-    dmGraphics::ReadPixels(g_Graphics, 0, 0, w, h, (uint8_t*)g_Data + HEADER + slot * SLOT, w * h * 4);
+    dmGraphics::ReadPixels(g_Graphics, 0, 0, w, h, (uint8_t*)g_Data + HEADER + slot * g_Slot, w * h * 4);
     if (Lock(F_WRLCK))
     {
         g_Data[1] = w;
@@ -76,6 +82,7 @@ static ExtensionResult Frame(dmExtension::Params*)
         g_Data[4] = getpid();
         g_Data[11] = slot;
         ++g_Data[3];
+        g_Served = g_Data[267];
         Lock(F_UNLCK);
     }
     return EXTENSION_RESULT_OK;
@@ -91,19 +98,25 @@ static dmExtension::Result AppInitialize(dmExtension::AppParams* params)
     g_File = open(path, O_RDWR | O_NOFOLLOW);
     struct stat info;
     if (g_File < 0) return dmExtension::RESULT_INIT_ERROR;
-    if (fstat(g_File, &info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != getuid() || info.st_size != CAPACITY)
+    if (fstat(g_File, &info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != getuid() || info.st_size < HEADER || info.st_size > HEADER + 2LL * 4096 * 4096 * 4)
     {
         close(g_File); g_File = -1;
         return dmExtension::RESULT_INIT_ERROR;
     }
-    void* data = mmap(0, CAPACITY, PROT_READ | PROT_WRITE, MAP_SHARED, g_File, 0);
+    g_Capacity = (size_t)info.st_size;
+    void* data = mmap(0, g_Capacity, PROT_READ | PROT_WRITE, MAP_SHARED, g_File, 0);
     if (data == MAP_FAILED) { close(g_File); g_File = -1; return dmExtension::RESULT_INIT_ERROR; }
-    if (((uint32_t*)data)[0] != 0x44464732)
+    uint32_t* words = (uint32_t*)data;
+    g_Simulator = words[0] == 0x44464733;
+    g_Slot = g_Simulator ? words[12] : 2048 * 2048 * 4;
+    if ((!g_Simulator && words[0] != 0x44464732) || !g_Slot || g_Slot > 4096 * 4096 * 4
+        || g_Capacity != HEADER + 2 * g_Slot)
     {
-        munmap(data, CAPACITY); close(g_File); g_File = -1;
+        munmap(data, g_Capacity); close(g_File); g_File = -1;
         return dmExtension::RESULT_INIT_ERROR;
     }
     g_Data = (uint32_t*)data;
+    if (g_Simulator) g_Data[13] = 1;
     g_Hid = (dmHID::HContext)ContextRegistryGet(ExtensionAppParamsGetContextRegistry(params), "hid");
     Method order = class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:));
     Method policy = class_getInstanceMethod([NSApplication class], @selector(setActivationPolicy:));
@@ -124,7 +137,20 @@ static dmExtension::Result Initialize(dmExtension::Params* params)
 
 static dmExtension::Result Update(dmExtension::Params*)
 {
-    if (!g_Data) return dmExtension::RESULT_OK;
+    if (!g_Data || g_Data[14] == 1) return dmExtension::RESULT_OK;
+    if (g_Simulator)
+    {
+        uint32_t sequence = __atomic_load_n(g_Data + 264, __ATOMIC_ACQUIRE);
+        uint32_t w = g_Data[256], h = g_Data[257];
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+        if (!(sequence & 1) && sequence != g_SettingsSequence
+            && sequence == __atomic_load_n(g_Data + 264, __ATOMIC_ACQUIRE)
+            && w > 0 && h > 0 && w <= 4096 && h <= 4096 && (uint64_t)w * h * 4 <= g_Slot)
+        {
+            g_SettingsSequence = sequence;
+            dmGraphics::SetWindowSize(g_Graphics, w, h);
+        }
+    }
     if (kill(g_Parent, 0) != 0) { _exit(0); }
     g_Input[10] = 0;
     if (Lock(F_WRLCK))
@@ -163,7 +189,7 @@ static dmExtension::Result AppFinalize(dmExtension::AppParams*)
     {
         method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), g_OrderWindow);
         method_setImplementation(class_getInstanceMethod([NSApplication class], @selector(setActivationPolicy:)), g_ActivationPolicy);
-        munmap(g_Data, CAPACITY); close(g_File); g_Data = 0; g_File = -1;
+        munmap(g_Data, g_Capacity); close(g_File); g_Data = 0; g_File = -1;
     }
     return dmExtension::RESULT_OK;
 }

@@ -301,7 +301,7 @@ public final class GamePreview implements AutoCloseable {
         view.stop();
         Session next = new Session(view.targetFrameRate, view.simulator.active ? view.simulator.device : null, view.simulator.rotation);
         view.session = next;
-        Platform.runLater(() -> { view.showGame.run(); view.updateTitle(); view.sequence = 0; view.image.setImage(null); view.image.setScaleY(next.isSimulator() ? -1 : 1); view.pixels = null;
+        Platform.runLater(() -> { view.showGame.run(); view.updateTitle(); view.sequence = 0; view.image.setImage(null); view.image.setScaleY(next.simulatorWindow != null ? -1 : 1); view.pixels = null;
             view.previewMode.setVisible(false);
             view.releaseInput(); view.status.setVisible(true); view.localize.accept(view.status, "game-preview.starting"); });
         return next;
@@ -357,7 +357,13 @@ public final class GamePreview implements AutoCloseable {
                 current.data.putInt(1060, showing ? 1 : 0);
                 if (!showing) {
                     releaseInput();
-                    current.simulatorWindow.input(mouseX, mouseY, 0, 0, keys, text);
+                    if (current.simulatorWindow != null)
+                        current.simulatorWindow.input(mouseX, mouseY, 0, 0, keys, text);
+                    else {
+                        try (FileLock lock = current.channel.tryLock()) {
+                            if (lock != null) { current.data.putInt(20, 0); current.data.putInt(32, 0); }
+                        } catch (IOException | IllegalStateException error) { stop(); }
+                    }
                     return;
                 }
             }
@@ -372,9 +378,9 @@ public final class GamePreview implements AutoCloseable {
                 }
                 return;
             }
+            current.refreshDevice(simulator.rotation);
             if (current.simulatorWindow != null) {
                 try {
-                    current.refreshDevice(simulator.rotation);
                     current.simulatorWindow.updateSimulator(current.process, current.device.pixelWidth(simulator.rotation), current.device.pixelHeight(simulator.rotation));
                     if (!root.getScene().getWindow().isFocused() || root.getScene().getFocusOwner() != viewport) releaseInput();
                     current.simulatorWindow.input(mouseX, mouseY, buttons, wheel, keys, text);
@@ -422,7 +428,7 @@ public final class GamePreview implements AutoCloseable {
             }
             // Release the shared lock before uploading to JavaFX. PixelBuffer avoids
             // PixelWriter's extra staging copy and per-frame format conversion.
-            if (!current.isSimulator())
+            if (current.simulatorWindow == null)
                 for (int i = 3; i < frame.capacity(); i += 4) frame.put(i, (byte)255);
             pixelBuffer.updateBuffer(buffer -> null);
             status.setVisible(false);
@@ -467,7 +473,7 @@ public final class GamePreview implements AutoCloseable {
                 return;
             }
             window = null;
-            simulatorWindow = device == null ? null : new WindowsGameWindow();
+            simulatorWindow = device != null && com.sun.jna.Platform.isWindows() ? new WindowsGameWindow() : null;
             path = com.sun.jna.Platform.isWindows()
                 ? Files.createTempFile("defold-game-", ".shm")
                 : Files.createTempFile("defold-game-", ".shm", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));

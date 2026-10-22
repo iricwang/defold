@@ -1970,6 +1970,7 @@ bail:
             Exit(engine, 0);
             return;
         }
+        dmEditorGame::Resize(engine->m_GraphicsContext);
         dmProfiler::SetUpdateFrequency((uint32_t)(1.0f / dt));
 
         if (dmGraphics::GetWindowStateParam(engine->m_GraphicsContext, WINDOW_STATE_ICONIFIED)

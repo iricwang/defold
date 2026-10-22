@@ -1,0 +1,29 @@
+Backend ready (game, bridge=True): 4.200s
+test_annotation_inference (__main__.EmmyLuaRegression.test_annotation_inference) ... ok
+test_class_fields (__main__.EmmyLuaRegression.test_class_fields) ... ok
+test_completion_extensions (__main__.EmmyLuaRegression.test_completion_extensions) ... ok
+test_completion_resolution (__main__.EmmyLuaRegression.test_completion_resolution) ... ok
+test_definition_hover (__main__.EmmyLuaRegression.test_definition_hover) ... ok
+test_defold_api (__main__.EmmyLuaRegression.test_defold_api) ... ok
+test_diagnostics_edit_close (__main__.EmmyLuaRegression.test_diagnostics_edit_close) ... ok
+test_editor_script (__main__.EmmyLuaRegression.test_editor_script) ... Backend ready (editor, bridge=True): 4.698s
+ok
+test_formatting (__main__.EmmyLuaRegression.test_formatting) ... ok
+test_incremental_unicode_diagnostics (__main__.EmmyLuaRegression.test_incremental_unicode_diagnostics) ... ok
+test_lifecycle_edit_positions (__main__.EmmyLuaRegression.test_lifecycle_edit_positions) ... ok
+test_lifecycle_types (__main__.EmmyLuaRegression.test_lifecycle_types) ... ok
+test_multiline_lifecycle (__main__.EmmyLuaRegression.test_multiline_lifecycle) ... ok
+test_project_isolation_restart (__main__.EmmyLuaRegression.test_project_isolation_restart) ... Backend ready (game, bridge=True): 3.823s
+ok
+test_rename_references (__main__.EmmyLuaRegression.test_rename_references) ... ok
+test_same_project_restart (__main__.EmmyLuaRegression.test_same_project_restart) ... Backend ready (game, bridge=True): 2.450s
+Backend ready (game, bridge=True): 2.196s
+ok
+test_semantics_and_hints (__main__.EmmyLuaRegression.test_semantics_and_hints) ... ok
+test_signature (__main__.EmmyLuaRegression.test_signature) ... ok
+test_type_diagnostics (__main__.EmmyLuaRegression.test_type_diagnostics) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 33.520s
+
+OK

@@ -23,6 +23,7 @@
             [editor.code.util :as util]
             [editor.lsp.async :as lsp.async]
             [editor.lsp.base :as lsp.base]
+            [editor.lsp.defold-lua :as defold-lua]
             [editor.lsp.jsonrpc :as lsp.jsonrpc]
             [editor.os :as os]
             [editor.resource :as resource]
@@ -259,7 +260,10 @@
                                                       hoverProvider
                                                       renameProvider
                                                       documentFormattingProvider
-                                                      documentRangeFormattingProvider]}]
+                                                      documentRangeFormattingProvider
+                                                      signatureHelpProvider
+                                                      semanticTokensProvider
+                                                      inlayHintProvider]}]
   (cond-> {:text-document-sync (cond
                                  (nil? textDocumentSync)
                                  {:change :none :open-close false}
@@ -274,6 +278,9 @@
 
                                  :else
                                  (throw (ex-info "Invalid text document sync kind" {:value textDocumentSync})))
+           :signature-help (boolean signatureHelpProvider)
+           :semantic-tokens (when (:full semanticTokensProvider) (:legend semanticTokensProvider))
+           :inlay-hints (boolean inlayHintProvider)
            :pull-diagnostics (cond
                                (nil? diagnosticProvider) :none
                                (:workspaceDiagnostics diagnosticProvider) :workspace
@@ -440,13 +447,25 @@
                                                         :hierarchicalDocumentSymbolSupport true
                                                         :tagSupport {:valueSet [symbol-tag-deprecated]}
                                                         :labelSupport true}
+                                       :signatureHelp {:dynamicRegistration false
+                                                       :signatureInformation {:documentationFormat ["plaintext" "markdown"]
+                                                                              :parameterInformation {:labelOffsetSupport true}
+                                                                              :activeParameterSupport true}}
+                                       :semanticTokens {:dynamicRegistration false
+                                                        :requests {:full true}
+                                                        :tokenTypes ["namespace" "type" "class" "enum" "interface" "struct" "typeParameter" "parameter" "variable" "property" "enumMember" "event" "function" "method" "macro" "keyword" "modifier" "comment" "string" "number" "regexp" "operator" "decorator"]
+                                                        :tokenModifiers ["declaration" "definition" "readonly" "static" "deprecated" "abstract" "async" "modification" "documentation" "defaultLibrary"]
+                                                        :formats ["relative"]
+                                                        :overlappingTokenSupport false
+                                                        :multilineTokenSupport false}
+                                       :inlayHint {:dynamicRegistration false}
                                        :hover {:dynamicRegistration false
                                                :contentFormat [:markdown :plaintext]}
                                        :rename {:dynamicRegistration false
                                                 :prepareSupport true
                                                 :honorsChangeAnnotations false}
                                        :formatting {:dynamicRegistration false}
-                                       :rangeFormatting {:dynamicRegistration false}}
+                                       :rangeFormatting {:dynamicRegistration false}
                         :completion {:dynamicRegistration false
                                      :completionItem {:snippetSupport true
                                                       :commitCharactersSupport true
@@ -463,7 +482,7 @@
                                                       :labelDetailsSupport false}
                                      :completionItemKind {:valueSet (vec (sort (keys completion-item-kind:lsp->editor)))}
                                      :contextSupport true
-                                     :insertTextMode insert-text-mode-adjust-indentation}}
+                                     :insertTextMode insert-text-mode-adjust-indentation}}}
          :workspaceFolders [{:uri uri :name title}]}))
     (* 60 1000)))
 
@@ -519,6 +538,7 @@
                      :exception connection)
           (try
             (let [[base-source base-sink base-err] (lsp.base/make (input-stream connection) (output-stream connection))
+                  [base-source base-sink] (if (:defold-lifecycle server) (defold-lua/wrap base-source base-sink) [base-source base-sink])
                   jsonrpc (lsp.jsonrpc/make
                             {"textDocument/publishDiagnostics" (diagnostics-handler project out on-publish-diagnostics)
                              "workspace/diagnostic/refresh" (constantly nil)
@@ -612,6 +632,21 @@
     (when-let [resource (maybe-resource project lsp-uri evaluation-context)]
       {:resource resource
        :cursor-range (lsp-range->editor-cursor-range lsp-range)})))
+
+(defn code-insight [resource kind cursor-range legend]
+  (raw-request
+    (lsp.jsonrpc/notification
+      (case kind
+        :signature-help "textDocument/signatureHelp"
+        :semantic-tokens "textDocument/semanticTokens/full"
+        :inlay-hints "textDocument/inlayHint")
+      (cond-> {:textDocument {:uri (resource-uri resource)}}
+        (= :signature-help kind) (assoc :position (editor-cursor->lsp-position (:to cursor-range)))
+        (= :inlay-hints kind) (assoc :range (editor-cursor-range->lsp-range cursor-range))))
+    (fn [result _project]
+      (if (= :semantic-tokens kind)
+        {:data (:data result) :legend legend}
+        result))))
 
 (defn goto-definition
   "See also:

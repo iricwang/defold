@@ -1,0 +1,28 @@
+src/clj/editor/code/view.clj:139:8: warning: Unused private var editor.code.view/enable-performance-tracker!
+src/clj/editor/code/view.clj:348:8: warning: Use util.coll/some instead of clojure.core/some.
+src/clj/editor/code/view.clj:358:8: warning: Use util.coll/some instead of clojure.core/some.
+src/clj/editor/code/view.clj:976:59: warning: Use util.coll/some instead of clojure.core/some.
+src/clj/editor/code/view.clj:1004:31: warning: Use util.coll/not-any? instead of clojure.core/not-any?.
+src/clj/editor/code/view.clj:1010:17: warning: Use util.coll/empty? instead of clojure.core/empty?.
+src/clj/editor/code/view.clj:1032:17: warning: Use util.coll/empty? instead of clojure.core/empty?.
+src/clj/editor/code/view.clj:1152:5: warning: Redundant let expression.
+src/clj/editor/code/view.clj:1167:4: warning: Use util.coll/first-where instead of clojure.core/some.
+src/clj/editor/code/view.clj:1175:6: warning: Use util.coll/first-where instead of clojure.core/some.
+src/clj/editor/code/view.clj:2068:6: info: Redundant boolean coercion: expression already has type boolean
+src/clj/editor/code/view.clj:2109:10: warning: Use util.coll/empty? instead of clojure.core/empty?.
+src/clj/editor/code/view.clj:2112:17: warning: Use util.coll/some instead of clojure.core/some.
+src/clj/editor/code/view.clj:2165:26: warning: Use util.coll/not-empty instead of clojure.core/not-empty.
+src/clj/editor/code/view.clj:2184:42: warning: Use util.coll/not-empty instead of clojure.core/not-empty.
+src/clj/editor/code/view.clj:2631:30: warning: Use util.coll/every? instead of clojure.core/every?.
+src/clj/editor/code/view.clj:2748:13: warning: redundant do
+src/clj/editor/code/view.clj:3041:4: warning: Use util.coll/not-every? instead of clojure.core/not-every?.
+src/clj/editor/code/view.clj:3182:6: warning: Use util.coll/not-every? instead of clojure.core/not-every?.
+src/clj/editor/code/view.clj:3260:21: warning: Single arg use of and always returns the arg itself
+src/clj/editor/code/view.clj:3517:4: warning: Use util.coll/some instead of clojure.core/some.
+src/clj/editor/code/view.clj:3635:14: warning: Use util.coll/empty? instead of clojure.core/empty?.
+src/clj/editor/code/view.clj:4300:20: warning: unused binding this
+src/clj/editor/code/view.clj:4300:31: warning: unused binding regions
+src/clj/editor/code/view.clj:4304:18: warning: unused binding this
+src/clj/editor/code/view.clj:4509:9: warning: unused binding spacing
+src/clj/editor/code/view.clj:4510:9: warning: unused binding padding
+linting took 476ms, errors: 0, warnings: 26

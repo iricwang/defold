@@ -108,6 +108,13 @@
             :zoom-on-scroll {:type :boolean}
             :hover {:type :boolean
                     :default true}
+            :lua-language-server {:type :enum
+                                  :scope :project
+                                  :values ["EmmyLua" "LuaLS"]
+                                  :default "EmmyLua"}
+            :signature-help {:type :boolean :default true}
+            :semantic-highlighting {:type :boolean :default true}
+            :inlay-hints {:type :boolean :default true}
             :enable-lua-language-server {:type :boolean
                                          :scope :project
                                          :default true}

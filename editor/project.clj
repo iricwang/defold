@@ -157,6 +157,11 @@
 
   ;; used by `pack` task
   :packing           {:pack-path "resources/_unpack"
+                      :emmy-language-server {:version "0.25.1"
+                                             :sha256 {"arm64-macos" "335023043cbc9ad683a13b24eb79f709a370215daf53673276b9a9663df96504"
+                                                      "x86_64-macos" "abc9cbe2e8d28624e0d441fa55055b1196f73251b034356d717b0e58b562f182"
+                                                      "x86_64-linux" "8f4096468da37654049169dc2e1283e7685348e5215cc144a27f9988befac590"
+                                                      "x86_64-win32" "82efa133287f67be09e1a624d8efecd8063832ec2b9bf9279c37afc5f42118bd"}}
                       :lua-language-server {:version "3.19.1"
                                             :sha256 {"arm64-macos" "0bc077f4447f076b4c92c14e9fd303f5b569eda2ec74b4dca2b55f75fae2e90c"
                                                      "x86_64-macos" "eb373c159cbe556711d7cd316315de2dce969bfd54b31edb7eb9cab2937f2cca"

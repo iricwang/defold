@@ -1074,6 +1074,19 @@
                :timeout-ms timeout-ms))))
     (result-callback completion)))
 
+(defn code-insight! [lsp resource kind cursor-range result-callback]
+  (if (resource/file-resource? resource)
+    (lsp (bound-fn [state]
+           (let [ch (a/chan 1 (take 1))]
+             (a/go (result-callback (<! ch)))
+             (send-requests! state ch
+                             :capabilities-pred kind
+                             :resource resource
+                             :timeout-ms 3000
+                             :requests-fn (fn [_ {:keys [capabilities]}]
+                                            [(lsp.server/code-insight resource kind cursor-range (:semantic-tokens capabilities))])))))
+    (do (result-callback nil) nil)))
+
 (defn hover! [lsp resource cursor result-callback & {:keys [timeout-ms]
                                                      :or {timeout-ms 1000}}]
   (if (resource/file-resource? resource)

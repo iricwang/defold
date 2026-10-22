@@ -81,6 +81,7 @@
    ;"${DYNAMO-HOME}/ext/bin/x86_64-win32/tint.exe"       "x86_64-win32/tint.exe"
 
    "resources/lua-annotations"                         "shared/lua-annotations"
+   "resources/emmylua"                                 "shared/emmylua"
    "resources/lua-language-server"                     "shared/lua-language-server"
    "${DYNAMO-HOME}/ext/share/luajit"                    "shared/luajit"
 
@@ -148,7 +149,7 @@
   (doseq [jogl-native-dep (filter jogl-native-dep? dependencies)]
     (extract-jogl-native-dep local-repo jogl-native-dep pack-path selected-platforms)))
 
-(defn pack-lua-language-server [pack-path {:keys [version sha256]} selected-platforms]
+(defn pack-language-server [pack-path {:keys [version sha256]} selected-platforms implementation]
   (doseq [platform selected-platforms
           :let [[release-platform extension] (case platform
                                                "x86_64-macos" ["darwin-x64" "tar.gz"]
@@ -157,21 +158,19 @@
                                                "x86_64-win32" ["win32-x64" "zip"])
                 expected-sha256 (or (get sha256 platform)
                                     (throw (IllegalArgumentException.
-                                             (format "Missing LuaLS archive SHA-256 for platform %s and version %s"
+                                             (format "Missing language server archive SHA-256 for platform %s and version %s"
                                                      platform
                                                      version))))
-                archive-file (-> (format "https://github.com/LuaLS/lua-language-server/releases/download/%s/lua-language-server-%s-%s.%s"
-                                         version
-                                         version
-                                         release-platform
-                                         extension)
+                archive-file (-> (if (= :emmylua implementation)
+                                  (format "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/%s/emmylua_ls-%s.%s" version release-platform extension)
+                                  (format "https://github.com/LuaLS/lua-language-server/releases/download/%s/lua-language-server-%s-%s.%s" version version release-platform extension))
                                  (http-cache/download false))
-                output-dir (.getCanonicalFile (io/file pack-path platform "bin" "lsp" "lua"))]]
+                output-dir (.getCanonicalFile (io/file pack-path platform "bin" "lsp" (name implementation)))]]
     (let [actual-sha256 (with-open [^InputStream input (io/input-stream archive-file)]
                           (DigestUtils/sha256Hex input))]
       (when-not (= expected-sha256 actual-sha256)
         (throw (IllegalStateException.
-                 (format "LuaLS archive SHA-256 mismatch for %s: expected %s, got %s"
+                 (format "Language server archive SHA-256 mismatch for %s: expected %s, got %s"
                          archive-file
                          expected-sha256
                          actual-sha256)))))
@@ -214,11 +213,12 @@
   [{:keys [dependencies local-repo packing] :as project} & [git-sha]]
   (let [sha (or git-sha (:engine project))
         archive-domain (get project :archive-domain)
-        {:keys [pack-path lua-language-server target-platform]} packing
+        {:keys [pack-path lua-language-server emmy-language-server target-platform]} packing
         platforms-to-pack (selected-platforms target-platform)]
     (when-not local-repo
       (throw (ex-info "Missing project :local-repo" {:task "pack"})))
     (FileUtils/deleteQuietly (io/file pack-path))
     (copy-artifacts pack-path archive-domain sha platforms-to-pack)
     (pack-jogl-natives pack-path local-repo dependencies platforms-to-pack)
-    (pack-lua-language-server pack-path lua-language-server platforms-to-pack)))
+    (pack-language-server pack-path lua-language-server platforms-to-pack :lua)
+    (pack-language-server pack-path emmy-language-server platforms-to-pack :emmylua)))

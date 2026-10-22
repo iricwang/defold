@@ -25,7 +25,7 @@
   (:import [com.defold.editor GamePreview SimulatorDevice]
            [java.nio.file Files Path]
            [java.util.function BiConsumer]
-           [javafx.scene.control ComboBox ToggleButton]
+           [javafx.scene.control Button CheckBox ComboBox ToggleButton]
            [javafx.event Event EventHandler]
            [javafx.scene.input KeyCode KeyEvent]
            [javafx.scene.image ImageView WritableImage]
@@ -114,6 +114,38 @@
            (when-let [path (.getPath next-session)]
              (is (not (Files/exists (Path/of path (make-array String 0))
                                    (make-array java.nio.file.LinkOption 0))))))))))
+
+;; Device simulation must remain available on macOS, persist settings and avoid loading Win32 APIs.
+(deftest simulator-cross-platform-session-and-settings
+  (let [directory (Files/createTempDirectory "device-session" (make-array java.nio.file.attribute.FileAttribute 0))
+        path (str directory)
+        make-pane #(GamePreview. path (fn []) (fn []) (reify BiConsumer (accept [_ _ _])))]
+    (try
+      @(fx/on-fx-thread
+         (with-open [pane (make-pane)]
+           (let [root (.getNode pane)
+                 enabled ^CheckBox (.lookup root "#game-simulator-enabled")
+                 rotate ^Button (.lookup root "#game-simulator-rotate")]
+             (is (not (.isDisabled enabled)))
+             (.fire enabled)
+             (let [[width height] (vec (.getPreviewDeviceSize pane))]
+               (is (< 2048 height))
+               (.fire rotate)
+               (is (= [height width] (vec (.getPreviewDeviceSize pane))))))
+           (with-open [session (GamePreview/prepare path true)]
+             (is (.isSimulator session))
+             (is (= (vec (.getPreviewDeviceSize pane))
+                    [(.getDeviceWidth session) (.getDeviceHeight session)]))
+             (is (Files/exists (Path/of (.getPath session) (make-array String 0))
+                               (make-array java.nio.file.LinkOption 0)))))
+         (with-open [pane (make-pane)]
+           (is (.isSelected ^CheckBox (.lookup (.getNode pane) "#game-simulator-enabled")))
+           (let [[width height] (vec (.getPreviewDeviceSize pane))]
+             (is (> width height)))))
+      (finally
+        (Files/deleteIfExists (.resolve directory ".internal/game-simulator.properties"))
+        (Files/deleteIfExists (.resolve directory ".internal"))
+        (Files/deleteIfExists directory)))))
 
 ;; Edit preview keeps the project aspect ratio and bounds GPU readback at large window sizes.
 (deftest edit-preview-resolution

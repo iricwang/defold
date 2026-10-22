@@ -240,3 +240,15 @@ Links:
 #overlay {
     -fx-background-color: transparent;
 }
+
+
+.code-signature-help {
+    -fx-background-color: -df-component-darker;
+    -fx-border-color: -df-component-light;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 8;
+    -fx-spacing: 4;
+    .label { -fx-text-fill: -df-text; }
+    .active-parameter { -fx-text-fill: -df-defold-blue-lighter; -fx-font-weight: bold; }
+}

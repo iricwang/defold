@@ -157,3 +157,8 @@ if (NOT (TARGET_PLATFORM MATCHES "wasm-web|wasm_pthread-web|x86_64-xbone"))
 
     defold_register_test_target(test_platform_app FALSE)
 endif()
+
+if(TARGET_PLATFORM MATCHES "^(arm64|x86_64)-macos$")
+    defold_add_executable(test_editor_game_safe_area "${CMAKE_CURRENT_LIST_DIR}/test_editor_game_safe_area.cpp")
+    defold_register_test_target(test_editor_game_safe_area ON "${CMAKE_CURRENT_LIST_DIR}/../..")
+endif()

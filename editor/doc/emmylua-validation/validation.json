@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-22",
+  "platform": "arm64-macos",
+  "revision": 78,
+  "backend": "emmylua_ls 0.25.1",
+  "unit_and_integration": {
+    "tests": 42,
+    "assertions": 682,
+    "failures": 0,
+    "errors": 0
+  },
+  "real_backend": {
+    "tests": 19,
+    "failures": 0,
+    "seconds": 33.52,
+    "production_protocol_adapter": true
+  },
+  "patch_unit_tests": {
+    "total": 28,
+    "passed": 17,
+    "skipped": 11,
+    "note": "Platform/optional installer tests skipped; actual Mac installation and restart independently verified."
+  },
+  "ui": {
+    "tool": "cljfx.plorer via local REPL",
+    "typing_before_fix": {
+      "visible_frames": 6,
+      "missing_frames": 20
+    },
+    "typing_patch78": {
+      "visible_frames": 22,
+      "missing_frames": 0
+    },
+    "verified": [
+      "Native preferences",
+      "EmmyLua → LuaLS → disabled → EmmyLua service transitions",
+      "Lifecycle action field completion",
+      "Parameter signature and active parameter",
+      "Line-end hints with no text overlap",
+      "Go to definition",
+      "Rename and undo",
+      "Installed Arrow Away project loads with both EmmyLua processes running"
+    ],
+    "note": "Definition, rename and backend switching were checked on candidate76; final patch78 rechecked hints, parameter popup, completion and preferences."
+  },
+  "install": {
+    "from": 74,
+    "to": 78,
+    "feed": "local HTTP 127.0.0.1:18878",
+    "download_verified": true,
+    "installation_verified": true,
+    "exact_files": 168,
+    "restart_command_started": true,
+    "commit": "aac521aa668fc81bccf0f98601b1afdba3ecf2bf"
+  },
+  "cleanup": {
+    "kept": "/Applications/Defold.app",
+    "old_backup_moved_to_trash": true
+  },
+  "limits": [
+    "Windows and Intel macOS execution not performed on this machine; CI checks configured.",
+    "Verification used a local loopback HTTP feed; not published to GitHub.",
+    "EmmyLua may return no signature in some cursor contexts, closing the popup after the response.",
+    "Unexpected backend exit requires disabling/re-enabling language services or selecting the backend again."
+  ]
+}

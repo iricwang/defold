@@ -77,7 +77,14 @@ jobs:
             editor.gui-animation-events-test editor.gui-animation-inspector-test \
             editor.scene-tools-animation-test editor.scene-test editor.ui-test integration.gui-animation-test \
             editor.craft-binding-test editor.app-view-photocraft-test editor.craft-publish-test \
-            integration.craft-project-test integration.craft-publish-test
+            integration.craft-project-test integration.craft-publish-test \
+            editor.code.insight-test editor.lsp.defold-lua-test integration.lsp-test
+      - name: Test EmmyLua backend and editor protocol adapter
+        run: |
+          source tmp/macos-build-env.sh
+          cd editor
+          LEIN_HOME="$PWD/build/lein" bash scripts/lein with-profile +offline classpath > ../tmp/emmy-test-classpath.txt
+          python3.12 scripts/test_emmylua.py --server "resources/_unpack/${{ matrix.platform }}/bin/lsp/emmylua/emmylua_ls" --bridge-classpath ../tmp/emmy-test-classpath.txt
       - name: Test exported GUI animations in the game runtime
         run: |
           source tmp/macos-build-env.sh
@@ -161,9 +168,14 @@ jobs:
           env = dict(os.environ, DYNAMO_HOME=str(root / 'tmp/windows-patch-home'),
                      DM_BOB_JAR=str(root / 'tmp/windows-patch-home/share/java/bob-editor.jar'),
                      DM_EDITOR_USE_BOB_PROTOCOLS='1', LEIN_HOME=str(editor / 'build/lein'))
-          code = "(javafx.application.Platform/startup (fn [] (javafx.application.Platform/setImplicitExit false))) (require 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test) (let [r (clojure.test/run-tests 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test)] (System/exit (if (zero? (+ (:fail r) (:error r))) 0 1)))"
+          code = "(javafx.application.Platform/startup (fn [] (javafx.application.Platform/setImplicitExit false))) (require 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test 'editor.code.insight-test 'editor.lsp.defold-lua-test) (let [r (clojure.test/run-tests 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test 'editor.code.insight-test 'editor.lsp.defold-lua-test)] (System/exit (if (zero? (+ (:fail r) (:error r))) 0 1)))"
           subprocess.run(['bash', 'scripts/lein', 'with-profile', '+offline', 'run',
                           '-m', 'clojure.main', '-e', code], cwd=editor, env=env, check=True)
+          with (root / 'tmp/emmy-test-classpath.txt').open('w') as output:
+              subprocess.run(['bash', 'scripts/lein', 'with-profile', '+offline', 'classpath'], cwd=editor, env=env, stdout=output, check=True)
+          subprocess.run(['python', '-X', 'utf8', 'scripts/test_emmylua.py', '--server',
+                          'resources/_unpack/x86_64-win32/bin/lsp/emmylua/emmylua_ls.exe',
+                          '--bridge-classpath', '../tmp/emmy-test-classpath.txt'], cwd=editor, env=env, check=True)
           PY
       - name: Upload patch and baseline inventory
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

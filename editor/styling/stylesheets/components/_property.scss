@@ -3,7 +3,9 @@
 }
 
 // Compact native GUI preset controls; colors and interaction states are inherited.
-.gui-layout-preset-menu {
+.menu-button.gui-layout-preset-menu {
+    -fx-background-radius: 5px;
+    -fx-border-radius: 4px;
     -fx-min-width: 76px;
     -fx-pref-width: 76px;
     -fx-max-width: 76px;
@@ -16,12 +18,21 @@
     &.overridden > .label { -fx-text-fill: -df-defold-blue-lighter; }
 }
 
-.gui-layout-preset-cell {
+// The whole preset panel is one custom menu item, not a selectable menu row.
+.context-menu .menu-item.gui-layout-preset-popup {
+    &, &:hover, &:focused {
+        -fx-background-color: transparent;
+    }
+}
+
+.toggle-button.gui-layout-preset-cell {
     -fx-min-width: 66px;
     -fx-pref-width: 66px;
     -fx-max-width: 66px;
     -fx-min-height: 52px;
     -fx-pref-height: 52px;
+    -fx-max-height: 52px;
+    -fx-alignment: center;
     -fx-padding: 4px;
     -fx-graphic-text-gap: 2px;
 }

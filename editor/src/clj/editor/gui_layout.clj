@@ -137,13 +137,13 @@
 (defn- preset-graphic [pivot]
   (let [[x y] (pivot-points pivot)]
     {:fx/type :pane
-     :min-width 28.0 :pref-width 28.0 :max-width 28.0
-     :min-height 24.0 :pref-height 24.0 :max-height 24.0
+     :min-width 26.0 :pref-width 26.0 :max-width 26.0
+     :min-height 22.0 :pref-height 22.0 :max-height 22.0
      :mouse-transparent true
-     :children [{:fx/type :rectangle :x 3.0 :y 3.0 :width 22.0 :height 18.0
+     :children [{:fx/type :rectangle :x 4.0 :y 4.0 :width 18.0 :height 14.0
                  :style "-fx-fill: transparent; -fx-stroke: -df-text-dark;"}
-                {:fx/type :circle :center-x (+ 3.0 (* 22.0 (double x)))
-                 :center-y (+ 3.0 (* 18.0 (- 1.0 (double y)))) :radius 2.5
+                {:fx/type :circle :center-x (+ 4.0 (* 18.0 (double x)))
+                 :center-y (+ 4.0 (* 14.0 (- 1.0 (double y)))) :radius 2.5
                  :style "-fx-fill: -df-defold-blue-lighter;"}]}))
 
 (defn inspector-view [coalesced context localization-state]
@@ -225,6 +225,7 @@
                             :tooltip (str (message localization-state (name kind)) ": " (preset-label kind selected))
                             :items
                             [{:fx/type :custom-menu-item :hide-on-click false
+                              :style-class ["menu-item" "custom-menu-item" "gui-layout-preset-popup"]
                               :content
                               {:fx/type fxui/vertical :spacing :small :padding :small
                                :children

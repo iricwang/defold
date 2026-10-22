@@ -1880,13 +1880,17 @@
 
 (defn update-language-servers! [project prefs server-definitions]
   {:pre [(ui/on-ui-thread?)]}
-  (let [{:keys [extension-language-servers lua-language-servers project-language-server]}
+  (let [{:keys [extension-language-servers lua-language-servers emmy-language-servers project-language-server]}
         (g/user-data-swap! project ::language-servers coll/merge server-definitions)]
     (lsp/set-servers!
       (lsp/get-lsp)
       (cond-> (set extension-language-servers)
         project-language-server (conj project-language-server)
-        (prefs/get prefs [:code :enable-lua-language-server]) (into lua-language-servers)))))
+        (prefs/get prefs [:code :enable-lua-language-server])
+        (into (if (and (= "EmmyLua" (prefs/get prefs [:code :lua-language-server]))
+                       emmy-language-servers)
+                emmy-language-servers
+                lua-language-servers))))))
 
 (defn make-project [workspace-id extensions]
   (let [code-preprocessors (workspace/code-preprocessors workspace-id)

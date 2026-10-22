@@ -1,0 +1,136 @@
+Compiling 69 source files to /Users/applemima1111/Documents/Dev/Defold/editor/target/classes
+/Users/applemima1111/Documents/Dev/Defold/editor/src/java/com/defold/editor/WindowsGameWindow.java:30: 警告: [deprecation] Native中的<T>loadLibrary(String,Class<T>)已过时
+        User32 INSTANCE = (User32) Native.loadLibrary("user32", User32.class);
+                                         ^
+  其中, T是类型变量:
+    T扩展已在方法 <T>loadLibrary(String,Class<T>)中声明的Object
+/Users/applemima1111/Documents/Dev/Defold/editor/src/java/com/defold/editor/Main.java:53: 警告: [deprecation] Native中的<T>loadLibrary(String,Class<T>)已过时
+            MacDisplays api = (MacDisplays)Native.loadLibrary("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", MacDisplays.class);
+                                                 ^
+  其中, T是类型变量:
+    T扩展已在方法 <T>loadLibrary(String,Class<T>)中声明的Object
+2 个警告
+10月 22, 2026 1:57:40 上午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @b0964b2'
+patch.clj:129 recur arg for primitive local: ceiling is not matching primitive, had: Object, needed: long
+Auto-boxing loop arg: ceiling
+
+Testing editor.code.insight-test
+
+Testing editor.lsp.defold-lua-test
+
+Testing integration.lsp-test
+2026-10-22 01:58:19.184 INFO  default    com.defold.libs.ResourceUnpacker - not deleting old unpack dirs from tmp as it is not in system support path /Users/applemima1111/Library/Application Support/Defold
+2026-10-22 01:58:19.779 INFO  default    com.defold.libs.ResourceUnpacker - defold.unpack.path=/Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack
+2026-10-22 01:58:20.581 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_mobile' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_mobile.dylib
+2026-10-22 01:58:22.034 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'gluegen_rt' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libgluegen_rt.dylib
+2026-10-22 01:58:22.811 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_awt' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_awt.dylib
+objc[74935]: Class ContextUpdater is implemented in both /private/var/folders/gc/yc_pl9gn1yj8jxbk3txvg6tw0000gn/T/jogamp_0000/file_cache/jln7221255526689111861/jln10923004692933166115/natives/macosx-universal/libjogl_desktop.dylib (0x1482fcbf0) and /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_desktop.dylib (0x14812cbf0). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[74935]: Class MyNSOpenGLContext is implemented in both /private/var/folders/gc/yc_pl9gn1yj8jxbk3txvg6tw0000gn/T/jogamp_0000/file_cache/jln7221255526689111861/jln10923004692933166115/natives/macosx-universal/libjogl_desktop.dylib (0x1482fcc40) and /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_desktop.dylib (0x14812cc40). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[74935]: Class MyNSOpenGLLayer is implemented in both /private/var/folders/gc/yc_pl9gn1yj8jxbk3txvg6tw0000gn/T/jogamp_0000/file_cache/jln7221255526689111861/jln10923004692933166115/natives/macosx-universal/libjogl_desktop.dylib (0x1482fcc90) and /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_desktop.dylib (0x14812cc90). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+2026-10-22 01:58:23.606 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_desktop' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libjogl_desktop.dylib
+2026-10-22 01:58:24.072 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'particle_shared' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libparticle_shared.dylib
+2026-10-22 01:58:24.872 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'newt_head' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnewt_head.dylib
+2026-10-22 01:58:25.359 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'mouse_capture_shared' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libmouse_capture_shared.dylib
+objc[74935]: Class MyCALayer is implemented in both /private/var/folders/gc/yc_pl9gn1yj8jxbk3txvg6tw0000gn/T/jogamp_0000/file_cache/jln7221255526689111861/jln10923004692933166115/natives/macosx-universal/libnativewindow_macosx.dylib (0x143cc44f8) and /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_macosx.dylib (0x143d304f8). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[74935]: Class MainRunnable is implemented in both /private/var/folders/gc/yc_pl9gn1yj8jxbk3txvg6tw0000gn/T/jogamp_0000/file_cache/jln7221255526689111861/jln10923004692933166115/natives/macosx-universal/libnativewindow_macosx.dylib (0x143cc4548) and /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_macosx.dylib (0x143d30548). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+2026-10-22 01:58:26.133 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_macosx' from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib/libnativewindow_macosx.dylib
+2026-10-22 01:58:26.134 INFO  default    com.defold.libs.ResourceUnpacker - preloaded 8 bundled native libraries from /Users/applemima1111/Documents/Dev/Defold/editor/tmp/unpack/arm64-macos/lib
+2026-10-22 01:58:26.923 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:27.955 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:33.351 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:35.064 INFO  default    editor.shared-editor-settings - {:line 143, :message "Loading workspace-config from Shared Editor Settings file."}
+2026-10-22 01:58:35.070 INFO  default    editor.shared-editor-settings - {:line 146, :message "Using workspace-config from Shared Editor Settings file.", :workspace-config {:non-editable-directories ["/non_editable"]}}
+2026-10-22 01:58:35.406 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 33, :retained 33, :unretained 0, :limit 1000}
+2026-10-22 01:58:41.822 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 147, :retained 34, :unretained 113, :limit 1000}
+2026-10-22 01:58:42.297 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 117, :retained 33, :unretained 84, :limit 1000}
+2026-10-22 01:58:43.046 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:43.957 ERROR default    editor.error-reporting - {:line 133, :ex-data {}}
+clojure.lang.ExceptionInfo: cannot format range
+	at integration.lsp_test$fn__146469$fn__146497$fn__146505.invoke(lsp_test.clj:1127)
+	at integration.lsp_test$make_test_server_launcher$reify__144912$get_request_method__144919$respond__144920.invoke(lsp_test.clj:191)
+	at editor.lsp.jsonrpc$respond.invokeStatic(jsonrpc.clj:43)
+	at editor.lsp.jsonrpc$respond.invoke(jsonrpc.clj:37)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684$state_machine__7189__auto____27693$fn__27695.invoke(jsonrpc.clj:77)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684$state_machine__7189__auto____27693.invoke(jsonrpc.clj:59)
+	at clojure.core.async.impl.ioc_macros$run_state_machine.invokeStatic(ioc_macros.clj:978)
+	at clojure.core.async.impl.ioc_macros$run_state_machine.invoke(ioc_macros.clj:977)
+	at clojure.core.async.impl.ioc_macros$run_state_machine_wrapped.invokeStatic(ioc_macros.clj:982)
+	at clojure.core.async.impl.ioc_macros$run_state_machine_wrapped.invoke(ioc_macros.clj:980)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684.invoke(jsonrpc.clj:59)
+	at clojure.lang.AFn.run(AFn.java:22)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at clojure.core.async.impl.concurrent$counted_thread_factory$reify__1048$fn__1049.invoke(concurrent.clj:29)
+	at clojure.lang.AFn.run(AFn.java:22)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+2026-10-22 01:58:43.960 WARN  default    editor.lsp - {:line 260, :message "Language server responded with error", :server {:languages #{"json"}, :launcher #object[integration.lsp_test$make_test_server_launcher$reify__144912 0x489b1d90 "integration.lsp_test$make_test_server_launcher$reify__144912@489b1d90"]}, :error {:code -32603, :message "cannot format range"}}
+2026-10-22 01:58:44.583 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:45.408 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:45.564 ERROR default    editor.error-reporting - {:line 133, :ex-data {}}
+clojure.lang.ExceptionInfo: This exception should be correctly handled by lsp test
+	at integration.lsp_test$fn__146176$fn__146224$fn__146227.invoke(lsp_test.clj:915)
+	at integration.lsp_test$make_test_server_launcher$reify__144912$get_request_method__144919$respond__144920.invoke(lsp_test.clj:191)
+	at editor.lsp.jsonrpc$respond.invokeStatic(jsonrpc.clj:43)
+	at editor.lsp.jsonrpc$respond.invoke(jsonrpc.clj:37)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684$state_machine__7189__auto____27693$fn__27695.invoke(jsonrpc.clj:77)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684$state_machine__7189__auto____27693.invoke(jsonrpc.clj:59)
+	at clojure.core.async.impl.ioc_macros$run_state_machine.invokeStatic(ioc_macros.clj:978)
+	at clojure.core.async.impl.ioc_macros$run_state_machine.invoke(ioc_macros.clj:977)
+	at clojure.core.async.impl.ioc_macros$run_state_machine_wrapped.invokeStatic(ioc_macros.clj:982)
+	at clojure.core.async.impl.ioc_macros$run_state_machine_wrapped.invoke(ioc_macros.clj:980)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684.invoke(jsonrpc.clj:59)
+	at clojure.lang.AFn.run(AFn.java:22)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at clojure.core.async.impl.concurrent$counted_thread_factory$reify__1048$fn__1049.invoke(concurrent.clj:29)
+	at clojure.lang.AFn.run(AFn.java:22)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+2026-10-22 01:58:45.565 WARN  default    editor.lsp - {:line 260, :message "Language server responded with error", :server {:languages #{"json"}, :launcher #object[integration.lsp_test$make_test_server_launcher$reify__144912 0xf7df733 "integration.lsp_test$make_test_server_launcher$reify__144912@f7df733"]}, :error {:code -32603, :message "This exception should be correctly handled by lsp test"}}
+2026-10-22 01:58:46.182 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:47.630 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:48.770 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:50.634 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:52.017 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:53.064 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:53.231 ERROR default    editor.error-reporting - {:line 133, :ex-data #:jsonrpc{:code -32801}}
+clojure.lang.ExceptionInfo: Content modified.
+	at integration.lsp_test$fn__146338$fn__146341.invoke(lsp_test.clj:999)
+	at integration.lsp_test$make_test_server_launcher$reify__144912$get_request_method__144919$respond__144920.invoke(lsp_test.clj:191)
+	at editor.lsp.jsonrpc$respond.invokeStatic(jsonrpc.clj:43)
+	at editor.lsp.jsonrpc$respond.invoke(jsonrpc.clj:37)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684$state_machine__7189__auto____27693$fn__27695.invoke(jsonrpc.clj:77)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684$state_machine__7189__auto____27693.invoke(jsonrpc.clj:59)
+	at clojure.core.async.impl.ioc_macros$run_state_machine.invokeStatic(ioc_macros.clj:978)
+	at clojure.core.async.impl.ioc_macros$run_state_machine.invoke(ioc_macros.clj:977)
+	at clojure.core.async.impl.ioc_macros$run_state_machine_wrapped.invokeStatic(ioc_macros.clj:982)
+	at clojure.core.async.impl.ioc_macros$run_state_machine_wrapped.invoke(ioc_macros.clj:980)
+	at editor.lsp.jsonrpc$server_message_processor$fn__27639$fn__27684.invoke(jsonrpc.clj:59)
+	at clojure.lang.AFn.run(AFn.java:22)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at clojure.core.async.impl.concurrent$counted_thread_factory$reify__1048$fn__1049.invoke(concurrent.clj:29)
+	at clojure.lang.AFn.run(AFn.java:22)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+2026-10-22 01:58:54.000 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:55.064 INFO  default    editor.shared-editor-settings - {:line 143, :message "Loading workspace-config from Shared Editor Settings file."}
+2026-10-22 01:58:55.065 INFO  default    editor.shared-editor-settings - {:line 146, :message "Using workspace-config from Shared Editor Settings file.", :workspace-config {:non-editable-directories ["/non_editable"]}}
+2026-10-22 01:58:55.156 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 33, :retained 33, :unretained 0, :limit 1000}
+2026-10-22 01:58:55.907 INFO  default    editor.shared-editor-settings - {:line 143, :message "Loading workspace-config from Shared Editor Settings file."}
+2026-10-22 01:58:55.908 INFO  default    editor.shared-editor-settings - {:line 146, :message "Using workspace-config from Shared Editor Settings file.", :workspace-config {:non-editable-directories ["/non_editable"]}}
+2026-10-22 01:58:56.001 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 33, :retained 33, :unretained 0, :limit 1000}
+2026-10-22 01:58:56.021 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 35, :retained 34, :unretained 1, :limit 1000}
+2026-10-22 01:58:59.040 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:58:59.394 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 8, :retained 1, :unretained 7, :limit 1000}
+2026-10-22 01:58:59.739 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 8, :retained 1, :unretained 7, :limit 1000}
+2026-10-22 01:59:00.169 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:59:00.541 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 8, :retained 2, :unretained 6, :limit 1000}
+2026-10-22 01:59:00.723 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 8, :retained 2, :unretained 6, :limit 1000}
+2026-10-22 01:59:01.312 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 2, :retained 2, :unretained 0, :limit 1000}
+2026-10-22 01:59:01.691 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 8, :retained 1, :unretained 7, :limit 1000}
+2026-10-22 01:59:01.880 INFO  default    editor.defold-project - {:line 486, :message "Cached loaded save data in system cache.", :total 8, :retained 2, :unretained 6, :limit 1000}
+
+Testing editor.code.script-test
+
+Ran 42 tests containing 682 assertions.
+0 failures, 0 errors.

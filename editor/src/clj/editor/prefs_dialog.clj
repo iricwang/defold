@@ -77,6 +77,10 @@
                 [:code :zoom-on-scroll]
                 [:code :hover]
                 [:code :enable-lua-language-server]
+                [:code :lua-language-server]
+                [:code :signature-help]
+                [:code :semantic-highlighting]
+                [:code :inlay-hints]
                 [:code :auto-closing-parens]
                 [:code :format-on-save]]}
        {:pattern (localization/message "prefs.tab.extensions")
@@ -116,6 +120,13 @@
         (cond-> desc
           (localization/defines-message-key? localization-state prompt-key)
           (assoc :prompt-text (localization-state (localization/message prompt-key))))))))
+
+(defmethod form-input :enum [_ schema value on-value-changed _ _]
+  {:fx/type fxui.combo-box/view
+   :to-string str
+   :value value
+   :items (:values schema)
+   :on-value-changed on-value-changed})
 
 (defmethod form-input :string [path schema value on-value-changed localization-state _]
   (text-input path value on-value-changed localization-state (if (:multiline (:ui schema)) fxui/value-area fxui/value-field) (:prompt (:ui schema))))

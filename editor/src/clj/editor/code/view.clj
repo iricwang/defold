@@ -40,6 +40,7 @@
             [dynamo.graph :as g]
             [editor.code-completion :as code-completion]
             [editor.code.data :as data]
+            [editor.code.insight :as insight]
             [editor.code.resource :as r]
             [editor.code.util :refer [split-lines]]
             [editor.defold-project :as project]
@@ -1044,12 +1045,31 @@
                        (data/execution-marker lines (dec line) type))))
           debugger-execution-locations)))
 
-(g/defnk produce-canvas-repaint-info [canvas color-scheme cursor-range-draw-infos execution-markers focus-state font grammar gutter-view hovered-element indent-type invalidated-rows layout lines minimap-cursor-range-draw-infos minimap-layout regions repaint-trigger visible-cursor-ranges visible-indentation-guides? visible-minimap? visible-whitespace :as canvas-repaint-info]
+(g/defnk produce-canvas-repaint-info [canvas code-insights color-scheme cursor-range-draw-infos execution-markers focus-state font grammar gutter-view hovered-element indent-type invalidated-rows layout lines minimap-cursor-range-draw-infos minimap-layout regions repaint-trigger visible-cursor-ranges visible-indentation-guides? visible-minimap? visible-whitespace :as canvas-repaint-info]
   canvas-repaint-info)
 
 (defn- repaint-canvas! [{:keys [^Canvas canvas execution-markers focus-state font gutter-view hovered-element layout minimap-layout color-scheme lines regions cursor-range-draw-infos minimap-cursor-range-draw-infos indent-type visible-cursor-ranges visible-indentation-guides? visible-minimap? visible-whitespace] :as _canvas-repaint-info} syntax-info]
   (let [regions (into [] cat [regions execution-markers])]
-    (draw! (.getGraphicsContext2D canvas) font gutter-view hovered-element layout minimap-layout color-scheme lines regions syntax-info cursor-range-draw-infos minimap-cursor-range-draw-infos indent-type visible-cursor-ranges focus-state visible-indentation-guides? visible-minimap? visible-whitespace))
+    (draw! (.getGraphicsContext2D canvas) font gutter-view hovered-element layout minimap-layout color-scheme lines regions syntax-info cursor-range-draw-infos minimap-cursor-range-draw-infos indent-type visible-cursor-ranges focus-state visible-indentation-guides? visible-minimap? visible-whitespace)
+    (let [^GraphicsContext gc (.getGraphicsContext2D canvas)
+          ^LayoutInfo layout layout
+          ^Rect viewport (.canvas layout)
+          hints (get-in _canvas-repaint-info [:code-insights :inlay-hints])]
+      (.save gc)
+      (.beginPath gc)
+      (.rect gc (.x viewport) (.y viewport) (.w viewport) (.h viewport))
+      (.clip gc)
+      (.setFont gc font)
+      (.setTextAlign gc TextAlignment/LEFT)
+      (.setFill gc (.deriveColor ^Color (color-lookup color-scheme "editor.foreground") 0.0 1.0 1.0 0.55))
+      (doseq [[row labels] hints
+              :when (<= (.dropped-line-count layout) (long row) (data/last-visible-row layout))
+              :let [line (get lines row)]
+              :when line]
+        (.fillText gc (coll/join-to-string "  ·  " labels)
+                   (+ 16.0 (data/col->x layout (count line) line))
+                   (+ (data/row->y layout row) (double (data/ascent (.glyph layout))))))
+      (.restore gc)))
   nil)
 
 (g/defnk produce-cursor-repaint-info [canvas color-scheme cursor-opacity layout lines repaint-trigger visible-cursors :as cursor-repaint-info]
@@ -1701,6 +1721,7 @@
   (property find-whole-word? g/Bool (dynamic visible (g/constantly false)))
   (property focus-state FocusState (default :not-focused) (dynamic visible (g/constantly false)))
 
+  (property code-insights g/Any (default {}) (dynamic visible (g/constantly false)))
   (property completions-showing g/Bool (default false) (dynamic visible (g/constantly false)))
   (property completions-doc g/Bool (default false) (dynamic visible (g/constantly false)))
   (property completions-insert-cursor g/Any (dynamic visible (g/constantly false)))
@@ -3844,6 +3865,9 @@
 (handler/defhandler :code.escape :code-view-tools
   (run [find-bar replace-bar view-node]
     (cond
+      (get-in (g/node-value view-node :code-insights) [:signature-help])
+      (g/transact {:undoable false} (g/update-property view-node :code-insights dissoc :signature-help))
+
       (in-tab-trigger? view-node)
       (exit-tab-trigger! view-node)
 
@@ -4061,8 +4085,87 @@
           :max-width 350.0
           :max-height max-popup-height}]}]}}))
 
+(defn- request-code-insights! [view-node]
+  (when-let [preferences (g/user-data view-node ::insight-prefs)]
+    (g/let-ec [lines (g/node-value view-node :lines evaluation-context)
+               resource-node (g/node-value view-node :resource-node evaluation-context)
+               resource (g/node-value resource-node :resource evaluation-context)
+               ranges (g/node-value view-node :cursor-ranges evaluation-context)
+               layout (g/node-value view-node :layout evaluation-context)
+               lsp (lsp/get-lsp (:basis evaluation-context))]
+      (when (and lsp (resource/file-resource? resource))
+        (let [cursor (:to (first ranges))
+              server-state (into {} (map (fn [[server state]] [server [(:status state) (:capabilities state) (get-in state [:diagnostics resource])]])) (:server->server-state (lsp)))
+              visible-range (data/->CursorRange (data/->Cursor (.dropped-line-count ^LayoutInfo layout) 0)
+                                                (data/->Cursor (min (dec (count lines)) (long (data/last-visible-row layout)))
+                                                               (count (get lines (min (dec (count lines)) (long (data/last-visible-row layout))) ""))))]
+          (doseq [[kind preference] [[:signature-help :signature-help]
+                                   [:semantic-tokens :semantic-highlighting]
+                                   [:inlay-hints :inlay-hints]]]
+            (let [enabled (prefs/get preferences [:code preference])
+                  selection (case kind :signature-help cursor :inlay-hints visible-range nil)
+                  key [lines selection enabled server-state]
+                  state-key [::insight-request kind]
+                  previous (g/user-data view-node state-key)]
+              (when-not (= key (:key previous))
+                (some-> (:timer previous) ui/cancel)
+                (g/user-data! view-node state-key {:key key})
+                ;; Keep the last result while the debounced replacement is in flight.
+                ;; Clearing first makes all hints and semantic colors blink on each keystroke.
+                (g/transact {:undoable false}
+                            (if enabled
+                              (g/update-property view-node :code-insights update kind
+                                                 (fn [value]
+                                                   (insight/pending-value kind value (first (:key previous)) lines
+                                                                          (second (:key previous)) selection)))
+                              (g/update-property view-node :code-insights dissoc kind)))
+                (when enabled
+                  (let [timer
+                        (ui/->future
+                          0.25
+                          (fn []
+                            (when (and (g/node-exists? view-node) (= key (:key (g/user-data view-node state-key))))
+                              (lsp/code-insight!
+                                lsp resource kind (if (= kind :signature-help) (data/->CursorRange cursor cursor) visible-range)
+                                (fn [result]
+                                  (let [converted (case kind
+                                                    :signature-help (insight/signature result)
+                                                    :semantic-tokens (insight/semantic-tokens result lines)
+                                                    :inlay-hints (insight/line-hints result lines))]
+                                    (ui/run-later
+                                      (when (and (g/node-exists? view-node)
+                                                 (= key (:key (g/user-data view-node state-key)))
+                                                 (= lines (g/node-value view-node :lines)))
+                                        (g/transact {:undoable false}
+                                                    (g/update-property view-node :code-insights assoc kind converted))))))))))]
+                    (g/user-data! view-node state-key {:key key :timer timer})))))))))))
+
+(defn- signature-popup-view [{:keys [canvas-repaint-info signature cursor view-node]}]
+  (let [{:keys [^Canvas canvas layout lines]} canvas-repaint-info
+        ^Rect r (data/cursor-rect layout lines cursor)
+        anchor (.localToScreen canvas (.x r) (.y r))]
+    (when anchor
+      {:fx/type fxui/with-popup-window
+       :desc {:fx/type ui/ext-value :value canvas}
+       :popup {:fx/type fx.popup/lifecycle
+               :showing true :auto-fix true :auto-hide false :hide-on-escape true
+               :anchor-location :window-bottom-left
+               :anchor-x (.getX anchor) :anchor-y (.getY anchor)
+               :on-auto-hide (fn [_] (g/transact {:undoable false} (g/update-property view-node :code-insights dissoc :signature-help)))
+               :content [{:fx/type fx.v-box/lifecycle
+                          :id "code-signature-help"
+                          :style-class "code-signature-help"
+                          :stylesheets [(str (io/resource "editor.css"))]
+                          :children (into [{:fx/type fx.label/lifecycle :text (:label signature) :wrap-text true :max-width 600}]
+                                          (keep identity)
+                                          [(when-let [parameter (:parameter signature)]
+                                             {:fx/type fx.label/lifecycle :text parameter :style-class "active-parameter"})
+                                           (when-let [documentation (:documentation signature)]
+                                             {:fx/type fx.label/lifecycle :text documentation :wrap-text true :max-width 600 :max-height 140})])}]}})))
+
 (defn repaint-view! [view-node elapsed-time {:keys [cursor-visible editable] :as _opts}]
   (assert (boolean? cursor-visible))
+  (request-code-insights! view-node)
 
   ;; Since the elapsed time updates at 60 fps, we store it as user-data to avoid transaction churn.
   (g/user-data! view-node :elapsed-time elapsed-time)
@@ -4090,7 +4193,9 @@
     (when-not (identical? prev-canvas-repaint-info canvas-repaint-info)
       (g/user-data! view-node :canvas-repaint-info canvas-repaint-info)
       (let [row (data/last-visible-row (:minimap-layout canvas-repaint-info))]
-        (repaint-canvas! canvas-repaint-info (get-valid-syntax-info resource-node canvas-repaint-info row))))
+        (repaint-canvas! canvas-repaint-info
+                         (insight/overlay-syntax (get-valid-syntax-info resource-node canvas-repaint-info row)
+                                                 (get-in canvas-repaint-info [:code-insights :semantic-tokens])))))
 
     (when editable
       ;; Show rename popup if appropriate
@@ -4138,6 +4243,17 @@
              :screen-bounds (mapv #(.getVisualBounds ^Screen %) (Screen/getScreens))
              :window-x (some-> scene .getWindow .getX)
              :window-y (some-> scene .getWindow .getY)}))))
+
+    (ui/advance-graph-user-data-component!
+      view-node :signature-popup
+      (when (and (= :input-focused (:focus-state canvas-repaint-info))
+                 (not hover-showing-regions)
+                 (get-in canvas-repaint-info [:code-insights :signature-help]))
+        {:fx/type signature-popup-view
+         :view-node view-node
+         :canvas-repaint-info canvas-repaint-info
+         :signature (get-in canvas-repaint-info [:code-insights :signature-help])
+         :cursor (:to (first (g/node-value view-node :cursor-ranges)))}))
 
     ;; Repaint cursors if needed.
     (when-not (identical? prev-cursor-repaint-info cursor-repaint-info)
@@ -4575,6 +4691,8 @@
                      :prefs prefs
                      :open-resource-fn open-resource-fn}]
 
+    (g/user-data! view-node ::insight-prefs prefs)
+
     ;; Canvas stretches to fit view, and updates properties in view node.
     (b/bind! (.widthProperty canvas) (.widthProperty canvas-pane))
     (b/bind! (.heightProperty canvas) (.heightProperty canvas-pane))
@@ -4670,6 +4788,10 @@
 
         ;; Remove callbacks when our tab is closed.
         (ui/on-closed! tab (fn [_]
+                             (doseq [kind [:signature-help :semantic-tokens :inlay-hints]]
+                               (some-> (g/user-data view-node [::insight-request kind]) :timer ui/cancel)
+                               (g/user-data! view-node [::insight-request kind] nil))
+                             (ui/advance-graph-user-data-component! view-node :signature-popup nil)
                              (lsp/close-view! lsp view-node)
                              (ui/kill-event-dispatch! canvas)
                              (dispose-repainter!)

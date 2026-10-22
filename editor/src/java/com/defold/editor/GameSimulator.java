@@ -86,7 +86,6 @@ final class GameSimulator {
         });
         toolbar.getChildren().addAll(enabled, devices, search, rotate, safe);
         overlay.setMouseTransparent(true);
-        enabled.setDisable(!com.sun.jna.Platform.isWindows());
         enabled.selectedProperty().addListener((p, old, value) -> { active = value; save(); changed.run(); });
         devices.valueProperty().addListener((p, old, value) -> {
             if (value == null || value == device) return;
@@ -103,7 +102,7 @@ final class GameSimulator {
     }
 
     void running(boolean value) {
-        enabled.setDisable(value || !com.sun.jna.Platform.isWindows());
+        enabled.setDisable(value);
         devices.setDisable(value || !active);
         custom.setDisable(value || !active);
         importDevices.setDisable(value);
@@ -129,7 +128,7 @@ final class GameSimulator {
             device = catalog.stream().filter(d -> d.name().equals(p.getProperty("name"))).findFirst().orElse(device);
             if (!catalog.contains(device)) catalog.add(device);
             devices.getItems().setAll(catalog);
-            active = com.sun.jna.Platform.isWindows() && Boolean.parseBoolean(p.getProperty("enabled"));
+            active = Boolean.parseBoolean(p.getProperty("enabled"));
             rotation = Integer.parseInt(p.getProperty("rotation", "0"));
             if (rotation < 0 || rotation > 3 || !device.supports(rotation)) rotation = device.initialRotation();
         } catch (IOException | IllegalArgumentException error) {

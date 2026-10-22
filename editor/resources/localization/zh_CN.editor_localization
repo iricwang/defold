@@ -2245,3 +2245,15 @@ gui-layout.pivot-e = 右
 gui-layout.pivot-sw = 左下
 gui-layout.pivot-s = 下
 gui-layout.pivot-se = 右下
+
+prefs.label.code.lua-language-server = Lua 语言服务
+
+prefs.label.code.signature-help = 函数参数提示
+
+prefs.label.code.semantic-highlighting = 语义高亮
+
+prefs.label.code.inlay-hints = 行内类型提示
+
+prefs.label.code.enable-lua-language-server = 启用 Lua 语言服务
+prefs.help.code.enable-lua-language-server = 为当前项目的游戏脚本和编辑器脚本启用代码辅助。关闭可减少大型项目的内存占用。
+prefs.label.code.format-on-save = 保存时格式化

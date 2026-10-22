@@ -320,7 +320,8 @@
                                    "constant.character.escape.lua"
                                    "punctuation.definition.comment.lua"
                                    "comment.block.lua"
-                                   "comment.line.double-dash.lua"}
+                                   "comment.line.double-dash.lua"
+                                   "comment.line.documentation.lua"}
                  :open-scopes {\' "punctuation.definition.string.quoted.begin.lua"
                                \" "punctuation.definition.string.quoted.begin.lua"
                                \[ "punctuation.definition.string.begin.lua"}
@@ -362,6 +363,14 @@
                :captures {0 {:name "punctuation.definition.comment.lua"}}
                :end #"\]\1\]"
                :name "comment.block.lua"}
+              {:begin #"(---\s*)(@\w+)"
+               :begin-captures {1 {:name "punctuation.definition.comment.lua"}
+                                2 {:name "storage.type.annotation.lua"}}
+               :end #"$"
+               :name "comment.line.documentation.lua"
+               :patterns [{:match #"\b(string|number|integer|boolean|table|function|nil|any|unknown|self)\b"
+                           :name "storage.type.lua"}
+                          {:match #"\b[A-Z][\w.]*\b" :name "entity.name.type.lua"}]}
               {:captures {1 {:name "punctuation.definition.comment.lua"}}
                :match #"(--).*"
                :name "comment.line.double-dash.lua"}

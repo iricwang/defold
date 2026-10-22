@@ -15,6 +15,7 @@
 #include <assert.h>
 
 #include "window.hpp"
+#include "editor_game_safe_area.h"
 #include "platform_window_constants.h"
 #include "platform_window_glfw3_private.h"
 #include "platform_window_opengl.h"
@@ -482,6 +483,9 @@ namespace dmPlatform
 
     bool GetSafeArea(HWindow window, WindowSafeArea* out)
     {
+#if defined(DM_PLATFORM_MACOS)
+        if (GetEditorGameSafeArea(out)) return true;
+#endif
         SetSafeAreaFull(window, out);
         return true;
     }

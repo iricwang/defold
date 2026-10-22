@@ -14,7 +14,18 @@
 
 package com.defold.editor;
 
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
+
+import java.awt.AWTError;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.HeadlessException;
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Properties;
 
 /**
  * Using separate Main class is needed to avoid error "JavaFX runtime components
@@ -28,10 +39,65 @@ import java.io.IOException;
  * discussion on github</a>
  */
 public class Main {
+    private interface MacDisplays extends Library {
+        int CGGetActiveDisplayList(int capacity, int[] displays, IntByReference count);
+        Pointer CGDisplayCopyDisplayMode(int display);
+        double CGDisplayModeGetRefreshRate(Pointer mode);
+        void CGDisplayModeRelease(Pointer mode);
+    }
+
+    private static int[] displayRefreshRates() {
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
+            // Initializing AWT before Glass on macOS claims NSApplication's dock
+            // menu delegate. Query CoreGraphics without starting another UI toolkit.
+            MacDisplays api = (MacDisplays)Native.loadLibrary("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", MacDisplays.class);
+            IntByReference count = new IntByReference();
+            if (api.CGGetActiveDisplayList(0, null, count) != 0) return new int[0];
+            int[] displays = new int[count.getValue()];
+            if (api.CGGetActiveDisplayList(displays.length, displays, count) != 0) return new int[0];
+            int[] rates = new int[count.getValue()];
+            for (int i = 0; i < rates.length; ++i) {
+                Pointer mode = api.CGDisplayCopyDisplayMode(displays[i]);
+                if (mode == null) continue;
+                try {
+                    rates[i] = (int)Math.ceil(api.CGDisplayModeGetRefreshRate(mode));
+                } finally {
+                    api.CGDisplayModeRelease(mode);
+                }
+            }
+            return rates;
+        }
+        GraphicsDevice[] displays = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
+        int[] rates = new int[displays.length];
+        for (int i = 0; i < displays.length; ++i)
+            rates[i] = displays[i].getDisplayMode().getRefreshRate();
+        return rates;
+    }
+
+    static void configureRefreshRate(Properties properties, int[] displayRates) {
+        // Match the fastest active display, including high-refresh secondary monitors.
+        // A zero rate means that the platform cannot report its refresh rate.
+        int refreshRate = 0;
+        for (int rate : displayRates) refreshRate = Math.max(refreshRate, rate);
+        String detected = Integer.toString(refreshRate > 0 ? refreshRate : 144);
+        String animation = properties.getProperty("javafx.animation.framerate");
+        String pulse = properties.getProperty("javafx.animation.pulse");
+        // Both timers need a target: setting only framerate leaves the non-native
+        // pulse scheduler at 60 Hz. Keep explicit user overrides on either timer.
+        properties.putIfAbsent("javafx.animation.framerate", pulse != null ? pulse : detected);
+        properties.putIfAbsent("javafx.animation.pulse", animation != null ? animation : detected);
+    }
+
     public static void main(String[] args) throws IOException {
-        // Set before JavaFX initializes its pulse timer. Respect explicit overrides.
-        if (System.getProperty("javafx.animation.framerate") == null)
-            System.setProperty("javafx.animation.framerate", "144");
+        int[] displayRates = new int[0];
+        try {
+            displayRates = displayRefreshRates();
+        } catch (HeadlessException | AWTError | SecurityException | LinkageError error) {
+            System.err.println("Unable to detect display refresh rate: " + error.getMessage());
+        }
+        // Configure before JavaFX initializes. Keep native display synchronization;
+        // fullspeed mode would busy-poll without increasing visible refresh rate.
+        configureRefreshRate(System.getProperties(), displayRates);
         Start.main(args);
     }
 }
