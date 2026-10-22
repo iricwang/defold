@@ -1,0 +1,16 @@
+[project]
+title = Panthera GO Hierarchy Example
+[bootstrap]
+main_collection = /main.collectionc
+[display]
+width = 1280
+height = 720
+vsync = 1
+[engine]
+run_while_iconified = 1
+[input]
+game_binding = /input/game.input_bindingc
+[render]
+clear_color_red = 0.045
+clear_color_green = 0.06
+clear_color_blue = 0.085

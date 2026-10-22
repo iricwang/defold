@@ -697,6 +697,13 @@
                                    ^Matrix4d parent-world-transform
                                    alloc-picking-id!]
   (let [node-id (peek node-id-path)
+        ;; Collection nodes disappear during compilation. A Panthera root GO
+        ;; already contains their baked pose and must not inherit them again.
+        runtime-root (and apply-transform-preview-overrides
+                          (get-in preview-overrides [node-id :animation-runtime-root]))
+        parent-world-transform (if runtime-root math/identity-mat4 parent-world-transform)
+        parent-world-rotation (if runtime-root math/identity-quat parent-world-rotation)
+        parent-world-scale (if runtime-root math/one-v3 parent-world-scale)
         renderable (:renderable scene)
         preview-fn (:preview-fn renderable)
         local-translation (Vector3d. 0.0 0.0 0.0)
@@ -735,7 +742,7 @@
           ;; additional non-transform preview overrides, and we need to invoke
           ;; the preview-fn associated with the renderable, if any.
           (-> prop-kw->override-value
-              (dissoc :position :rotation :scale)
+              (dissoc :position :rotation :scale :animation-runtime-root)
               (coll/not-empty)))
 
         [visibility-aabb user-data]

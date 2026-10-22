@@ -1,0 +1,12 @@
+{
+  "samples": 8,
+  "objects": 11,
+  "max_errors": {
+    "position": 2.9381557851593243e-05,
+    "rotation": 3.257183622817905e-08,
+    "scale": 4.838706435528195e-08,
+    "matrix": 4.862166269958834e-05
+  },
+  "runtime": "Panthera runtime.7, actual dmengine, guarded hidden window",
+  "result": "passed"
+}

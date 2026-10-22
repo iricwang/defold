@@ -3075,3 +3075,9 @@ prefs.label.code.signature-help = Function parameter hints
 prefs.label.code.semantic-highlighting = Semantic highlighting
 
 prefs.label.code.inlay-hints = Inline type hints
+
+gui-animation.go-title = GO Animation · Panthera
+gui-animation.go-empty = Create an animation, select a GO, then set a key. Nested GO paths and transform values follow Panthera runtime coordinates. Preview leaves the Collection unchanged.
+gui-animation.go-toggle-editor-help = Show or hide the GO animation editor
+dock.collection-scene = Collection Scene
+dock.go-animation = GO Animation

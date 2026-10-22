@@ -1,0 +1,1794 @@
+{
+  "type": "animation_editor",
+  "format": "json",
+  "version": 1,
+  "data": {
+    "name": "GO animations",
+    "nodes": {},
+    "animations": [
+      {
+        "animation_id": "default",
+        "duration": 4.0,
+        "animation_keys": [
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "child",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "left/deep/child",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 565.6283366402089,
+            "property_id": "position_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 565.6283366402089,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "left/nchild",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 548.2635181510879,
+            "property_id": "position_x",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 548.2635181510879,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 165.0,
+            "property_id": "position_x",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 165.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 180.0,
+            "property_id": "position_x",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 180.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "right/deep/child",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 952.8088293231616,
+            "property_id": "position_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 952.8088293231616,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "right/nchild",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 971.9101300752043,
+            "property_id": "position_x",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 971.9101300752043,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 276.36729827876644,
+            "property_id": "position_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 276.36729827876644,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 374.84807796902595,
+            "property_id": "position_y",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 374.84807796902595,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 365.0,
+            "property_id": "position_y",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 365.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 260.0,
+            "property_id": "position_y",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 260.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 267.5040259934748,
+            "property_id": "position_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 267.5040259934748,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 375.832886000725,
+            "property_id": "position_y",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 375.832886000725,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 5.870384982418187,
+            "property_id": "rotation_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 5.870384982418187,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 3.246216701862295,
+            "property_id": "rotation_x",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 3.246216701862295,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_x",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_x",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 9.629338877644443,
+            "property_id": "rotation_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 9.629338877644443,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 6.75378371779135,
+            "property_id": "rotation_x",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 6.75378371779135,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 10.037423807600902,
+            "property_id": "rotation_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 10.037423807600902,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 10.151082029732606,
+            "property_id": "rotation_y",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 10.151082029732606,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_y",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_y",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 11.009661539273566,
+            "property_id": "rotation_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 11.009661539273566,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 10.151082029674598,
+            "property_id": "rotation_y",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 10.151082029674598,
+            "key_type": "tween"
+          },
+          {
+            "end_value": -4.9238489502623395,
+            "property_id": "rotation_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": -4.9238489502623395,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 9.846552115884037,
+            "property_id": "rotation_z",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 9.846552115884037,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_z",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_z",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": -24.59476715912922,
+            "property_id": "rotation_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": -24.59476715912922,
+            "key_type": "tween"
+          },
+          {
+            "end_value": -9.84655211401747,
+            "property_id": "rotation_z",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": -9.84655211401747,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.9899999952316278,
+            "property_id": "scale_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.9899999952316278,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_x",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_x",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_x",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.8909999721050258,
+            "property_id": "scale_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.8909999721050258,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.8999999761581421,
+            "property_id": "scale_x",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.8999999761581421,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.9899999952316278,
+            "property_id": "scale_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 0.9899999952316278,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_y",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_y",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_y",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0890000183582298,
+            "property_id": "scale_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0890000183582298,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.100000023841858,
+            "property_id": "scale_y",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.100000023841858,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 0.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 85.0,
+            "property_id": "position_x",
+            "node_id": "child",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 85.0,
+            "property_id": "position_x",
+            "node_id": "left/deep/child",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 590.6283366402089,
+            "property_id": "position_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 565.6283366402089,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 85.0,
+            "property_id": "position_x",
+            "node_id": "left/nchild",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 573.2635181510879,
+            "property_id": "position_x",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 548.2635181510879,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 190.0,
+            "property_id": "position_x",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 165.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 205.0,
+            "property_id": "position_x",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 180.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 85.0,
+            "property_id": "position_x",
+            "node_id": "right/deep/child",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 977.8088293231616,
+            "property_id": "position_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 952.8088293231616,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 85.0,
+            "property_id": "position_x",
+            "node_id": "right/nchild",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 60.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 996.9101300752043,
+            "property_id": "position_x",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 971.9101300752043,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 301.36729827876644,
+            "property_id": "position_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 276.36729827876644,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 399.84807796902595,
+            "property_id": "position_y",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 374.84807796902595,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 390.0,
+            "property_id": "position_y",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 365.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 285.0,
+            "property_id": "position_y",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 260.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 292.5040259934748,
+            "property_id": "position_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 267.5040259934748,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 400.832886000725,
+            "property_id": "position_y",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 375.832886000725,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 20.870384982418187,
+            "property_id": "rotation_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 5.870384982418187,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 18.246216701862295,
+            "property_id": "rotation_x",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 3.246216701862295,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 15.0,
+            "property_id": "rotation_x",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 15.0,
+            "property_id": "rotation_x",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 24.629338877644443,
+            "property_id": "rotation_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 9.629338877644443,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 21.75378371779135,
+            "property_id": "rotation_x",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 6.75378371779135,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 25.037423807600902,
+            "property_id": "rotation_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 10.037423807600902,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 25.151082029732606,
+            "property_id": "rotation_y",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 10.151082029732606,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 15.0,
+            "property_id": "rotation_y",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 15.0,
+            "property_id": "rotation_y",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 26.009661539273566,
+            "property_id": "rotation_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 11.009661539273566,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 25.151082029674598,
+            "property_id": "rotation_y",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 10.151082029674598,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 50.07615104973766,
+            "property_id": "rotation_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": -4.9238489502623395,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 64.84655211588404,
+            "property_id": "rotation_z",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 9.846552115884037,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 55.0,
+            "property_id": "rotation_z",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 55.0,
+            "property_id": "rotation_z",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 30.40523284087078,
+            "property_id": "rotation_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": -24.59476715912922,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 45.15344788598253,
+            "property_id": "rotation_z",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": -9.84655211401747,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.1384999945163718,
+            "property_id": "scale_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.9899999952316278,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_x",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_x",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_x",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0246499679207797,
+            "property_id": "scale_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.8909999721050258,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0349999725818633,
+            "property_id": "scale_x",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.8999999761581421,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.1384999945163718,
+            "property_id": "scale_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.9899999952316278,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_y",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_y",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_y",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.2523500211119643,
+            "property_id": "scale_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0890000183582298,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.2650000274181366,
+            "property_id": "scale_y",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.100000023841858,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_z",
+            "node_id": "left/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_z",
+            "node_id": "parent",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_z",
+            "node_id": "reference",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.15,
+            "property_id": "scale_z",
+            "node_id": "right/nested",
+            "start_time": 0.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "child",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 85.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "left/deep/child",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 85.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 565.6283366402089,
+            "property_id": "position_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 590.6283366402089,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "left/nchild",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 85.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 548.2635181510879,
+            "property_id": "position_x",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 573.2635181510879,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 165.0,
+            "property_id": "position_x",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 190.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 180.0,
+            "property_id": "position_x",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 205.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "right/deep/child",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 85.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 952.8088293231616,
+            "property_id": "position_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 977.8088293231616,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 60.0,
+            "property_id": "position_x",
+            "node_id": "right/nchild",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 85.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 971.9101300752043,
+            "property_id": "position_x",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 996.9101300752043,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 276.36729827876644,
+            "property_id": "position_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 301.36729827876644,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 374.84807796902595,
+            "property_id": "position_y",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 399.84807796902595,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 365.0,
+            "property_id": "position_y",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 390.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 260.0,
+            "property_id": "position_y",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 285.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 267.5040259934748,
+            "property_id": "position_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 292.5040259934748,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 375.832886000725,
+            "property_id": "position_y",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 400.832886000725,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "position_z",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 0.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 5.870384982418187,
+            "property_id": "rotation_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 20.870384982418187,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 3.246216701862295,
+            "property_id": "rotation_x",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 18.246216701862295,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_x",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 15.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_x",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 15.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 9.629338877644443,
+            "property_id": "rotation_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 24.629338877644443,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 6.75378371779135,
+            "property_id": "rotation_x",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 21.75378371779135,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 10.037423807600902,
+            "property_id": "rotation_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 25.037423807600902,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 10.151082029732606,
+            "property_id": "rotation_y",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 25.151082029732606,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_y",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 15.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_y",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 15.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 11.009661539273566,
+            "property_id": "rotation_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 26.009661539273566,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 10.151082029674598,
+            "property_id": "rotation_y",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 25.151082029674598,
+            "key_type": "tween"
+          },
+          {
+            "end_value": -4.9238489502623395,
+            "property_id": "rotation_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 50.07615104973766,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 9.846552115884037,
+            "property_id": "rotation_z",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 64.84655211588404,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_z",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 55.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.0,
+            "property_id": "rotation_z",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 55.0,
+            "key_type": "tween"
+          },
+          {
+            "end_value": -24.59476715912922,
+            "property_id": "rotation_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 30.40523284087078,
+            "key_type": "tween"
+          },
+          {
+            "end_value": -9.84655211401747,
+            "property_id": "rotation_z",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 45.15344788598253,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.9899999952316278,
+            "property_id": "scale_x",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.1384999945163718,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_x",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_x",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_x",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.8909999721050258,
+            "property_id": "scale_x",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0246499679207797,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.8999999761581421,
+            "property_id": "scale_x",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.0349999725818633,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 0.9899999952316278,
+            "property_id": "scale_y",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.1384999945163718,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_y",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_y",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_y",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0890000183582298,
+            "property_id": "scale_y",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.2523500211119643,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.100000023841858,
+            "property_id": "scale_y",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.2650000274181366,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "left/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "left/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "parent",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "reference",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "right/deep/leaf",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          },
+          {
+            "end_value": 1.0,
+            "property_id": "scale_z",
+            "node_id": "right/nested",
+            "start_time": 2.0,
+            "easing": "linear",
+            "duration": 2.0,
+            "start_value": 1.15,
+            "key_type": "tween"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "gui_path": "/main.collection",
+      "fps": 60,
+      "settings": {},
+      "gizmo_steps": {},
+      "template_animation_paths": {}
+    }
+  }
+}

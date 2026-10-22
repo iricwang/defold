@@ -1,0 +1,15 @@
+name: "animation_nested"
+collection_instances {
+  id: "left"
+  collection: "/collection/animation_nested_inner.collection"
+  position { x: 400 y: 150 z: 30 }
+  rotation { x: 0.17364817766693033 w: 0.984807753012208 }
+  scale3 { x: 1.2 y: 0.8 z: 1.5 }
+}
+collection_instances {
+  id: "right"
+  collection: "/collection/animation_nested_inner.collection"
+  position { x: -150 y: 230 z: -10 }
+  rotation { y: 0.25881904510252074 w: 0.9659258262890683 }
+  scale3 { x: -0.9 y: 1.3 z: 0.7 }
+}

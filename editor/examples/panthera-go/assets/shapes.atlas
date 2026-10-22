@@ -1,0 +1,6 @@
+images { image: "/assets/blue.png" }
+images { image: "/assets/gold.png" }
+images { image: "/assets/mint.png" }
+images { image: "/assets/pink.png" }
+images { image: "/assets/panel.png" }
+extrude_borders: 2

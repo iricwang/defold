@@ -122,11 +122,11 @@
 (defn new-document
   "Create a Panthera project containing an empty one-second default animation."
   [gui-path]
-  (require-value! (string? gui-path) "A GUI resource path is required." {})
+  (require-value! (string? gui-path) "An animation resource path is required." {})
   {:type "animation_editor"
    :format "json"
    :version 1
-   :data {:name "GUI animations"
+   :data {:name (if (string/ends-with? gui-path ".collection") "GO animations" "GUI animations")
           :nodes {}
           :animations [{:animation_id "default"
                         :duration 1.0
@@ -691,15 +691,49 @@
   [document]
   (str "return " (lua-value (assoc (runtime-document document) :format "lua")) "\n"))
 
+(def ^:private go-callback-support
+  (str
+    "-- Keep Euler channels independent across seeks and rotations beyond 90 degrees.\n"
+    "-- The linear timeline sampler also keeps playback and scrubbing on the same path.\n"
+    "local function create_go_animation(data, collection_name, objects)\n"
+    "    local state = panthera.create_go(data, collection_name, objects)\n"
+    "    local original = state.adapter\n"
+    "    local adapter = {}\n"
+    "    for key, value in pairs(original) do adapter[key] = value end\n"
+    "    local rotations = {}\n"
+    "    local axes = {rotation_x = \"x\", rotation_y = \"y\", rotation_z = \"z\"}\n"
+    "    adapter.set_node_property = function(node, property, value)\n"
+    "        local axis = axes[property]\n"
+    "        if not axis then return original.set_node_property(node, property, value) end\n"
+    "        local euler = rotations[node]\n"
+    "        if not euler then euler = go.get(node, \"euler\"); rotations[node] = euler end\n"
+    "        euler[axis] = value\n"
+    "        original.stop_tween(node, property)\n"
+    "        local x, y, z = math.rad(euler.x) / 2, math.rad(euler.y) / 2, math.rad(euler.z) / 2\n"
+    "        local cx, cy, cz = math.cos(x), math.cos(y), math.cos(z)\n"
+    "        local sx, sy, sz = math.sin(x), math.sin(y), math.sin(z)\n"
+    "        go.set_rotation(vmath.quat(sy*sz*cx + sx*cy*cz,\n"
+    "                                  sy*cz*cx + sz*sx*cy,\n"
+    "                                  -sy*sx*cz + sz*cy*cx,\n"
+    "                                  -sy*sz*sx + cy*cz*cx), node)\n"
+    "        return true\n"
+    "    end\n"
+    "    state.adapter = adapter\n"
+    "    return state\n"
+    "end\n"
+    "\n"))
+
 (defn callback-template [document animation-id module-name]
-  (let [ids (into [] (comp (filter #(= "event" (key-kind %)))
+  (let [collection (string/ends-with? (get-in document [:data :metadata :gui_path] "") ".collection")
+        ids (into [] (comp (filter #(= "event" (key-kind %)))
                            (map :event_id) (distinct))
                   (animation-keys document animation-id))]
-    (str "-- Merge these functions into your GUI script.\n"
+    (str (if collection "-- Merge these functions into your GO script.\n" "-- Merge these functions into your GUI script.\n")
          "-- Export Lua first and change the module path to your exported file.\n"
          "-- Business callbacks run in the game, never in the editor preview.\n"
          "local panthera = require(\"panthera.panthera\")\n"
          "local animation_data = require(" (lua-string module-name) ")\n\n"
+         (when collection go-callback-support)
          "local event_handlers = {\n"
          (transduce (map #(str "    [" (lua-string %) "] = function(self, node, data, value)\n"
                               "        -- TODO: handle this event; data is the configured payload.\n"
@@ -707,8 +741,11 @@
                               "    end,\n")) str ids)
          "}\n\n"
          "function init(self)\n"
-         "    self.animation = panthera.create_gui(animation_data)\n"
+         (if collection
+           "    self.animation = create_go_animation(animation_data)\n"
+           "    self.animation = panthera.create_gui(animation_data)\n")
          "    panthera.play(self.animation, " (lua-string animation-id) ", {\n"
+         (when collection "        easing = function(t) return t end,\n")
          "        callback_event = function(event_id, node, data, value)\n"
          "            local handler = event_handlers[event_id]\n"
          "            if handler then handler(self, node, data, value) end\n"

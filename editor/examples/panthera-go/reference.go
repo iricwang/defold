@@ -1,0 +1,2 @@
+embedded_components { id: "shape" type: "sprite" data: "tile_set: \"/assets/shapes.atlas\"\ndefault_animation: \"mint\"\nmaterial: \"/builtins/materials/sprite.material\"\nblend_mode: BLEND_MODE_ALPHA\n" position { x: 0 y: 0 z: 0 } scale { x: 1.6875 y: 1.125 z: 1 }  }
+embedded_components { id: "label" type: "label" data: "font: \"/builtins/fonts/default.font\"\nmaterial: \"/builtins/fonts/label-df.material\"\ntext: \"ref\"\nsize { x: 1200 y: 60 }\ncolor { x: 0.04 y: 0.06 z: 0.09 w: 1 } " scale { x: 0.7 y: 0.7 z: 0.7 }  }

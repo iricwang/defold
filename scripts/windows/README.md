@@ -5,6 +5,44 @@
 需要 Python 3.12+、Java 25、Git Bash，以及 MinGW GCC 或 Visual Studio C++ Build Tools。
 依赖下载沿用仓库缓存。脚本使用短临时目录，后台安装不弹命令行窗口。
 
+## 日常功能验证：先热加载，验收后再打包
+
+普通 Clojure 逻辑修改先运行相关测试，再向当前编辑器热加载整个命名空间，
+检查实际行为后即可试用。这个过程不升 patch、不合并 JAR、不生成 ZIP、不重启。
+只有明确需要安装、打包或发布时才运行下面的 `patch` / `full` 流程。
+
+```powershell
+# port 和 pid 使用本次运行实际确认的 socket REPL 端口与 Java 进程号
+scripts\windows\editor.cmd reload --port 19941 --pid <Java进程号> --namespace editor.game-preview
+
+# 多个文件按依赖顺序加载；随后执行本次功能的刷新与验收脚本
+scripts\windows\editor.cmd reload --port 19941 --pid <Java进程号> --namespace editor.game-preview --after <刷新与验收.clj>
+```
+
+`reload` 连接已启用的本机 **Clojure socket REPL**，不是 nREPL；不自行附加进程、
+开启端口或改写安装配置。当前测试会话已启用此入口。开发会话也可在其现有 REPL
+执行下面的表达式显式开启（仅绑定回环地址，使用完毕后关闭）：
+
+```clojure
+(require 'clojure.core.server)
+(clojure.core.server/start-server
+  {:name "local-validation" :address "127.0.0.1" :port 19941
+   :accept 'clojure.core.server/repl :server-daemon true})
+;; 查看当前 PID
+(.pid (java.lang.ProcessHandle/current))
+;; 验证结束后关闭入口
+(clojure.core.server/stop-server "local-validation")
+```
+
+脚本先核对目标 PID 与编辑器命名空间，再加载源码。重启后需重新确认 PID 与端口。
+连接失败不会退回完整构建。加载出错或超时可能留下部分改动，不自动重试，也不自动回滚。
+热加载仅对本次会话有效，重启恢复已安装版本；它不等于功能测试通过或已经安装新版本。
+
+已有闭包、事件处理器可能仍持有旧实现，需要通过 `--after` 重新注册，
+并断言实际行为；涉及 UI 的刷新仍使用 `cljfx.plorer` 在 JavaFX 线程执行。
+图节点定义、record/class 结构、Java、原生库及生成协议的修改不能依赖普通热加载，
+须执行相应编译和重启验证。正式发布仍执行完整的精确基线与最终包校验。
+
 ## 常用命令
 
 ```powershell

@@ -1,0 +1,122 @@
+---@diagnostic disable: missing-parameter, param-type-mismatch
+local M = {}
+
+
+---@param str string
+---@param ending string
+---@return boolean
+local function ends_with(str, ending)
+	return ending == "" or str:sub(-#ending) == ending
+end
+
+
+---@param path string
+---@param file_data string
+---@return boolean
+local function is_panthera_animation_file(path, file_data)
+	local is_json = ends_with(path, ".json")
+	local is_lua = ends_with(path, ".lua")
+
+	if is_json then
+		-- Check contains "type":"animation_editor"
+		return (not not file_data:find("\"type\"%s*:%s*\"animation_editor\""))
+	end
+
+	if is_lua then
+		-- Check contains type = "animation_editor"
+		return (not not file_data:find("type%s*=%s*\"animation_editor\""))
+	end
+
+	return false
+end
+
+
+local function save_file_from_dependency(dependency_file_path, output_file_path)
+	local content = editor.get(dependency_file_path, "text")
+	local file, err = io.open(output_file_path, "w")
+	if not file then
+		print("Error:", err)
+		return false
+	end
+	file:write(content)
+	file:close()
+	return true
+end
+
+
+function M.get_commands()
+	return {
+		{
+			label = "[Panthera] Edit Panthera Animation",
+			locations = { "Assets" , "Edit" },
+			query = { selection = { type = "resource", cardinality = "one" } },
+			active = function(opts)
+				if not editor.can_get(opts.selection, "text") then
+					return false
+				end
+
+				local path = editor.get(opts.selection, "path")
+				local text = editor.get(opts.selection, "text")
+				local is_extension_ok = ends_with(path, ".lua") or ends_with(path, ".json")
+				if not is_extension_ok then
+					return false
+				end
+
+				return is_panthera_animation_file(path, text)
+			end,
+			run = function(opts)
+				local project_path = editor.external_file_attributes(".").path
+				local absolute_path = project_path .. editor.get(opts.selection, "path")
+
+				print("Send Panthera Editor 2.0 Open Command...")
+				local is_ok, _ = pcall(http.request, "http://localhost:16114/open", {
+					method = "POST",
+					as = "json",
+					body = json.encode({
+						command = "open",
+						path = absolute_path
+					})
+				})
+
+				if not is_ok then
+					print("The Panthera Editor 2.0 is not running, please start it first.")
+					print("Download Editor from https://github.com/Insality/panthera/releases")
+					error("The Panthera Editor 2.0 is not running, please start it first.")
+				end
+			end
+		},
+
+		{
+			label = "[Panthera] Create Panthera Animation",
+			locations = { "Assets" , "Edit" },
+			query = { selection = { type = "resource", cardinality = "one" } },
+			active = function(opts)
+				local path = editor.get(opts.selection, "path")
+				return ends_with(path, ".collection") or ends_with(path, ".gui") or ends_with(path, ".go")
+			end,
+			run = function(opts)
+				local project_path = editor.external_file_attributes(".").path
+				local absolute_path = project_path .. editor.get(opts.selection, "path")
+
+				print("Send Panthera Editor 2.0 Create Command...")
+				local is_ok, _ = pcall(http.request, "http://localhost:16114/create", {
+					method = "POST",
+					as = "json",
+					body = json.encode({
+						command = "create",
+						path = absolute_path
+					})
+				})
+
+				if not is_ok then
+					print("The Panthera Editor 2.0 is not running, please start it first.")
+					print("Download Editor from https://github.com/Insality/panthera/releases")
+					error("The Panthera Editor 2.0 is not running, please start it first.")
+				end
+			end
+		},
+	}
+end
+
+
+return M

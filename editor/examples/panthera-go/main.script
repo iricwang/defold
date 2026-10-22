@@ -1,0 +1,145 @@
+-- Copyright 2020-2026 The Defold Foundation
+-- Copyright 2014-2020 King
+-- Copyright 2009-2014 Ragnar Svensson, Christian Murray
+-- Licensed under the Defold License version 1.0 (the "License"); you may not use
+-- this file except in compliance with the License.
+--
+-- You may obtain a copy of the License, together with FAQs at
+-- https://www.defold.com/license
+--
+-- Unless required by applicable law or agreed to in writing, software distributed
+-- under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-- CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-- specific language governing permissions and limitations under the License.
+--
+local panthera = require("panthera.panthera")
+-- Keep Euler channels independent across seeks and rotations beyond 90 degrees.
+-- The linear timeline sampler also keeps playback and scrubbing on the same path.
+local function create_go_animation(data, collection_name, objects)
+    local state = panthera.create_go(data, collection_name, objects)
+    local original = state.adapter
+    local adapter = {}
+    for key, value in pairs(original) do adapter[key] = value end
+    local rotations = {}
+    local axes = {rotation_x = "x", rotation_y = "y", rotation_z = "z"}
+    adapter.set_node_property = function(node, property, value)
+        local axis = axes[property]
+        if not axis then return original.set_node_property(node, property, value) end
+        local euler = rotations[node]
+        if not euler then euler = go.get(node, "euler"); rotations[node] = euler end
+        euler[axis] = value
+        original.stop_tween(node, property)
+        local x, y, z = math.rad(euler.x) / 2, math.rad(euler.y) / 2, math.rad(euler.z) / 2
+        local cx, cy, cz = math.cos(x), math.cos(y), math.cos(z)
+        local sx, sy, sz = math.sin(x), math.sin(y), math.sin(z)
+        go.set_rotation(vmath.quat(sy*sz*cx + sx*cy*cz,
+                                  sy*cz*cx + sz*sx*cy,
+                                  -sy*sx*cz + sz*cy*cx,
+                                  -sy*sz*sx + cy*cz*cx), node)
+        return true
+    end
+    state.adapter = adapter
+    return state
+end
+
+
+local data = require("main_panthera")
+local names = {"right/deep/leaf","child","parent","right/deep/child","left/nested","right/nested","left/deep/leaf","left/deep/child","left/nchild","reference","right/nchild"}
+local times = {0, 0.5, 1, 2, 3, 4, 1}
+local function vector(v) return {v.x,v.y,v.z} end
+local function snapshot(self, time)
+    local row = {time=time, nodes={}}
+    for _,name in ipairs(names) do
+        local url = "/"..name
+        local m = go.get_world_transform(url)
+        local q = go.get_rotation(url)
+        local matrix = {}
+        for i=0,3 do for j=0,3 do matrix[#matrix+1]=m["m"..i..j] end end
+        row.nodes[name]={position=vector(go.get_position(url)),rotation={q.x,q.y,q.z,q.w},scale=vector(go.get_scale(url)),matrix=matrix}
+    end
+    self.samples[#self.samples+1]=row
+end
+local function handle_input(self, action_id, action)
+    if self.testing or not action.pressed then return end
+    if action_id == hash("pause") then
+        self.paused = not self.paused
+        if self.paused then
+            self.time = panthera.get_time(self.animation)
+            panthera.stop(self.animation)
+        else
+            panthera.play(self.animation, "default", {from=self.time, speed=4/math.max(0.001,4-self.time), easing=function(t) return t end, callback=function() panthera.play(self.animation,"default",{is_loop=true,easing=function(t) return t end}) end})
+        end
+    elseif action_id == hash("restart") then
+        self.time = 0
+        self.paused = false
+        panthera.play(self.animation, "default", {is_loop=true, easing=function(t) return t end})
+    elseif action_id == hash("back") or action_id == hash("forward") then
+        panthera.stop(self.animation)
+        self.paused = true
+        self.time = math.max(0, math.min(4, self.time + (action_id == hash("back") and -0.25 or 0.25)))
+        panthera.set_time(self.animation, "default", self.time)
+    end
+end
+
+function init(self)
+    self.animation=create_go_animation(data)
+    self.testing=sys.get_config_string("test.enabled", "0")=="1"
+    msg.post(".", "acquire_input_focus")
+    self.paused = false
+    self.time = 0
+    if self.testing then
+        self.index=1; self.phase=0; self.samples={}
+    else
+        panthera.play(self.animation,"default",{is_loop=true,easing=function(t) return t end})
+    end
+    local preview_time = sys.get_config_number("example.time", -1)
+    if not self.testing and preview_time >= 0 then
+        panthera.stop(self.animation)
+        self.time = math.min(4, preview_time)
+        self.paused = true
+        panthera.set_time(self.animation, "default", self.time)
+    end
+end
+function update(self,dt)
+    if not self.testing then
+        if not self.paused then self.time = panthera.get_time(self.animation) end
+        go.set("/ui_status#label", "text", string.format("%s  %.2f / 4.00 s", self.paused and "PAUSED" or "PLAYING", self.time))
+        return
+    end
+    if self.index<=#times then
+        if self.phase==0 then panthera.set_time(self.animation,"default",times[self.index]); self.phase=1
+        else snapshot(self,times[self.index]); self.index=self.index+1; self.phase=0 end
+    elseif not self.play_started then
+        panthera.play(self.animation,"default",{easing=function(t) return t end,callback=function() self.finished=true end});self.play_started=true
+    elseif self.finished then
+        self.finish_wait=(self.finish_wait or 0)+1
+        if self.finish_wait==3 then
+            snapshot(self,4)
+            self.testing = false
+            self.time = 2
+            self.paused = true
+            panthera.set_time(self.animation, "default", self.time)
+            handle_input(self, hash("forward"), {pressed=true})
+            assert(self.paused and self.time == 2.25)
+            handle_input(self, hash("back"), {pressed=true})
+            assert(self.paused and self.time == 2)
+            handle_input(self, hash("pause"), {pressed=true})
+            assert(not self.paused and panthera.is_playing(self.animation))
+            handle_input(self, hash("pause"), {pressed=true})
+            assert(self.paused and not panthera.is_playing(self.animation))
+            handle_input(self, hash("restart"), {pressed=true})
+            assert(not self.paused and self.time == 0 and panthera.is_playing(self.animation))
+            panthera.stop(self.animation)
+            self.testing = true
+            print("GO_EXAMPLE_CONTROLS_OK")
+            local f=assert(io.open("runtime.json","w")); f:write(json.encode(self.samples)); f:close()
+            print("GO_RUNTIME_PARITY_SAMPLES_OK"); msg.post("@system:","exit",{code=0})
+        end
+    end
+end
+function final(self) panthera.stop(self.animation) end
+
+
+function on_input(self, action_id, action)
+    handle_input(self, action_id, action)
+end

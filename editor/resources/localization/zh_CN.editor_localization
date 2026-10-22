@@ -2257,3 +2257,9 @@ prefs.label.code.inlay-hints = 行内类型提示
 prefs.label.code.enable-lua-language-server = 启用 Lua 语言服务
 prefs.help.code.enable-lua-language-server = 为当前项目的游戏脚本和编辑器脚本启用代码辅助。关闭可减少大型项目的内存占用。
 prefs.label.code.format-on-save = 保存时格式化
+
+gui-animation.go-title = GO 动画 · Panthera
+gui-animation.go-empty = 创建动画后，选择 GO 并设置关键帧。嵌套 GO 路径与变换值采用 Panthera 运行时坐标，预览不会修改 Collection。
+gui-animation.go-toggle-editor-help = 显示或收起 GO 动画编辑器
+dock.collection-scene = Collection 场景
+dock.go-animation = GO 动画

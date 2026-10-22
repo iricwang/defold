@@ -1,0 +1,4 @@
+key_trigger { input: KEY_SPACE action: "pause" }
+key_trigger { input: KEY_R action: "restart" }
+key_trigger { input: KEY_LEFT action: "back" }
+key_trigger { input: KEY_RIGHT action: "forward" }

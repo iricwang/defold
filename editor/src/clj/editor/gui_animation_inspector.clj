@@ -40,12 +40,14 @@
       (when (= 1 (count selected-raws))
         (first selected-raws))))
 
-(defn create! [{:keys [state commit! set-time! localize! guard template-document! node-names]}]
+(defn create! [{:keys [state commit! set-time! localize! guard template-document! node-names tween-properties key-kinds]
+                 :or {tween-properties animation/supported-properties
+                      key-kinds ["tween" "trigger" "event" "animation"]}}]
   (let [loading (atom false)
         context (atom nil)
         root (doto (HBox. 10.0) (.setId "gui-animation-key-inspector") (.setPadding (Insets. 6.0)))
         empty-label (doto (Label.) (.setId "gui-animation-selection-empty") (localize! "select-segment"))
-        kind (doto (ComboBox.) (.setId "gui-animation-key-kind") (ui/items! ["tween" "trigger" "event" "animation"]) (.setValue "event"))
+        kind (doto (ComboBox.) (.setId "gui-animation-key-kind") (ui/items! key-kinds) (.setValue "event"))
         node (doto (ComboBox.) (.setId "gui-animation-key-node") (.setEditable true))
         property (doto (ComboBox.) (.setId "gui-animation-key-property") (.setEditable true))
         start (doto (TextField. "0") (.setId "gui-animation-key-start"))
@@ -123,7 +125,7 @@
                 (try
                   (.setValue kind (animation/key-kind key))
                   (ui/items! property (case (animation/key-kind key)
-                                       "tween" animation/supported-properties
+                                       "tween" tween-properties
                                        "trigger" animation/trigger-properties
                                        "animation" (animation/animation-ids (:document @state)) ["event"]))
                   (.setValue node (get key :node_id ""))
@@ -185,7 +187,7 @@
     (.setOnAction kind (ui/event-handler _
                         (when-not @loading
                           (ui/items! property (case (.getValue kind)
-                                                "tween" animation/supported-properties
+                                                "tween" tween-properties
                                                 "trigger" animation/trigger-properties
                                                 "animation" (animation/animation-ids (template-document! (value node))) []))
                           (.setDisable event (not= "event" (.getValue kind)))

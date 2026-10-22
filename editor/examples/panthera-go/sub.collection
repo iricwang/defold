@@ -1,0 +1,4 @@
+name: "sub"
+instances { id: "nested" prototype: "/root.go" children: "nchild" position { x: 0 y: 10 z: 0 } rotation { x: 0.0434534024273578 y: 0.0870727897926938 z: -0.0038016801040236755 w: 0.9952465414778341 } scale3 { x: 1 y: 1 z: 1 }  }
+instances { id: "nchild" prototype: "/child.go" position { x: 60 y: 0 z: 0 } rotation { x: 0.0 y: 0.0 z: 0.0 w: 1.0 } scale3 { x: 1 y: 1 z: 1 }  }
+collection_instances { id: "deep" collection: "/deep.collection" position { x: 0 y: -90 z: 0 } rotation { x: 0.0 y: 0.0 z: -0.13052619222005157 w: 0.9914448613738104 } scale3 { x: 1.1 y: 0.9 z: 1 }  }

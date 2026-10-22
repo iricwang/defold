@@ -17,10 +17,65 @@
   (:require [clojure.string :as string]
             [dynamo.graph :as g]
             [editor.gui-animation-data :as animation]
-            [editor.math :as math]))
+            [editor.math :as math]
+            [editor.pose :as pose]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+
+(def go-channels
+  ["position_x" "position_y" "position_z"
+   "rotation_x" "rotation_y" "rotation_z"
+   "scale_x" "scale_y" "scale_z"])
+
+(defn collection-node-ids
+  "All GO instances, addressed by the same nested paths as Panthera create_go."
+  [resource-node]
+  (g/node-value resource-node :go-inst-ids))
+
+(defn collection-context
+  "Runtime-local GO poses. Collection transforms are baked, inner to outer, only
+  into root GOs; actual GO parenting remains intact, as in collection-common."
+  [scene node-ids]
+  (let [ids (into #{} (map second) node-ids)
+        result (volatile! {})]
+    (letfn [(visit! [scene collections parent]
+              (let [id (:node-id scene)
+                    go (and (contains? ids id) (not= parent id))
+                    collection (= :editor.collection/CollectionInstanceNode (g/node-type-kw id))
+                    collections (cond-> collections collection (conj (:pose scene)))
+                    local (when go (if parent (:pose scene)
+                                       (reduce pose/pre-multiply (:pose scene) (rseq collections))))]
+                (when go
+                  (vswap! result assoc id {:pose local
+                                          :runtime-root (and (nil? parent) (pos? (count collections)))}))
+                (run! #(visit! % collections (if go id parent)) (:children scene))))]
+      (visit! scene [] nil))
+    @result))
+
+(defn go-pose-values [local]
+  (zipmap go-channels (into [] cat [(:translation local) (math/clj-quat->euler (:rotation local)) (:scale local)])))
+
+(defn collection-preview-overrides [context values]
+  (doseq [[id channels] values
+          [channel _] channels]
+    (when-not (contains? (set go-channels) channel)
+      (throw (ex-info (str "GO preview currently supports position, rotation and scale only: " channel)
+                      {:node-id id :channel channel}))))
+  (into {}
+        (map (fn [[id {:keys [pose runtime-root]}]]
+               (let [animated (get values id)
+                     channels (merge (go-pose-values pose) animated)
+                     xyz (fn [prefix] (mapv #(get channels (str prefix "_" %)) ["x" "y" "z"]))]
+                 [id (cond-> {:position (xyz "position")
+                              :rotation (if (or (contains? animated "rotation_x")
+                                                (contains? animated "rotation_y")
+                                                (contains? animated "rotation_z"))
+                                          (math/vecmath->clj (math/euler->quat (xyz "rotation")))
+                                          (:rotation pose))
+                              :scale (xyz "scale")}
+                       runtime-root (assoc :animation-runtime-root true))])))
+        context))
 
 (def channel-specs
   (into {"color_a" [:alpha nil] "outline_a" [:outline-alpha nil] "shadow_a" [:shadow-alpha nil]
@@ -95,3 +150,13 @@
         result (select-keys properties [:position :rotation :scale :alpha])]
     (cond-> result
       (pos? (count extended)) (assoc :graph-properties properties))))
+
+(defn go-node-overrides
+  "GO transforms use local space and Euler degrees, matching Panthera create_go.
+  Reject component channels rather than silently previewing incompatible data."
+  [node-id channels]
+  (doseq [[channel _] channels]
+    (when-not (contains? (set go-channels) channel)
+      (throw (ex-info (str "GO preview currently supports position, rotation and scale only: " channel)
+                      {:node-id node-id :channel channel}))))
+  (node-overrides node-id channels))

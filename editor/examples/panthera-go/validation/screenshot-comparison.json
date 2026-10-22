@@ -1,0 +1,13 @@
+{
+  "time_seconds": 2,
+  "region": [
+    40,
+    145,
+    1240,
+    566
+  ],
+  "pixels_above_8_levels": 26,
+  "max_channel_difference": 108,
+  "mean_max_channel_difference": 0.06204473475851148,
+  "note": "Runtime status footer excluded; screenshots captured from live editor renderer and actual engine."
+}

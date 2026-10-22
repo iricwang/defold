@@ -80,10 +80,12 @@
 (defn- node-values [node-id]
   (animation-properties/node-values node-id))
 
-(defn- preview-overrides [node-ids values]
+(defn- preview-overrides [node-ids values collection]
   (into {} (keep (fn [[name channels]]
                    (when-let [id (get node-ids name)]
-                     [id (animation-properties/node-overrides id channels)]))) values))
+                     [id (if collection
+                           (animation-properties/go-node-overrides id channels)
+                           (animation-properties/node-overrides id channels))]))) values))
 
 (defn- time-x
   ^double [^Canvas canvas state time]
@@ -236,17 +238,26 @@
       (when (not= document (read-document node-id))
         (g/transact
         (into [] cat
-              [(g/operation-label "Edit GUI animation")
+              [(g/operation-label "Edit animation")
                (g/set-property node-id :modified-lines
                  (code-data/string->lines (animation/write-json document)))]))))))
 
 (defn attach!
-  "Adds a Panthera timeline to a GUI scene. Only the JSON resource is edited;
+  "Adds a Panthera timeline to a GUI or Collection scene. Only the JSON resource is edited;
   playback state and scene overrides belong to the view and are not saved."
   [^Parent parent view-id resource-node {:keys [project workspace localization] :as opts}]
   (let [gui-resource (g/node-value resource-node :resource)
         gui-path (resource/proj-path gui-resource)
-        path (str (subs gui-path 0 (- (count gui-path) 4)) "_panthera.json")
+        collection (= "collection" (resource/ext gui-resource))
+        node-ids! #(if collection
+                    (animation-properties/collection-node-ids resource-node)
+                    (g/node-value resource-node :node-ids))
+        collection-context-cached (cache-last animation-properties/collection-context)
+        collection-context! #(collection-context-cached (g/node-value resource-node :scene) (node-ids!))
+        node-values (if collection
+                      #(animation-properties/go-pose-values (:pose (get (collection-context!) %)))
+                      node-values)
+        path (str (string/replace gui-path #"\.[^.]+$" "") (if collection "_go_panthera.json" "_panthera.json"))
         state (atom {:document (animation/new-document gui-path)
                      :animation-id "default" :time 0.0 :playing false :preview false
                      :recording false :draft {} :collapsed #{} :zoom 1.0 :offset 0.0
@@ -256,7 +267,7 @@
         tool-controller-id (g/node-value view-id :tool-controller-id)
         manipulation-handler (atom nil)
         scene-content (first (.getChildrenUnmodifiable parent))
-        layout-tools (gui-layout/attach! scene-content view-id resource-node opts)
+        layout-tools (when-not collection (gui-layout/attach! scene-content view-id resource-node opts))
         root (BorderPane.)
         content (doto (VBox. 0.0) (.setMinWidth 0.0) (ui/add-style! "gui-animation-workspace") (.setPrefHeight 468.0))
         content-scroll (doto (ScrollPane. content) (.setFitToWidth true) (.setFitToHeight true)
@@ -351,7 +362,7 @@
                                  (into (animation/preview-issues document animation-id)
                                        (comp (map first) (distinct)
                                              (remove #(contains? node-ids %))
-                                             (map #(str "GUI node is missing: " %)))
+                                             (map #(str "Animation target is missing: " %)))
                                        (timeline/tracks document animation-id))))
         stop-preview! (fn []
                         (swap! state assoc :playing false :preview false :recording false :draft {})
@@ -367,15 +378,19 @@
                           (let [{:keys [document animation-id time preview draft]} @state
                                 document (resolved-document! document)
                                 _ (swap! state assoc :preview-document document)
-                                node-ids (g/node-value resource-node :node-ids)
+                                node-ids (node-ids!)
                                 issues (when preview
                                          (preview-issues-cached document animation-id node-ids))
                                 active (and preview (zero? (count issues)))
                                 overrides (if active
-                                            (preview-overrides node-ids
-                                                               (reduce (fn [values [node-name property-id]] (update values node-name dissoc property-id))
-                                                                       (merge-with merge (evaluate-cached document animation-id time) draft)
-                                                                       (:muted @state)))
+                                            (let [values (reduce (fn [values [node-name property-id]] (update values node-name dissoc property-id))
+                                                                 (merge-with merge (evaluate-cached document animation-id time) draft)
+                                                                 (:muted @state))]
+                                              (if collection
+                                                (animation-properties/collection-preview-overrides
+                                                  (collection-context!)
+                                                  (into {} (map (fn [[name channels]] [(get node-ids name) channels])) values))
+                                                (preview-overrides node-ids values false)))
                                             {})]
                             (when (not= overrides (g/node-value view-id :animation-preview-overrides))
                               (g/transact {:undoable false}
@@ -407,7 +422,7 @@
                        (let [{:keys [document animation-id time draft]} @state
                              node-name (.getValue node-choice)
                              property-id (.getValue property-choice)
-                             node-id (get (g/node-value resource-node :node-ids) node-name)
+                             node-id (get (node-ids!) node-name)
                              context [document animation-id time node-name property-id draft]]
                          (when (not= context (:field-context @state))
                            (swap! state assoc :field-context context)
@@ -462,9 +477,9 @@
                           (.setValue easing-choice (:easing keyframe)))
                         (sync-fields!))
         record-value! (fn [node-name property-id value]
-                        (let [node-id (get (g/node-value resource-node :node-ids) node-name)
+                        (let [node-id (get (node-ids!) node-name)
                               {:keys [animation-id time]} @state]
-                          (when-not node-id (throw (ex-info "Select a GUI node." {})))
+                          (when-not node-id (throw (ex-info "Select an animation target." {})))
                           (commit! #(timeline/record-value % animation-id node-name property-id time value
                                                            (get (node-values node-id) property-id) (.getValue easing-choice)))
                           (set-time! time)
@@ -488,7 +503,7 @@
          :apply!
          (fn [phase overrides]
            (when (:preview @state)
-             (let [id->name (into {} (map (fn [[name id]] [id name])) (g/node-value resource-node :node-ids))
+             (let [id->name (into {} (map (fn [[name id]] [id name])) (node-ids!))
                    {:keys [document animation-id time recording]} @state
                    values (into {}
                                 (keep (fn [[id properties]]
@@ -499,7 +514,7 @@
                                 overrides)
                    changes (into []
                                  (mapcat (fn [[name channels]]
-                                           (let [initial (merge (node-values (get (g/node-value resource-node :node-ids) name))
+                                           (let [initial (merge (node-values (get (node-ids!) name))
                                                                 (get (animation/evaluate (resolved-document! document) animation-id time) name))]
                                              (into [] (keep (fn [[property value]]
                                                               (when (> (Math/abs (- (double value) (double (get initial property)))) 1.0e-7)
@@ -511,7 +526,7 @@
                  (commit! (fn [document]
                             (reduce (fn [document [name property value]]
                                       (timeline/record-value document animation-id name property time value
-                                                             (get (node-values (get (g/node-value resource-node :node-ids) name)) property)
+                                                             (get (node-values (get (node-ids!) name)) property)
                                                              (.getValue easing-choice)))
                                     document changes)))
                  (swap! state assoc :draft {}))
@@ -545,14 +560,16 @@
                                       (reduce-kv (fn [document name channels]
                                                    (reduce-kv (fn [document property value]
                                                                 (timeline/record-value document animation-id name property time value
-                                                                                       (get (node-values (get (g/node-value resource-node :node-ids) name)) property)
+                                                                                       (get (node-values (get (node-ids!) name)) property)
                                                                                        (.getValue easing-choice))) document channels)) document draft)))
                            (swap! state assoc :draft {})
                            (update-preview!)))
         ^Button scene-key-button (button "commit-all" "gui-animation-scene-commit" commit-drafts!)
         reset-drafts! (fn [] (swap! state assoc :draft {}) (update-preview!))
         key-inspector (inspector/create! {:state state :commit! commit! :set-time! set-time! :localize! localize! :guard guarded :resolve-document! resolved-document!
-                                          :node-names #(vec (sort (into [] (coll/keys (g/node-value resource-node :node-ids)))))
+                                          :tween-properties (if collection animation-properties/go-channels animation/supported-properties)
+                                          :key-kinds (if collection ["tween" "event" "animation"] ["tween" "trigger" "event" "animation"])
+                                          :node-names #(vec (sort (into [] (coll/keys (node-ids!)))))
                                           :template-document! (fn [name]
                                                                 (let [target (animation/template-document (:document @state) name)]
                                                                   (cond (map? target) target (string? target) (load-source! target) :else (:document @state))))})
@@ -569,7 +586,7 @@
                                     #(swap! state assoc :event-log []))
                             (button "copy-callback" "gui-animation-copy-callback"
                                     #(let [module-name (-> path (subs 1) (string/replace #"\.json$" "") (string/replace "/" "."))
-                                           text (animation/callback-template (:document @state) (:animation-id @state) module-name)]
+                                           text (animation/callback-template (assoc-in (:document @state) [:data :metadata :gui_path] gui-path) (:animation-id @state) module-name)]
                                        (.setContent (Clipboard/getSystemClipboard)
                                                     (doto (ClipboardContent.) (.putString text)))
                                        (localize! status "callback-copied")))]))
@@ -628,9 +645,9 @@
         add-property! (fn []
                         (let [node-name (.getValue node-choice)
                               property-id (.getValue property-choice)
-                              node-id (get (g/node-value resource-node :node-ids) node-name)
+                              node-id (get (node-ids!) node-name)
                               animation-id (:animation-id @state)]
-                          (when-not node-id (throw (ex-info "Select a GUI node." {})))
+                          (when-not node-id (throw (ex-info "Select an animation target." {})))
                           (when (zero? (count (animation/keyframes (:document @state) animation-id node-name property-id)))
                             (commit! #(animation/set-keyframe % animation-id node-name property-id 0.0
                                                               (get (node-values node-id) property-id) "linear")))
@@ -703,7 +720,7 @@
                      (ui/children! [animation-choice scene-mode path-label
                                     (button "save-file" "gui-animation-save-file" save!) more-menu]))
         welcome (doto (FlowPane. 8.0 6.0) (ui/add-style! "animation-welcome")
-                      (ui/children! [(doto (Label.) (localize! "empty"))
+                      (ui/children! [(doto (Label.) (localize! (if collection "go-empty" "empty")))
                                      (button "create" "gui-animation-start" create!)]))
         icon-button (fn ^Button [suffix id text f]
                       (doto (Button. text) (.setId id) (ui/add-style! "animation-icon-button")
@@ -741,11 +758,13 @@
                                           (timeline/segment-rows document animation-id)))))
         refresh-tracks! (fn []
                           (let [{:keys [document animation-id collapsed time draft active-track muted]} @state
-                                child-counts (frequencies (eduction (map :parent) (:nodes (g/node-value resource-node :save-value))))
+                                child-counts (if collection
+                                               (into {} (map (fn [[name id]] [name (count (g/node-value id :child-ids))])) (node-ids!))
+                                               (frequencies (eduction (map :parent) (:nodes (g/node-value resource-node :save-value)))))
                                 rows (editor-rows-cached document animation-id collapsed (.getValue node-choice) child-counts)
                                 context [animation-id rows]
                                 values (merge-with merge (evaluate-cached (resolved-document! document) animation-id time) draft)
-                                node-ids (g/node-value resource-node :node-ids)
+                                node-ids (node-ids!)
                                 base-values (cache-last node-values)
                                 keyframes (into {} (keep (fn [row]
                                                           (when (:property-id row)
@@ -825,7 +844,7 @@
                                     (.setTooltip key-button (doto (Tooltip.) (localize! (case key-state :draft "key-draft" :keyed "key-current" "key-add"))))))
                                 (when (and (number? value) (not (.isFocused field)))
                                   (.setText field (format "%.4f" (double value))))))))]
-    (localize! workspace-tab "title")
+    (localize! workspace-tab (if collection "go-title" "title"))
     (.setGraphic workspace-tab (glyph "M10 0 L20 5 L20 16 L10 21 L0 16 L0 5 Z M0 5 L10 10 L20 5 M10 10 L10 21"))
     (.setContent workspace-tab content-scroll)
     (.add (.getTabs workspace-tabs) workspace-tab)
@@ -917,7 +936,7 @@
                           (.setDividerPositions scene-split (double-array [(:scene-divider @state)]))
                           (.setCenter root scene-split)))))
     (localize! editor-toggle "toggle-editor")
-    (.setTooltip editor-toggle (doto (Tooltip.) (localize! "toggle-editor-help")))
+    (.setTooltip editor-toggle (doto (Tooltip.) (localize! (if collection "go-toggle-editor-help" "toggle-editor-help"))))
     (StackPane/setAlignment editor-toggle Pos/TOP_LEFT)
     (StackPane/setMargin editor-toggle (Insets. 20.0 0.0 0.0 20.0))
     (.setOnAction editor-toggle
@@ -981,12 +1000,14 @@
     (ui/add-styles! play-button ["animation-transport" "animation-play"])
     (.setTooltip play-button (doto (Tooltip.) (localize! "play")))
     (.setPromptText name-field "Animation name")
-    (doseq [[^Node control text] [[animation-choice "Animation"] [node-choice "GUI node"]
+    (doseq [[^Node control text] [[animation-choice "Animation"] [node-choice (if collection "GO instance" "GUI node")]
                                   [property-choice "Animated property"] [easing-choice "Easing"]
                                   [time-field "Time in seconds"] [duration-field "Duration in seconds"]
                                   [name-field "New animation name"] [value-field "Keyframe value"]]]
       (.setAccessibleText control text))
-    (.setTooltip preview-check (Tooltip. "Preview does not change the GUI layout. Turn off to edit the layout."))
+    (.setTooltip preview-check (Tooltip. (if collection
+                                          "Preview does not change the Collection. Turn off to edit the scene."
+                                          "Preview does not change the GUI layout. Turn off to edit the layout.")))
     (.setTooltip record-button (doto (Tooltip.) (localize! "record-help")))
     (ui/children! parent [])
     ;; Toolbars are registered before the first CSS pulse, so scene descendants must already be attached.
@@ -1185,7 +1206,7 @@
                                                           (.setOnAction (ui/event-handler _
                                                                           ((guarded #(do (add-segment! kind time node-name)
                                                                                          (.select (.getSelectionModel settings) (int 2)))) nil)))))
-                                                      ["event" "trigger"]))
+                                                      (if collection ["event"] ["event" "trigger"])))
                                 (.show timeline-menu canvas (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event))))
                             (.consume ^MouseEvent event))
                           (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
@@ -1269,18 +1290,19 @@
           floating-panels (mapv (fn [[slot key menu-items]]
                                  (dock-windows/register! slot
                                                         (str (resource/proj-path gui-resource) " — " (localization (localization/message key)))
-                                                        {:persistent-key [:gui (resource/proj-path gui-resource) key]
+                                                        {:persistent-key [(if collection :collection :gui) (resource/proj-path gui-resource) key]
                                                          :focus! (:focus-view! opts) :floating! floating!
-                                                         :drag-handle (when (= "dock.gui-animation" key) workspace-tabs)
+                                                         :drag-handle (when (contains? #{"dock.gui-animation" "dock.go-animation"} key) workspace-tabs)
                                                          :home-visible! (fn [visible]
                                                                           (when (and (not visible) (.isSelected fullscreen))
                                                                             (.fire fullscreen))
                                                                           (dock-windows/set-home-visible! slot visible)
                                                                           (dock-windows/set-tab-empty! (:tab opts) (zero? (count (.getItems scene-split)))))
                                                          :menu-items menu-items}))
-                               [[scene-pane "dock.gui-scene" nil] [title "dock.gui-animation" (.getItems more-menu)]])
+                               [[scene-pane (if collection "dock.collection-scene" "dock.gui-scene") nil]
+                                [title (if collection "dock.go-animation" "dock.gui-animation") (.getItems more-menu)]])
           refresh! (fn [dt]
-                     ((:refresh! layout-tools))
+                     (when layout-tools ((:refresh! layout-tools)))
                      (when (.isVisible title)
                        (try
                          (refresh-document!)
@@ -1302,7 +1324,7 @@
 
                                (:selected @state)
                                (.select (.getSelectionModel settings) (int 1)))))
-                         (let [node-ids (g/node-value resource-node :node-ids)
+                         (let [node-ids (node-ids!)
                                names (vec (sort (into [] (coll/keys node-ids))))
                                selection (g/node-value (:app-view opts) :selected-node-ids)]
                            (when (not= names (vec (.getItems node-choice)))
@@ -1383,7 +1405,7 @@
                            (.setText status (.getMessage error))))))]
       {:refresh-fn refresh!
        :visible? (:visible? (second floating-panels))
-       :dispose-fn #(do ((:dispose! layout-tools))
+       :dispose-fn #(do (when layout-tools ((:dispose! layout-tools)))
                          (doseq [panel floating-panels] ((:dispose! panel)))
                          (.hide timeline-menu)
                          (swap! state assoc :playing false :preview false))})))

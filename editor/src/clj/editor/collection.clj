@@ -29,6 +29,7 @@
             [editor.game-object :as game-object]
             [editor.game-object-common :as game-object-common]
             [editor.graph-util :as gu]
+            [editor.gui-animation-view :as gui-animation-view]
             [editor.handler :as handler]
             [editor.id :as id]
             [editor.localization :as localization]
@@ -1025,4 +1026,5 @@
       :category (localization/message "resource.category.objects")
       :view-types [:scene :text]
       :view-opts {:scene {:grid true
+                          :augment-view-fn gui-animation-view/attach!
                           :drop-fn handle-drop}})))

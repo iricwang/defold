@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+# Copyright 2020-2026 The Defold Foundation
+# Copyright 2014-2020 King
+# Copyright 2009-2014 Ragnar Svensson, Christian Murray
+# Licensed under the Defold License version 1.0 (the "License"); you may not use
+# this file except in compliance with the License.
+#
+# You may obtain a copy of the License, together with FAQs at
+# https://www.defold.com/license
+#
+# Unless required by applicable law or agreed to in writing, software distributed
+# under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+# CONDITIONS OF ANY KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations under the License.
 """Local Windows editor builds, portable archives, verification and installation."""
 import argparse
 import hashlib
@@ -114,11 +127,21 @@ def parser():
         command.add_argument('--sha256', help='Expected SHA-256 from the trusted download source')
     status = sub.add_parser('status', help='Show source and installed versions')
     status.add_argument('--app', type=Path, required=True)
+    reload = sub.add_parser('reload', help='Reload Clojure sources in a running editor; no build, archive or restart')
+    reload.add_argument('--port', type=int, required=True, help='Existing loopback Clojure socket REPL (not nREPL)')
+    reload.add_argument('--pid', type=int, required=True, help='Expected editor Java PID; checked before loading')
+    reload.add_argument('--namespace', action='append', required=True, help='Source namespace; repeat in dependency order')
+    reload.add_argument('--after', type=Path, help='Optional Clojure file to refresh existing callbacks and assert behavior')
+    reload.add_argument('--timeout', type=float, default=60, help='Overall timeout in seconds; never retries mutations')
     return result
 
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    if args.command == 'reload':
+        from live_reload import reload_sources
+        reload_sources(ROOT, args)
+        return
     for name in ('app', 'archive', 'from_installed', 'output'):
         value = getattr(args, name, None)
         if value is not None:
