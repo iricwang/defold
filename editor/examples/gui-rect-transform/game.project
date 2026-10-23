@@ -1,0 +1,10 @@
+[project]
+title = Native Rect Transform
+[bootstrap]
+main_collection = /main.collectionc
+[display]
+width = 800
+height = 600
+[graphics]
+default_texture_min_filter = linear
+default_texture_mag_filter = linear

@@ -76,3 +76,16 @@
     .animation-welcome { -fx-padding: 6px 8px; }
   }
 }
+
+// Skeleton authoring uses the same native controls and neutral collapsed choices.
+#skeletal-workspace {
+  -fx-background-color: -df-background;
+  .combo-box > .list-cell { -fx-background-color: -df-background-input; }
+  .tool-bar { -fx-padding: 3px; -fx-spacing: 4px; -fx-background-color: -df-background-lightish; }
+  .button { -fx-min-width: 24px; -fx-min-height: 24px; -fx-padding: 2px 7px; }
+  .text-field { -fx-min-width: 40px; -fx-pref-height: 24px; -fx-max-height: 26px; }
+  #skeletal-duration, #skeletal-fps { -fx-pref-width: 65px; }
+  #skeletal-clip-name { -fx-pref-width: 130px; }
+  #skeletal-animation { -fx-pref-width: 110px; }
+  #skeletal-status { -fx-padding: 2px 5px; }
+}

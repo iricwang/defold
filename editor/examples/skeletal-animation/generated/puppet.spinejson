@@ -1,0 +1,286 @@
+{
+  "skeleton": {
+    "spine": "4.2.0"
+  },
+  "bones": [
+    {
+      "name": "root",
+      "x": 0.0,
+      "y": 0.0,
+      "rotation": 0.0,
+      "scaleX": 1.0,
+      "scaleY": 1.0,
+      "length": 0.0
+    },
+    {
+      "name": "upper",
+      "x": 0.0,
+      "y": 60.0,
+      "rotation": 0.0,
+      "scaleX": 1.0,
+      "scaleY": 1.0,
+      "length": 110.0,
+      "parent": "root"
+    },
+    {
+      "name": "lower",
+      "x": 110.0,
+      "y": 0.0,
+      "rotation": 0.0,
+      "scaleX": 1.0,
+      "scaleY": 1.0,
+      "length": 90.0,
+      "parent": "upper"
+    },
+    {
+      "name": "target",
+      "x": 155.0,
+      "y": 155.0,
+      "rotation": 0.0,
+      "scaleX": 1.0,
+      "scaleY": 1.0,
+      "length": 0.0,
+      "parent": "root"
+    },
+    {
+      "name": "tip",
+      "x": 90.0,
+      "y": 0.0,
+      "rotation": 0.0,
+      "scaleX": 1.0,
+      "scaleY": 1.0,
+      "length": 0.0,
+      "parent": "lower"
+    }
+  ],
+  "slots": [
+    {
+      "name": "body",
+      "bone": "root",
+      "attachment": "body"
+    },
+    {
+      "name": "upper",
+      "bone": "upper",
+      "attachment": "upper"
+    },
+    {
+      "name": "lower",
+      "bone": "lower",
+      "attachment": "lower"
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "body": {
+          "body": {
+            "width": 110.0,
+            "height": 110.0,
+            "x": 0.0,
+            "path": "images/body",
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "rotation": 0.0,
+            "type": "region",
+            "y": 0.0,
+            "color": "ffffffff"
+          }
+        },
+        "upper": {
+          "upper": {
+            "width": 110.0,
+            "height": 40.0,
+            "uvs": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0,
+              0,
+              0
+            ],
+            "x": 0.0,
+            "path": "images/limb",
+            "scaleX": 1.0,
+            "vertices": [
+              2,
+              1,
+              0.0,
+              -20.0,
+              0.9,
+              2,
+              -110.0,
+              -20.0,
+              0.09999999999999998,
+              2,
+              1,
+              110.0,
+              -20.0,
+              0.1,
+              2,
+              0.0,
+              -20.0,
+              0.9,
+              2,
+              1,
+              110.0,
+              20.0,
+              0.1,
+              2,
+              0.0,
+              20.0,
+              0.9,
+              2,
+              1,
+              0.0,
+              20.0,
+              0.9,
+              2,
+              -110.0,
+              20.0,
+              0.09999999999999998
+            ],
+            "scaleY": 1.0,
+            "rotation": 0.0,
+            "type": "mesh",
+            "y": 0.0,
+            "triangles": [
+              0,
+              1,
+              2,
+              2,
+              3,
+              0
+            ],
+            "color": "ffffffff"
+          }
+        },
+        "lower": {
+          "lower": {
+            "width": 90.0,
+            "height": 30.0,
+            "x": 45.0,
+            "path": "images/limb",
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "rotation": 0.0,
+            "type": "region",
+            "y": 0.0,
+            "color": "ffffffff"
+          }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "wave": {
+      "bones": {
+        "target": {
+          "translatey": [
+            {
+              "time": 0.0,
+              "value": -55.0
+            },
+            {
+              "time": 1.0,
+              "value": 25.0
+            },
+            {
+              "time": 2.0,
+              "value": -55.0
+            }
+          ]
+        }
+      },
+      "attachments": {
+        "default": {
+          "upper": {
+            "upper": {
+              "deform": [
+                {
+                  "time": 0.0,
+                  "vertices": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "time": 1.0,
+                  "vertices": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    -10,
+                    0,
+                    -10,
+                    0,
+                    10,
+                    0,
+                    10,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "time": 2.0,
+                  "vertices": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "ik": [
+    {
+      "name": "arm",
+      "bones": [
+        "upper",
+        "lower"
+      ],
+      "target": "target",
+      "mix": 1.0,
+      "bendPositive": true,
+      "order": 0
+    }
+  ]
+}

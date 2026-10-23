@@ -1,0 +1,13 @@
+[project]
+title = Built-in Skeleton Authoring
+dependencies = https://github.com/defold/extension-spine/archive/refs/tags/4.9.2.zip
+
+[bootstrap]
+main_collection = /main.collectionc
+
+[display]
+width = 800
+height = 600
+
+[input]
+game_binding = /input/game.input_bindingc

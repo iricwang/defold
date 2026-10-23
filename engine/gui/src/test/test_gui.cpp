@@ -6221,3 +6221,95 @@ int main(int argc, char **argv)
     jc_test_init(&argc, argv);
     return jc_test_run_all();
 }
+
+// Parent size changes stretch the rectangle, not the child's scale; repeated
+// evaluation, property writes, nesting, cloning and reset must not accumulate drift.
+TEST_F(dmGuiTest, RectTransformParentResize)
+{
+    dmGui::SetSceneResolution(m_Scene, 800, 600);
+    dmGui::SetPhysicalResolution(m_Context, 800, 600);
+    dmGui::HNode parent = dmGui::NewNode(m_Scene, Point3(400, 300, 0), Vector3(200, 100, 0), dmGui::NODE_TYPE_BOX, 0);
+    dmGui::HNode child = dmGui::NewNode(m_Scene, Point3(10, 5, 0), Vector3(160, 70, 0), dmGui::NODE_TYPE_BOX, 0);
+    ASSERT_EQ(dmGui::RESULT_OK, dmGui::SetNodeParent(m_Scene, child, parent, false));
+    dmGui::SetNodeRectTransform(m_Scene, child, true, Vector4(0, 0, 0, 0), Vector4(1, 1, 0, 0), Vector4(200, 100, 0.5f, 0.5f));
+    dmGui::SetNodeResetPoint(m_Scene, child);
+    dmGui::SetNodeProperty(m_Scene, parent, dmGui::PROPERTY_SIZE, Vector4(400, 200, 0, 0));
+    for (int i = 0; i < 3; ++i)
+    {
+        ASSERT_NEAR(360, dmGui::GetNodeSize(m_Scene, child).getX(), 0.001f);
+        ASSERT_NEAR(170, dmGui::GetNodeSize(m_Scene, child).getY(), 0.001f);
+        ASSERT_NEAR(10, dmGui::GetNodePosition(m_Scene, child).getX(), 0.001f);
+        Matrix4 transform = dmGui::GetNodeWorldTransform(m_Scene, child);
+        ASSERT_NEAR(1, transform.getCol0().getX(), 0.001f);
+    }
+    dmGui::SetNodeProperty(m_Scene, child, dmGui::PROPERTY_SIZE, Vector4(300, 150, 0, 0));
+    ASSERT_NEAR(300, dmGui::GetNodeSize(m_Scene, child).getX(), 0.001f);
+    dmGui::SetNodePosition(m_Scene, child, Point3(20, 25, 0));
+    ASSERT_NEAR(20, dmGui::GetNodePosition(m_Scene, child).getX(), 0.001f);
+    dmGui::ResetNodes(m_Scene);
+    ASSERT_NEAR(360, dmGui::GetNodeSize(m_Scene, child).getX(), 0.001f);
+    ASSERT_NEAR(10, dmGui::GetNodePosition(m_Scene, child).getX(), 0.001f);
+
+    dmGui::HNode grandchild = dmGui::NewNode(m_Scene, Point3(0, 0, 0), Vector3(340, 150, 0), dmGui::NODE_TYPE_BOX, 0);
+    dmGui::SetNodeParent(m_Scene, grandchild, child, false);
+    dmGui::SetNodeRectTransform(m_Scene, grandchild, true, Vector4(0, 0, 0, 0), Vector4(1, 1, 0, 0), Vector4(360, 170, 0.5f, 0.5f));
+    dmGui::SetNodeProperty(m_Scene, parent, dmGui::PROPERTY_SIZE, Vector4(500, 300, 0, 0));
+    ASSERT_NEAR(440, dmGui::GetNodeSize(m_Scene, grandchild).getX(), 0.001f);
+    ASSERT_NEAR(250, dmGui::GetNodeSize(m_Scene, grandchild).getY(), 0.001f);
+    dmGui::HNode clone;
+    ASSERT_EQ(dmGui::RESULT_OK, dmGui::CloneNode(m_Scene, child, &clone));
+    dmGui::SetNodeParent(m_Scene, clone, parent, false);
+    ASSERT_NEAR(dmGui::GetNodeSize(m_Scene, child).getX(), dmGui::GetNodeSize(m_Scene, clone).getX(), 0.001f);
+    Vector3 old_position = dmGui::GetNodeWorldTransform(m_Scene, clone).getTranslation();
+    dmGui::SetNodeParent(m_Scene, clone, dmGui::INVALID_HANDLE, true);
+    ASSERT_NEAR(old_position.getX(), dmGui::GetNodeWorldTransform(m_Scene, clone).getTranslation().getX(), 0.001f);
+    ASSERT_NEAR(old_position.getY(), dmGui::GetNodeWorldTransform(m_Scene, clone).getTranslation().getY(), 0.001f);
+}
+
+// Fixed and stretch anchors use both ends of the parent rectangle, including
+// non-centered parent pivots, without changing dimensions on fixed axes.
+TEST_F(dmGuiTest, RectTransformPresets)
+{
+    dmGui::HNode parent = dmGui::NewNode(m_Scene, Point3(0, 0, 0), Vector3(200, 100, 0), dmGui::NODE_TYPE_BOX, 0);
+    dmGui::SetNodePivot(m_Scene, parent, dmGui::PIVOT_SW);
+    for (int x = 0; x < 4; ++x)
+    {
+        for (int y = 0; y < 4; ++y)
+        {
+            float min_x = x == 3 ? 0.0f : x * 0.5f;
+            float max_x = x == 3 ? 1.0f : min_x;
+            float min_y = y == 3 ? 0.0f : y * 0.5f;
+            float max_y = y == 3 ? 1.0f : min_y;
+            dmGui::HNode child = dmGui::NewNode(m_Scene, Point3(30, 20, 0), Vector3(40, 20, 0), dmGui::NODE_TYPE_BOX, 0);
+            dmGui::SetNodeParent(m_Scene, child, parent, false);
+            dmGui::SetNodeRectTransform(m_Scene, child, true, Vector4(min_x, min_y, 0, 0), Vector4(max_x, max_y, 0, 0), Vector4(200, 100, 0, 0));
+            dmGui::SetNodeProperty(m_Scene, parent, dmGui::PROPERTY_SIZE, Vector4(400, 300, 0, 0));
+            ASSERT_NEAR(30 + (min_x + max_x) * 100, dmGui::GetNodePosition(m_Scene, child).getX(), 0.001f);
+            ASSERT_NEAR(20 + (min_y + max_y) * 100, dmGui::GetNodePosition(m_Scene, child).getY(), 0.001f);
+            ASSERT_NEAR(x == 3 ? 240 : 40, dmGui::GetNodeSize(m_Scene, child).getX(), 0.001f);
+            ASSERT_NEAR(y == 3 ? 220 : 20, dmGui::GetNodeSize(m_Scene, child).getY(), 0.001f);
+            dmGui::DeleteNode(m_Scene, child, true);
+            dmGui::SetNodeProperty(m_Scene, parent, dmGui::PROPERTY_SIZE, Vector4(200, 100, 0, 0));
+        }
+    }
+}
+
+// Root stretch follows logical viewport size; child setters, screen positioning
+// and animation targets remain actual local coordinates after a resize.
+TEST_F(dmGuiTest, RectTransformViewportAndAnimation)
+{
+    dmGui::SetSceneResolution(m_Scene, 800, 600);
+    dmGui::SetPhysicalResolution(m_Context, 800, 600);
+    dmGui::HNode root = dmGui::NewNode(m_Scene, Point3(400, 300, 0), Vector3(700, 500, 0), dmGui::NODE_TYPE_BOX, 0);
+    dmGui::SetNodeRectTransform(m_Scene, root, true, Vector4(0, 0, 0, 0), Vector4(1, 1, 0, 0), Vector4(800, 600, 0, 0));
+    dmGui::SetPhysicalResolution(m_Context, 1600, 600);
+    ASSERT_NEAR(1500, dmGui::GetNodeSize(m_Scene, root).getX(), 0.001f);
+    ASSERT_NEAR(800, dmGui::GetNodePosition(m_Scene, root).getX(), 0.001f);
+    dmGui::SetScreenPosition(m_Scene, root, Point3(900, 250, 0));
+    ASSERT_NEAR(900, dmGui::GetNodePosition(m_Scene, root).getX(), 0.001f);
+    dmGui::AnimateNodeHash(m_Scene, root, dmHashString64("position.x"), Vector4(950), dmEasing::Curve(dmEasing::TYPE_LINEAR), dmGui::PLAYBACK_ONCE_FORWARD, 0.1f, 0, 0, 0, 0);
+    dmGui::UpdateScene(m_Scene, 0.1f);
+    dmGui::UpdateScene(m_Scene, 0.1f);
+    ASSERT_NEAR(950, dmGui::GetNodePosition(m_Scene, root).getX(), 0.001f);
+    ASSERT_NEAR(950, dmGui::GetNodeWorldTransform(m_Scene, root).getTranslation().getX(), 0.001f);
+}

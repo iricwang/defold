@@ -822,6 +822,8 @@ namespace dmGameSystem
 
         dmGui::SetNodeTextStyle(scene, n, node_desc->m_Style[0] ? dmHashString64(node_desc->m_Style) : 0);
 
+        // Disable rectangle resolution while restoring authored values on load/layout switch.
+        dmGui::SetNodeRectTransform(scene, n, false, node_desc->m_RectAnchorMin, node_desc->m_RectAnchorMax, node_desc->m_RectReference);
         // properties
         dmGui::SetNodePosition(scene, n, Point3(node_desc->m_Position.getXYZ()));
         dmGui::SetNodeProperty(scene, n, dmGui::PROPERTY_EULER, node_desc->m_Rotation);
@@ -922,6 +924,7 @@ namespace dmGameSystem
         dmGui::SetNodePivot(scene, n, (dmGui::Pivot) node_desc->m_Pivot);
         dmGui::SetNodeXAnchor(scene, n, (dmGui::XAnchor) node_desc->m_Xanchor);
         dmGui::SetNodeYAnchor(scene, n, (dmGui::YAnchor) node_desc->m_Yanchor);
+        dmGui::SetNodeRectTransform(scene, n, node_desc->m_RectTransform, node_desc->m_RectAnchorMin, node_desc->m_RectAnchorMax, node_desc->m_RectReference);
         dmGui::SetNodeAdjustMode(scene, n, (dmGui::AdjustMode) node_desc->m_AdjustMode);
         dmGui::SetNodeInheritAlpha(scene, n, node_desc->m_InheritAlpha);
 

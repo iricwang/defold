@@ -138,6 +138,10 @@ namespace dmGui
         void*                   m_ParticlefxPrototype;
         dmParticle::HInstance   m_ParticleInstance;
         dmVMath::Vector4*       m_ResetPointProperties;
+        dmVMath::Vector4         m_RectAnchorMin;
+        dmVMath::Vector4         m_RectAnchorMax;
+        dmVMath::Vector4         m_RectReference;
+        dmVMath::Vector4         m_RectSize;
         uint32_t                m_ResetPointState;
         uint32_t                m_RenderConstantsHash;
         uint32_t                m_CustomType; // Only valid if m_NodeType == NODE_TYPE_CUSTOM
@@ -167,7 +171,8 @@ namespace dmGui
                 uint32_t        m_ClippingInverted : 1;
                 uint32_t        m_IsBone : 1;
                 uint32_t        m_HasHeadlessPfx : 1;
-                uint32_t        m_Reserved : 2;
+                uint32_t        m_RectTransform : 1;
+                uint32_t        m_Reserved : 1;
             };
             uint32_t m_State;
         };
@@ -414,7 +419,7 @@ namespace dmGui
         dmVMath::Vector4 size(1.0f, 1.0f, 0.0f, 0.0f);
         if (flags & CALCULATE_NODE_INCLUDE_SIZE)
         {
-            size = node.m_Properties[dmGui::PROPERTY_SIZE];
+            size = node.m_RectTransform ? node.m_RectSize : node.m_Properties[dmGui::PROPERTY_SIZE];
         }
         // Reset the pivot of the node, so that the resulting transform has the origin in the lower left, which is used for quad rendering etc.
         if (flags & CALCULATE_NODE_RESET_PIVOT)
@@ -466,7 +471,7 @@ namespace dmGui
             CalculateParentNodeTransformAndAlphaCached(scene, parent, parent_trans, parent_opacity, traversal_cache);
         }
 
-        if (node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
+        if (node.m_RectTransform || node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
         {
             UpdateLocalTransform(scene, n);
         }
@@ -517,7 +522,7 @@ namespace dmGui
         }
 
         const Node& node = n->m_Node;
-        if (node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
+        if (node.m_RectTransform || node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
         {
             UpdateLocalTransform(scene, n);
         }

@@ -1,0 +1,12 @@
+{
+  "schema": "defold.skeleton",
+  "version": 1,
+  "name": "save_data",
+  "bones": [
+    {"id": "root", "parent": null, "x": 12.0, "y": 20.0, "rotation": 15.0, "scale-x": 1.2, "scale-y": 0.8, "length": 100.0}
+  ],
+  "slots": [],
+  "animations": [
+    {"id": "default", "duration": 2.0, "tracks": []}
+  ]
+}

@@ -62,10 +62,21 @@
 (defn adjust-pose
   "Runtime AdjustPosScale before the parent reference scale is cancelled.
   Return the adjusted pose and local adjust scale separately to preserve rotations."
-  [node-pose {:keys [adjust-mode x-anchor y-anchor]} reference root-dims rect parent-scale]
-  (if (or (= reference :adjust-reference-disabled)
-          (and parent-scale (= reference :adjust-reference-legacy)))
+  [node-pose {:keys [adjust-mode x-anchor y-anchor rect-transform]} reference root-dims rect parent-scale]
+  (cond
+    (and rect-transform parent-scale) [node-pose [1.0 1.0 1.0]]
+    (and rect-transform (not= reference :adjust-reference-disabled))
+    (let [[offset-x offset-y width height] rect
+          [scene-width scene-height] root-dims
+          fit (min (/ (double width) scene-width) (/ (double height) scene-height))
+          [x y z] (:translation node-pose)]
+      [(assoc node-pose :translation [(+ offset-x (* x fit)) (+ offset-y (* y fit)) z]
+                       :scale (mapv * (:scale node-pose) [fit fit 1.0]))
+       [fit fit 1.0]])
+    (or (= reference :adjust-reference-disabled)
+        (and parent-scale (= reference :adjust-reference-legacy)))
     [node-pose [1.0 1.0 1.0]]
+    :else
     (let [[offset-x offset-y width height] rect
           [scene-width scene-height] root-dims
           [rx ry] (or parent-scale [(/ (double width) scene-width) (/ (double height) scene-height)])
@@ -104,7 +115,7 @@
             result (assoc value :pose adjusted
                           :children (mapv #(adapt-scene-impl % reference root-dims rect local-scale pose/default overrides)
                                           (:children value)))]
-        (if (and parent-scale (= reference :adjust-reference-parent))
+        (if (and (not (:rect-transform layout)) parent-scale (= reference :adjust-reference-parent))
           ;; S^-1 * R * S cannot be represented by one pose when rotated. A
           ;; separate scale parent reproduces UpdateLocalTransform exactly.
           {:node-id (:node-id value)
@@ -132,9 +143,18 @@
         report (g/transact {:dry-run true} steps)
         context (g/make-evaluation-context {:basis (:basis report)
                                            :cache (cache/cache-invalidate (g/cache) (:outputs-modified report))})
-        value (gui-animation-preview/apply-preview (g/node-value resource-node :scene context) overrides)
         {:keys [width height]} (g/node-value resource-node :scene-dims context)
         rect (safe-rect physical-size insets (get-in config [:settings ["gui" "safe_area_mode"]]))
+        fit (max 1.0e-9 (min (/ (double (nth rect 2)) (max 1 width))
+                             (/ (double (nth rect 3)) (max 1 height))))
+        rect-dims (if (= :adjust-reference-disabled (:adjust-reference config))
+                    {:width width :height height}
+                    {:width (/ (double (nth rect 2)) fit) :height (/ (double (nth rect 3)) fit)})
+        report (g/transact {:dry-run true}
+                           (conj steps (g/set-property resource-node :preview-rect-dims rect-dims)))
+        context (g/make-evaluation-context {:basis (:basis report)
+                                           :cache (cache/cache-invalidate (g/cache) (:outputs-modified report))})
+        value (gui-animation-preview/apply-preview (g/node-value resource-node :scene context) overrides)
         value (adapt-scene value (:adjust-reference config) [(max 1 width) (max 1 height)] rect overrides)]
     (assoc (scene/produce-scene-render-data
       {;; Geometry and alpha have already been evaluated and adapted above.

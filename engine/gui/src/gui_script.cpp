@@ -4328,8 +4328,7 @@ namespace dmGui
             }\
             else\
                 v = *dmScript::CheckVector4(L, 2);\
-            n->m_Node.m_Properties[property] = v;\
-            n->m_Node.m_DirtyLocal = 1;\
+            SetNodeProperty(GetScene(L), hnode, property, v);\
             return 0;\
         }\
 
@@ -4337,7 +4336,7 @@ namespace dmGui
     int LuaGet##name(lua_State* L)\
     {\
         InternalNode* n = LuaCheckNodeInternal(L, 1, 0);\
-        const Vector4& v = n->m_Node.m_Properties[property];\
+        Vector4 v = GetNodeProperty(GetScene(L), GetNodeHandle(n), property);\
         dmScript::PushVector3(L, Vector3(v.getX(), v.getY(), v.getZ()));\
         return 1;\
     }\
@@ -4489,8 +4488,7 @@ namespace dmGui
         }
         else
             v = *dmScript::CheckVector4(L, 2);
-        n->m_Node.m_Properties[PROPERTY_SIZE] = v;
-        n->m_Node.m_DirtyLocal = 1;
+        SetNodeProperty(GetScene(L), hnode, PROPERTY_SIZE, v);
         return 0;
     }
 
@@ -4504,7 +4502,7 @@ namespace dmGui
     int LuaGetSize(lua_State* L)
     {
         InternalNode* n = LuaCheckNodeInternal(L, 1, 0);
-        Vector3 v(n->m_Node.m_Properties[PROPERTY_SIZE].getX(), n->m_Node.m_Properties[PROPERTY_SIZE].getY(), n->m_Node.m_Properties[PROPERTY_SIZE].getZ());
+        Vector3 v(GetNodeSize(GetScene(L), GetNodeHandle(n)));
         dmScript::PushVector3(L, v);
         return 1;
     }

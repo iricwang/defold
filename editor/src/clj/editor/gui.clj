@@ -38,6 +38,8 @@
             [editor.gui-animation-preview :as gui-animation-preview]
             [editor.gui-animation-view :as gui-animation-view]
             [editor.gui-attachment :as gui-attachment]
+            [editor.gui-layout :as gui-layout]
+            [editor.gui-rect :as gui-rect]
             [editor.gui-clipping :as clipping]
             [editor.handler :as handler]
             [editor.id :as id]
@@ -75,9 +77,10 @@
            [com.jogamp.opengl GL GL3]
            [editor.gl.shader ShaderLifecycle]
            [editor.gl.texture TextureLifecycle]
+           [editor.pose Pose]
            [internal.graph.types Arc]
            [java.awt.image BufferedImage]
-           [javax.vecmath Quat4d Vector3d]
+           [javax.vecmath Matrix4d Quat4d Vector3d]
            [org.apache.commons.io FilenameUtils]))
 
 (set! *warn-on-reflection* true)
@@ -366,6 +369,7 @@
 
 (def gui-node-parent-attachments
   [[:id :parent]
+   [:rect :rect-parent]
    [:trivial-gui-scene-info :trivial-gui-scene-info]
    [:basic-gui-scene-info :basic-gui-scene-info]
    [:costly-gui-scene-info :costly-gui-scene-info]])
@@ -1274,6 +1278,8 @@
             (let [layer->index (:layer->index basic-gui-scene-info)]
               (layer->index layer))))
 
+  (input rect-parent g/Any)
+  (output rect g/Any (gu/passthrough rect-parent))
   (input parent g/Str)
   (input child-scenes g/Any :array)
   (input child-indices NodeIndex :array)
@@ -1617,7 +1623,7 @@
         texture-page-count (get texture-page-counts texture)]
     (validation/prop-error :fatal _node-id :material shader/page-count-mismatch-error-message is-paged-material texture-page-count material-max-page-count exclude-gles-sm100 texture-message)))
 
-(g/defnk produce-visual-base-node-msg [gui-base-node-msg ^:raw visible ^:raw blend-mode ^:raw adjust-mode ^:raw material ^:raw pivot ^:raw x-anchor ^:raw y-anchor]
+(g/defnk produce-visual-base-node-msg [gui-base-node-msg ^:raw visible ^:raw blend-mode ^:raw adjust-mode ^:raw material ^:raw pivot ^:raw x-anchor ^:raw y-anchor ^:raw rect-transform ^:raw rect-anchor-min ^:raw rect-anchor-max ^:raw rect-reference]
   (assoc gui-base-node-msg
     :visible visible
     :blend-mode blend-mode ; TODO: Not used by particlefx (forced to :blend-mode-alpha). Move?
@@ -1625,14 +1631,58 @@
     :material material
     :pivot pivot ; TODO: Not used by particlefx (forced to :pivot-center). Move?
     :x-anchor x-anchor
-    :y-anchor y-anchor))
+    :y-anchor y-anchor
+    :rect-transform rect-transform
+    :rect-anchor-min rect-anchor-min
+    :rect-anchor-max rect-anchor-max
+    :rect-reference rect-reference))
 
 (g/defnode VisualNode
   (inherits GuiNode)
 
+  (property rect-transform g/Bool (default false)
+            (dynamic visible (g/constantly false))
+            (dynamic edit-type (layout-property-edit-type rect-transform {:type g/Bool}))
+            (value (layout-property-getter rect-transform))
+            (set (layout-property-setter rect-transform)))
+  (property rect-anchor-min types/Vec4 (default [0.0 0.0 0.0 0.0])
+            (dynamic visible (g/constantly false))
+            (dynamic edit-type (layout-property-edit-type rect-anchor-min {:type types/Vec4}))
+            (value (layout-property-getter rect-anchor-min))
+            (set (layout-property-setter rect-anchor-min)))
+  (property rect-anchor-max types/Vec4 (default [0.0 0.0 0.0 0.0])
+            (dynamic visible (g/constantly false))
+            (dynamic edit-type (layout-property-edit-type rect-anchor-max {:type types/Vec4}))
+            (value (layout-property-getter rect-anchor-max))
+            (set (layout-property-setter rect-anchor-max)))
+  (property rect-reference types/Vec4 (default [0.0 0.0 0.0 0.0])
+            (dynamic visible (g/constantly false))
+            (dynamic edit-type (layout-property-edit-type rect-reference {:type types/Vec4}))
+            (value (layout-property-getter rect-reference))
+            (set (layout-property-setter rect-reference)))
+  (output rect-base-size types/Vec3 (g/constantly [0.0 0.0 0.0]))
+  ;; Keep size independent of position so moving a node does not rebuild its
+  ;; mesh, clipping geometry or text layout (including for legacy GUI nodes).
+  (output rect-size types/Vec3
+          (g/fnk [rect-transform rect-base-size rect-anchor-min rect-anchor-max rect-reference rect-parent]
+            (if rect-transform
+              (gui-rect/resolve-size rect-base-size rect-anchor-min rect-anchor-max rect-reference rect-parent)
+              rect-base-size)))
+  (output rect-position types/Vec3
+          (g/fnk [rect-transform position pivot rect-anchor-min rect-anchor-max rect-reference rect-parent]
+            (if rect-transform
+              (gui-rect/resolve-position position (gui-layout/pivot-points pivot)
+                                        rect-anchor-min rect-anchor-max rect-reference rect-parent)
+              position)))
+  (output rect-geometry g/Any (g/fnk [rect-position rect-size] {:position rect-position :size rect-size}))
+  (output rect g/Any (g/fnk [rect-size pivot]
+                      (into (subvec rect-size 0 2) (gui-layout/pivot-points pivot))))
+  (output pose Pose (g/fnk [rect-position rotation scale] (pose/make rect-position rotation scale)))
+  (output transform Matrix4d :cached (g/fnk [pose] (pose/matrix pose)))
+
   (output game-preview-node-data g/Any
-          (g/fnk [type adjust-mode x-anchor y-anchor]
-            {:type type :adjust-mode adjust-mode :x-anchor x-anchor :y-anchor y-anchor}))
+          (g/fnk [type adjust-mode x-anchor y-anchor rect-transform]
+            {:type type :adjust-mode adjust-mode :x-anchor x-anchor :y-anchor y-anchor :rect-transform rect-transform}))
 
   (property visible g/Bool (default (protobuf/default Gui$NodeDesc :visible))
             (dynamic edit-type (layout-property-edit-type visible {:type g/Bool}))
@@ -1887,6 +1937,7 @@
             (dynamic visible (g/fnk [size-mode texture]
                                (= :texture-size (visible-size-property-label size-mode texture)))))
   (property size-mode g/Keyword (default (protobuf/default Gui$NodeDesc :size-mode))
+            (dynamic read-only? (g/fnk [rect-transform] rect-transform))
             (dynamic edit-type (layout-property-edit-type size-mode (properties/->pb-choicebox Gui$NodeDesc$SizeMode) size-mode-property-changes-fn))
             (dynamic label (properties/label-dynamic :gui :size-mode))
             (dynamic tooltip (properties/tooltip-dynamic :gui :size-mode))
@@ -1959,8 +2010,9 @@
                                          (let [texture-gpu-textures (:texture-gpu-textures costly-gui-scene-info)]
                                            (or (get texture-gpu-textures texture)
                                                @texture/white-pixel))))
-  (output size types/Vec3 (g/fnk [manual-size size-mode texture texture-size]
-                            (if (or (= :size-mode-manual size-mode)
+  (output size types/Vec3 (g/fnk [rect-size] rect-size))
+  (output rect-base-size types/Vec3 (g/fnk [manual-size size-mode texture texture-size rect-transform]
+                            (if (or rect-transform (= :size-mode-manual size-mode)
                                     (coll/empty? texture))
                               manual-size
                               texture-size)))
@@ -2156,6 +2208,8 @@
 (g/defnode TextNode
   (inherits VisualNode)
 
+  (output rect-base-size types/Vec3 (gu/passthrough manual-size))
+
   ; Text
   (property manual-size types/Vec3 (default (protobuf/vector4->vector3 (protobuf/default Gui$NodeDesc :size)))
             (dynamic label (properties/label-dynamic :size))
@@ -2252,9 +2306,9 @@
   (output node-msg g/Any :cached produce-text-node-msg)
   (output gpu-texture TextureLifecycle (g/fnk [font-data] (:texture font-data)))
   (output scene-renderable-user-data g/Any :cached
-          (g/fnk [costly-gui-scene-info manual-size font material material-shader pivot text-data color+alpha]
-            (let [[w h] manual-size
-                  offset (pivot-offset pivot manual-size)
+          (g/fnk [costly-gui-scene-info rect-size font material material-shader pivot text-data color+alpha]
+            (let [[w h] rect-size
+                  offset (pivot-offset pivot rect-size)
                   lines (mapv conj (apply concat (take 4 (partition 2 1 (cycle (geom/transl offset [[0 0] [w 0] [w h] [0 h]]))))) (repeat 0))
                   font-map (get-in text-data [:font-data :font-map])
                   texture-recip-uniform (some-> font-map font/get-texture-recip-uniform)
@@ -2273,12 +2327,12 @@
                :renderable-tags #{:gui-text}})))
   (output markup-error g/Any :cached (g/fnk [_node-id font-data text]
                                        (font/markup-error _node-id :text (:font-map font-data) text)))
-  (output text-layout g/Any :cached (g/fnk [manual-size font-data text line-break text-leading text-tracking style]
-                                      (font/layout-text (some-> font-data :font-map (assoc :style style)) text line-break (first manual-size) text-tracking text-leading)))
-  (output aabb g/Any :cached (g/fnk [pivot manual-size] (calc-aabb pivot manual-size)))
+  (output text-layout g/Any :cached (g/fnk [rect-size font-data text line-break text-leading text-tracking style]
+                                      (font/layout-text (some-> font-data :font-map (assoc :style style)) text line-break (first rect-size) text-tracking text-leading)))
+  (output aabb g/Any :cached (g/fnk [pivot rect-size] (calc-aabb pivot rect-size)))
   (output aabb-size g/Any :cached (g/fnk [text-layout]
                                     [(:width text-layout) (:height text-layout) 0]))
-  (output text-data g/KeywordMap (g/fnk [text-layout font-data color alpha outline outline-alpha shadow shadow-alpha aabb-size manual-size pivot]
+  (output text-data g/KeywordMap (g/fnk [text-layout font-data color alpha outline outline-alpha shadow shadow-alpha aabb-size rect-size pivot]
                                    (let [text-data {:text-layout text-layout
                                                     :font-data font-data
                                                     :color (assoc color 3 alpha)
@@ -2291,8 +2345,8 @@
 
                                        (get-in font-data [:font-map :native-renderer-spec])
                                        (assoc text-data
-                                         :box-height (second manual-size)
-                                         :offset (pivot-offset pivot manual-size)
+                                         :box-height (second rect-size)
+                                         :offset (pivot-offset pivot rect-size)
                                          :vertical-align (pivot->v-align pivot))
 
                                        :else
@@ -2944,6 +2998,8 @@
   (output basic-gui-scene-info BasicGuiSceneInfo (gu/passthrough basic-gui-scene-info))
   (input costly-gui-scene-info CostlyGuiSceneInfo)
   (output costly-gui-scene-info CostlyGuiSceneInfo (gu/passthrough costly-gui-scene-info))
+  (input scene-dims g/Any)
+  (output rect g/Any (g/fnk [scene-dims] [(double (:width scene-dims)) (double (:height scene-dims)) 0.0 0.0]))
   (input child-scenes g/Any :array)
   (input child-indices NodeIndex :array)
   (output child-scenes g/Any (g/fnk [child-scenes] (vec (sort-by (comp :child-index :renderable) child-scenes))))
@@ -3995,10 +4051,12 @@
              :profiles display-profiles
              :layouts layout-names
              :adjust-reference adjust-reference}))
+  (property preview-rect-dims g/Any (dynamic visible (g/constantly false)))
   (output scene-dims g/Any :cached
-          (g/fnk [display-profiles project-settings trivial-gui-scene-info]
+          (g/fnk [display-profiles project-settings trivial-gui-scene-info preview-rect-dims]
             (let [current-layout (:current-layout trivial-gui-scene-info)]
-              (or (some #(and (= current-layout (:name %))
+              (or preview-rect-dims
+                  (some #(and (= current-layout (:name %))
                               (first (:qualifiers %)))
                         display-profiles)
 
@@ -4469,7 +4527,8 @@
                          [:build-errors :build-errors]
                          [:template-build-targets :template-build-targets]]]
           (g/connect node-tree from self to))
-        (for [[from to] [[:trivial-gui-scene-info :trivial-gui-scene-info]
+        (for [[from to] [[:scene-dims :scene-dims]
+                         [:trivial-gui-scene-info :trivial-gui-scene-info]
                          [:basic-gui-scene-info :basic-gui-scene-info]
                          [:costly-gui-scene-info :costly-gui-scene-info]]]
           (g/connect self from node-tree to))

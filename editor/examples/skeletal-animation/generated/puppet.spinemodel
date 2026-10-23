@@ -1,0 +1,5 @@
+spine_scene: "/generated/puppet.spinescene"
+default_animation: "wave"
+skin: ""
+material: "/defold-spine/assets/spine.material"
+create_go_bones: true

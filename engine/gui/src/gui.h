@@ -1112,6 +1112,10 @@ namespace dmGui
     BlendMode GetNodeBlendMode(HScene scene, HNode node);
     void SetNodeBlendMode(HScene scene, HNode node, BlendMode blend_mode);
 
+    // Reference rectangle uses width, height, and normalized parent pivot.
+    void SetNodeRectTransform(HScene scene, HNode node, bool enabled, const dmVMath::Vector4& anchor_min, const dmVMath::Vector4& anchor_max, const dmVMath::Vector4& reference);
+    dmVMath::Vector4 GetNodeParentRect(HScene scene, HNode node);
+
     XAnchor GetNodeXAnchor(HScene scene, HNode node);
     void SetNodeXAnchor(HScene scene, HNode node, XAnchor x_anchor);
     YAnchor GetNodeYAnchor(HScene scene, HNode node);

@@ -59,6 +59,7 @@
             [editor.rig :as rig]
             [editor.script-api :as script-api]
             [editor.shared-editor-settings :as shared-editor-settings]
+            [editor.skeletal-animation :as skeletal-animation]
             [editor.sound :as sound]
             [editor.sprite :as sprite]
             [editor.tile-map :as tile-map]
@@ -108,6 +109,7 @@
       (render-target/register-resource-types workspace)
       (rig/register-resource-types workspace)
       (shared-editor-settings/register-resource-types workspace)
+      (skeletal-animation/register-resource-types workspace)
       (sound/register-resource-types workspace)
       (sprite/register-resource-types workspace)
       (tile-map/register-resource-types workspace)

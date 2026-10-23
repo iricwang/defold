@@ -769,6 +769,15 @@ namespace dmGui
     {
     }
 
+    void SetNodeRectTransform(HScene scene, HNode node, bool enabled, const Vector4& anchor_min, const Vector4& anchor_max, const Vector4& reference)
+    {
+    }
+
+    Vector4 GetNodeParentRect(HScene scene, HNode node)
+    {
+        return Vector4(0.0f);
+    }
+
     XAnchor GetNodeXAnchor(HScene scene, HNode node)
     {
         return XANCHOR_NONE;

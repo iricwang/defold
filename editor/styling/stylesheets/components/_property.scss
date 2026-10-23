@@ -126,3 +126,11 @@
         -fx-alignment: center-right;
     }
 }
+
+.toggle-button.gui-rect-preset-cell {
+    -fx-padding: 4;
+    -fx-min-width: 40;
+    -fx-pref-width: 40;
+    -fx-min-height: 35;
+    -fx-pref-height: 35;
+}

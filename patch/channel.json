@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 78,
-  "version": "1.14.1-patch.78",
+  "revision": 81,
+  "version": "1.14.1-patch.81",
   "repository": "iricwang/defold",
-  "notes": "默认接入 EmmyLua 并保留 LuaLS 切换；补全 Defold 生命周期类型、参数提示、语义着色及行尾提示；修复连续输入时类型提示闪烁，并验证各脚本类型、位置映射、编辑操作和语言服务启停。"
+  "notes": "新增内置骨骼动画制作器：Spine 4.2 JSON 导入续编，骨骼与 PNG 插槽、网格变形、权重、IK、摄影表和 Bezier 曲线编辑，保存撤销及 Defold 资源导出；按 Spine 参考布局组织画布和停靠面板。"
 }

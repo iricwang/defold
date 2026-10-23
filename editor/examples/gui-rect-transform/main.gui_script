@@ -1,0 +1,54 @@
+local function near(actual, expected, label)
+    assert(math.abs(actual - expected) < 0.02, label .. ": " .. actual .. " != " .. expected)
+end
+
+local function verify(width, height)
+    for row = 0, 3 do
+        for col = 0, 3 do
+            local node = gui.get_node("item_" .. col .. "_" .. row)
+            local position, size = gui.get_position(node), gui.get_size(node)
+            local x = col == 3 and 0.5 or col / 2
+            local y = row == 3 and 0.5 or 1 - row / 2
+            near(position.x, (x - 0.5) * (width - 150), "position.x")
+            near(position.y, (y - 0.5) * (height - 100), "position.y")
+            near(size.x, 40 + (col == 3 and width - 150 or 0), "size.x")
+            near(size.y, 24 + (row == 3 and height - 100 or 0), "size.y")
+        end
+    end
+end
+
+function init(self)
+    verify(150, 100)
+    for row = 0, 3 do
+        for col = 0, 3 do
+            gui.set_size(gui.get_node("cell_" .. col .. "_" .. row), vmath.vector3(180, 120, 0))
+        end
+    end
+    verify(180, 120)
+    local node = gui.get_node("item_3_3")
+    gui.set_size(node, vmath.vector3(80, 60, 0))
+    near(gui.get_size(node).x, 80, "set_size")
+    gui.set_position(node, vmath.vector3(12, 18, 0))
+    near(gui.get_position(node).x, 12, "set_position")
+    local screen = gui.get_screen_position(node)
+    screen.x = screen.x + 7
+    gui.set_screen_position(node, screen)
+    near(gui.get_screen_position(node).x, screen.x, "screen_position")
+    gui.reset_nodes()
+    verify(150, 100)
+    self.pending = 16
+    for row = 0, 3 do
+        for col = 0, 3 do
+            gui.animate(gui.get_node("cell_" .. col .. "_" .. row), "size", vmath.vector3(180, 120, 0), gui.EASING_LINEAR, 0.15, 0, function()
+                self.pending = self.pending - 1
+                if self.pending == 0 then
+                    verify(180, 120)
+                    print("RECT_TRANSFORM_RUNTIME_OK: 16 presets, parent resize, getters/setters, screen position, reset and animation")
+                    if sys.get_config_string("test.enabled", "0") == "1" then
+                        msg.post("@system:", "exit", {code = 0})
+                    end
+                end
+            end)
+        end
+    end
+end

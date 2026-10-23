@@ -1942,10 +1942,18 @@
     (event-handler event
       (.consume event)
       (let [scene (scene menu-button)
+            ;; Custom menu content lives in a separate Scene. Use its owner for
+            ;; editor settings, but keep the popup's focused property context.
+            settings-scene (loop [^Scene candidate scene]
+                             (let [window (.getWindow candidate)]
+                               (if (and (nil? (user-data candidate :localization))
+                                        (instance? PopupWindow window))
+                                 (recur (.getScene (.getOwnerWindow ^PopupWindow window)))
+                                 candidate)))
             menu (handler/realize-menu menu-location)
             command-contexts (contexts scene false)
-            keymap (or (user-data scene :keymap) keymap/empty)
-            localization (user-data scene :localization)
+            keymap (or (user-data settings-scene :keymap) keymap/empty)
+            localization (user-data settings-scene :localization)
             _ (assert (some? localization))
 
             menu-items

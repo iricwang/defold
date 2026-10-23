@@ -59,6 +59,7 @@
             [editor.scene-visibility :as scene-visibility]
             [editor.search-results-view :as search-results-view]
             [editor.shared-editor-settings :as shared-editor-settings]
+            [editor.skeletal-animation-view :as skeletal-animation-view]
             [editor.system :as system]
             [editor.targets :as targets]
             [editor.ui :as ui]
@@ -97,7 +98,8 @@
         (code-view/register-view-types workspace)
         (scene/register-view-types workspace)
         (cljfx-form-view/register-view-types workspace)
-        (html-view/register-view-types workspace)))
+        (html-view/register-view-types workspace)
+        (skeletal-animation-view/register-view-types workspace)))
 
     (workspace/clean-editor-plugins! workspace)
     (resource-types/register-resource-types! workspace)

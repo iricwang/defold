@@ -17,6 +17,7 @@
   (:require [dynamo.graph :as g]
             [editor.camera :as camera]
             [editor.fxui :as fxui]
+            [editor.gui-rect :as gui-rect]
             [editor.localization :as localization]
             [editor.properties :as properties]
             [editor.ui :as ui]
@@ -101,24 +102,30 @@
 
 (defn- child-compensation [node-id delta evaluation-context]
   (into []
-        (map (fn [child]
-               (let [id (:node-id child)]
-                 [id :position (mapv - (g/node-value id :position evaluation-context) delta)])))
+        (keep (fn [child]
+                (let [id (:node-id child)]
+                  (when-not (and (g/has-property? (g/node-type* id) :rect-transform)
+                                 (g/node-value id :rect-transform evaluation-context))
+                    [id :position (mapv - (g/node-value id :position evaluation-context) delta)]))))
         (g/node-value node-id :scene-children evaluation-context)))
 
 (defn- node-size [node-id entries evaluation-context]
-  (g/node-value node-id (if (contains? entries :size-mode) :size :manual-size) evaluation-context))
+  (g/node-value node-id (if (contains? entries :rect-transform) :rect-size :manual-size) evaluation-context))
 
 (defn pivot-changes [node-id pivot keep-appearance evaluation-context]
   (let [entries (:properties (g/node-value node-id :_properties evaluation-context))
         size (node-size node-id entries evaluation-context)
+        rect-enabled (g/node-value node-id :rect-transform evaluation-context)
+        position (g/node-value node-id :rect-position evaluation-context)
         delta (pivot-delta size (g/node-value node-id :pivot evaluation-context) pivot)]
     (cond-> [[node-id :pivot pivot]]
+      rect-enabled
+      (into [[node-id :rect-reference (g/node-value node-id :rect-parent evaluation-context)]
+             [node-id :manual-size size] [node-id :position position]])
       keep-appearance
       (into (into [[node-id :position
-                    (mapv + (g/node-value node-id :position evaluation-context)
-                          (local-delta->parent (g/node-value node-id :rotation evaluation-context)
-                                               (g/node-value node-id :scale evaluation-context) delta))]]
+                    (mapv + position (local-delta->parent (g/node-value node-id :rotation evaluation-context)
+                                                        (g/node-value node-id :scale evaluation-context) delta))]]
                   (child-compensation node-id delta evaluation-context))))))
 
 (defn- message [localization-state suffix]
@@ -146,6 +153,202 @@
                  :center-y (+ 4.0 (* 14.0 (- 1.0 (double y)))) :radius 2.5
                  :style "-fx-fill: -df-defold-blue-lighter;"}]}))
 
+(defn rect-preset-changes [node-id preset set-pivot set-position evaluation-context]
+  (let [parent (g/node-value node-id :rect-parent evaluation-context)
+        old-pivot (g/node-value node-id :pivot evaluation-context)
+        pivot (if set-pivot
+                (first (coll/first-where #(= (:pivot preset) (val %)) pivot-points))
+                old-pivot)
+        size (g/node-value node-id :rect-size evaluation-context)
+        position (g/node-value node-id :rect-position evaluation-context)
+        delta (pivot-delta size old-pivot pivot)
+        position (mapv + position (local-delta->parent (g/node-value node-id :rotation evaluation-context)
+                                                       (g/node-value node-id :scale evaluation-context) delta))
+        {:keys [anchor-min anchor-max]} preset
+        [position size]
+        (if set-position
+          (reduce (fn [[position size] axis]
+                    (let [span (- (double (anchor-max axis)) (double (anchor-min axis)))
+                          length (if (pos? span) (* span (double (parent axis))) (double (size axis)))
+                          anchor (+ (double (anchor-min axis)) (* span (double ((pivot-points pivot) axis))))]
+                      [(assoc position axis (* (- anchor (double (parent (+ (long axis) 2)))) (double (parent axis))))
+                       (assoc size axis length)]))
+                  [position size] [0 1])
+          [position size])
+        entries (:properties (g/node-value node-id :_properties evaluation-context))]
+    (cond-> (into [[node-id :rect-transform true]
+                  [node-id :rect-anchor-min anchor-min] [node-id :rect-anchor-max anchor-max]
+                  [node-id :rect-reference parent] [node-id :position position]
+                  [node-id :manual-size size] [node-id :pivot pivot]]
+                 (child-compensation node-id delta evaluation-context))
+      (contains? entries :size-mode) (conj [node-id :size-mode :size-mode-manual]))))
+
+(defn- rect-preset-graphic [anchor-min anchor-max]
+  {:fx/type :pane
+   :min-width 30.0 :pref-width 30.0 :max-width 30.0
+   :min-height 25.0 :pref-height 25.0 :max-height 25.0
+   :mouse-transparent true
+   :children
+   (into [{:fx/type :rectangle :x 4.0 :y 4.0 :width 22.0 :height 17.0
+           :style "-fx-fill: transparent; -fx-stroke: -df-text-dark;"}
+          {:fx/type :rectangle
+           :x (+ 4.0 (* 22.0 (double (first anchor-min))))
+           :y (+ 4.0 (* 17.0 (- 1.0 (double (second anchor-max)))))
+           :width (* 22.0 (- (double (first anchor-max)) (double (first anchor-min))))
+           :height (* 17.0 (- (double (second anchor-max)) (double (second anchor-min))))
+           :style "-fx-fill: transparent; -fx-stroke: -df-defold-blue-lighter;"}]
+         (map (fn [[x y]]
+                {:fx/type :circle :center-x (+ 4.0 (* 22.0 (double x)))
+                 :center-y (+ 4.0 (* 17.0 (- 1.0 (double y)))) :radius 2.0
+                 :style "-fx-fill: -df-defold-blue-lighter;"}))
+         (into [] (distinct) [[(first anchor-min) (second anchor-min)] [(first anchor-min) (second anchor-max)]
+                    [(first anchor-max) (second anchor-min)] [(first anchor-max) (second anchor-max)]]))})
+
+(defn- rect-preset-popup [node-id app-view localization-state render-grid]
+  (let [enabled (g/node-value node-id :rect-transform)
+        anchor-min (g/node-value node-id :rect-anchor-min)
+        anchor-max (g/node-value node-id :rect-anchor-max)
+        apply-preset! (fn [^Node source preset set-pivot set-position]
+                        (when-not (ui/user-data source ::preset-applied)
+                          (ui/user-data! source ::preset-applied true)
+                          (when-not (animation-preview-active? app-view)
+                            (commit! (rect-preset-changes node-id preset set-pivot set-position (g/make-evaluation-context))
+                                     (localization/message "gui-layout.operation")))
+                          (.hide (.getWindow (.getScene source)))))]
+    {:fx/type :custom-menu-item :hide-on-click false
+     :style-class ["menu-item" "custom-menu-item" "gui-layout-preset-popup"]
+     :content
+     {:fx/type fxui/vertical :spacing :small :padding :small
+      :children
+      (into [] (remove nil?)
+            [{:fx/type fxui/label :text (message localization-state "anchor-presets")}
+             {:fx/type fxui/label :color :hint :text (message localization-state "preset-modifiers")}
+             {:fx/type fxui/grid :spacing :small
+              :children
+              (into
+                (into
+                  (mapv (fn [column label]
+                          {:fx/type fxui/label :text (message localization-state label)
+                           :grid-pane/column (inc (long column)) :grid-pane/row 0})
+                        (range 4) ["left" "center" "right" "stretch"])
+                  (map-indexed (fn [row label]
+                                 {:fx/type fxui/label :text (message localization-state label)
+                                  :grid-pane/column 0 :grid-pane/row (inc (long row))}))
+                  ["top" "middle" "bottom" "stretch"])
+                (map (fn [{:keys [column row] :as preset}]
+                       {:fx/type fxui/toggle-button
+                        :id (str "gui-rect-preset-" column "-" row)
+                        :style-class "gui-rect-preset-cell"
+                        :graphic (rect-preset-graphic (:anchor-min preset) (:anchor-max preset))
+                        :selected (and enabled (= anchor-min (:anchor-min preset)) (= anchor-max (:anchor-max preset)))
+                        :grid-pane/column (inc (long column)) :grid-pane/row (inc (long row))
+                        :tooltip (str (message localization-state (nth ["left" "center" "right" "stretch"] column))
+                                      " / " (message localization-state (nth ["top" "middle" "bottom" "stretch"] row)))
+                        :on-mouse-pressed (fn [^MouseEvent event]
+                                            (ui/user-data! (.getSource event) ::preset-applied false)
+                                            (ui/user-data! (.getSource event) ::preset-modifiers [(.isShiftDown event) (.isAltDown event)]))
+                        :on-key-pressed (fn [^KeyEvent event]
+                                          (ui/user-data! (.getSource event) ::preset-applied false)
+                                          (ui/user-data! (.getSource event) ::preset-modifiers [(.isShiftDown event) (.isAltDown event)]))
+                        ;; JavaFX button behavior ignores modified mouse presses.
+                        :on-mouse-clicked (fn [^MouseEvent event]
+                                            (when (and (= MouseButton/PRIMARY (.getButton event))
+                                                       (or (.isShiftDown event) (.isAltDown event)))
+                                              (apply-preset! (.getSource event) preset (.isShiftDown event) (.isAltDown event))
+                                              (.consume event)))
+                        :on-action (fn [^javafx.event.ActionEvent event]
+                                     (let [[set-pivot set-position] (ui/user-data (.getSource event) ::preset-modifiers)]
+                                       (apply-preset! (.getSource event) preset set-pivot set-position)))}))
+                gui-rect/presets)}
+             (when enabled
+               {:fx/type fxui/grid :spacing :small
+                :children
+                (mapv (fn [index]
+                        (let [maximum (>= (long index) 2)
+                              axis (mod (long index) 2)
+                              field (if maximum :rect-anchor-max :rect-anchor-min)
+                              values (if maximum anchor-max anchor-min)]
+                          {:fx/type fxui/vertical :spacing :small
+                           :grid-pane/column (long index) :grid-pane/row 0
+                           :children
+                           [{:fx/type fxui/label :text (str (if maximum "Max " "Min ") (if (zero? (long axis)) "X" "Y"))}
+                            {:fx/type fxui/value-field :id (str "gui-rect-" (name field) "-" axis)
+                             :pref-column-count 3 :min-width 0.0 :value (values axis)
+                             :to-string #(format "%.2f" (double %))
+                             :to-value #(try
+                                          (let [value (Double/parseDouble %)]
+                                            (when (and (Double/isFinite value)
+                                                       (if maximum (<= (double (anchor-min axis)) value)
+                                                           (<= value (double (anchor-max axis))))) value))
+                                          (catch NumberFormatException _ nil))
+                             :on-value-changed
+                             (fn [value]
+                               (when-not (animation-preview-active? app-view)
+                                 (commit! [[node-id :position (g/node-value node-id :rect-position)]
+                                           [node-id :manual-size (g/node-value node-id :rect-size)]
+                                           [node-id :rect-reference (g/node-value node-id :rect-parent)]
+                                           [node-id field (assoc values axis value)]]
+                                          (localization/message "gui-layout.operation"))))}]}))
+                      (range 4))})
+             {:fx/type fxui/check-box :id "gui-rect-enabled" :selected enabled
+              :text (message localization-state "parent-relative")
+              :on-selected-changed
+              (fn [value]
+                (when-not (animation-preview-active? app-view)
+                  (commit! [[node-id :position (g/node-value node-id :rect-position)]
+                            [node-id :manual-size (g/node-value node-id :rect-size)]
+                            [node-id :rect-reference (g/node-value node-id :rect-parent)]
+                            [node-id :rect-transform value]] (localization/message "gui-layout.operation"))))}
+             (when-not enabled (render-grid [:x-anchor :y-anchor]))])}}))
+
+(defn- rect-fields [node-id app-view read-only localization-state]
+  (let [parent (g/node-value node-id :rect-parent)
+        position (g/node-value node-id :rect-position)
+        size (g/node-value node-id :rect-size)
+        pivot (pivot-points (g/node-value node-id :pivot))
+        anchor-min (g/node-value node-id :rect-anchor-min)
+        anchor-max (g/node-value node-id :rect-anchor-max)
+        offsets (gui-rect/offsets position size pivot anchor-min anchor-max parent)
+        commit-geometry (fn [{:keys [position size]}]
+                          (when-not (animation-preview-active? app-view)
+                            (commit! [[node-id :position position] [node-id :manual-size size]
+                                      [node-id :rect-reference parent]] (localization/message "gui-layout.operation"))))]
+    {:fx/type fxui/grid :spacing :small :h-box/hgrow :always :min-width 0.0
+     :column-constraints [{:fx/type :column-constraints :hgrow :always :min-width 0.0}
+                          {:fx/type :column-constraints :hgrow :always :min-width 0.0}]
+     :children
+     (into []
+           (mapcat
+             (fn [axis]
+               (let [stretch (not= (anchor-min axis) (anchor-max axis))]
+                 (mapv (fn [row]
+                         (let [label (if stretch
+                                       (get-in [["left" "right"] ["bottom" "top"]] [axis row])
+                                       (get-in [["pos-x" "width"] ["pos-y" "height"]] [axis row]))
+                               index (+ (long axis) (* (long row) 2))
+                               value (if stretch (offsets index)
+                                         (if (zero? (long row))
+                                           (- (double (position axis))
+                                              (* (- (double (anchor-min axis)) (double (parent (+ (long axis) 2)))) (double (parent axis))))
+                                           (size axis)))]
+                           {:fx/type fxui/vertical :spacing :small
+                            :grid-pane/column axis :grid-pane/row row :min-width 0.0
+                            :children [{:fx/type fxui/label :text (message localization-state label)}
+                                       {:fx/type fxui/value-field :id (str "gui-rect-" label)
+                                        :min-width 0.0 :pref-column-count 6 :disable read-only
+                                        :value value :to-string #(format "%.2f" (double %))
+                                        :to-value #(try (let [n (Double/parseDouble %)] (when (Double/isFinite n) n)) (catch NumberFormatException _ nil))
+                                        :on-value-changed
+                                        (fn [value]
+                                          (commit-geometry
+                                            (if stretch
+                                              (gui-rect/from-offsets (assoc offsets index value) position size pivot anchor-min anchor-max parent)
+                                              (if (zero? (long row))
+                                                {:position (assoc position axis (+ (double value) (* (- (double (anchor-min axis)) (double (parent (+ (long axis) 2)))) (double (parent axis))))) :size size}
+                                                {:position position :size (assoc size axis (max 0.0 (double value)))}))))}]}))
+                       [0 1]))))
+           [0 1])}))
+
 (defn inspector-view [coalesced context localization-state]
   (let [entries (:properties coalesced)
         node-ids (:original-node-ids coalesced)
@@ -166,6 +369,7 @@
                             (-> (render-property-grid (into [] (comp (filter visible-properties) (map #(vector % (entries %)))) keys))
                                 (assoc :min-width 0.0)
                                 (assoc-in [:column-constraints 1 :min-width] 0.0))))
+            rect-enabled (g/node-value (first node-ids) :rect-transform)
             layout (:current-layout (g/node-value (first node-ids) :trivial-gui-scene-info))
             preset-label (fn [kind pivot]
                            (message localization-state
@@ -220,11 +424,16 @@
                                            (conj "overridden"))
                             :disable read-only
                             :content-display :top
-                            :graphic (preset-graphic selected)
-                            :text (preset-label kind selected)
+                            :graphic (if (and (= :anchor kind) rect-enabled)
+                                       (rect-preset-graphic (g/node-value (first node-ids) :rect-anchor-min)
+                                                            (g/node-value (first node-ids) :rect-anchor-max))
+                                       (preset-graphic selected))
+                            :text (if (and (= :anchor kind) rect-enabled) (message localization-state "anchor") (preset-label kind selected))
                             :tooltip (str (message localization-state (name kind)) ": " (preset-label kind selected))
                             :items
-                            [{:fx/type :custom-menu-item :hide-on-click false
+                            (if (= :anchor kind)
+                              [(rect-preset-popup (first node-ids) app-view localization-state render-grid)]
+                              [{:fx/type :custom-menu-item :hide-on-click false
                               :style-class ["menu-item" "custom-menu-item" "gui-layout-preset-popup"]
                               :content
                               {:fx/type fxui/vertical :spacing :small :padding :small
@@ -260,10 +469,12 @@
                                  (= :pivot kind)
                                  (conj {:fx/type fxui/check-box :id "gui-layout-keep-appearance"
                                         :text (message localization-state "keep-appearance")
-                                        :selected @keep-appearance :on-selected-changed #(reset! keep-appearance %)}))}}]}))
+                                        :selected @keep-appearance :on-selected-changed #(reset! keep-appearance %)}))}}])}))
                        [:anchor :pivot])}]
                    (keep identity)
-                   [(some-> (render-grid [:position :manual-size :texture-size :size-mode]) (assoc :h-box/hgrow :always))])}
+                   [(if rect-enabled
+                      (rect-fields (first node-ids) app-view read-only localization-state)
+                      (some-> (render-grid [:position :manual-size :texture-size :size-mode]) (assoc :h-box/hgrow :always)))])}
                 (render-grid [:rotation :scale])])}))))
 
 (defn- project-point [camera viewport ^Matrix4d transform [x y]]
@@ -365,7 +576,7 @@
                                         (rect-corners (g/node-value parent :pivot ec) parent-size)
                                         [[0.0 0.0] [(double width) 0.0] [(double width) (double height)] [0.0 (double height)]])
                     reference-transform (if parent-size (:parent-world-transform renderable) (doto (Matrix4d.) (.setIdentity)))
-                    position (get overrides :position (g/node-value id :position ec))]
+                    position (get overrides :position (g/node-value id :rect-position ec))]
                 (when (and transform (> (Math/abs (.determinant ^Matrix4d transform)) 1.0e-12))
                   {:id id :layout (:current-layout (g/node-value id :trivial-gui-scene-info ec))
                    :size size :pivot-value pivot :transform transform :camera camera :viewport viewport
@@ -482,6 +693,9 @@
                                       true (conj [id :manual-size size]
                                                  [id :position (mapv + position (local-delta->parent rotation scale delta))]))
                                     (child-compensation id delta ec))))
+                          changes (cond-> changes
+                                    (g/node-value id :rect-transform ec)
+                                    (conj [id :rect-reference (g/node-value id :rect-parent ec)]))
                           overrides (reduce (fn [result [node property value]]
                                               (-> result
                                                   (assoc-in [node :layout] (:layout drag))

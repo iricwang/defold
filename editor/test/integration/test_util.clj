@@ -1728,6 +1728,9 @@
 (defmethod edit-resource-node "animationset" [resource-node-id]
   (g/update-property resource-node-id :animations pop))
 
+(defmethod edit-resource-node "skeleton" [resource-node-id]
+  (g/update-property resource-node-id :document update :name str "_edited"))
+
 (defmethod edit-resource-node "atlas" [resource-node-id]
   (g/update-property resource-node-id :margin type-preserving-add 1))
 

@@ -24,8 +24,9 @@
             [support.test-support :as test-support])
   (:import [java.util ArrayDeque]
            [javafx.animation AnimationTimer]
+           [javafx.geometry Side]
            [javafx.scene Node Scene]
-           [javafx.scene.control ComboBox ContextMenu ListView Menu MenuBar MenuItem SelectionMode SplitPane Tab TabPane TreeItem TreeView]
+           [javafx.scene.control ComboBox ContextMenu CustomMenuItem ListView Menu MenuBar MenuButton MenuItem SelectionMode SplitPane Tab TabPane TreeItem TreeView]
            [javafx.scene.control.skin TabPaneSkin]
            [javafx.scene.layout Pane VBox]))
 
@@ -436,3 +437,46 @@
       (is (false? (ui/nodes-along-path? leaf root root)))
       (is (ui/nodes-along-path? leaf parent root))
       (is (false? (ui/nodes-along-path? nil parent root))))))
+
+;; Nested property menus inherit settings from their actual owner, while commands
+;; retain the popup property context instead of targeting the main window.
+(deftest nested-property-menu-settings-test
+  (ui/run-now
+    (test-support/with-clean-system
+      (handler/register-menu! ::nested-property-menu
+        [{:label (localization/message "command.file.open") :command ::nested-property-command}])
+      (handler/defhandler ::nested-property-command ::popup-property
+        (run [target result] (reset! result target)))
+      (doseq [depth [0 1 2]]
+        (let [owner (make-fake-stage)
+              root (.getRoot (.getScene owner))
+              button (MenuButton. "Property")
+              result (atom nil)
+              popups (atom [])]
+          (try
+            (ui/user-data! (.getScene owner) :localization test-util/localization)
+            (ui/context! button ::popup-property {:target :nested-property :result result} nil)
+            (ui/register-button-menu button ::nested-property-menu)
+            (.show owner)
+            (loop [parent root remaining depth]
+              (if (zero? remaining)
+                (ui/children! parent [button])
+                (let [content (VBox.)
+                      popup (ContextMenu. (into-array MenuItem [(CustomMenuItem. content false)]))]
+                  (swap! popups conj popup)
+                  (.show popup parent Side/BOTTOM 0.0 0.0)
+                  (recur content (dec remaining)))))
+            (.requestFocus button)
+            (when (pos? depth)
+              (is (nil? (ui/user-data (.getScene button) :localization))))
+            (.show button)
+            (is (= 1 (count (.getItems button))))
+            (when-let [item (first (.getItems button))]
+              (is (= (@test-util/localization (localization/message "command.file.open")) (.getText item)))
+              (is (false? (.isDisable item)))
+              (.fire item)
+              (is (= :nested-property @result)))
+            (finally
+              (.hide button)
+              (doseq [popup (rseq @popups)] (.hide popup))
+              (.close owner))))))))

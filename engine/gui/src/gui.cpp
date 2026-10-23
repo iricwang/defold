@@ -2801,6 +2801,11 @@ namespace dmGui
         node->m_Node.m_BlendMode = 0;
         node->m_Node.m_NodeType = (uint32_t) node_type;
         node->m_Node.m_CustomType = custom_type;
+        node->m_Node.m_RectTransform = 0;
+        node->m_Node.m_RectAnchorMin = Vector4(0.0f);
+        node->m_Node.m_RectAnchorMax = Vector4(0.0f);
+        node->m_Node.m_RectReference = Vector4(0.0f);
+        node->m_Node.m_RectSize = Vector4(size, 0);
         node->m_Node.m_XAnchor = 0;
         node->m_Node.m_YAnchor = 0;
         node->m_Node.m_Pivot = 0;
@@ -3269,6 +3274,61 @@ namespace dmGui
         }
     }
 
+    static void ResolveRectTransform(HScene scene, InternalNode* n, Vector4& position, Vector4& size);
+
+    Vector4 GetNodeParentRect(HScene scene, HNode node)
+    {
+        InternalNode* n = GetNode(scene, node);
+        if (n->m_ParentIndex == INVALID_INDEX)
+        {
+            float width = (float)scene->m_Width;
+            float height = (float)scene->m_Height;
+            if (scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED && width > 0 && height > 0)
+            {
+                float fit = dmMath::Min(scene->m_AdjustWidth / width, scene->m_AdjustHeight / height);
+                if (fit > 0)
+                    return Vector4(scene->m_AdjustWidth / fit, scene->m_AdjustHeight / fit, 0, 0);
+            }
+            return Vector4(width, height, 0, 0);
+        }
+        InternalNode* parent = &scene->m_Nodes[n->m_ParentIndex];
+        Vector4 position, size;
+        ResolveRectTransform(scene, parent, position, size);
+        Vector4 pivot = -CalcPivotDelta(parent->m_Node.m_Pivot, Vector4(1, 1, 0, 0));
+        return Vector4(size.getX(), size.getY(), pivot.getX(), pivot.getY());
+    }
+
+    static void ResolveRectTransform(HScene scene, InternalNode* n, Vector4& position, Vector4& size)
+    {
+        const Node& node = n->m_Node;
+        position = node.m_Properties[PROPERTY_POSITION];
+        size = node.m_Properties[PROPERTY_SIZE];
+        if (!node.m_RectTransform)
+            return;
+        Vector4 parent = GetNodeParentRect(scene, GetNodeHandle(n));
+        Vector4 pivot = -CalcPivotDelta(node.m_Pivot, Vector4(1, 1, 0, 0));
+        for (int axis = 0; axis < 2; ++axis)
+        {
+            float span = node.m_RectAnchorMax[axis] - node.m_RectAnchorMin[axis];
+            float anchor = node.m_RectAnchorMin[axis] + span * pivot[axis];
+            position[axis] += (anchor - parent[axis + 2]) * parent[axis]
+                            - (anchor - node.m_RectReference[axis + 2]) * node.m_RectReference[axis];
+            size[axis] = dmMath::Max(0.0f, size[axis] + span * (parent[axis] - node.m_RectReference[axis]));
+        }
+    }
+
+    void SetNodeRectTransform(HScene scene, HNode node, bool enabled, const Vector4& anchor_min, const Vector4& anchor_max, const Vector4& reference)
+    {
+        Node& n = GetNode(scene, node)->m_Node;
+        n.m_RectTransform = enabled;
+        n.m_RectAnchorMin = anchor_min;
+        n.m_RectAnchorMax = anchor_max;
+        n.m_RectReference = reference;
+        n.m_DirtyLocal = 1;
+        if (enabled)
+            n.m_SizeMode = SIZE_MODE_MANUAL;
+    }
+
     void UpdateLocalTransform(HScene scene, InternalNode* n)
     {
         Node& node = n->m_Node;
@@ -3280,7 +3340,22 @@ namespace dmGui
         Vector4 prop_scale = node.m_Properties[dmGui::PROPERTY_SCALE];
         Vector4 reference_scale = Vector4(1.0, 1.0, 1.0, 1.0);
         node.m_LocalAdjustScale = reference_scale;
-        if (scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED) {
+        if (node.m_RectTransform)
+        {
+            ResolveRectTransform(scene, n, position, node.m_RectSize);
+            // Rect children inherit their parent's transform without the legacy
+            // per-node scale cancellation. Root rectangles use logical canvas units.
+            if (n->m_ParentIndex == INVALID_INDEX && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED)
+            {
+                float fit = dmMath::Min(scene->m_AdjustWidth / (float)dmMath::Max(1U, scene->m_Width),
+                                       scene->m_AdjustHeight / (float)dmMath::Max(1U, scene->m_Height));
+                node.m_LocalAdjustScale = Vector4(fit, fit, 1, 1);
+                position = mulPerElem(position, node.m_LocalAdjustScale);
+                position.setX(position.getX() + scene->m_AdjustOffsetX);
+                position.setY(position.getY() + scene->m_AdjustOffsetY);
+            }
+        }
+        else if (scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED) {
             reference_scale = CalculateReferenceScale(scene, n);
             AdjustPosScale(scene, n, reference_scale, position, node.m_LocalAdjustScale);
         }
@@ -3293,7 +3368,7 @@ namespace dmGui
         node.m_LocalTransform.setUpper3x3(Matrix3::rotation(r) * Matrix3::scale( mulPerElem(node.m_LocalAdjustScale, prop_scale).getXYZ() ));
         node.m_LocalTransform.setTranslation(position.getXYZ());
 
-        if (scene->m_AdjustReference == ADJUST_REFERENCE_PARENT && n->m_ParentIndex != INVALID_INDEX)
+        if (!node.m_RectTransform && scene->m_AdjustReference == ADJUST_REFERENCE_PARENT && n->m_ParentIndex != INVALID_INDEX)
         {
             // undo parent scale (if node has parent)
             Vector3 inv_ref_scale = Vector3(1.0f / reference_scale.getX(), 1.0f / reference_scale.getY(), 1.0f / reference_scale.getZ());
@@ -3312,8 +3387,11 @@ namespace dmGui
             Node* n = &node->m_Node;
             if (n->m_HasResetPoint) {
                 memcpy(n->m_Properties, n->m_ResetPointProperties, sizeof(n->m_Properties));
-                n->m_DirtyLocal = 1;
+                n->m_RectAnchorMin = n->m_ResetPointProperties[PROPERTY_COUNT];
+                n->m_RectAnchorMax = n->m_ResetPointProperties[PROPERTY_COUNT + 1];
+                n->m_RectReference = n->m_ResetPointProperties[PROPERTY_COUNT + 2];
                 n->m_State = n->m_ResetPointState;
+                n->m_DirtyLocal = 1;
             }
         }
         scene->m_Animations.SetSize(0);
@@ -3345,13 +3423,17 @@ namespace dmGui
     Point3 GetNodePosition(HScene scene, HNode node)
     {
         InternalNode* n = GetNode(scene, node);
-        return Point3(n->m_Node.m_Properties[PROPERTY_POSITION].getXYZ());
+        Vector4 position, size;
+        ResolveRectTransform(scene, n, position, size);
+        return Point3(position.getXYZ());
     }
 
     Point3 GetNodeSize(HScene scene, HNode node)
     {
         InternalNode* n = GetNode(scene, node);
-        return Point3(n->m_Node.m_Properties[PROPERTY_SIZE].getXYZ());
+        Vector4 position, size;
+        ResolveRectTransform(scene, n, position, size);
+        return Point3(size.getXYZ());
     }
 
     Matrix4 GetNodeWorldTransform(HScene scene, HNode node)
@@ -3370,9 +3452,7 @@ namespace dmGui
 
     void SetNodePosition(HScene scene, HNode node, const Point3& position)
     {
-        InternalNode* n = GetNode(scene, node);
-        n->m_Node.m_Properties[PROPERTY_POSITION] = Vector4(position);
-        n->m_Node.m_DirtyLocal = 1;
+        SetNodeProperty(scene, node, PROPERTY_POSITION, Vector4(position));
     }
 
     bool HasPropertyHash(HScene scene, HNode node, dmhash_t property)
@@ -3385,20 +3465,25 @@ namespace dmGui
     {
         assert(property < PROPERTY_COUNT);
         InternalNode* n = GetNode(scene, node);
+        if (n->m_Node.m_RectTransform && (property == PROPERTY_POSITION || property == PROPERTY_SIZE))
+        {
+            Vector4 position, size;
+            ResolveRectTransform(scene, n, position, size);
+            return property == PROPERTY_POSITION ? position : size;
+        }
         return n->m_Node.m_Properties[property];
     }
 
     Vector4 GetNodePropertyHash(HScene scene, HNode node, dmhash_t property)
     {
-        InternalNode* n = GetNode(scene, node);
         PropDesc* pd = GetPropertyDesc(property);
         if (pd) {
-            Vector4* base_value = &n->m_Node.m_Properties[pd->m_Property];
+            Vector4 value = GetNodeProperty(scene, node, (Property)pd->m_Property);
 
             if (pd->m_Component == 0xff) {
-                return *base_value;
+                return value;
             } else {
-                return Vector4(base_value->getElem(pd->m_Component));
+                return Vector4(value.getElem(pd->m_Component));
             }
         }
         dmLogError("Property '%s' not found", dmHashReverseSafe64(property));
@@ -3422,7 +3507,8 @@ namespace dmGui
             n->m_Node.m_Properties[PROPERTY_EULER] = v;
         }
 
-        n->m_Node.m_Properties[property] = value;
+        Vector4 delta = GetNodeProperty(scene, node, property) - n->m_Node.m_Properties[property];
+        n->m_Node.m_Properties[property] = value - delta;
         n->m_Node.m_DirtyLocal = 1;
     }
 
@@ -3472,9 +3558,12 @@ namespace dmGui
         InternalNode* n = GetNode(scene, node);
         if (!n->m_Node.m_ResetPointProperties)
         {
-            n->m_Node.m_ResetPointProperties = (dmVMath::Vector4*)malloc(sizeof(dmVMath::Vector4) * PROPERTY_COUNT);
+            n->m_Node.m_ResetPointProperties = (dmVMath::Vector4*)malloc(sizeof(dmVMath::Vector4) * (PROPERTY_COUNT + 3));
         }
         memcpy(n->m_Node.m_ResetPointProperties, n->m_Node.m_Properties, sizeof(n->m_Node.m_Properties));
+        n->m_Node.m_ResetPointProperties[PROPERTY_COUNT] = n->m_Node.m_RectAnchorMin;
+        n->m_Node.m_ResetPointProperties[PROPERTY_COUNT + 1] = n->m_Node.m_RectAnchorMax;
+        n->m_Node.m_ResetPointProperties[PROPERTY_COUNT + 2] = n->m_Node.m_RectReference;
         n->m_Node.m_ResetPointState = n->m_Node.m_State;
         n->m_Node.m_HasResetPoint = 1;
     }
@@ -4237,6 +4326,7 @@ namespace dmGui
         PropDesc* pd = GetPropertyDesc(property);
         if (pd)
         {
+            Vector4 target = to - (GetNodeProperty(scene, node, (Property)pd->m_Property) - n->m_Node.m_Properties[pd->m_Property]);
             float* base_value = (float*)&n->m_Node.m_Properties[pd->m_Property];
 
             if (pd->m_Component == 0xff)
@@ -4245,15 +4335,15 @@ namespace dmGui
                 no_callback_easing.release_callback = 0;
                 for (int j = 0; j < 3; ++j)
                 {
-                    AnimateComponent(scene, node, &base_value[j], to.getElem(j), no_callback_easing, playback, duration, delay, 1.0f, 0, 0, 0);
+                    AnimateComponent(scene, node, &base_value[j], target.getElem(j), no_callback_easing, playback, duration, delay, 1.0f, 0, 0, 0);
                 }
 
                 // Only run callback for the lastcomponent
-                AnimateComponent(scene, node, &base_value[3], to.getElem(3), easing, playback, duration, delay, 1.0f, animation_complete, userdata1, userdata2);
+                AnimateComponent(scene, node, &base_value[3], target.getElem(3), easing, playback, duration, delay, 1.0f, animation_complete, userdata1, userdata2);
             }
             else
             {
-                AnimateComponent(scene, node, &base_value[pd->m_Component], to.getElem(pd->m_Component), easing, playback, duration, delay, 1.0f, animation_complete, userdata1, userdata2);
+                AnimateComponent(scene, node, &base_value[pd->m_Component], target.getElem(pd->m_Component), easing, playback, duration, delay, 1.0f, animation_complete, userdata1, userdata2);
             }
         }
         else
@@ -4711,6 +4801,21 @@ namespace dmGui
     {
         Matrix4 parent_m;
 
+        if (node->m_Node.m_RectTransform)
+        {
+            if (parent_node)
+            {
+                CalculateNodeTransform(scene, parent_node, CalculateNodeTransformFlags(), parent_m);
+                return (inverse(parent_m) * Vector4(screen_position, 1.0f)).getXYZ();
+            }
+            if (scene->m_AdjustReference == ADJUST_REFERENCE_DISABLED)
+                return screen_position;
+            float fit = dmMath::Min(scene->m_AdjustWidth / (float)dmMath::Max(1U, scene->m_Width),
+                                   scene->m_AdjustHeight / (float)dmMath::Max(1U, scene->m_Height));
+            return Vector3((screen_position.getX() - scene->m_AdjustOffsetX) / dmMath::Max(fit, 0.000001f),
+                           (screen_position.getY() - scene->m_AdjustOffsetY) / dmMath::Max(fit, 0.000001f), screen_position.getZ());
+        }
+
         if (scene->m_AdjustReference == ADJUST_REFERENCE_DISABLED)
         {
             if (parent_node == 0x0)
@@ -4800,8 +4905,7 @@ namespace dmGui
     static void SetScreenPosition(HScene scene, InternalNode* node, InternalNode* parent_node, dmVMath::Vector3 screen_position)
     {
         Vector3 local_position = ScreenToLocalPosition(scene, node, parent_node, screen_position);
-        node->m_Node.m_Properties[dmGui::PROPERTY_POSITION] = Vector4(local_position, 1.0f);
-        node->m_Node.m_DirtyLocal = 1;
+        SetNodePosition(scene, GetNodeHandle(node), Point3(local_position));
     }
 
     void SetScreenPosition(HScene scene, HNode node, const Point3& screen_position)
@@ -4837,6 +4941,9 @@ namespace dmGui
         }
         if (parent_index != n->m_ParentIndex)
         {
+            Vector3 rect_screen_position;
+            Vector4 rect_size;
+            bool keep_rect = keep_scene_transform && n->m_Node.m_RectTransform;
             if (keep_scene_transform) {
 
                 Matrix4 node_m;
@@ -4844,7 +4951,13 @@ namespace dmGui
                 CalculateNodeTransform(scene, n, CalculateNodeTransformFlags(), node_m);
                 Vector3 node_pos = node_m.getCol3().getXYZ();
 
-                SetScreenPosition(scene, n, parent_node, node_pos);
+                if (keep_rect)
+                {
+                    rect_screen_position = node_pos;
+                    rect_size = Vector4(GetNodeSize(scene, node));
+                }
+                else
+                    SetScreenPosition(scene, n, parent_node, node_pos);
             }
 
             RemoveFromNodeList(scene, n);
@@ -4859,6 +4972,12 @@ namespace dmGui
                 prev = &scene->m_Nodes[prev_index];
             }
             AddToNodeList(scene, n, parent_node, prev);
+            if (keep_rect)
+            {
+                n->m_Node.m_RectReference = GetNodeParentRect(scene, node);
+                n->m_Node.m_Properties[PROPERTY_SIZE] = rect_size;
+                SetScreenPosition(scene, n, parent_node, rect_screen_position);
+            }
         }
         return RESULT_OK;
     }
@@ -4998,7 +5117,7 @@ namespace dmGui
         }
 
         const Node& node = n->m_Node;
-        if (node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
+        if (node.m_RectTransform || node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
         {
             UpdateLocalTransform(scene, n);
         }
@@ -5020,7 +5139,7 @@ namespace dmGui
         }
 
         const Node& node = n->m_Node;
-        if (node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
+        if (node.m_RectTransform || node.m_DirtyLocal || (scene->m_ResChanged && scene->m_AdjustReference != ADJUST_REFERENCE_DISABLED))
         {
             UpdateLocalTransform(scene, n);
         }

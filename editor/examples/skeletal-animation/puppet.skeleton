@@ -1,0 +1,324 @@
+{
+  "schema": "defold.skeleton",
+  "version": 1,
+  "name": "puppet",
+  "bones": [
+    {
+      "id": "root",
+      "parent": null,
+      "x": 0.0,
+      "y": 0.0,
+      "rotation": 0.0,
+      "scale-x": 1.0,
+      "scale-y": 1.0,
+      "length": 0.0
+    },
+    {
+      "id": "upper",
+      "parent": "root",
+      "x": 0.0,
+      "y": 60.0,
+      "rotation": 0.0,
+      "scale-x": 1.0,
+      "scale-y": 1.0,
+      "length": 110.0
+    },
+    {
+      "id": "lower",
+      "parent": "upper",
+      "x": 110.0,
+      "y": 0.0,
+      "rotation": 0.0,
+      "scale-x": 1.0,
+      "scale-y": 1.0,
+      "length": 90.0
+    },
+    {
+      "id": "target",
+      "parent": "root",
+      "x": 155.0,
+      "y": 155.0,
+      "rotation": 0.0,
+      "scale-x": 1.0,
+      "scale-y": 1.0,
+      "length": 0.0
+    },
+    {
+      "id": "tip",
+      "parent": "lower",
+      "x": 90.0,
+      "y": 0.0,
+      "rotation": 0.0,
+      "scale-x": 1.0,
+      "scale-y": 1.0,
+      "length": 0.0
+    }
+  ],
+  "slots": [
+    {
+      "id": "body",
+      "bone": "root",
+      "attachment": {
+        "type": "region",
+        "path": "/images/body.png",
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0,
+        "scale-x": 1.0,
+        "scale-y": 1.0,
+        "width": 110.0,
+        "height": 110.0,
+        "color": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "id": "upper",
+      "bone": "upper",
+      "attachment": {
+        "type": "mesh",
+        "path": "/images/limb.png",
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0,
+        "scale-x": 1.0,
+        "scale-y": 1.0,
+        "width": 110.0,
+        "height": 40.0,
+        "color": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "vertices": [
+          0,
+          -20,
+          110,
+          -20,
+          110,
+          20,
+          0,
+          20
+        ],
+        "uvs": [
+          0,
+          1,
+          1,
+          1,
+          1,
+          0,
+          0,
+          0
+        ],
+        "triangles": [
+          0,
+          1,
+          2,
+          2,
+          3,
+          0
+        ],
+        "weights": [
+          [
+            {
+              "bone": "upper",
+              "weight": 0.9,
+              "x": 0.0,
+              "y": -20.0
+            },
+            {
+              "bone": "lower",
+              "weight": 0.09999999999999998,
+              "x": -110.0,
+              "y": -20.0
+            }
+          ],
+          [
+            {
+              "bone": "upper",
+              "weight": 0.1,
+              "x": 110.0,
+              "y": -20.0
+            },
+            {
+              "bone": "lower",
+              "weight": 0.9,
+              "x": 0.0,
+              "y": -20.0
+            }
+          ],
+          [
+            {
+              "bone": "upper",
+              "weight": 0.1,
+              "x": 110.0,
+              "y": 20.0
+            },
+            {
+              "bone": "lower",
+              "weight": 0.9,
+              "x": 0.0,
+              "y": 20.0
+            }
+          ],
+          [
+            {
+              "bone": "upper",
+              "weight": 0.9,
+              "x": 0.0,
+              "y": 20.0
+            },
+            {
+              "bone": "lower",
+              "weight": 0.09999999999999998,
+              "x": -110.0,
+              "y": 20.0
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "lower",
+      "bone": "lower",
+      "attachment": {
+        "type": "region",
+        "path": "/images/limb.png",
+        "x": 45.0,
+        "y": 0.0,
+        "rotation": 0.0,
+        "scale-x": 1.0,
+        "scale-y": 1.0,
+        "width": 90.0,
+        "height": 30.0,
+        "color": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    }
+  ],
+  "ik": [
+    {
+      "id": "arm",
+      "bones": [
+        "upper",
+        "lower"
+      ],
+      "target": "target",
+      "mix": 1.0,
+      "bend-positive": true
+    }
+  ],
+  "animations": [
+    {
+      "id": "wave",
+      "duration": 2.0,
+      "tracks": [
+        {
+          "bone": "target",
+          "property": "y",
+          "keys": [
+            {
+              "time": 0.0,
+              "value": 100.0,
+              "interpolation": "linear"
+            },
+            {
+              "time": 1.0,
+              "value": 180.0,
+              "interpolation": "linear"
+            },
+            {
+              "time": 2.0,
+              "value": 100.0,
+              "interpolation": "linear"
+            }
+          ]
+        }
+      ],
+      "deforms": [
+        {
+          "slot": "upper",
+          "attachment": "upper",
+          "skin": "default",
+          "keys": [
+            {
+              "time": 0.0,
+              "vertices": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "interpolation": "linear"
+            },
+            {
+              "time": 1.0,
+              "vertices": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                -10,
+                0,
+                -10,
+                0,
+                10,
+                0,
+                10,
+                0,
+                0,
+                0,
+                0
+              ],
+              "interpolation": "linear"
+            },
+            {
+              "time": 2.0,
+              "vertices": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "interpolation": "linear"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

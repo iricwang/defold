@@ -23,7 +23,7 @@
             [editor.pose :as pose]
             [integration.test-util :as test-util]
             [util.coll :as coll])
-  (:import [javax.vecmath Matrix4d Point3d]))
+  (:import [javax.vecmath Matrix4d Point3d Vector3d]))
 
 ;; Safe-area mode chooses physical long/short axes and keeps the bottom-left origin after rotation.
 (deftest physical-safe-area-modes
@@ -176,3 +176,23 @@
         (layout/commit! [[node :manual-size [120.0 80.0 0.0]]] "Default layout resize")
         (is (= landscape-transient (render [900 600])))
         (is (= portrait-transient (render [600 900])))))))
+
+;; Device preview must rebuild rectangle geometry at logical viewport dimensions,
+;; and restore the authored graph after rendering rather than scaling its margins.
+(deftest native-rect-device-preview
+  (test-util/with-loaded-project "test/resources/gui_preview_project"
+    (let [resource (test-util/resource-node project "/parent.gui")
+          node ((g/node-value resource :node-ids) "fit")
+          view (g/make-node! PreviewState)]
+      (layout/commit! (layout/rect-preset-changes node
+                                                {:anchor-min [0.0 0.0 0.0 0.0]
+                                                 :anchor-max [1.0 1.0 0.0 0.0]
+                                                 :pivot [0.5 0.5]}
+                                                true true (g/make-evaluation-context)) "Stretch")
+      (let [before (g/node-value resource :save-value)
+            config (g/node-value resource :game-preview-config)
+            data (preview/render-data resource view config [640 240] [0 0 0 0] false (g/make-evaluation-context))
+            item (coll/first-where #(= node (:node-id %)) (get-in data [:renderables pass/transparent]))]
+        (is (= (Vector3d. 320.0 120.0 0.0) (:world-translation item)))
+        (is (= before (g/node-value resource :save-value)))
+        (is (= [320.0 240.0 0.0] (g/node-value node :rect-size)))))))

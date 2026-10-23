@@ -208,6 +208,13 @@ message NodeDesc
     optional string    custom_type_name  = 49;
     repeated Property  custom_properties = 50;
     optional string    style             = 51 [default = "default"];
+
+    // Opt-in parent-relative rectangle layout. Existing position/size describe
+    // the rectangle at rect_reference (parent width, height, pivot x, pivot y).
+    optional bool rect_transform = 52 [default = false];
+    optional dmMath.Vector4 rect_anchor_min = 53;
+    optional dmMath.Vector4 rect_anchor_max = 54;
+    optional dmMath.Vector4 rect_reference = 55;
 }
 
 message SceneDesc

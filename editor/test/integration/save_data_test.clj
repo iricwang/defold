@@ -1218,6 +1218,11 @@
 (defmethod nested-field-frequencies :code [resource]
   (sorted-map "lines" (if (string/blank? (slurp resource)) 0 1)))
 
+(defmethod nested-field-frequencies :skeletal-animation [resource]
+  ;; The document is the sole editable property; detailed schema round trips
+  ;; are covered by skeletal-animation-data-test and skeletal-animation-test.
+  (sorted-map "document" (if (string/blank? (slurp resource)) 0 1)))
+
 (defmethod nested-field-frequencies :ddf [resource]
   (let [ext (resource/type-ext resource)
         pb (pb-read-resource resource)

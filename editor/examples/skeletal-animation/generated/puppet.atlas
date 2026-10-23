@@ -1,0 +1,14 @@
+animations {
+  id: "images/body"
+  images { image: "/images/body.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+animations {
+  id: "images/limb"
+  images { image: "/images/limb.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+extrude_borders: 2
+inner_padding: 2

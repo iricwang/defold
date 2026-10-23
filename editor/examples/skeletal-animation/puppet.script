@@ -1,0 +1,33 @@
+local function complete(self, message_id, message, sender)
+    assert(self.changed, "Skeleton animation did not move the target bone")
+    assert(self.ik_samples > 10, "No constrained bone poses were observed")
+    print("SKELETAL_AUTHORING_RUNTIME_OK: exported skeleton and weighted mesh loaded; animation and IK target following verified")
+    if self.testing then
+        sys.exit(0)
+    end
+end
+
+function init(self)
+    self.testing = sys.get_config_string("test.enabled", "0") == "1"
+    self.start = nil
+    self.changed = false
+    self.ik_samples = 0
+    spine.play_anim("#rig", hash("wave"),
+        self.testing and go.PLAYBACK_ONCE_FORWARD or go.PLAYBACK_LOOP_FORWARD,
+        { blend_duration = 0 }, complete)
+end
+
+function update(self, dt)
+    local target = spine.get_go("#rig", hash("target"))
+    local tip = spine.get_go("#rig", hash("tip"))
+    local position = go.get_world_position(target)
+    local tip_position = go.get_world_position(tip)
+    local distance = vmath.length(position - tip_position)
+    assert(distance < 0.1, "IK tip failed to follow target: " .. distance)
+    self.ik_samples = self.ik_samples + 1
+    if self.start then
+        self.changed = self.changed or math.abs(position.y - self.start) > 5
+    else
+        self.start = position.y
+    end
+end

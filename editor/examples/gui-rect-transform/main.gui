@@ -1,0 +1,715 @@
+script: "/main.gui_script"
+nodes {
+  position {
+    x: 105.0
+    y: 515.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_0_0"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.2
+    y: 0.45
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_0_0"
+  parent: "cell_0_0"
+  rect_transform: true
+  rect_anchor_min {
+    y: 1.0
+  }
+  rect_anchor_max {
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 300.0
+    y: 515.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_1_0"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.37
+    y: 0.45
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_1_0"
+  parent: "cell_1_0"
+  rect_transform: true
+  rect_anchor_min {
+    x: 0.5
+    y: 1.0
+  }
+  rect_anchor_max {
+    x: 0.5
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 495.0
+    y: 515.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_2_0"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.54
+    y: 0.45
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_2_0"
+  parent: "cell_2_0"
+  rect_transform: true
+  rect_anchor_min {
+    x: 1.0
+    y: 1.0
+  }
+  rect_anchor_max {
+    x: 1.0
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 690.0
+    y: 515.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_3_0"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.71
+    y: 0.45
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_3_0"
+  parent: "cell_3_0"
+  rect_transform: true
+  rect_anchor_min {
+    y: 1.0
+  }
+  rect_anchor_max {
+    x: 1.0
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 105.0
+    y: 375.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_0_1"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.2
+    y: 0.55
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_0_1"
+  parent: "cell_0_1"
+  rect_transform: true
+  rect_anchor_min {
+    y: 0.5
+  }
+  rect_anchor_max {
+    y: 0.5
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 300.0
+    y: 375.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_1_1"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.37
+    y: 0.55
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_1_1"
+  parent: "cell_1_1"
+  rect_transform: true
+  rect_anchor_min {
+    x: 0.5
+    y: 0.5
+  }
+  rect_anchor_max {
+    x: 0.5
+    y: 0.5
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 495.0
+    y: 375.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_2_1"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.54
+    y: 0.55
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_2_1"
+  parent: "cell_2_1"
+  rect_transform: true
+  rect_anchor_min {
+    x: 1.0
+    y: 0.5
+  }
+  rect_anchor_max {
+    x: 1.0
+    y: 0.5
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 690.0
+    y: 375.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_3_1"
+  rect_transform: true
+  rect_anchor_max {
+    x: 1.0
+    y: 1.0
+  }
+  rect_reference {
+    x: 800.0
+    y: 600.0
+  }
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.71
+    y: 0.55
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_3_1"
+  parent: "cell_3_1"
+  rect_transform: true
+  rect_anchor_min {
+    y: 0.5
+  }
+  rect_anchor_max {
+    x: 1.0
+    y: 0.5
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 105.0
+    y: 235.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_0_2"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.2
+    y: 0.65
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_0_2"
+  parent: "cell_0_2"
+  rect_transform: true
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 300.0
+    y: 235.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_1_2"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.37
+    y: 0.65
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_1_2"
+  parent: "cell_1_2"
+  rect_transform: true
+  rect_anchor_min {
+    x: 0.5
+  }
+  rect_anchor_max {
+    x: 0.5
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 495.0
+    y: 235.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_2_2"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.54
+    y: 0.65
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_2_2"
+  parent: "cell_2_2"
+  rect_transform: true
+  rect_anchor_min {
+    x: 1.0
+  }
+  rect_anchor_max {
+    x: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 690.0
+    y: 235.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_3_2"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.71
+    y: 0.65
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_3_2"
+  parent: "cell_3_2"
+  rect_transform: true
+  rect_anchor_max {
+    x: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 105.0
+    y: 95.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_0_3"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.2
+    y: 0.75
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_0_3"
+  parent: "cell_0_3"
+  rect_transform: true
+  rect_anchor_max {
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 300.0
+    y: 95.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_1_3"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.37
+    y: 0.75
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_1_3"
+  parent: "cell_1_3"
+  rect_transform: true
+  rect_anchor_min {
+    x: 0.5
+  }
+  rect_anchor_max {
+    x: 0.5
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 495.0
+    y: 95.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_2_3"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.54
+    y: 0.75
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_2_3"
+  parent: "cell_2_3"
+  rect_transform: true
+  rect_anchor_min {
+    x: 1.0
+  }
+  rect_anchor_max {
+    x: 1.0
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+nodes {
+  position {
+    x: 690.0
+    y: 95.0
+  }
+  size {
+    x: 150.0
+    y: 100.0
+  }
+  color {
+    x: 0.16
+    y: 0.18
+    z: 0.2
+  }
+  type: TYPE_BOX
+  id: "cell_3_3"
+}
+nodes {
+  size {
+    x: 40.0
+    y: 24.0
+  }
+  color {
+    x: 0.71
+    y: 0.75
+    z: 0.85
+  }
+  type: TYPE_BOX
+  id: "item_3_3"
+  parent: "cell_3_3"
+  rect_transform: true
+  rect_anchor_max {
+    x: 1.0
+    y: 1.0
+  }
+  rect_reference {
+    x: 150.0
+    y: 100.0
+    z: 0.5
+    w: 0.5
+  }
+}
+material: "/builtins/materials/gui.material"
+adjust_reference: ADJUST_REFERENCE_PARENT
+max_nodes: 256
