@@ -45,6 +45,8 @@ scripts\windows\editor.cmd reload --port 19941 --pid <Java进程号> --namespace
 
 ## 常用命令
 
+后台 Game MCP 的开发编译入口是 `automation-build --app X:\Programs\Defold`，仅构建独立 Java/native worker，不打包或安装编辑器。使用方式和能力边界见 [后台 MCP](../automation/README.md)。
+
 ```powershell
 # 查看源码版本与本机安装版本
 scripts\windows\editor.cmd status --app X:\Programs\Defold

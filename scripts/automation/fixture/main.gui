@@ -1,0 +1,3 @@
+script: "/main.gui_script"
+material: "/builtins/materials/gui.material"
+fonts { name: "default" font: "/builtins/fonts/default.font" }

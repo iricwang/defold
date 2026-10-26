@@ -16,6 +16,7 @@
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.string :as string]
+            [editor.automation-editor :as automation-editor]
             [editor.craft-project :as craft-project]
             [editor.craft-publish :as craft-publish]
             [editor.dialogs :as dialogs]
@@ -144,7 +145,10 @@
                                    (http-server/json-response {:error (merge {:code "RECOVERY_REQUIRED" :message (ex-message error)} (ex-data error))} 409))
                                  (catch Exception _
                                    (http-server/json-response {:error {:code "PROTOCOL_UNSUPPORTED" :message "Invalid structured adapter request"}} 400))))}]))
-        {"/craft/v1/project" (fn [_] (ui/run-now (craft-project/describe service)))
+        {"/automation/v1/snapshot" (fn [request] (ui/run-now (automation-editor/snapshot service (:path request))))
+         "/automation/v1/edit" (fn [request] (ui/run-now (automation-editor/edit! service request)))
+         "/automation/v1/history" (fn [request] (ui/run-now (automation-editor/history! service request)))
+         "/craft/v1/project" (fn [_] (ui/run-now (craft-project/describe service)))
          "/craft/v1/snapshot" (fn [request] (ui/run-now (craft-project/snapshot service (:path request))))
          "/craft/v1/resource/open" (fn [request] (ui/run-now (craft-project/open-resource! service (:path request))))
          "/craft/v1/publish/prepare" #(craft-publish/prepare! service %)
@@ -616,6 +620,7 @@
                  :editor-session-id (str (UUID/randomUUID))
                  :state (atom {})
                  :publish-state (atom {})
+                 :automation-state (atom {})
                  :prepare! prepare!
                  :idle? idle?
                  :selected-path selected-path}

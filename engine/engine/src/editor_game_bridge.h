@@ -38,6 +38,9 @@ namespace dmEditorGame
     static uint32_t* g_Data = 0;
     static pid_t g_Parent = 0;
     static uint32_t g_Input[256];
+    static uint32_t g_AutomationInput = 0;
+    static uint32_t g_DeviceRevision = 0;
+    static bool g_Automation = false;
 
     static bool Lock(short type)
     {
@@ -84,6 +87,12 @@ namespace dmEditorGame
             return false;
         }
         if (g_Simulator) g_Data[13] = 1;
+        g_Automation = g_Simulator && g_Data[268] == 0x41555431;
+        if (g_Automation)
+        {
+            g_Data[269] = 1;
+            dmLogInfo("Editor automation bridge protocol 1 (macOS HID)");
+        }
         g_Data[14] = 1; // The built-in bridge owns capture when the extension is also linked.
         dmPlatform::ConfigureBackgroundApplication();
         memset(g_Input, 0, sizeof(g_Input));
@@ -108,10 +117,16 @@ namespace dmEditorGame
         // Keep the previous snapshot when the editor owns the lock. Hardware polling
         // must not manufacture a key-up between two embedded input snapshots.
         g_Input[10] = 0;
+        g_Input[9] = 0;
         if (Lock(F_WRLCK))
         {
             memcpy(g_Input, g_Data, sizeof(g_Input));
             g_Data[10] = 0;
+            if (g_Automation)
+            {
+                g_AutomationInput = g_Data[277];
+                g_Data[9] = 0; // Wheel and text are impulses, not held state.
+            }
             Lock(F_UNLCK);
         }
         dmHID::HKeyboard keyboard = dmHID::GetKeyboard(hid, 0);
@@ -136,7 +151,7 @@ namespace dmEditorGame
         uint32_t count = dmMath::Min(g_Input[10], (uint32_t)128);
         for (uint32_t i = 0; i < count; ++i)
             if (focused) dmHID::AddKeyboardChar(hid, g_Input[128+i]);
-
+        if (g_Automation) __atomic_store_n(g_Data + 271, g_AutomationInput, __ATOMIC_RELEASE);
     }
 
     static void Resize(dmGraphics::HContext graphics)
@@ -144,18 +159,22 @@ namespace dmEditorGame
         if (!g_Data || !g_Simulator) return;
         uint32_t sequence = __atomic_load_n(g_Data + 264, __ATOMIC_ACQUIRE);
         if ((sequence & 1) || sequence == g_SettingsSequence) return;
-        uint32_t w = g_Data[256], h = g_Data[257];
+        uint32_t w = g_Data[256], h = g_Data[257], revision = g_Data[275];
         __atomic_thread_fence(__ATOMIC_ACQUIRE);
         if (sequence != __atomic_load_n(g_Data + 264, __ATOMIC_ACQUIRE)
             || w == 0 || h == 0 || w > 4096 || h > 4096 || (uint64_t)w * h * 4 > g_SlotSize) return;
         g_SettingsSequence = sequence;
         dmGraphics::SetWindowSize(graphics, w, h);
+        g_DeviceRevision = revision;
+        if (g_Automation) __atomic_store_n(g_Data + 278, revision, __ATOMIC_RELEASE);
     }
 
     static void Frame(dmGraphics::HContext graphics)
     {
         if (!g_Data) return;
+        if (g_Automation) __atomic_add_fetch(g_Data + 270, 1, __ATOMIC_RELEASE);
         if (g_Simulator && (!g_Data[265] || g_Data[267] == g_Served)) return;
+        uint32_t request = g_Data[267];
         uint32_t w = dmGraphics::GetWindowWidth(graphics);
         uint32_t h = dmGraphics::GetWindowHeight(graphics);
         if (w > 0 && h > 0 && w <= 4096 && h <= 4096 && (uint64_t)w * h * 4 <= g_SlotSize)
@@ -173,7 +192,14 @@ namespace dmEditorGame
             g_Data[2] = h;
             ++g_Data[3];
             g_Data[4] = getpid();
-            g_Served = g_Data[267];
+            g_Served = request;
+            if (g_Automation)
+            {
+                g_Data[272] = g_Data[270];
+                g_Data[273] = g_AutomationInput;
+                g_Data[274] = g_DeviceRevision;
+                __atomic_store_n(g_Data + 276, request, __ATOMIC_RELEASE);
+            }
         }
         else
         {

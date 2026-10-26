@@ -1,0 +1,11 @@
+[project]
+title = Background automation fixture
+[bootstrap]
+main_collection = /main.collectionc
+[display]
+width = 320
+height = 240
+[input]
+game_binding = /game.input_bindingc
+[engine]
+run_while_iconified = 1

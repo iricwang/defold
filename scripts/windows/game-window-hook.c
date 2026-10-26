@@ -16,6 +16,7 @@
 #define WINVER 0x0A00
 #define _WIN32_WINNT 0x0A00
 #define NTDDI_VERSION 0x0A000002
+#include <winsock2.h>
 #include <windows.h>
 #include <tlhelp32.h>
 #include "game-simulator.h"
@@ -23,11 +24,46 @@
 static HINSTANCE module;
 static const WCHAR original_proc_key[] = L"DefoldEditorEmbeddedGameOriginalProc";
 
+/* The parent owns this handle. Windows kills even a hung child when the worker
+ * crashes, independent of the child's render loop or graceful pipe shutdown. */
+__declspec(dllexport) HANDLE CreateOwnedGameJob(HANDLE process)
+{
+    HANDLE job = CreateJobObjectW(NULL, NULL);
+    if (!job) return NULL;
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {0};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits))
+        || !AssignProcessToJobObject(job, process))
+    {
+        DWORD error = GetLastError();
+        CloseHandle(job);
+        SetLastError(error);
+        return NULL;
+    }
+    return job;
+}
+
 /* A newly launched game must not present a standalone window before adoption. */
 static LRESULT CALLBACK HoldWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
     WNDPROC original = (WNDPROC)GetPropW(window, original_proc_key);
     if (!original) return DefWindowProcW(window, message, wparam, lparam);
+    if (simulator_data && GetPropW(window, L"DefoldEditorGameShowRequested"))
+    {
+        simulator_window = window;
+        /* A FIFO marker follows automation input messages. It acknowledges window
+         * dispatch, not application callbacks. Only the private owned session uses it. */
+        if (message == WM_APP + 0x3D1 && simulator_data[268] == 0x41555431)
+        {
+            InterlockedExchange((volatile LONG*)&simulator_data[271], (LONG)wparam);
+            return 0;
+        }
+        if (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST && message != WM_MOUSEWHEEL && message != WM_MOUSEHWHEEL)
+        {
+            simulator_cursor.x = (short)LOWORD(lparam);
+            simulator_cursor.y = (short)HIWORD(lparam);
+        }
+    }
     if (message == WM_GETMINMAXINFO && simulator_data)
     {
         LRESULT result = CallWindowProcW(original, window, message, wparam, lparam);
@@ -66,6 +102,7 @@ static LRESULT CALLBACK HoldWindow(HWND window, UINT message, WPARAM wparam, LPA
     else if (message == WM_NCDESTROY)
     {
         RemovePropW(window, original_proc_key);
+        if (simulator_window == window) { simulator_window = NULL; simulator_capture = FALSE; }
     }
     return CallWindowProcW(original, window, message, wparam, lparam);
 }
@@ -110,6 +147,8 @@ __declspec(dllexport) void CALLBACK InstallGameWindowGuard(ULONG_PTR parameter)
     HANDLE ready = result->ready;
     MSG message;
     PeekMessageW(&message, NULL, WM_USER, WM_USER, PM_NOREMOVE);
+    /* Install per-process transport restrictions before engine startup creates listeners. */
+    InitSimulatorCapture();
     DWORD error = SetWindowsHookExW(WH_CBT, GameWindowCreate, NULL, GetCurrentThreadId())
         ? ERROR_SUCCESS : GetLastError();
     result->error = error;

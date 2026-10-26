@@ -1,0 +1,4 @@
+mouse_trigger { input: MOUSE_BUTTON_1 action: "click" }
+mouse_trigger { input: MOUSE_WHEEL_UP action: "wheel" }
+key_trigger { input: KEY_SPACE action: "key" }
+text_trigger { input: TEXT action: "text" }

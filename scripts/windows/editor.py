@@ -133,11 +133,19 @@ def parser():
     reload.add_argument('--namespace', action='append', required=True, help='Source namespace; repeat in dependency order')
     reload.add_argument('--after', type=Path, help='Optional Clojure file to refresh existing callbacks and assert behavior')
     reload.add_argument('--timeout', type=float, default=60, help='Overall timeout in seconds; never retries mutations')
+    automation = sub.add_parser('automation-build', help='Compile the local Windows background MCP worker; no packaging/install')
+    automation.add_argument('--app', type=Path, required=True)
+    automation.add_argument('--output', type=Path)
     return result
 
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    if args.command == 'automation-build':
+        sys.path.insert(0, str(ROOT / 'scripts/automation'))
+        from build import prepare
+        print(json.dumps(prepare(args.app, args.output), indent=2))
+        return
     if args.command == 'reload':
         from live_reload import reload_sources
         reload_sources(ROOT, args)

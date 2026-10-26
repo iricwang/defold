@@ -1,0 +1,5 @@
+name: "standalone"
+instances {
+  id: "gui"
+  prototype: "/main.go"
+}

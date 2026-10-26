@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "defold-background": {
+      "command": "C:/Python313/python.exe",
+      "args": [
+        "-X", "utf8", "X:/AI/UI/defold/scripts/automation/server.py",
+        "--project", "X:/AI/UI/defold/scripts/automation/fixture",
+        "--project", "X:/AI/Copy/apk_analysis/defold_game"
+      ]
+    }
+  }
+}
