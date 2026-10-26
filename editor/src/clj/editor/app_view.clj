@@ -31,6 +31,7 @@
             [editor.build-errors-view :as build-errors-view]
             [editor.camera :as camera]
             [editor.code.data :as data :refer [CursorRange->line-number]]
+            [editor.code.navigation :as code-navigation]
             [editor.code.view :as code-view]
             [editor.console :as console]
             [editor.craft-binding :as craft-binding]
@@ -503,6 +504,26 @@
 (defn- apply-tab-pane-active-style! [^TabPane tab-pane active]
   (ui/set-style! tab-pane "inactive" (not active)))
 
+(def ^:dynamic *record-code-navigation* true)
+
+(defn- code-location [view-id]
+  (when (and view-id (g/node-exists? view-id) (g/node-instance? code-view/CodeEditorView view-id))
+    (g/with-auto-evaluation-context evaluation-context
+      (when-let [resource-node (g/node-value view-id :resource-node evaluation-context)]
+        (when (g/node-exists? resource-node)
+          {:resource-node resource-node
+           :path (resource/proj-path (g/node-value resource-node :resource evaluation-context))
+           :cursor-ranges (g/node-value view-id :cursor-ranges evaluation-context)
+           :scroll-x (g/node-value view-id :scroll-x evaluation-context)
+           :scroll-y (g/node-value view-id :scroll-y evaluation-context)})))))
+
+(defn- record-code-navigation! [app-view source destination]
+  (when *record-code-navigation*
+    (g/user-data! app-view ::code-navigation
+                  (code-navigation/visit (g/user-data app-view ::code-navigation) source destination))))
+
+(declare navigate-code!)
+
 (defn- on-active-tab-changed! [app-view prefs ^Tab new-active-tab is-in-active-tab-pane]
   (g/let-ec [basis (:basis evaluation-context)
              ^Tab old-active-tab (g/node-value app-view :active-tab evaluation-context)
@@ -532,6 +553,9 @@
                      (disconnect-sources basis app-view :active-scene)))))]
 
     (when (coll/not-empty tx-data)
+      (record-code-navigation! app-view
+                               (code-location (some-> old-active-tab editor-tab/view-node-id))
+                               (code-location new-view-node-id))
       (g/transact
         {:undoable false}
         tx-data)
@@ -2592,6 +2616,19 @@
     (editor-tab/set-view-node-id! tab view)
     (ui/user-data! parent :editor.dock-windows/focus! focus-view!)
 
+    ;; Keep navigation on the resource content so it also works after floating it.
+    ;; Consume the entire side-button gesture before code selection sees it.
+    (when (g/node-instance? code-view/CodeEditorView view)
+      (.addEventFilter parent MouseEvent/ANY
+                       (ui/event-handler event
+                         (when-let [direction (condp = (.getButton ^MouseEvent event)
+                                                MouseButton/BACK :back
+                                                MouseButton/FORWARD :forward
+                                                nil)]
+                           (.consume event)
+                           (when (= MouseEvent/MOUSE_PRESSED (.getEventType event))
+                             (navigate-code! app-view (:prefs opts) localization (:project opts) direction))))))
+
     (let [content (.getContent tab)
           slot (doto (StackPane.) (.setMinSize 0.0 0.0))]
       (.setContent tab nil)
@@ -2724,6 +2761,20 @@
          (.requestFocus tab-pane)
          (done-fn))))))
 
+(defn- select-resource-tab! [app-view prefs source tab open-opts done-fn]
+  (let [record *record-code-navigation*]
+    (binding [*record-code-navigation* false]
+      (select-editor-tab!
+        tab open-opts
+        (fn []
+          ;; The tab may already be selected in an unfocused window, in which
+          ;; case neither the selection nor focus-owner listener runs again.
+          (binding [*record-code-navigation* false]
+            (on-active-tab-changed! app-view prefs tab true))
+          (binding [*record-code-navigation* record]
+            (record-code-navigation! app-view source (code-location (editor-tab/view-node-id tab))))
+          (done-fn))))))
+
 (defn open-editor-tab!
   "Opens an editor tab of the registered tab type identified by `type-id`,
   selecting the tab that is already open when its instance key matches. Returns
@@ -2808,6 +2859,7 @@
                :existing-tab existing-tab
                :resource-node resource-node
                :open-opts opts
+               :prefs prefs
                :app-view app-view}
               (let [tab-pane-index (or (:tab-pane-index opts)
                                        (coll/index-of tab-panes (g/valid-node-value app-view :active-tab-pane evaluation-context)))]
@@ -2888,7 +2940,7 @@
       (when-some [select-node (:select-node open-opts)]
         (g/transact
           (select app-view resource-node [select-node])))
-      (select-editor-tab! existing-tab open-opts)
+      (select-resource-tab! app-view (:prefs open-resource-plan) (code-location (g/node-value app-view :active-view)) existing-tab open-opts fn/constantly-nil)
       true)
 
     :open-new-tab
@@ -2900,13 +2952,15 @@
           ^TabPane tab-pane (or (nth tab-panes tab-pane-index nil)
                                 (add-other-tab-pane! editor-tabs-split app-view prefs))
           tab-pane-tabs (.getTabs tab-pane)
-          new-tab (make-tab! app-view prefs localization resource-node view-type tab-pane-tabs open-opts)]
+          source (code-location (g/node-value app-view :active-view))
+          new-tab (binding [*record-code-navigation* false]
+                    (make-tab! app-view prefs localization resource-node view-type tab-pane-tabs open-opts))]
       (g/transact
         {:undoable false}
         (select app-view resource-node [select-node]))
       (when select-tab
-        (select-editor-tab!
-          new-tab open-opts
+        (select-resource-tab!
+          app-view prefs source new-tab open-opts
           (fn refresh-done-fn []
             (ui/run-later
               (slog/smoke-log "opened-resource")))))
@@ -2919,6 +2973,37 @@
    (-> (g/with-auto-evaluation-context evaluation-context
          (make-open-resource-plan app-view prefs project resource opts evaluation-context))
        (perform-open-resource-plan! localization))))
+
+(defn- navigation-resource [project location]
+  (g/with-auto-evaluation-context evaluation-context
+    (if (g/node-exists? (:resource-node location))
+      (g/node-value (:resource-node location) :resource evaluation-context)
+      (workspace/find-resource (project/workspace project evaluation-context) (:path location)))))
+
+(defn- navigate-code! [app-view prefs localization project direction]
+  (let [source (code-location (g/node-value app-view :active-view))
+        {:keys [history destination]}
+        (code-navigation/travel
+          (g/user-data app-view ::code-navigation) source direction
+          (fn [location]
+            (when-let [resource (navigation-resource project location)]
+              (and (resource/openable-resource? resource) (resource/exists? resource)))))]
+    (if-not destination
+      (g/user-data! app-view ::code-navigation history)
+      (binding [*record-code-navigation* false]
+        (when (open-resource! app-view prefs localization project (navigation-resource project destination)
+                             {:selected-view-type (workspace/get-view-type (project/workspace project) :code)
+                              :use-custom-editor false
+                              :navigation-location destination})
+          (g/user-data! app-view ::code-navigation history))))))
+
+(handler/defhandler :code.navigate-back :workbench
+  (enabled? [app-view] (coll/not-empty (:back (g/user-data app-view ::code-navigation))))
+  (run [app-view prefs localization project] (navigate-code! app-view prefs localization project :back)))
+
+(handler/defhandler :code.navigate-forward :workbench
+  (enabled? [app-view] (coll/not-empty (:forward (g/user-data app-view ::code-navigation))))
+  (run [app-view prefs localization project] (navigate-code! app-view prefs localization project :forward)))
 
 (def ^:private release-notes-markdown-delay
   "Markdown for the running version's bundled release notes, or nil when the

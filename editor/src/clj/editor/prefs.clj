@@ -207,6 +207,8 @@
                                 :val {:type :array :item {:type :number}}}
               :hidden-panes {:type :set :item {:type :keyword}}
               :locale {:type :locale}
+              :keymap-preset {:type :enum :values ["IntelliJ IDEA" "Defold"]
+                              :default "IntelliJ IDEA"}
               :keymap {:type :object-of
                        :key {:type :keyword} ;; command
                        :val {:type :object

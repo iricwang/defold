@@ -18,6 +18,7 @@
             [dynamo.graph :as g]
             [editor.game-preview :as preview]
             [editor.gl.pass :as pass]
+            [editor.resource :as resource]
             [editor.scene :as scene]
             [editor.ui :as ui]
             [support.test-support :refer [with-clean-system]]
@@ -310,3 +311,82 @@
          (.stop view)
          (Event/fireEvent viewport (key-event))
          (is (= 2 @events))))))
+
+
+;; Unsupported tabs retain the last live target and avoid redraws; supported tabs still follow,
+;; locks still pin, device/project changes still render, and closing the retained view clears it.
+(deftest unsupported-tabs-retain-preview
+  (with-clean-system
+    @(fx/on-fx-thread
+       (let [active (atom nil)
+             live (atom #{1 2 3})
+             width (atom 640)
+             renders (atom [])
+             source-image (ImageView. (WritableImage. 16 8))
+             select! (fn [view ext]
+                       (reset! active {:view view :resource {:ext ext :path (str "/test." ext)}}))]
+         (with-redefs [ui/ui-disabled? (constantly false)
+                       g/node-exists? (fn [_ view] (contains? @live view))
+                       g/node-instance? (fn [_ _ view] (contains? @live view))
+                       resource/ext :ext
+                       resource/proj-path :path
+                       scene/make-game-preview-renderer
+                       (fn [] {:render! (fn [data _ _ _ _ _ _ _]
+                                          (swap! renders conj (:view data))
+                                          (WritableImage. 16 8))
+                               :dispose! (fn [])})
+                       g/node-value (fn [node label _]
+                                      (case label
+                                        :active-view (:view @active)
+                                        :active-resource (:resource @active)
+                                        :active-resource-node (:view @active)
+                                        :image-view source-image
+                                        :scene-dims {:width 640 :height 480}
+                                        :display-width @width
+                                        :display-height 480
+                                        :game-render-data {:view node :renderables {}}
+                                        :updatable-states {}
+                                        :drawable :test-drawable
+                                        :render-clear-color [0.0 0.0 0.0 1.0]
+                                        nil))]
+           (with-open [pane (GamePreview. "retained-preview-test" (fn []) (fn [])
+                                         (reify BiConsumer (accept [_ _ _])))]
+             (preview/attach! pane :app :project)
+             (let [field (doto (.getDeclaredField GamePreview "idleRefresh") (.setAccessible true))
+                   refresh ^Runnable (.get field pane)
+                   image ^ImageView (.lookup (.getNode pane) "ImageView")
+                   title (.lookup (.getNode pane) "#game-preview-resource")
+                   lock ^ToggleButton (.lookup (.getNode pane) "#game-preview-lock")]
+               (.run refresh)
+               (is (nil? (.getImage image)))
+               (doseq [[view ext] [[1 "gui"] [2 "collection"] [3 "go"]]]
+                 (select! view ext)
+                 (.run refresh)
+                 (is (= view (peek @renders)))
+                 (is (= (str "Game · test." ext) (.getText title)))
+                 (let [before (.getImage image)
+                       count-before (count @renders)]
+                   (doseq [unsupported ["lua" "script" "atlas" nil]]
+                     (select! 9 unsupported)
+                     (.run refresh)
+                     (is (identical? before (.getImage image)))
+                     (is (= (str "Game · test." ext) (.getText title))))
+                   (is (= count-before (count @renders))))
+                 ;; A changed display input must render the retained resource while a script is active.
+                 (swap! width inc)
+                 (.run refresh)
+                 (is (= view (peek @renders))))
+               (.setSelected lock true)
+               (select! 1 "gui")
+               (.run refresh)
+               (is (= "Game · test.go" (.getText title)))
+               (.unlockPreview pane)
+               (.run refresh)
+               (is (= "Game · test.gui" (.getText title)))
+               (select! 9 "lua")
+               (.setSelected lock true)
+               (swap! live disj 1)
+               (.run refresh)
+               (is (nil? (.getImage image)))
+               (is (= "Game" (.getText title)))
+               (is (not (.isPreviewLocked pane))))))))))

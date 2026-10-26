@@ -106,6 +106,18 @@ Windows 构建脚本会从最终增量 ZIP 提取 JAR，启动真实解包流程
 Windows 嵌入进程的检查还会从子进程内部确认没有控制台，并校验参数转义、
 环境变量、标准输出/错误输出以及退出码，防止无窗口启动丢失日志。
 
+修改 Windows Simulator 输入桥接后，另行运行
+`python -X utf8 -m unittest patch.test_simulator_input -v`。
+设置 `JAVA_HOME` 为包含 `javac` 的 JDK，`DEFOLD_PATCH_TEST_JAR` 为编辑器 JAR，
+`DEFOLD_SIMULATOR_TEST_ENGINE` 为旁边带有匹配 PDB 的 `dmengine.exe`。
+该测试复用统一构建脚本编译原生桥接，并在隔离工程中后台验证横竖屏 GUI 点击命中、
+拖动和松开、滚轮、键盘、文字及帧捕获；同时检查隐藏游戏不会抢占桌面鼠标捕获。
+测试完全本地执行，不需要桌面焦点，也不会修改用户项目。
+安装后设置 `DEFOLD_SIMULATOR_TEST_PACKAGED=1` 并将 `DEFOLD_PATCH_TEST_JAR`
+指向安装目录中的 JAR，再运行同一测试。该模式只编译测试探针，输入桥 Java 类和
+原生 DLL 全部从安装包读取，在全新解包目录和游戏进程中验证，避免仅热更新有效、
+重启后回退到旧输入实现。未设置此变量时仍验证当前源码。
+
 ## 本地 patch.22 一次性接入 CI 更新链
 
 旧的本地 Apple Silicon patch.22 与同版本 CI 产物可能有不同的启动器和 JAR 哈希。

@@ -23,7 +23,8 @@
             [editor.process :as process]
             [editor.protobuf :as protobuf]
             [editor.resource :as resource]
-            [editor.system :as system])
+            [editor.system :as system]
+            [util.coll :as coll])
   (:import [com.defold.editor GamePreview WindowsGameProcess]
            [com.dynamo.bob Platform]
            [com.dynamo.render.proto Render$Resize]
@@ -32,6 +33,8 @@
            [java.io BufferedReader File IOException InputStream]
            [java.lang ProcessHandle]
            [java.net HttpURLConnection InetSocketAddress Socket URI]
+           [java.nio.file Files LinkOption NoSuchFileException]
+           [java.nio.file.attribute BasicFileAttributes]
            [java.util.zip ZipEntry ZipFile]))
 
 (set! *warn-on-reflection* true)
@@ -279,6 +282,15 @@
   (let [unpack-dir (io/file project-directory "build" (:extender-platform engine-descriptor))]
     (io/file unpack-dir (dmengine-filename (current-platform)))))
 
+(defonce ^:private installed-engine-cache (atom nil))
+
+(defn- engine-file-state [^File file]
+  (try
+    (let [^BasicFileAttributes attributes (Files/readAttributes (.toPath file) BasicFileAttributes
+                                                               ^"[Ljava.nio.file.LinkOption;" (make-array LinkOption 0))]
+      [(.fileKey attributes) (.size attributes) (.lastModifiedTime attributes) (.creationTime attributes)])
+    (catch NoSuchFileException _ nil)))
+
 (defn install-engine! ^File [^File project-directory {:keys [^File dmengine ^File engine-archive extender-platform] :as engine-descriptor}]
   (assert (or dmengine engine-archive))
   (cond
@@ -288,12 +300,28 @@
     (some? engine-archive)
     (let [engine-file (engine-install-path project-directory engine-descriptor)
           engine-dir (.getParentFile engine-file)]
-      (fs/delete-directory! engine-dir {:missing :ignore})
-      (fs/create-directories! engine-dir)
-      (unpack-build-zip! engine-archive engine-dir)
-      (fs/set-executable! engine-file true)
-      (copy-dmengine-dependencies! engine-dir extender-platform)
-      engine-file)))
+      ;; Reuse only an installation completed by this editor session. Both the
+      ;; archive and every installed file must still match; a cleaned build,
+      ;; updated extension archive or replaced PDB forces installation again.
+      (locking installed-engine-cache
+        (let [signature [(:id engine-descriptor) (.getCanonicalPath engine-archive)
+                         (engine-file-state engine-archive) (.getCanonicalPath engine-dir)]
+              cached @installed-engine-cache]
+          (when-not (and (= signature (:signature cached))
+                         (coll/every? (fn [[file state]] (= state (engine-file-state file))) (:files cached)))
+            (reset! installed-engine-cache nil)
+            (fs/delete-directory! engine-dir {:missing :ignore})
+            (fs/create-directories! engine-dir)
+            (unpack-build-zip! engine-archive engine-dir)
+            (fs/set-executable! engine-file true)
+            (copy-dmengine-dependencies! engine-dir extender-platform)
+            (reset! installed-engine-cache
+                    {:signature signature
+                     :files (into {}
+                                  (comp (filter #(.isFile ^File %))
+                                        (map (fn [file] [file (engine-file-state file)])))
+                                  (fs/file-walker engine-dir true))})))
+        engine-file))))
 
 (defn- validate-service-port [port-str]
   (when port-str

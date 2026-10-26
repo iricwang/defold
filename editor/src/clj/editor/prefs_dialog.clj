@@ -68,6 +68,7 @@
                 [:asset-browser :track-active-tab]
                 [:build :lint-code]
                 [:window :locale]
+                [:window :keymap-preset]
                 [:run :engine-arguments]]}
        {:pattern (localization/message "prefs.tab.code")
         :paths [[:code :custom-editor]
@@ -196,7 +197,7 @@
                     :mouse-binding (= :custom (:binding-source row))
                     :mouse-modifier (not= (:modifier row) (:default-modifier row))
                     (not= (keymap/shortcuts keymap command)
-                          (keymap/shortcuts (keymap/default) command)))
+                          (keymap/shortcuts (keymap/base keymap) command)))
           parts (case kind
                   (:mouse-binding :mouse-modifier) (into [(:context-path row)] (:action row))
                   :keyboard (string/split (name command) #"\."))]
@@ -310,15 +311,15 @@
 (defn- handle-reset-shortcuts-action [update-keymap command _]
   (update-keymap dissoc command))
 
-(defn- handle-add-shortcut-action [update-keymap command shortcut _]
+(defn- handle-add-shortcut-action [keymap update-keymap command shortcut _]
   (let [shortcut-str (str shortcut)]
     (update-keymap update command (fn [old-changes]
-                                    (if (and (contains? (keymap/shortcuts (keymap/default) command) shortcut)
+                                    (if (and (contains? (keymap/shortcuts (keymap/base keymap) command) shortcut)
                                              (contains? (:remove old-changes) shortcut-str))
                                       (update old-changes :remove (fnil disj #{}) shortcut-str)
                                       (update old-changes :add (fnil conj #{}) shortcut-str))))))
 
-(defn handle-remove-shortcut-action [update-keymap command shortcut _]
+(defn handle-remove-shortcut-action [keymap update-keymap command shortcut _]
   (let [shortcut-str (str shortcut)]
     (update-keymap
       update
@@ -328,7 +329,7 @@
           (contains? (:add old-changes) shortcut-str)
           (update :add (fnil disj #{}) shortcut-str)
 
-          (contains? (keymap/shortcuts (keymap/default) command) shortcut)
+          (contains? (keymap/shortcuts (keymap/base keymap) command) shortcut)
           (update :remove (fnil conj #{}) shortcut-str))))))
 
 (def ^:private ^:const new-shortcut-popup-width 400)
@@ -609,7 +610,7 @@
 
 (defn- keyboard-context-menu-items [localization-state update-keymap swap-state keymap command]
   (let [shortcuts (keymap/shortcuts keymap command)
-        default-shortcuts (keymap/shortcuts (keymap/default) command)]
+        default-shortcuts (keymap/shortcuts (keymap/base keymap) command)]
     (vec
       (e/cons
         {:fx/type fx.menu-item/lifecycle
@@ -626,7 +627,7 @@
                (e/map (fn [[text shortcut]]
                         {:fx/type fx.menu-item/lifecycle
                          :text (localization-state (localization/message "prefs.keymap.context-menu.remove" {"shortcut" text}))
-                         :on-action #(handle-remove-shortcut-action update-keymap command shortcut %)})))
+                         :on-action #(handle-remove-shortcut-action keymap update-keymap command shortcut %)})))
           (when default-shortcuts
             (let [removed-built-in-shortcuts (set/difference default-shortcuts (or shortcuts #{}))]
               (->> removed-built-in-shortcuts
@@ -635,7 +636,7 @@
                    (e/map (fn [[text shortcut]]
                             {:fx/type fx.menu-item/lifecycle
                              :text (localization-state (localization/message "prefs.keymap.context-menu.add" {"shortcut" text}))
-                             :on-action #(handle-add-shortcut-action update-keymap command shortcut %)}))))))))))
+                             :on-action #(handle-add-shortcut-action keymap update-keymap command shortcut %)}))))))))))
 
 (defn- mouse-binding-context-menu-items [localization-state swap-state update-mouse-bindings row]
   (let [{:keys [context command bindings binding-source]} row

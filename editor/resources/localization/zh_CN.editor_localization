@@ -932,6 +932,8 @@ command.code.sort-lines.option.case-sensitive = 区分大小写
 command.code.select-next-occurrence = 选择下一个匹配项
 command.code.split-selection-into-lines = 将选中内容拆分为行
 command.code.goto-definition = 转到定义
+command.code.navigate-back = 后退到上一处代码
+command.code.navigate-forward = 前进到下一处代码
 command.code.goto-line = 转到行…
 command.code.show-references = 查找引用
 command.code.toggle-minimap = 缩略图
@@ -2257,6 +2259,23 @@ prefs.label.code.inlay-hints = 行内类型提示
 prefs.label.code.enable-lua-language-server = 启用 Lua 语言服务
 prefs.help.code.enable-lua-language-server = 为当前项目的游戏脚本和编辑器脚本启用代码辅助。关闭可减少大型项目的内存占用。
 prefs.label.code.format-on-save = 保存时格式化
+
+prefs.label.window.keymap-preset = 键位预设
+prefs.help.window.keymap-preset = IDEA 导航：Ctrl+B 跳转、Alt+F7 引用、Ctrl+F9 构建。自定义快捷键优先；Ctrl+P、Ctrl+Q 预留。
+code.navigation.filter = 按文件路径或代码过滤…
+code.navigation.results = {count} / {total} 个位置（包含声明） · Enter 跳转 · Esc 关闭
+code.navigation.no-results = 未找到对应符号位置。
+
+command.code.lua-intentions = Lua 参数操作…
+code.intentions.field = 为参数创建字段
+code.intentions.parameter = 创建参数注释
+code.intentions.field-name = 字段名
+code.intentions.field-doc = 为类添加 @field 注释
+code.intentions.create = 创建
+code.intentions.invalid-name = 请输入合法的 Lua 标识符（不能使用关键字）。
+code.intentions.duplicate-field = 该字段已赋值或已声明。
+code.intentions.no-class = 当前文件未找到该表的类声明，仍可生成字段赋值。
+code.intentions.none = 请将光标放在有效 Lua 函数声明的参数名上；已有参数注释不会重复添加。
 
 gui-animation.go-title = GO 动画 · Panthera
 gui-animation.go-empty = 创建动画后，选择 GO 并设置关键帧。嵌套 GO 路径与变换值采用 Panthera 运行时坐标，预览不会修改 Collection。

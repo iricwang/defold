@@ -60,9 +60,16 @@
                 (vreset! selected nil)
                 (.unlockPreview pane))
               (when (or (not (.isPreviewLocked pane)) (nil? (:view @selected)))
-                (vreset! selected {:view (g/node-value app-view :active-view ec)
-                                   :resource (g/node-value app-view :active-resource ec)
-                                   :resource-node (g/node-value app-view :active-resource-node ec)}))
+                (let [view (g/node-value app-view :active-view ec)
+                      resource (g/node-value app-view :active-resource ec)]
+                  ;; Unsupported tabs leave the last live preview target selected.
+                  ;; Keeping the target, rather than only its image, also preserves device updates.
+                  (when (and view
+                             (contains? #{"gui" "collection" "go"} (some-> resource resource/ext))
+                             (g/node-instance? (:basis ec) scene/SceneView view))
+                    (vreset! selected {:view view
+                                       :resource resource
+                                       :resource-node (g/node-value app-view :active-resource-node ec)}))))
               (let [{:keys [view resource resource-node]} @selected
                     ext (some-> resource resource/ext)
                     supported (and (contains? #{"gui" "collection" "go"} ext)

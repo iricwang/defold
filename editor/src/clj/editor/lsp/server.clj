@@ -476,10 +476,11 @@
                                                       :insertReplaceSupport false
                                                       :resolveSupport {:properties ["detail"
                                                                                     "documentation"
+                                                                                     "labelDetails"
                                                                                     "additionalTextEdits"]}
                                                       :insertTextModeSupport {:valueSet [insert-text-mode-as-is
                                                                                          insert-text-mode-adjust-indentation]}
-                                                      :labelDetailsSupport false}
+                                                      :labelDetailsSupport true}
                                      :completionItemKind {:valueSet (vec (sort (keys completion-item-kind:lsp->editor)))}
                                      :contextSupport true
                                      :insertTextMode insert-text-mode-adjust-indentation}}}
@@ -696,7 +697,7 @@
 (defn- completion-item:lsp->editor
   [{:keys [label filterText insertText tags deprecated kind
            insertTextMode insertTextFormat commitCharacters
-           detail documentation textEdit additionalTextEdits]
+           detail labelDetails documentation textEdit additionalTextEdits]
     :or {insertTextMode insert-text-mode-adjust-indentation
          insertTextFormat insert-text-format-plaintext}
     :as source}]
@@ -712,6 +713,8 @@
         :commit-characters (set commitCharacters)
         :type (some-> kind completion-item-kind:lsp->editor)
         :detail detail
+        :label-detail (:detail labelDetails)
+        :label-description (:description labelDetails)
         :doc (cond
                (string? documentation) (->MarkupContent :plaintext documentation)
                documentation (markup-content:lsp->editor documentation))
@@ -760,7 +763,7 @@
           ;; results, but the Lua language server might return null anyway
           result
           (conj (select-keys (completion-item:lsp->editor result)
-                             [:detail :doc :additional-edits])))))))
+                             [:detail :label-detail :label-description :doc :additional-edits])))))))
 
 (defn find-references
   "See also:
