@@ -40,3 +40,4 @@ pom.xml.asc
 
 # Optional local Remote video codec (built by remote/native/build-macos.sh).
 /resources/lib/*-macos/libremote_video.dylib
+/resources/lib/x86_64-win32/remote_video.dll

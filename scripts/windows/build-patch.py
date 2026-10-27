@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
+# Copyright 2020-2026 The Defold Foundation
+# Copyright 2014-2020 King
+# Copyright 2009-2014 Ragnar Svensson, Christian Murray
+# Licensed under the Defold License version 1.0 (the "License"); you may not use
+# this file except in compliance with the License.
+#
+# You may obtain a copy of the License, together with FAQs at
+# https://www.defold.com/license
+#
+# Unless required by applicable law or agreed to in writing, software distributed
+# under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+# CONDITIONS OF ANY KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations under the License.
 """Build a Windows editor patch with matching archived or locally built engine artifacts."""
 import json
+import argparse
 import io
 import os
 from pathlib import Path
@@ -167,6 +181,8 @@ def main(*, baseline=None, full=False, engine_home=None):
     jdk = bundle.get_jdk('x86_64-win32')
     bundle.place_release_notes(options)
     bundle.init_editor(options, 'x86_64-win32', jdk)
+    from remote_video import build as build_remote_video
+    build_remote_video(jdk, ROOT / 'editor/resources/lib/x86_64-win32/remote_video.dll')
     build_windows_native(ROOT / 'scripts/windows/game-window-hook.c',
                          ROOT / 'editor/resources/_unpack/x86_64-win32/lib/game_window_hook.dll')
     bundle.invoke_lein(['run', '-m', 'editor.ns-batch-builder', 'resources/sorted_clojure_ns_list.edn'], jdk_path=jdk)
@@ -186,4 +202,7 @@ def main(*, baseline=None, full=False, engine_home=None):
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--engine-home', type=Path,
+                        help='Use the matching locally compiled engine and Bob for CI publication')
+    main(engine_home=parser.parse_args().engine_home)

@@ -138,11 +138,18 @@ def parser():
     automation = sub.add_parser('automation-build', help='Compile the local Windows background MCP worker; no packaging/install')
     automation.add_argument('--app', type=Path, required=True)
     automation.add_argument('--output', type=Path)
+    video = sub.add_parser('remote-video-build', help='Compile Windows hardware H.264 JNI locally; no editor packaging/install')
+    video.add_argument('--jdk', type=Path, required=True)
+    video.add_argument('--output', type=Path, default=ROOT / 'editor/resources/lib/x86_64-win32/remote_video.dll')
     return result
 
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    if args.command == 'remote-video-build':
+        from remote_video import build
+        build(args.jdk, args.output)
+        return
     if args.command == 'automation-build':
         sys.path.insert(0, str(ROOT / 'scripts/automation'))
         from build import prepare

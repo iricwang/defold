@@ -1,0 +1,110 @@
+{
+  "date": "2026-10-27",
+  "installed_revision": 102,
+  "delivery": "User-authorized local incremental package installed and editor restarted; no GitHub publication",
+  "installation": {
+    "app": "X:/Programs/Defold",
+    "package": "editor/target/editor/Defold-x86_64-win32-patch-101-to-102.zip",
+    "sha256": "56d826f749c656e07f2da2cc2a6f6ef384edc1e2d20b7866717d2237f80a17b6",
+    "bytes": 236136005,
+    "verification": "11 final-package tests passed during build and again during installation; exact patch.101 baseline and installed target file inventory verified",
+    "delivery_source": "Local ZIP through unified editor.py installer; published GitHub feed not used",
+    "restart": "Defold PID 91588, Java PID 83956; command line version 1.14.1-patch.102; startup log confirms patch.102 resource cache and nine native libraries loaded",
+    "build_log": "tmp/remote-windows/package.log",
+    "install_log": "tmp/remote-windows/install.log",
+    "startup_log": "X:/Programs/.defold-helper-1248271927514417007/editor.log"
+  },
+  "backend": "Windows Media Foundation hardware-only H.264; NVIDIA GeForce RTX 3060 / driver 32.0.16.1714",
+  "baseline": {
+    "baseline": true,
+    "streams": [
+      {
+        "mode": "jpeg",
+        "frames": 240,
+        "fps": 25.19428456586005,
+        "p95_interval_ms": 45.6818,
+        "mbps": 6.733768147329852
+      }
+    ],
+    "transport": "loopback, real hidden Windows engine and headless JavaFX; not phone/Wi-Fi displayed FPS",
+    "input_callbacks": 0
+  },
+  "visible_and_detached": {
+    "disconnect_release_verified": true,
+    "streams": [
+      {
+        "mode": "jpeg",
+        "frames": 900,
+        "fps": 29.54801366518393,
+        "p95_interval_ms": 41.758,
+        "mbps": 7.873250525052426
+      },
+      {
+        "mode": "h264",
+        "frames": 900,
+        "fps": 52.9321028905874,
+        "p95_interval_ms": 33.3498,
+        "mbps": 3.0794001562174143
+      }
+    ],
+    "input_callbacks": 12,
+    "transport": "loopback, real hidden Windows engine and headless JavaFX; not phone/Wi-Fi displayed FPS",
+    "baseline": false
+  },
+  "hidden_from_start": {
+    "disconnect_release_verified": true,
+    "streams": [
+      {
+        "mode": "h264",
+        "frames": 2200,
+        "fps": 56.85148590937085,
+        "p95_interval_ms": 23.1297,
+        "mbps": 3.224510385515174
+      }
+    ],
+    "input_callbacks": 8,
+    "transport": "loopback, real hidden Windows engine and headless JavaFX; not phone/Wi-Fi displayed FPS",
+    "baseline": false
+  },
+  "decode": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "profile": "Constrained Baseline",
+        "width": 1920,
+        "height": 1080,
+        "has_b_frames": 0,
+        "color_space": "bt709",
+        "nb_read_frames": "2200"
+      }
+    ]
+  },
+  "checks": {
+    "orientation_assertions": 99,
+    "native_codec": "120 frames + 720p, portrait 1080x1920, 360p, invalid input and repeated close passed",
+    "jpeg_fallback": "Optional codec absent: fallback retained",
+    "quick_tap": "Down/up preserved across completed engine captures",
+    "coordinates": "Lua coordinates asserted at quarter, three-quarter and center; lease release retains last position",
+    "disconnect": "Detached panel released held pointer after stream closure",
+    "build": "Unified remote-video-build and automation-build; local only"
+  },
+  "limitations": [
+    "Loopback host-side FPS; no Android device or Wi-Fi display-latency verification.",
+    "Test scene uses an animated clear color at 1920x1080, not a representative complex gameplay scene.",
+    "NVIDIA hardware verified; AMD candidates failed initialization on this host, Intel not tested.",
+    "Windows scaling/color conversion is CPU-side NV12; H.264 compression is hardware."
+  ],
+  "artifacts": {
+    "screen": "tmp/remote-windows/hardware-check.png",
+    "capture": "tmp/remote-windows/hidden-long-run/h264.stream",
+    "logs": "tmp/remote-windows/hidden-long-run/engine.log"
+  },
+  "inputs": {
+    "editor/src/java/com/defold/editor/GamePreview.java": "b762424fb84791ad494836d2eac164bec28aa4e26b544a2a6d60715a8b238f16",
+    "editor/src/java/com/defold/editor/RemoteVideoEncoder.java": "f966910541bf6d753ff08569697fef172c6cbc0b80d88b90ec63bf406142d584",
+    "remote/native/remote_video_windows.cpp": "cf993e8e0e8fe7ee042564470d71323539f276f03323c07616c282416fd0de28",
+    "scripts/windows/game-simulator.h": "15768a6a6c04971ccef6dcff1684f81cbf8aca9dd302fce566282a72cc976cb9"
+  }
+}

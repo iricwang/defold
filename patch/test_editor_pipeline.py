@@ -1,3 +1,16 @@
+# Copyright 2020-2026 The Defold Foundation
+# Copyright 2014-2020 King
+# Copyright 2009-2014 Ragnar Svensson, Christian Murray
+# Licensed under the Defold License version 1.0 (the "License"); you may not use
+# this file except in compliance with the License.
+#
+# You may obtain a copy of the License, together with FAQs at
+# https://www.defold.com/license
+#
+# Unless required by applicable law or agreed to in writing, software distributed
+# under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+# CONDITIONS OF ANY KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations under the License.
 """Verify resource cache upgrades and compilation using the shipped Windows editor JAR."""
 import os
 import io
@@ -13,6 +26,50 @@ import zipfile
 @unittest.skipUnless(os.name == 'nt' and os.environ.get('DEFOLD_PATCH_TEST_JAR'),
                      'Windows editor JAR required')
 class EditorPipelineTest(unittest.TestCase):
+    # The shipped Windows codec must load; supported hardware must produce decodable configuration.
+    def test_packaged_windows_remote_video(self):
+        root = Path(__file__).resolve().parents[1]
+        jar = os.environ['DEFOLD_PATCH_TEST_JAR']
+        with zipfile.ZipFile(jar) as archive:
+            self.assertIn('lib/x86_64-win32/remote_video.dll', archive.namelist())
+        java = Path(os.environ['JAVA_HOME']) / 'bin/java.exe'
+        compiler = java.with_name('javac.exe')
+        if not compiler.exists():
+            compiler = next((root / 'editor/build/jdk/x86_64-win32').glob('jdk-*/bin/javac.exe'))
+        with tempfile.TemporaryDirectory(prefix='remote-video-', dir=root / 'tmp') as directory:
+            compiled = subprocess.run([str(compiler), '-cp', jar, '-d', directory,
+                str(root / 'remote/tests/java/RemoteVideoTest.java')], capture_output=True, text=True,
+                errors='replace', timeout=60, creationflags=subprocess.CREATE_NO_WINDOW)
+            self.assertEqual(0, compiled.returncode, compiled.stdout + compiled.stderr)
+            result = subprocess.run([str(java), '--enable-native-access=ALL-UNNAMED', '-cp', directory + os.pathsep + jar,
+                'RemoteVideoTest', str(Path(directory) / 'encoded.h264'), 'optional'], capture_output=True, text=True,
+                errors='replace', timeout=60, creationflags=subprocess.CREATE_NO_WINDOW)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    # Windows bottom-up capture must become top-left Remote frames at every quality.
+    def test_packaged_remote_frame_orientation(self):
+        root = Path(__file__).resolve().parents[1]
+        java = Path(os.environ['JAVA_HOME']) / 'bin/java.exe'
+        compiler = java.with_name('javac.exe')
+        if not compiler.exists():
+            compiler = next((root / 'editor/build/jdk/x86_64-win32').glob('jdk-*/bin/javac.exe'))
+        jar = os.environ['DEFOLD_PATCH_TEST_JAR']
+        with tempfile.TemporaryDirectory(prefix='remote-orientation-', dir=root / 'tmp') as directory:
+            classes = Path(directory) / 'classes'
+            classes.mkdir()
+            compilation = subprocess.run(
+                [str(compiler), '-cp', jar, '-d', str(classes),
+                 str(root / 'remote/tests/java/RemoteFrameTest.java')],
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+            self.assertEqual(0, compilation.returncode, compilation.stdout + compilation.stderr)
+            result = subprocess.run(
+                [str(java), '--enable-native-access=ALL-UNNAMED', '-Dglass.platform=headless', '-Dprism.order=sw',
+                 '-cp', str(classes) + os.pathsep + jar, 'com.defold.editor.RemoteFrameTest', directory],
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
     # Native RectTransform fields must survive the actual shipped Bob protocol.
     def test_packaged_gui_rect_transform_protocol(self):
         code = """(import 'com.dynamo.gamesys.proto.Gui$NodeDesc)
@@ -42,7 +99,7 @@ class EditorPipelineTest(unittest.TestCase):
                             source (java.io.File. original "x86_64-win32/lib/game_window_hook.dll")]
                         (try
                           (dotimes [i 40]
-                            (let [cache (java.io.File. {json.dumps(directory)} (str "cache 路径 " i))
+                            (let [cache (java.io.File. {json.dumps(directory)} (str {json.dumps('cache 路径 ')} i))
                                   dll (java.io.File. cache "x86_64-win32/lib/game_window_hook.dll")]
                               (.mkdirs (.getParentFile dll))
                               (clojure.java.io/copy source dll)
@@ -53,7 +110,7 @@ class EditorPipelineTest(unittest.TestCase):
                               (let [p (com.defold.editor.WindowsGameProcess/start
                                         [{json.dumps(str(probe))}] (java.io.File. {json.dumps(directory)}) {{}})
                                     output (with-open [stream (.getInputStream p)] (slurp stream))]
-                                (assert (= 0 (.waitFor p)) output)
+                                (assert (= 0 (.waitFor p)) (str "Cache iteration " i ": " output))
                                 (assert (.contains output "HIDDEN_STARTUP_AND_ADOPTION_OK") output)
                                 (assert (not (.isAlive p))))))
                           (println "FRESH_CACHE_STARTS_OK 40")

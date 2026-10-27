@@ -55,7 +55,9 @@ The Android control bar counts distinct UI-presented frames over a rolling one-s
 ## Hardware video extension (editor patch.95 / APK 0.5.0)
 
 `status` and catalog entries advertise `video_codecs: ["h264", "jpeg"]` when the
-optional macOS native codec is loaded; other platforms advertise `["jpeg"]`.
+optional macOS VideoToolbox or Windows Media Foundation hardware codec is available;
+unsupported hosts advertise `["jpeg"]`. Windows probes a hardware encoder before
+advertising H.264 and retains JPEG fallback on unsupported devices.
 Protocol remains 2, and existing `/stream` clients remain compatible.
 
 `GET /games/{id}/video?resolution=540p|720p|1080p|original` requires the same bearer

@@ -24,13 +24,21 @@ public final class RemoteVideoEncoder implements AutoCloseable {
     final int width, height;
     public static boolean available() { return AVAILABLE; }
     private static boolean load() {
-        if (!System.getProperty("os.name", "").startsWith("Mac")) return false;
+        boolean windows = System.getProperty("os.name", "").startsWith("Windows");
+        if (!windows && !System.getProperty("os.name", "").startsWith("Mac")) return false;
         String arch = System.getProperty("os.arch").equals("aarch64") ? "arm64" : "x86_64";
-        try (InputStream input = RemoteVideoEncoder.class.getResourceAsStream("/lib/" + arch + "-macos/libremote_video.dylib")) {
+        String resource = windows ? "/lib/x86_64-win32/remote_video.dll" : "/lib/" + arch + "-macos/libremote_video.dylib";
+        try (InputStream input = RemoteVideoEncoder.class.getResourceAsStream(resource)) {
             if (input == null) return false;
-            Path library = Files.createTempFile("defold-remote-video-", ".dylib");
+            Path library = Files.createTempFile("defold-remote-video-", windows ? ".dll" : ".dylib");
             Files.copy(input, library, StandardCopyOption.REPLACE_EXISTING);
-            library.toFile().deleteOnExit(); System.load(library.toString()); return true;
+            library.toFile().deleteOnExit(); System.load(library.toString());
+            if (windows) {
+                long probe = create(640, 360);
+                if (probe == 0) return false;
+                destroy(probe);
+            }
+            return true;
         } catch (IOException | LinkageError | SecurityException e) {
             System.err.println("Remote hardware video unavailable: " + e.getMessage()); return false;
         }

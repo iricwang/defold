@@ -218,7 +218,11 @@ static BOOL WINAPI SimulatorSwapBuffers(HDC dc)
                     simulator_data[276] = request;
                 }
                 simulator_served = request;
-                simulator_last_capture = now;
+                /* Preserve the 60 Hz phase. Resetting to 'now' skips every other
+                 * frame when a nominal 60 Hz render tick arrives slightly early. */
+                LONGLONG interval = frequency.QuadPart / 60;
+                simulator_last_capture.QuadPart = now.QuadPart - simulator_last_capture.QuadPart > interval * 2
+                    ? now.QuadPart : simulator_last_capture.QuadPart + interval;
                 UnlockFileEx(simulator_file, 0, MAXDWORD, MAXDWORD, &lock);
             }
         }

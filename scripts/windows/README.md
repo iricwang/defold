@@ -3,6 +3,7 @@
 统一入口：在仓库根目录运行 `scripts\windows\editor.cmd`，或使用
 `python -X utf8 scripts/windows/editor.py`。不再为每个版本另写临时构建脚本。
 需要 Python 3.12+、Java 25、Git Bash，以及 MinGW GCC 或 Visual Studio C++ Build Tools。
+Remote H.264 原生库还需要 MSVC 和 Windows SDK（使用系统 Media Foundation 硬件编码器）。
 依赖下载沿用仓库缓存。脚本使用短临时目录，后台安装不弹命令行窗口。
 
 ## 日常功能验证：先热加载，验收后再打包
@@ -44,6 +45,11 @@ scripts\windows\editor.cmd reload --port 19941 --pid <Java进程号> --namespace
 须执行相应编译和重启验证。正式发布仍执行完整的精确基线与最终包校验。
 
 ## 常用命令
+
+Remote 硬件编码的独立开发编译入口：
+`python -X utf8 scripts/windows/editor.py remote-video-build --jdk "C:/path/to/jdk-25"`。
+只编译 JNI DLL，不打包或安装编辑器；正式 `patch` / `full` 自动调用同一构建函数。
+实现和验证说明见 [Remote 原生编码](../../remote/native/README.md)。
 
 后台 Game MCP 的开发编译入口是 `automation-build --app X:\Programs\Defold`，仅构建独立 Java/native worker，不打包或安装编辑器。使用方式和能力边界见 [后台 MCP](../automation/README.md)。
 

@@ -121,7 +121,7 @@ jobs:
 
   build-windows:
     name: Patch (x86_64-win32)
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -134,6 +134,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25.0.4+101.0.LTS'
+      - uses: lukka/get-cmake@fffaaafeea488556c2c12dad60690008bc1caacb
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
@@ -143,10 +144,22 @@ jobs:
           key: windows-patch-${{ hashFiles('editor/project.clj', 'editor/scripts/lein') }}
       - name: Test patch packaging
         run: python -X utf8 -m unittest discover -s patch -p 'test_*.py'
+      - name: Build matching Windows engine and Bob
+        shell: bash
+        run: |
+          mkdir -p tmp
+          python -X utf8 scripts/build.py --save-env-path=tmp/windows-build-env.sh save_env
+          source tmp/windows-build-env.sh
+          python -X utf8 scripts/build.py install_ext check_sdk --platform=x86_64-win32
+          python -X utf8 scripts/build.py build_engine --platform=x86_64-win32 --skip-tests -- --skip-build-tests
+          python -X utf8 scripts/build.py build_bob --platform=x86_64-win32 --skip-tests --keep-bob-uncompressed
       - name: Build and verify Windows patch resources and cache upgrades
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -X utf8 scripts/windows/build-patch.py
+        run: |
+          source tmp/windows-build-env.sh
+          python -X utf8 scripts/windows/build-patch.py --engine-home "$DYNAMO_HOME"
       - name: Test Windows installation and restart
         shell: pwsh
         run: |
@@ -156,6 +169,7 @@ jobs:
       - name: Test Windows panel drag and redocking events
         shell: bash
         run: |
+          source tmp/windows-build-env.sh
           python -X utf8 - <<'PY'
           import os
           from pathlib import Path
@@ -165,8 +179,8 @@ jobs:
           root = Path.cwd()
           editor = root / 'editor'
           shutil.move(editor / 'target/classes', editor / 'target/release-classes')
-          env = dict(os.environ, DYNAMO_HOME=str(root / 'tmp/windows-patch-home'),
-                     DM_BOB_JAR=str(root / 'tmp/windows-patch-home/share/java/bob-editor.jar'),
+          env = dict(os.environ,
+                     DM_BOB_JAR=str(Path(os.environ['DYNAMO_HOME']) / 'share/java/bob-editor.jar'),
                      DM_EDITOR_USE_BOB_PROTOCOLS='1', LEIN_HOME=str(editor / 'build/lein'))
           code = "(javafx.application.Platform/startup (fn [] (javafx.application.Platform/setImplicitExit false))) (require 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test 'editor.code.insight-test 'editor.lsp.defold-lua-test) (let [r (clojure.test/run-tests 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test 'editor.code.insight-test 'editor.lsp.defold-lua-test)] (System/exit (if (zero? (+ (:fail r) (:error r))) 0 1)))"
           subprocess.run(['bash', 'scripts/lein', 'with-profile', '+offline', 'run',

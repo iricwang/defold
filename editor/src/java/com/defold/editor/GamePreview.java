@@ -47,6 +47,9 @@ public final class GamePreview implements AutoCloseable {
     private volatile long remoteInputTime;
     private int remoteX, remoteY;
     private boolean remotePressed;
+    private boolean remotePosition;
+    private Session remotePointerSession;
+    private int remotePointerSequence;
     private final BiConsumer<Object, String> localize;
     private final VBox root = new VBox();
     private final StackPane viewport = new StackPane();
@@ -240,6 +243,11 @@ public final class GamePreview implements AutoCloseable {
                 return;
             }
             if (session == null) return;
+            if (e.getEventType() == MouseEvent.MOUSE_MOVED || e.getEventType() == MouseEvent.MOUSE_DRAGGED
+                    || e.getEventType() == MouseEvent.MOUSE_PRESSED || e.getEventType() == MouseEvent.MOUSE_RELEASED) {
+                remotePosition = false;
+                remoteRelease();
+            }
             if (e.getEventType() == MouseEvent.MOUSE_PRESSED) viewport.requestFocus();
             if (pixels != null) {
                 double[] point = gamePoint(viewport.getWidth(), viewport.getHeight(), pixels.getWidth(), pixels.getHeight(), e.getX(), e.getY());
@@ -384,7 +392,7 @@ public final class GamePreview implements AutoCloseable {
         if (view.remote != null) view.remote.resetFrames();
         Session next = new Session(view.targetFrameRate, view.simulator.active ? view.simulator.device : null, view.simulator.rotation);
         view.session = next;
-        Platform.runLater(() -> { view.showGame.run(); view.updateTitle(); view.sequence = 0; view.image.setImage(null); view.image.setScaleY(next.simulatorWindow != null ? -1 : 1); view.pixels = null;
+        Platform.runLater(() -> { view.remotePosition = false; view.remotePressed = false; view.showGame.run(); view.updateTitle(); view.sequence = 0; view.image.setImage(null); view.image.setScaleY(next.simulatorWindow != null ? -1 : 1); view.pixels = null;
             view.previewMode.setVisible(false);
             view.releaseInput(); view.status.setVisible(true); view.localize.accept(view.status, "game-preview.starting"); });
         return next;
@@ -428,27 +436,33 @@ public final class GamePreview implements AutoCloseable {
         // alive for the entire FX read; Session.close uses the same monitor.
         synchronized (current) {
             if (current.closed || current != session) return;
-            if (root.getScene() == null || root.getScene().getWindow() == null) {
+            javafx.stage.Window host = root.getScene() == null ? null : root.getScene().getWindow();
+            if (host == null && !remotePressed && (remote == null || !remote.hasStream())) {
                 if (current.window != null) current.window.hide();
                 return;
             }
             if (current.process != null && !current.process.isAlive()) {
                 localize.accept(status, "game-preview.stopped"); status.setVisible(true); stop(); return;
             }
-            if (current.isSimulator()) {
-                boolean showing = remote != null && remote.hasStream() || com.sun.javafx.scene.NodeHelper.isTreeShowing(root)
+            boolean localShowing = host != null && com.sun.javafx.scene.NodeHelper.isTreeShowing(root)
                     && viewport.getWidth() > 1 && viewport.getHeight() > 1
-                    && !(root.getScene().getWindow() instanceof javafx.stage.Stage stage && stage.isIconified());
+                    && !(host instanceof javafx.stage.Stage stage && stage.isIconified());
+            if (current.isSimulator()) {
+                boolean showing = remote != null && remote.hasStream() || localShowing;
                 current.data.putInt(1060, showing ? 1 : 0);
                 if (!showing) {
                     releaseInput();
                     if (current.simulatorWindow != null)
-                        current.simulatorWindow.input(mouseX, mouseY, 0, 0, keys, text);
+                        current.simulatorWindow.input(
+                            remotePosition ? (int)((long)remoteX * Math.max(0, current.data.getInt(4)-1) / 65535) : mouseX,
+                            remotePosition ? (int)((long)remoteY * Math.max(0, current.data.getInt(8)-1) / 65535) : mouseY,
+                            0, 0, keys, text);
                     else {
                         try (FileLock lock = current.channel.tryLock()) {
                             if (lock != null) { current.data.putInt(20, 0); current.data.putInt(32, 0); }
                         } catch (IOException | IllegalStateException error) { stop(); }
                     }
+                    remotePressed = false;
                     return;
                 }
             }
@@ -467,14 +481,11 @@ public final class GamePreview implements AutoCloseable {
             if (current.simulatorWindow != null) {
                 try {
                     current.simulatorWindow.updateSimulator(current.process, current.device.pixelWidth(simulator.rotation), current.device.pixelHeight(simulator.rotation));
-                    if (!root.getScene().getWindow().isFocused() || root.getScene().getFocusOwner() != viewport) releaseInput();
-                    current.simulatorWindow.input(mouseX, mouseY, buttons, wheel, keys, text);
-                    wheel = 0;
                 } catch (RuntimeException error) {
                     error.printStackTrace(); stop(); return;
                 }
             }
-            if (sequence == 0 && System.nanoTime() - current.started > 30_000_000_000L) {
+            if (current.data.getInt(12) == 0 && System.nanoTime() - current.started > 30_000_000_000L) {
                 stop();
                 localize.accept(status, "game-preview.simulator-timeout"); status.setVisible(true);
                 return;
@@ -483,28 +494,45 @@ public final class GamePreview implements AutoCloseable {
                 if (lock == null) return;
                 ByteBuffer data = current.data;
                 updateResourcePick(current, data);
-                boolean nowFocused = root.getScene().getWindow().isFocused();
+                boolean nowFocused = host != null && host.isFocused();
                 boolean focused = nowFocused && root.getScene().getFocusOwner() == viewport;
                 if (!focused || (windowFocused && !nowFocused)) releaseInput();
                 windowFocused = nowFocused;
                 boolean remoteControl = remoteInputTime != 0 && System.nanoTime() - remoteInputTime < 1_000_000_000L;
-                int[] pointer = remotePointers.poll();
+                boolean releaseRemote = !remoteControl && remotePressed;
+                // Preserve tap edges until the engine has completed a frame; FX
+                // pulses can run faster than the game's input/render loop.
+                int[] pointer = remotePointerSession != current || remotePointerSequence != data.getInt(12)
+                    ? remotePointers.poll() : null;
                 if (pointer != null && remotePressed && pointer[2] != 0) {
                     int[] newer;
                     while ((newer = remotePointers.peek()) != null && newer[2] != 0) {
                         newer = remotePointers.poll(); if (newer == null) break; pointer = newer;
                     }
                 }
-                if (pointer != null && remoteControl) { remoteX = pointer[0]; remoteY = pointer[1]; remotePressed = pointer[2] != 0; }
+                if (pointer != null && remoteControl) {
+                    remoteX = pointer[0]; remoteY = pointer[1]; remotePressed = pointer[2] != 0;
+                    remotePosition = true; remotePointerSession = current; remotePointerSequence = data.getInt(12);
+                }
                 if (!remoteControl) { remotePressed = false; remotePointers.clear(); }
-                data.putInt(20, focused || remoteControl ? 1 : 0);
-                data.putInt(24, remoteControl ? (int)((long)remoteX * Math.max(0, data.getInt(4)-1) / 65535) : mouseX);
-                data.putInt(28, remoteControl ? (int)((long)remoteY * Math.max(0, data.getInt(8)-1) / 65535) : mouseY);
-                data.putInt(32, remoteControl ? (remotePressed ? 1 : 0) : buttons); data.putInt(36, wheel);
+                boolean useRemote = remoteControl || releaseRemote;
+                data.putInt(20, focused || useRemote ? 1 : 0);
+                data.putInt(24, remotePosition ? (int)((long)remoteX * Math.max(0, data.getInt(4)-1) / 65535) : mouseX);
+                data.putInt(28, remotePosition ? (int)((long)remoteY * Math.max(0, data.getInt(8)-1) / 65535) : mouseY);
+                data.putInt(32, useRemote ? (remotePressed ? 1 : 0) : buttons); data.putInt(36, wheel);
+                // Windows consumes window messages, whereas macOS consumes the shared
+                // input fields. Dispatch the same resolved controller state to both.
+                if (current.simulatorWindow != null) {
+                    current.simulatorWindow.input(data.getInt(24), data.getInt(28), data.getInt(32), wheel, keys, text);
+                    wheel = 0;
+                }
                 data.position(64); data.put(keys);
                 int count = Math.min(128, data.getInt(40));
                 while (count < 128 && !text.isEmpty()) data.putInt(512 + 4*count++, text.removeFirst());
                 data.putInt(40, count);
+                // A detached/minimized panel still pumps input but does not need a
+                // second frame copy and JavaFX upload. Remote owns its readback demand.
+                if (!localShowing) return;
                 int w = data.getInt(4), h = data.getInt(8), next = data.getInt(12);
                 if (current.isSimulator() && data.getInt(52) != 1) return;
                 if (data.getInt(16) == -1) { localize.accept(status, "game-preview.resolution-limit"); status.setVisible(true); return; }
@@ -573,6 +601,12 @@ public final class GamePreview implements AutoCloseable {
             try (FileLock lock=current.channel.tryLock()) {
                 if (lock==null) return null;
                 ByteBuffer data=current.data;
+                // Remote must drive readback independently of JavaFX presentation:
+                // collapsed/minimized Game panels must not stall the phone stream.
+                if (current.isSimulator()) {
+                    data.putInt(1060, 1);
+                    data.putInt(1068, data.getInt(1068) + 1);
+                }
                 int sequence=data.getInt(12), width=data.getInt(4), height=data.getInt(8), slot=data.getInt(44);
                 if (current==previousSession && sequence==previousSequence || width<=0 || height<=0
                     || width>4096 || height>4096 || (long)width*height*4>current.slotSize || slot<0 || slot>1) return null;
@@ -582,9 +616,24 @@ public final class GamePreview implements AutoCloseable {
                 int[] source=reuse!=null&&reuse.length==width*height?reuse:new int[width*height];
                 ByteBuffer pixels=data.duplicate().order(data.order());pixels.position(base);pixels.asIntBuffer().get(source);
                 int[] rgb=source;
+                // Windows glReadPixels stores bottom-up rows. The local ImageView
+                // flips them, but Remote encoders need top-left rows themselves.
+                // Keep X unchanged: reversing the full array would mirror text.
+                boolean bottomUp=current.simulatorWindow!=null;
                 if(outW!=width||outH!=height){
                     rgb=new int[outW*outH];
-                    for(int y=0;y<outH;y++)for(int x=0;x<outW;x++)rgb[y*outW+x]=source[(y*height/outH)*width+x*width/outW];
+                    for(int y=0;y<outH;y++){
+                        int sourceY=y*height/outH;
+                        if(bottomUp)sourceY=height-1-sourceY;
+                        for(int x=0;x<outW;x++)rgb[y*outW+x]=source[sourceY*width+x*width/outW];
+                    }
+                }else if(bottomUp){
+                    for(int y=0;y<height/2;y++){
+                        int top=y*width,bottom=(height-1-y)*width;
+                        for(int x=0;x<width;x++){
+                            int pixel=rgb[top+x];rgb[top+x]=rgb[bottom+x];rgb[bottom+x]=pixel;
+                        }
+                    }
                 }
                 return new RemoteFrame(current, sequence, outW, outH, rgb);
             }
