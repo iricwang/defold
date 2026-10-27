@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Each editor runner builds and validates its own executable tools. Full Bob CI
+# retains its separate all-host artifact requirement.
+env:
+  DEFOLD_BOB_TOOL_SCOPE: host
+
 concurrency:
   group: macos-dmg-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

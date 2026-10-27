@@ -1,3 +1,17 @@
+// Copyright 2020-2026 The Defold Foundation
+// Copyright 2014-2020 King
+// Copyright 2009-2014 Ragnar Svensson, Christian Murray
+// Licensed under the Defold License version 1.0 (the "License"); you may not use
+// this file except in compliance with the License.
+//
+// You may obtain a copy of the License, together with FAQs at
+// https://www.defold.com/license
+//
+// Unless required by applicable law or agreed to in writing, software distributed
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations under the License.
+
 import groovy.json.JsonSlurper
 import org.apache.tools.ant.types.selectors.SelectorUtils
 
@@ -20,8 +34,14 @@ def isLightTool = { String path ->
     lightToolPatterns.any { SelectorUtils.matchPath(it, platformPath) }
 }
 def desktopPlatforms = ['x86_64-macos', 'arm64-macos', 'x86_64-linux', 'arm64-linux', 'x86_64-win32']
-def requireAllTools = System.getenv('CI')?.toBoolean() || System.getenv('GITHUB_ACTIONS')?.toBoolean() ||
-        System.getenv('GITHUB_WORKFLOW') != null
+// Desktop editor jobs compile host tools independently; standalone Bob CI still
+// requires every host. The editor removes non-host tools when assembling its JAR.
+def toolScope = System.getenv('DEFOLD_BOB_TOOL_SCOPE') ?: 'all'
+if (!(toolScope in ['all', 'host'])) {
+    throw new GradleException("Invalid DEFOLD_BOB_TOOL_SCOPE: ${toolScope}")
+}
+def requireAllTools = toolScope == 'all' && (System.getenv('CI')?.toBoolean() ||
+        System.getenv('GITHUB_ACTIONS')?.toBoolean() || System.getenv('GITHUB_WORKFLOW') != null)
 
 def libraryName = { String platform, String name ->
     platform.endsWith('win32') ? "${name}.dll" : "lib${name}.${platform.endsWith('macos') ? 'dylib' : 'so'}"

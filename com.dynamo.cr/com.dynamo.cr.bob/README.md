@@ -47,6 +47,10 @@ into their usual `$DYNAMO_HOME/ext/bin/<platform>` and `ext/lib/<platform>` path
 preserving locally built tools for the current host and selected target.
 Full Bob requires them for all desktop hosts; Bob Light requires the current
 host's LuaJIT executable and Ogg libraries.
+Independent desktop-editor CI jobs set `DEFOLD_BOB_TOOL_SCOPE=host`: all tools
+needed on the build host remain mandatory, while tools for other desktop hosts
+are optional (the final editor JAR excludes them). Standalone Bob CI defaults to
+`all` and still requires every host's tools. Unsupported scope values fail the build.
 The LuaJIT modules installed in `$DYNAMO_HOME/ext` are assembled into
 `tmp/luajit-share.zip` and packaged inside each JAR as `lib/luajit-share.zip`.
 Both JAR tasks track the manifests as inputs, so changing a list updates the
