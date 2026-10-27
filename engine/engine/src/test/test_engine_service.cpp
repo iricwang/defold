@@ -14,6 +14,7 @@
 
 #include "test_engine.h"
 #include "../engine_service_private.h"
+#include "../engine_remote.h"
 #include <dlib/atomic.h>
 #include <dlib/http/http_client.h>
 #include <dlib/socket.h>
@@ -112,6 +113,8 @@ public:
     dmArray<char> m_Body;
     char m_ContentType[64];
     char m_Allow[16];
+    char m_TransferEncoding[32];
+    const char* m_Token;
     int m_Status;
     int32_atomic_t m_Done;
     const char* m_Method;
@@ -120,6 +123,7 @@ public:
 
     void SetUp()
     {
+        m_Token = 0;
         dmSocket::Initialize();
         m_Service = dmEngineService::New(0);
         ASSERT_NE((dmEngineService::HEngineService)0, m_Service);
@@ -138,6 +142,8 @@ public:
     {
         EngineServiceOpenAPITest* self = (EngineServiceOpenAPITest*)context;
         self->m_Status = status;
+        if (dmStrCaseCmp(key, "Transfer-Encoding") == 0)
+            dmStrlCpy(self->m_TransferEncoding, value, sizeof(self->m_TransferEncoding));
         if (dmStrCaseCmp(key, "Content-Type") == 0)
             dmStrlCpy(self->m_ContentType, value, sizeof(self->m_ContentType));
         if (dmStrCaseCmp(key, "Allow") == 0)
@@ -158,6 +164,12 @@ public:
         }
     }
 
+    static dmHttpClient::Result WriteHeaders(dmHttpClient::HResponse response, void* context)
+    {
+        EngineServiceOpenAPITest* self = (EngineServiceOpenAPITest*)context;
+        return self->m_Token ? dmHttpClient::WriteHeader(response, "X-Defold-Remote-Token", self->m_Token) : dmHttpClient::RESULT_OK;
+    }
+
     static void Request(void* context)
     {
         EngineServiceOpenAPITest* self = (EngineServiceOpenAPITest*)context;
@@ -168,6 +180,7 @@ public:
         dmHttpClient::NewParams params;
         params.m_Userdata = self;
         params.m_HttpHeader = Header;
+        params.m_HttpWriteHeaders = WriteHeaders;
         params.m_HttpContent = Content;
         params.m_RequestTimeout = 5000000;
         params.m_MaxGetRetries = 1;
@@ -184,6 +197,7 @@ public:
         m_Status = 0;
         m_ContentType[0] = 0;
         m_Allow[0] = 0;
+        m_TransferEncoding[0] = 0;
         m_Body.SetSize(0);
         dmAtomicStore32(&m_Done, 0);
         dmThread::Thread client = dmThread::New(Request, 0x80000, this, "openapi-client");
@@ -294,6 +308,58 @@ TEST_P(EngineServiceOpenAPITest, ExtensionLifecycle)
     ASSERT_STREQ("text/html", m_ContentType);
 }
 
+// Verifies authentication errors reach the client instead of being accidentally sent as HTTP 200.
+TEST_F(EngineServiceOpenAPITest, RemoteHttpAuthorization)
+{
+    dmEngineService::RemoteState remote;
+    remote.m_Token[0] = 0;
+    dmWebServer::HServer server = dmEngineService::GetWebServer(m_Service);
+    ASSERT_EQ(dmWebServer::RESULT_OK, dmWebServer::RemoveHandler(server, "/remote"));
+    dmWebServer::HandlerParams params;
+    params.m_Handler = dmEngineService::RemoteState::Handler;
+    params.m_Userdata = &remote;
+    ASSERT_EQ(dmWebServer::RESULT_OK, dmWebServer::AddHandler(server, "/remote", &params));
+    Fetch("GET", "/remote/status");
+    ASSERT_EQ(404, m_Status);
+    dmStrlCpy(remote.m_Token, "0123456789abcdef", sizeof(remote.m_Token));
+    Fetch("GET", "/remote/status");
+    ASSERT_EQ(403, m_Status);
+    m_Token = "0123456789abcdef";
+    Fetch("GET", "/remote/status");
+    ASSERT_EQ(200, m_Status);
+    ASSERT_NE((const char*)0, strstr(m_Body.Begin(), "\"protocol\":1"));
+    Fetch("GET", "/remote/input");
+    ASSERT_EQ(405, m_Status);
+    ASSERT_STREQ("POST", m_Allow);
+    Fetch("GET", "/remote/unknown");
+    ASSERT_EQ(404, m_Status);
+}
+
+// Verifies an unavailable frame is a bodyless HTTP 204, without illegal chunked transfer framing.
+TEST_F(EngineServiceOpenAPITest, RemoteHttpNoContent)
+{
+    dmEngineService::RemoteState remote;
+    dmStrlCpy(remote.m_Token, "0123456789abcdef", sizeof(remote.m_Token));
+    dmWebServer::HServer server = dmEngineService::GetWebServer(m_Service);
+    ASSERT_EQ(dmWebServer::RESULT_OK, dmWebServer::RemoveHandler(server, "/remote"));
+    dmWebServer::HandlerParams params;
+    params.m_Handler = dmEngineService::RemoteState::Handler;
+    params.m_Userdata = &remote;
+    ASSERT_EQ(dmWebServer::RESULT_OK, dmWebServer::AddHandler(server, "/remote", &params));
+    m_Token = "0123456789abcdef";
+    Fetch("GET", "/remote/frame");
+    ASSERT_EQ(204, m_Status);
+    ASSERT_STREQ("", m_TransferEncoding);
+    ASSERT_EQ(1, m_Body.Size()); // Fixture's trailing zero only.
+    ASSERT_TRUE(remote.m_Requested);
+    ASSERT_NE((void*)0, remote.Buffer(1, 1));
+    remote.Publish();
+    Fetch("GET", "/remote/frame");
+    ASSERT_EQ(200, m_Status);
+    ASSERT_EQ(21, m_Body.Size());
+    ASSERT_EQ(0, memcmp("DFR1", m_Body.Begin(), 4));
+}
+
 static const bool profiler_initialization_orders[] = {false, true};
 INSTANTIATE_TEST_CASE_P(ProfilerInitializationOrder, EngineServiceOpenAPITest, jc_test_values_in(profiler_initialization_orders));
 
@@ -390,3 +456,99 @@ TEST_F(EngineServiceOpenAPITest, DiscoveryRequestValidation)
 }
 
 #endif
+
+
+// Verifies Remote stays disabled without a valid explicit token and rejects mismatched tokens.
+TEST_F(EngineTest, RemoteAuthentication)
+{
+    dmEngineService::RemoteState state;
+    state.m_Token[0] = 0;
+    ASSERT_FALSE(state.Authorized(""));
+    dmStrlCpy(state.m_Token, "0123456789abcdef", sizeof(state.m_Token));
+    ASSERT_FALSE(state.Authorized(0));
+    ASSERT_FALSE(state.Authorized("0123456789abcde"));
+    ASSERT_FALSE(state.Authorized("0123456789abcdeg"));
+    ASSERT_TRUE(state.Authorized("0123456789abcdef"));
+}
+
+// Verifies quick taps preserve both edges, bounded queues reject overflow, and disconnect releases input.
+TEST_F(EngineTest, RemotePointerQueueAndTimeout)
+{
+    dmEngineService::RemoteState state;
+    uint8_t packet[] = {0xff, 0xff, 0, 0x80, 1};
+    ASSERT_FALSE(state.Enqueue(packet, 4));
+    ASSERT_TRUE(state.Enqueue(packet, 5));
+    packet[4] = 0;
+    ASSERT_TRUE(state.Enqueue(packet, 5));
+    dmEngineService::RemoteInput input;
+    ASSERT_TRUE(state.Input(&input));
+    ASSERT_EQ(65535, input.m_X);
+    ASSERT_EQ(32768, input.m_Y);
+    ASSERT_TRUE(input.m_Pressed);
+    ASSERT_TRUE(state.Input(&input));
+    ASSERT_FALSE(input.m_Pressed);
+    packet[4] = 1;
+    for (uint32_t i = 0; i < 64; ++i) ASSERT_TRUE(state.Enqueue(packet, 5));
+    ASSERT_FALSE(state.Enqueue(packet, 5));
+    state.m_InputTime = dmTime::GetMonotonicTime() - 1000001;
+    ASSERT_TRUE(state.Input(&input));
+    ASSERT_FALSE(input.m_Pressed);
+    ASSERT_FALSE(state.Input(&input));
+}
+
+// Verifies on-demand capture, explicit byte order, size limits, and reboot clearing old frames/input.
+TEST_F(EngineTest, RemoteFrameWireFormatAndReset)
+{
+    dmEngineService::RemoteState state;
+    dmStrlCpy(state.m_Token, "0123456789abcdef", sizeof(state.m_Token));
+    ASSERT_EQ((void*)0, state.Buffer(2, 1));
+    state.m_Requested = true;
+    ASSERT_EQ((void*)0, state.Buffer(0, 1));
+    ASSERT_EQ((void*)0, state.Buffer(4097, 1));
+    uint8_t* buffer = (uint8_t*)state.Buffer(2, 1);
+    ASSERT_NE((void*)0, buffer);
+    const uint8_t pixels[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    memcpy(buffer, pixels, sizeof(pixels));
+    state.Publish();
+    ASSERT_EQ(24, state.m_Frame.Size());
+    ASSERT_EQ(0, memcmp("DFR1\x02\0\0\0\x01\0\0\0\x01\0\0\0", state.m_Frame.Begin(), 16));
+    ASSERT_EQ(0, memcmp(pixels, state.m_Frame.Begin() + 16, 8));
+    ASSERT_EQ((void*)0, state.Buffer(2, 1));
+    state.Reset();
+    ASSERT_EQ(0, state.m_Frame.Size());
+    dmEngineService::RemoteInput input;
+    ASSERT_FALSE(state.Input(&input));
+}
+
+// Verifies capture pacing rejects early requests, resumes at the deadline, and resets on reboot.
+TEST_F(EngineTest, RemoteFramePacing)
+{
+    dmEngineService::RemoteState state;
+    dmStrlCpy(state.m_Token, "0123456789abcdef", sizeof(state.m_Token));
+    state.m_Requested = true;
+    state.m_NextFrameTime = dmTime::GetMonotonicTime() + 1000000;
+    ASSERT_EQ((void*)0, state.Buffer(2, 1));
+    state.m_NextFrameTime = dmTime::GetMonotonicTime();
+    ASSERT_NE((void*)0, state.Buffer(2, 1));
+    state.Publish();
+    ASSERT_GE(state.m_NextFrameTime, state.m_FrameTime);
+    ASSERT_LE(state.m_NextFrameTime, state.m_FrameTime + 16667);
+    state.Reset();
+    ASSERT_EQ(0, state.m_NextFrameTime);
+}
+
+// Verifies large and narrow frames retain aspect ratio without zero-sized output.
+TEST_F(EngineTest, RemoteFrameDownsample)
+{
+    dmEngineService::RemoteState state;
+    dmStrlCpy(state.m_Token, "0123456789abcdef", sizeof(state.m_Token));
+    state.m_Requested = true;
+    ASSERT_NE((void*)0, state.Buffer(1920, 1080));
+    state.Publish();
+    ASSERT_EQ(16 + 960 * 540 * 4, state.m_Frame.Size());
+    state.Reset();
+    state.m_Requested = true;
+    ASSERT_NE((void*)0, state.Buffer(1, 4096));
+    state.Publish();
+    ASSERT_EQ(16 + 960 * 4, state.m_Frame.Size());
+}

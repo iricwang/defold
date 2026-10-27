@@ -2313,7 +2313,7 @@ skeletal.select-help = 选择骨骼、贴图或 IK 约束。
 skeletal.fit = 适应画布
 skeletal.bones = 显示骨骼
 skeletal.import = 导入 Spine
-skeletal.import-path = Spine JSON 路径，或点击选择…
+skeletal.import-path = Spine 工程 / JSON，或浏览…
 skeletal.export = 导出到项目
 skeletal.exported = 已导出
 skeletal.hierarchy = 骨骼层级
@@ -2335,3 +2335,151 @@ skeletal.warnings = 导入兼容说明
 skeletal.ik-root = 请先选择非根骨骼，再添加 IK。
 skeletal.timeline = 摄影表
 skeletal.curves = 曲线
+
+skeletal.save-spine = 另存为 .spine…
+
+skeletal.converting = 正在通过本机 Spine 转换…
+
+skeletal.select-skeleton = 选择要编辑的骨架
+
+skeletal.bridge-notice = 依赖本机 Spine；不保留工程专用设置
+
+skeletal.shear-x = 错切 X
+
+skeletal.shear-y = 错切 Y
+
+skeletal.skin = 皮肤
+skeletal.copy-skin = 复制皮肤
+
+skeletal.edit-mesh = 编辑网格
+skeletal.mesh-setup-only = 请在设置模式下编辑网格拓扑。
+skeletal.split-edge = 分割边
+skeletal.delete-vertices = 删除顶点
+skeletal.select-edge = 请选择一条边的两个顶点。
+skeletal.weight-tools = 权重工具
+skeletal.brush-radius = 笔刷半径（像素）
+skeletal.brush-strength = 强度（0–1）
+skeletal.lock-weight-bone = 锁定当前骨骼权重
+skeletal.auto-weights = 自动权重
+skeletal.smooth-weights = 平滑
+skeletal.prune-weights = 剪枝
+skeletal.normalize-weights = 归一化
+skeletal.inherit = 继承模式
+skeletal.constrained-bones = 受约束骨骼（逗号分隔）
+skeletal.constraint-order = 约束顺序
+skeletal.add-transform = 变换约束
+skeletal.transform-constraint = 变换约束
+skeletal.mix-rotate = 旋转混合
+skeletal.mix-x = 位移 X 混合
+skeletal.mix-y = 位移 Y 混合
+skeletal.mix-scale-x = 缩放 X 混合
+skeletal.mix-scale-y = 缩放 Y 混合
+skeletal.mix-shear-y = 错切 Y 混合
+skeletal.binding-bones = 绑定骨骼（Cmd/Ctrl 多选）
+skeletal.connect-edge = 连接边
+skeletal.disconnect-edge = 解除约束边
+skeletal.mirror-bones = 镜像骨对（left:right，逗号分隔）
+skeletal.mirror-weights = 镜像权重
+skeletal.mirror-pair-error = 请使用 left:right 形式的骨骼名称对。
+
+skeletal.softness = 柔化距离
+
+skeletal.compress = 压缩
+
+skeletal.stretch = 伸展
+
+skeletal.uniform = 等比缩放
+
+skeletal.copy-keys = 复制关键帧
+
+skeletal.paste-keys = 粘贴关键帧
+
+skeletal.reverse-keys = 反转关键帧
+
+skeletal.snap-keys = 吸附到帧
+
+skeletal.key-scale = 时间缩放
+
+skeletal.scale-keys = 缩放关键帧
+
+skeletal.path-attachment = 路径附件
+
+skeletal.path-constraint = 路径约束
+
+skeletal.closed-path = 闭合路径
+
+skeletal.constant-speed = 恒定速度
+
+skeletal.edit-path = 编辑控制点
+
+skeletal.add-path = 添加路径
+
+skeletal.position = 位置
+
+skeletal.spacing = 间距
+
+skeletal.target-slot = 目标插槽
+
+skeletal.native-notice = 独立原生编解码 · 已验证的 4.2.43 功能范围
+skeletal.generate-iterations = 细分次数
+skeletal.generate-mesh = 生成
+skeletal.reset-mesh = 重置
+skeletal.trace-threshold = 透明度阈值
+skeletal.trace-simplify = 简化
+skeletal.trace-padding = 扩边
+skeletal.trace-mesh = 描摹轮廓
+skeletal.mesh-rebuild-notice = 生成、重置和描摹会清除权重及变形关键帧，可撤销恢复。重置会将图像矩形恢复到插槽原点。
+skeletal.add-physics = 物理
+skeletal.physics-constraint = 物理约束
+skeletal.physics-scope = 动画作用范围
+skeletal.physics-global = 响应全局时间轴
+skeletal.physics-reset-key = 设置物理重置帧
+skeletal.inertia = 惯性
+skeletal.strength = 弹力
+skeletal.damping = 阻尼
+skeletal.mass = 质量
+skeletal.wind = 风力
+skeletal.gravity = 重力
+skeletal.limit = 位移限制
+skeletal.fps = 模拟帧率
+skeletal.rotate = 旋转影响
+
+skeletal.preview-attachment-readonly = 动画当前显示的是切换后的附件。请切换到设置模式编辑附件几何。
+
+skeletal.project-menu = 项目
+skeletal.new-menu = 创建
+skeletal.animation-settings = 动画设置
+skeletal.properties = 属性
+skeletal.search-hierarchy = 搜索层级…
+skeletal.draw-order = 绘制顺序
+skeletal.skins = 皮肤
+skeletal.animations = 动画
+skeletal.events = 事件
+skeletal.previous-key = 上一关键帧
+skeletal.next-key = 下一关键帧
+skeletal.previous-frame = 上一帧
+skeletal.next-frame = 下一帧
+skeletal.tool-rotate = 旋转
+skeletal.tool-move = 移动
+skeletal.tool-scale = 缩放
+skeletal.tool-shear = 倾斜
+skeletal.tool-mesh = 网格
+skeletal.tool-weights = 权重
+skeletal.tool-path = 路径
+
+skeletal.space-local = 本地
+skeletal.space-parent = 父级
+skeletal.space-world = 世界
+skeletal.auto-key = 自动关键帧
+skeletal.key-edited = 关键帧已编辑
+skeletal.tool-pose = 姿势
+skeletal.tool-create = 创建
+skeletal.create-setup-only = 只能在设置模式中创建骨骼。
+skeletal.key-shown = 可见轨道打帧
+skeletal.images = 图片
+skeletal.names = 名称
+
+game-preview.pick-unsupported = 当前游戏引擎不支持 GUI 资源定位，请使用更新后的引擎重新构建。
+game-preview.pick-empty = 此位置没有可见的 GUI 节点。
+game-preview.pick-timeout = 游戏未响应 GUI 资源定位请求。
+game-preview.pick-running = 请先运行游戏，再定位鼠标下方的 GUI。

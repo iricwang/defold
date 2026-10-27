@@ -261,10 +261,20 @@ namespace dmHttpServer
         {
             case 200:
                 return "OK";
+            case 204:
+                return "No Content";
+            case 400:
+                return "Bad Request";
+            case 403:
+                return "Forbidden";
             case 404:
                 return "Not Found";
             case 405:
                 return "Method Not Allowed";
+            case 413:
+                return "Content Too Large";
+            case 429:
+                return "Too Many Requests";
             case 500:
                 return "Internal Server Error";
             case 302:
@@ -307,7 +317,10 @@ bail:
         HTTP_SERVER_SENDALL_AND_BAIL("Server: Dynamo 1.0\r\n")
         if (internal_req->m_CloseConnection)
             HTTP_SERVER_SENDALL_AND_BAIL("Connection: close\r\n")
-        HTTP_SERVER_SENDALL_AND_BAIL(chunked_header)
+        if (internal_req->m_StatusCode != 204)
+        {
+            HTTP_SERVER_SENDALL_AND_BAIL(chunked_header)
+        }
         HTTP_SERVER_SENDALL_AND_BAIL("\r\n")
 
         return;
@@ -349,7 +362,10 @@ bail:
 
         FlushSendBuffer(request);
 
-        HTTP_SERVER_SENDALL_AND_BAIL("0\r\n\r\n")
+        if (internal_req->m_StatusCode != 204)
+        {
+            HTTP_SERVER_SENDALL_AND_BAIL("0\r\n\r\n")
+        }
 
         return;
 bail:
@@ -398,13 +414,15 @@ bail:
 
     Result Send(const Request* request, const void* data, uint32_t data_length)
     {
+        InternalRequest* internal_req = (InternalRequest*) request->m_Internal;
+        if (internal_req->m_StatusCode == 204 && data_length != 0)
+            return RESULT_ERROR_INVAL;
         // Do not send empty chunks as the empty chunk is
         // interpreted as the last and terminating chunk
         if (data_length == 0) {
             return RESULT_OK;
         }
 
-        InternalRequest* internal_req = (InternalRequest*) request->m_Internal;
         if (internal_req->m_Result != RESULT_OK)
             return internal_req->m_Result;
 

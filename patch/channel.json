@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 81,
-  "version": "1.14.1-patch.81",
+  "revision": 99,
+  "version": "1.14.1-patch.99",
   "repository": "iricwang/defold",
-  "notes": "新增内置骨骼动画制作器：Spine 4.2 JSON 导入续编，骨骼与 PNG 插槽、网格变形、权重、IK、摄影表和 Bezier 曲线编辑，保存撤销及 Defold 资源导出；按 Spine 参考布局组织画布和停靠面板。"
+  "notes": "Rebuild current editor sources and synchronize local Spine game engine with runtime GUI picking"
 }

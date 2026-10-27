@@ -195,9 +195,11 @@
        (let [root (.getNode pane)
              lock (.lookup root "#game-preview-lock")
              title (.lookup root "#game-preview-resource")
-             items (.get (.getProperties root) "dock-menu-items")]
+             items (.get (.getProperties root) "dock-menu-items")
+             toolbar-children (vec (.getChildren (.getParent lock)))]
          (is (instance? ToggleButton lock))
-         (is (= lock (last (.getChildren (.getParent lock)))))
+         (is (= ["game-preview-lock" "game-remote-pairing"]
+                (mapv #(.getId ^javafx.scene.Node %) (subvec toolbar-children (- (count toolbar-children) 2)))))
          (is (nil? (.lookup root "#game-simulator-custom")))
          (is (= ["game-simulator-custom" "game-simulator-import"] (mapv #(.getId ^javafx.scene.control.MenuItem %) items)))
          (.setPreviewResource pane "/main/screen.gui")
@@ -310,3 +312,19 @@
          (.stop view)
          (Event/fireEvent viewport (key-event))
          (is (= 2 @events))))))
+
+;; Navigation rejects letterbox clicks instead of clamping them onto a visible GUI node.
+(deftest gui-resource-pick-coordinates
+  (is (= [0.5 0.5] (vec (GamePreview/resourcePickPoint 1000 600 640 480 500 300))))
+  (is (nil? (GamePreview/resourcePickPoint 1000 600 640 480 50 300)))
+  (is (nil? (GamePreview/resourcePickPoint 600 1000 640 480 300 50)))
+  (is (nil? (GamePreview/resourcePickPoint 0 0 640 480 0 0)))
+  (is (nil? (GamePreview/resourcePickPoint 640 480 640 480 640 100))))
+
+;; Only a project-rooted compiled GUI path may navigate; scripts and path traversal cannot.
+(deftest runtime-gui-source-path
+  (is (= "/screens/menu.gui" (preview/gui-source-path "/screens/menu.guic")))
+  (is (= "/界面/菜单.gui" (preview/gui-source-path "/界面/菜单.guic")))
+  (doseq [path [nil "" "menu.guic" "/menu.gui_scriptc" "/../menu.guic" "/a/./menu.guic"
+               "/a/../menu.guic" "/a\\menu.guic" "/a\u0000menu.guic"]]
+    (is (nil? (preview/gui-source-path path)))))

@@ -1,0 +1,19 @@
+function init(self)
+    msg.post('.', 'acquire_input_focus')
+    self.time = 0
+end
+function update(self, dt)
+    local w, h = window.get_size()
+    if self.last_width ~= w or self.last_height ~= h then
+        local a = window.get_safe_area()
+        print(string.format("SIMULATOR_AREA %d %d %d %d %d %d", w, h, a.inset_top, a.inset_right, a.inset_bottom, a.inset_left))
+        self.last_width, self.last_height = w, h
+    end
+    self.time = self.time + dt
+    msg.post('@render:', 'clear_color', {color=vmath.vector4(0.12, 0.3 + math.sin(self.time)*0.15, 0.55, 1)})
+end
+function on_input(self, action_id, action)
+    if action.pressed or action.released then
+        print('GAME_INPUT', action_id, action.pressed, action.released, action.x, action.y)
+    end
+end

@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-25",
+  "from_revision": 86,
+  "revision": 92,
+  "application": "/Applications/Defold.app",
+  "feed": "local HTTP http://127.0.0.1:18392/manifest.json",
+  "download_sha256_verified": true,
+  "exact_baseline_verified": true,
+  "target_files_verified": 168,
+  "restart_verified": true,
+  "restored_project": "Dragon Burst - Defold",
+  "remote_catalog_verified": true,
+  "qr_dialog_verified": true,
+  "editor_processes": 1,
+  "preserved_engine_sha1": "d295ed4edff2e49072719835713e625f409849f1",
+  "cleanup": {
+    "removed": [
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-89/Defold.app",
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-89/Defold.app.patch-backup-510e0345-3d3c-482a-9d58-5af725eb6772",
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch/Defold.app",
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch/Defold.app.patch-backup-b1728e18-cd1b-455e-8288-4f769ec9fb26",
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-91/Defold.app",
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-91/Defold.app.patch-backup-e7f10280-e77b-44ab-a95f-f38bbdb961cc",
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-90/Defold.app",
+      "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-90/Defold.app.patch-backup-b074350c-6e05-404c-a5ee-f5a2a757a8f5",
+      "/Applications/Defold.app.patch-backup-9818324d-72d1-4a1f-a1df-d064335beebc",
+      "/Applications/.defold-patch-6832992145395329982"
+    ],
+    "retained": "/Applications/Defold.app",
+    "registry_entries": 1
+  },
+  "published_to_github": false,
+  "apk_changed": false
+}

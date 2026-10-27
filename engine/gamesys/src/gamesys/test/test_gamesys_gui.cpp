@@ -13,6 +13,7 @@
 // specific language governing permissions and limitations under the License.
 
 #include "test_gamesys_private.h"
+#include <gamesys/components/comp_gui.h>
 #include <dlib/thread.h>
 
 using namespace dmVMath;
@@ -3108,4 +3109,38 @@ TEST_F(GuiTest, GuiCustomPropertiesFromLayoutDDF)
 
     dmGui::SetDisplayProfiles(m_GuiContext, 0);
     dmResource::Release(m_Factory, display_profiles);
+}
+
+// Runtime resource picking returns the GUI file (not its script), ignores hidden
+// nodes, and resets between requests instead of returning a stale previous hit.
+TEST_F(GuiTest, EditorGuiResourcePick)
+{
+    dmGui::SetDefaultResolution(m_GuiContext, 640, 480);
+    dmGui::SetPhysicalResolution(m_GuiContext, 640, 480);
+    ASSERT_TRUE(dmGameObject::Init(m_Collection));
+    dmGameObject::HInstance go = Spawn(m_Factory, m_Collection, "/gui/gui_text_layout_cache.goc", dmHashString64("/pick"), 0, Point3(0, 0, 0), Quat(0, 0, 0, 1), Vector3(1, 1, 1));
+    ASSERT_NE(0, go);
+    ASSERT_TRUE(dmGameObject::Update(m_Collection, &m_UpdateContext));
+    ASSERT_TRUE(dmGameObject::PostUpdate(m_Collection));
+    dmGui::HScene scene = GetGuiComponent(m_Collection)->m_Scene;
+    dmGui::SetNodeEnabled(scene, dmGui::GetNodeById(scene, "text"), false);
+    uint32_t width, height;
+    dmGui::GetDefaultResolution(m_GuiContext, width, height);
+    dmGui::HNode node = dmGui::NewNode(scene, Point3(width * 0.5f, height * 0.5f, 0), Vector3(100, 100, 0), dmGui::NODE_TYPE_BOX, 0);
+    dmGameSystem::BeginGuiResourcePick(0.5f, 0.5f);
+    dmRender::RenderListBegin(m_RenderContext);
+    dmGameObject::Render(m_Collection);
+    ASSERT_STREQ("/gui/gui_text_layout_cache.guic", dmGameSystem::EndGuiResourcePick());
+    dmGui::SetNodeAlpha(scene, node, 0.0f);
+    dmGameSystem::BeginGuiResourcePick(0.5f, 0.5f);
+    dmRender::RenderListBegin(m_RenderContext);
+    dmGameObject::Render(m_Collection);
+    ASSERT_STREQ("", dmGameSystem::EndGuiResourcePick());
+    dmGui::SetNodeAlpha(scene, node, 1.0f);
+    dmGui::SetNodeEnabled(scene, node, false);
+    dmGameSystem::BeginGuiResourcePick(0.5f, 0.5f);
+    dmRender::RenderListBegin(m_RenderContext);
+    dmGameObject::Render(m_Collection);
+    ASSERT_STREQ("", dmGameSystem::EndGuiResourcePick());
+    ASSERT_TRUE(dmGameObject::Final(m_Collection));
 }

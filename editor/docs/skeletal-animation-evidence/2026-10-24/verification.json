@@ -1,0 +1,31 @@
+{
+  "revision": 86,
+  "tests": 265,
+  "assertions": 4265,
+  "failures": 0,
+  "errors": 0,
+  "platform": "arm64-macos",
+  "feed": "local-loopback-http",
+  "installed_files": 168,
+  "published": false,
+  "screenshots": [
+    "bone-compensation.png",
+    "box-selection-drag.png",
+    "box-selection-result.png",
+    "clear-selection.png",
+    "curve-undo.png",
+    "curve-x-edit.png",
+    "curve-y-edit.png",
+    "image-compensation.png",
+    "installed86-compensation.png",
+    "installed86-curve-edit.png",
+    "installed86-final.png",
+    "installed86-pose.png",
+    "multichannel-curves.png",
+    "pose-chain.png",
+    "pose-redo.png",
+    "select-all.png",
+    "shift-add-selection.png",
+    "shift-remove-selection.png"
+  ]
+}

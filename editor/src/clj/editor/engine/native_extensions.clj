@@ -288,7 +288,7 @@
     ;; These editor-only sources participate in the cache key. Existing native
     ;; engines must rebuild instead of silently retaining a bridge-less binary.
     (when (contains? #{"arm64-macos" "x86_64-macos"} platform)
-      (doseq [path ["ext.manifest" "src/bridge.mm"]]
+      (doseq [path ["ext.manifest" "src/bridge.mm" "src/audio.h"]]
         (let [content (with-open [input (io/input-stream (io/resource (str "_defold/editor_game_bridge/" path)))]
                         (.readAllBytes input))]
           (.add resources

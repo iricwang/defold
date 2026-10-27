@@ -234,6 +234,39 @@
   (let [bone (bones index)]
     (transform-point (transforms (:id bone)) [(:length bone 0.0) 0.0])))
 
+(defn solve-pose-chain
+  "Rotate a contiguous root-to-tip authoring chain toward a world target.
+  Leaves translations, lengths and non-chain bones unchanged. Returns the best
+  pose encountered, so an unreachable target cannot make the pose diverge."
+  [bones chain target]
+  (validate-numbers! target "Pose target")
+  (let [bones (vec bones)
+        indices (into {} (map-indexed (fn [index bone] [(:id bone) index])) bones)
+        chain-indices (mapv indices chain)]
+    (when-not (and (= 2 (count target)) (pos? (count chain))
+                   (= (count chain) (count (set chain)))
+                   (coll/every? integer? chain-indices)
+                   (coll/every? (fn [[parent child]] (= parent (:parent (bones (indices child)))))
+                                (partitionv 2 1 chain)))
+      (throw (ex-info "Pose requires a contiguous bone chain and finite XY target" {:chain chain})))
+    (let [last-index (peek chain-indices)
+          error (fn [pose]
+                  (let [[x y] (tip pose (world-transforms pose) last-index)]
+                    (Math/hypot (- x (target 0)) (- y (target 1)))))]
+      (loop [pose bones best bones best-error (error bones) iteration 0]
+        (if (or (< best-error 1.0e-5) (= iteration 96))
+          best
+          (let [next-pose (reduce (fn [current index]
+                                   (turn-toward current index
+                                                (tip current (world-transforms current) last-index) target))
+                                 pose (rseq chain-indices))
+                next-error (error next-pose)]
+            (if (= pose next-pose)
+              best
+              (recur next-pose
+                     (if (< next-error best-error) next-pose best)
+                     (min next-error best-error) (inc iteration)))))))))
+
 (defn- solve-constraint
   "Solves a one- or two-bone rotation constraint without changing bind lengths,
   translation or scale. Unreachable targets approach the closest chain pose;
@@ -316,3 +349,16 @@
 
 (defn normalize-weights [influences]
   (normalize-influences influences))
+
+(defn compensate-region
+  "Keep a region attachment a region. Reject shear instead of changing topology."
+  [attachment old-world new-world]
+  (let [inverse (or (inverse-transform new-world) (throw (ex-info "Cannot compensate a collapsed image transform" {})))
+        [a b c d x y] (compose-transforms inverse (compose-transforms old-world (local-transform attachment)))
+        sx (Math/hypot a b)
+        sy (Math/hypot c d)
+        dot (+ (* a c) (* b d))]
+    (when (> (abs dot) (* 1.0e-6 (max 1.0 (* sx sy))))
+      (throw (ex-info "Image compensation would require shear. Region images cannot represent this transform; disable Images compensation or adjust the parent scaling." {:attachment-type "region"})))
+    (assoc attachment :x x :y y :rotation (Math/toDegrees (Math/atan2 b a))
+           :scale-x sx :scale-y (* (if (neg? (- (* a d) (* b c))) -1.0 1.0) sy))))

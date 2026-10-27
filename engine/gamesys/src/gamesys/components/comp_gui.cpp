@@ -2731,6 +2731,74 @@ namespace dmGameSystem
     }
 
     // Called from gui.cpp
+    static bool g_GuiResourcePickActive = false;
+    static float g_GuiResourcePickX, g_GuiResourcePickY;
+    static uint32_t g_GuiResourcePickOrder;
+    static char g_GuiResourcePickPath[2048];
+
+    void BeginGuiResourcePick(float x, float y)
+    {
+        g_GuiResourcePickActive = true;
+        g_GuiResourcePickX = x;
+        g_GuiResourcePickY = y;
+        g_GuiResourcePickOrder = 0;
+        g_GuiResourcePickPath[0] = 0;
+    }
+
+    const char* EndGuiResourcePick()
+    {
+        g_GuiResourcePickActive = false;
+        return g_GuiResourcePickPath;
+    }
+
+    static void PickGuiResource(dmGui::HScene scene, const dmGui::RenderEntry* entries,
+                               const float* opacities, const dmGui::StencilScope** scopes,
+                               uint32_t count, RenderGuiContext* context)
+    {
+        if (!g_GuiResourcePickActive)
+            return;
+        uint32_t width, height;
+        dmGui::GetDefaultResolution(context->m_GuiWorld->m_CompGuiContext->m_GuiContext, width, height);
+        float x = g_GuiResourcePickX * width;
+        float y = (1.0f - g_GuiResourcePickY) * height;
+        uint32_t order = MakeFinalRenderOrder(context->m_GuiWorld->m_RenderOrder,
+                                             dmGui::GetRenderOrder(scene), context->m_NextSortOrder);
+        if (g_GuiResourcePickPath[0] && order < g_GuiResourcePickOrder)
+            return;
+        for (uint32_t i = count; i > 0; --i)
+        {
+            dmGui::HNode node = entries[i - 1].m_Node;
+            if (opacities[i - 1] <= 0.0f || (scopes[i - 1] && !scopes[i - 1]->m_ColorMask)
+                || !dmGui::PickNode(scene, node, x, y))
+                continue;
+            bool clipped = false;
+            for (dmGui::HNode parent = dmGui::GetNodeParent(scene, node); parent;
+                 parent = dmGui::GetNodeParent(scene, parent))
+            {
+                if (dmGui::GetNodeClippingMode(scene, parent) == dmGui::CLIPPING_MODE_STENCIL
+                    && dmGui::PickNode(scene, parent, x, y) == dmGui::GetNodeClippingInverted(scene, parent))
+                {
+                    clipped = true;
+                    break;
+                }
+            }
+            if (!clipped)
+            {
+                GuiComponent* component = (GuiComponent*) dmGui::GetSceneUserData(scene);
+                dmhash_t path_hash;
+                if (dmResource::GetPath(context->m_GuiWorld->m_CompGuiContext->m_Factory,
+                                        component->m_Resource, &path_hash) != dmResource::RESULT_OK)
+                    continue;
+                const char* path = (const char*) dmHashReverse64(path_hash, 0);
+                if (!path || strlen(path) >= sizeof(g_GuiResourcePickPath))
+                    continue;
+                dmStrlCpy(g_GuiResourcePickPath, path, sizeof(g_GuiResourcePickPath));
+                g_GuiResourcePickOrder = order;
+                break;
+            }
+        }
+    }
+
     static void RenderNodes(dmGui::HScene scene,
                     const dmGui::RenderEntry* entries,
                     const Matrix4* node_transforms,
@@ -2746,6 +2814,8 @@ namespace dmGameSystem
 
         RenderGuiContext* gui_context = (RenderGuiContext*) context;
         GuiWorld* gui_world = gui_context->m_GuiWorld;
+
+        PickGuiResource(scene, entries, node_opacities, stencil_scopes, node_count, gui_context);
 
         gui_world->m_RenderedParticlesSize = 0;
         gui_context->m_FirstStencil = true;

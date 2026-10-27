@@ -63,6 +63,17 @@ namespace dmEngineService
     };
 
     void InitState(HEngineService engine_service, EngineState* state);
+
+    // Private LAN Remote protocol. Disabled unless DM_REMOTE_TOKEN is set.
+    struct RemoteInput
+    {
+        uint16_t m_X; // Normalized 0..65535, origin at the top left.
+        uint16_t m_Y;
+        bool     m_Pressed;
+    };
+    bool GetRemoteInput(HEngineService service, RemoteInput* input);
+    void* GetRemoteFrameBuffer(HEngineService service, uint32_t width, uint32_t height);
+    void PublishRemoteFrame(HEngineService service);
 }
 
 #endif // DM_ENGINE_SERVICE

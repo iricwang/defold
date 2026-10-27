@@ -20,7 +20,8 @@
            [javafx.beans.value ChangeListener]
            [javafx.scene.canvas Canvas GraphicsContext]
            [javafx.scene.input KeyCode MouseButton MouseEvent]
-           [javafx.scene.layout StackPane]
+           [javafx.scene.control Button CheckBox Tooltip]
+           [javafx.scene.layout BorderPane HBox StackPane]
            [javafx.scene.paint Color]
            [javafx.scene.text Font]))
 
@@ -58,15 +59,16 @@
     (.setFill gc color)
     (.fillOval gc (- x radius) (- y radius) (* 2.0 radius) (* 2.0 radius))))
 
-(defn- draw! [^Canvas canvas state drag]
+(defn- draw-channel! [^Canvas canvas state drag]
   (let [^GraphicsContext gc (.getGraphicsContext2D canvas)
         width (.getWidth canvas) height (.getHeight canvas)
         keys (get state :keys [])
-        bounds (or (:bounds drag) (curve-bounds width height keys (or (:duration state) 1.0)))
+        bounds (or (:bounds drag) (:bounds state) (curve-bounds width height keys (or (:duration state) 1.0)))
         {:keys [left top low high] graph-width :width graph-height :height} bounds
         segment (selected-segment state)
         selected-time (get-in segment [:key :time])
         keys (if drag (mapv #(if (== (double (:time %)) (double (get-in drag [:key :time]))) (assoc % :curve (:curve drag)) %) keys) keys)]
+    (when-not (:overlay state)
     (.setFill gc (Color/web "#202124")) (.fillRect gc 0.0 0.0 width height)
     (.setFont gc (Font/font 10.0)) (.setLineWidth gc 1.0)
     (dotimes [index 6]
@@ -75,9 +77,9 @@
         (.strokeLine gc x top x (+ top graph-height)) (.strokeLine gc left y (+ left graph-width) y)
         (.setFill gc (Color/web "#aeb3b8"))
         (.fillText gc (format "%.2f" (* ratio (:duration bounds))) (- x 9.0) (- height 8.0))
-        (.fillText gc (format "%.2f" (- high (* ratio (- high low)))) 3.0 (+ y 3.0))))
+        (.fillText gc (format "%.2f" (- high (* ratio (- high low)))) 3.0 (+ y 3.0)))))
     (when (pos? (count keys))
-      (.setStroke gc (Color/web "#77b8f5")) (.setLineWidth gc 2.0) (.beginPath gc)
+      (.setStroke gc (Color/web (get state :color "#77b8f5"))) (.setLineWidth gc 2.0) (.beginPath gc)
       (let [[x y] (value->point bounds [(:time (first keys)) (:value (first keys))])] (.moveTo gc x y))
       (dotimes [index (dec (count keys))]
         (let [key (nth keys index) next-key (nth keys (inc index))
@@ -89,7 +91,7 @@
       (let [[x y] (value->point bounds [(:duration bounds) (:value (peek keys))])] (.lineTo gc x y))
       (.stroke gc))
     (doseq [key keys]
-      (draw-key! gc bounds key (if (and selected-time (== (double selected-time) (double (:time key)))) Color/ORANGE (Color/web "#77b8f5")) 3.5))
+      (draw-key! gc bounds key (if (and selected-time (== (double selected-time) (double (:time key)))) Color/ORANGE (Color/web (get state :color "#77b8f5"))) 3.5))
     (when segment
       (let [key (:key segment) right (:right segment)
             curve (or (:curve drag) (:curve key))
@@ -107,6 +109,25 @@
       (.setFill gc (Color/web "#aeb3b8"))
       (.fillText gc (get state :empty-text "Select a scalar animation track") (+ left 12.0) (+ top 22.0)))))
 
+(defn graph-bounds [canvas-width canvas-height state]
+  (curve-bounds canvas-width canvas-height
+                (if (contains? state :channels) (into [] (mapcat :keys) (:channels state)) (:keys state))
+                (or (:duration state) 1.0)))
+
+(defn- draw! [^Canvas canvas state drag]
+  (if-not (contains? state :channels)
+    (draw-channel! canvas state drag)
+    (let [bounds (or (:bounds drag) (graph-bounds (.getWidth canvas) (.getHeight canvas) state))
+          colors ["#77b8f5" "#e8ab65" "#88cc88" "#ce91dc" "#ee7e7e"]]
+      (draw-channel! canvas (assoc state :keys [] :bounds bounds :empty-text "") nil)
+      (doseq [[index channel] (map-indexed vector (:channels state))]
+        (let [active (= (:active-track state) (:property channel))]
+          (draw-channel! canvas
+                         (assoc state :keys (:keys channel) :bounds bounds :overlay true
+                                :selected-time (when active (:selected-time state))
+                                :color (nth colors (mod index (count colors))))
+                         (when active drag)))))))
+
 (defn make-view
   "read-state! returns {:keys :time :duration :selected-time :selected-key}.
   commit-curve! receives [existing-key absolute-controls] exactly once on a
@@ -115,6 +136,14 @@
   (let [canvas (doto (Canvas. 600.0 180.0) (.setId "skeletal-curve-canvas") (.setFocusTraversable true))
         node (doto (StackPane.) (.setId "skeletal-curve-editor") (.setMinSize 100.0 80.0))
         drag (atom nil)
+        selection (atom nil)
+        active-track (atom nil)
+        source-state read-state!
+        read-state! (fn [] (let [state (source-state)
+                                 channel (or (coll/first-where #(= @active-track (:property %)) (:channels state)) (first (:channels state)))]
+                             (cond-> state
+                               channel (assoc :keys (:keys channel) :active-track (:property channel))
+                               @selection (assoc :selected-time @selection))))
         last-token (atom nil)
         refresh (fn []
                   (let [state (read-state!)
@@ -131,15 +160,23 @@
       (ui/event-handler event
         (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
           (let [state (read-state!)
+                bounds (graph-bounds (.getWidth canvas) (.getHeight canvas) state)
+                hit (coll/first-where (fn [key] (let [[x y] (value->point bounds [(:time key) (:value key)])]
+                                                (< (Math/hypot (- x (.getX ^MouseEvent event)) (- y (.getY ^MouseEvent event))) 9.0)))
+                                      (if (contains? state :channels)
+                                        (into [] (mapcat (fn [channel] (mapv #(assoc % :track (:property channel)) (:keys channel)))) (:channels state))
+                                        (:keys state)))
+                _ (when hit (reset! selection (:time hit)) (reset! active-track (:track hit)))
+                state (read-state!)
                 {:keys [key right]} (selected-segment state)]
             (when key
-              (let [bounds (curve-bounds (.getWidth canvas) (.getHeight canvas) (:keys state) (or (:duration state) 1.0))
+              (let [bounds (graph-bounds (.getWidth canvas) (.getHeight canvas) state)
                     index (reduce-kv (fn [_ i [x y]]
                                        (when (< (Math/hypot (- x (.getX ^MouseEvent event)) (- y (.getY ^MouseEvent event))) 10.0) (reduced i)))
                                      nil (handle-points bounds (:curve key)))]
                 (when index
                   (.requestFocus canvas)
-                  (reset! drag {:key key :curve (:curve key) :handle index :bounds bounds :right-time (:time right)})
+                  (reset! drag {:key (cond-> key (:active-track state) (assoc :track (:active-track state))) :curve (:curve key) :handle index :bounds bounds :right-time (:time right)})
                   (.consume ^MouseEvent event))))))))
     (.setOnMouseDragged canvas
       (ui/event-handler event
@@ -160,4 +197,44 @@
         (when (= KeyCode/ESCAPE (.getCode ^javafx.scene.input.KeyEvent event))
           (reset! drag nil) (refresh) (.consume ^javafx.scene.input.KeyEvent event))))
     (refresh)
-    {:node node :refresh! refresh}))
+    {:node node :refresh! refresh
+     :interpolate! (fn [kind]
+                     (let [state (read-state!)
+                           key (coll/first-where #(= (:selected-time state) (:time %)) (:keys state))
+                           right (when key (coll/first-where #(> (:time %) (:time key)) (:keys state)))]
+                       (when (and key right)
+                         (commit-curve! (cond-> key (:active-track state) (assoc :track (:active-track state)))
+                                        (if (= "bezier" kind)
+                                          (let [dt (/ (- (:time right) (:time key)) 3.0)
+                                                dv (/ (- (:value right) (:value key)) 3.0)]
+                                            [(+ (:time key) dt) (+ (:value key) dv) (- (:time right) dt) (- (:value right) dv)])
+                                          kind))
+                         (refresh))))}))
+
+(defn make-multichannel-view
+  "Shared graph with per-channel visibility and independent key/handle selection."
+  [read-state! commit-curve!]
+  (let [hidden (atom #{})
+        strip (HBox. 8.0)
+        pane (doto (BorderPane.) (.setId "skeletal-multichannel-curves"))
+        order (atom nil)
+        view (make-view (fn [] (update (read-state!) :channels #(filterv (fn [channel] (not (contains? @hidden (:property channel)))) %))) commit-curve!)
+        refresh (fn []
+                  (let [ids (mapv :property (:channels (read-state!)))]
+                    (when (not= ids @order)
+                      (reset! order ids)
+                      (.clear (.getChildren strip))
+                      (doseq [kind ["linear" "stepped" "bezier"]]
+                        (let [button (doto (Button. kind) (.setId (str "skeletal-curve-" kind))
+                                       (.setFocusTraversable false)
+                                       (.setTooltip (Tooltip. "Apply interpolation to the selected key")))]
+                          (.setOnAction button (ui/event-handler _ ((:interpolate! view) kind)))
+                          (.add (.getChildren strip) button)))
+                      (doseq [id ids]
+                        (let [check (doto (CheckBox. id) (.setSelected (not (contains? @hidden id))))]
+                          (.setOnAction check (ui/event-handler _ (swap! hidden (if (.isSelected check) disj conj) id)))
+                          (.add (.getChildren strip) check))))
+                    ((:refresh! view))))]
+    (.setTop pane strip)
+    (.setCenter pane (:node view))
+    {:node pane :refresh! refresh}))

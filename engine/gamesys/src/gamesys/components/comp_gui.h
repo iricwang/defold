@@ -28,6 +28,11 @@ namespace dmGameSystem
 {
     struct FontResource;
 
+    // One-shot editor navigation. Coordinates are normalized, with a top-left origin.
+    // Collect only during the requested render frame; do no per-node work otherwise.
+    void BeginGuiResourcePick(float x, float y);
+    const char* EndGuiResourcePick();
+
     // Callbacks used to integrate dmGui scenes with game objects
     void GuiGetURLCallback(dmGui::HScene scene, dmMessage::URL* url);
     dmhash_t GuiResolvePathCallback(dmGui::HScene scene, const char* path);

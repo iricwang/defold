@@ -46,7 +46,7 @@
             (if (= "x86_64-win32" platform)
               (is (zero? (count bridge)))
               (do
-                (is (= #{"__defold_editor_game_bridge/ext.manifest" "__defold_editor_game_bridge/src/bridge.mm"}
+                (is (= #{"__defold_editor_game_bridge/ext.manifest" "__defold_editor_game_bridge/src/bridge.mm" "__defold_editor_game_bridge/src/audio.h"}
                        (into #{} (map #(.getPath ^ExtenderResource %)) bridge)))
                 (is (not= (.calcKey cache platform "sdk" resources)
                           (.calcKey cache platform "sdk" (java.util.ArrayList. (filterv #(not (.startsWith (.getPath ^ExtenderResource %) "__defold_editor_game_bridge/")) resources)))))))))))))

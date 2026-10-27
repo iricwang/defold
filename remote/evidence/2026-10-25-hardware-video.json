@@ -1,0 +1,133 @@
+{
+  "date": "2026-10-25",
+  "editor_version": "1.14.1-patch.95",
+  "update_feed": "local HTTP loopback, not GitHub published",
+  "baseline_revision": 94,
+  "inventory_files": 168,
+  "installed_verified": true,
+  "restarted_project": "Dragon Burst",
+  "single_install": "/Applications/Defold.app",
+  "apk": {
+    "version": "0.5.0",
+    "versionCode": 5,
+    "bytes": 319957,
+    "sha256": "e1897cdb8c6b795d44af0e71bdf3e777a874bb3c76f1a13fe8dc1acc0e2aa067"
+  },
+  "native": "macOS VideoToolbox hardware H.264 / Metal Core Image scaling",
+  "android": "MediaCodec hardware decoder with explicit SPS/PPS and low-latency feature when supported; JPEG fallback",
+  "installed_benchmark": {
+    "streams": [
+      {
+        "mode": "1080p",
+        "encoder_dropped": 0,
+        "size": [
+          1920,
+          1080
+        ],
+        "frames": 900,
+        "unique": 900,
+        "source_fps": 59.07617835419057,
+        "fps": 59.07617835419057,
+        "p95_interval_ms": 23.606374976225197,
+        "max_interval_ms": 41.652708081528544,
+        "mbps": 20.08878781614467
+      }
+    ],
+    "input_http_ack_ms": {
+      "n": 1445,
+      "median": 1.6440420877188444,
+      "p95": 2.564874943345785,
+      "max": 9.771790937520564,
+      "errors": 0
+    },
+    "transport": "same-host LAN IP; not Android display or glass-to-glass latency"
+  },
+  "detail_benchmark": {
+    "streams": [
+      {
+        "mode": "1080p",
+        "encoder_dropped": 0,
+        "size": [
+          1920,
+          1080
+        ],
+        "frames": 900,
+        "unique": 900,
+        "source_fps": 58.351165227829995,
+        "fps": 57.33081698340892,
+        "p95_interval_ms": 26.818208978511393,
+        "max_interval_ms": 45.75362498871982,
+        "mbps": 19.474049264716545
+      },
+      {
+        "mode": "720p",
+        "encoder_dropped": 0,
+        "size": [
+          1280,
+          720
+        ],
+        "frames": 180,
+        "unique": 180,
+        "source_fps": 58.46916379595036,
+        "fps": 58.46916379595036,
+        "p95_interval_ms": 26.864625047892332,
+        "max_interval_ms": 30.928749940358102,
+        "mbps": 8.88336181874269
+      },
+      {
+        "mode": "original",
+        "encoder_dropped": 32,
+        "size": [
+          2560,
+          1440
+        ],
+        "frames": 180,
+        "unique": 180,
+        "source_fps": 59.42368233014792,
+        "fps": 57.808908353785206,
+        "p95_interval_ms": 26.24850010033697,
+        "max_interval_ms": 33.47754094284028,
+        "mbps": 35.45772111700658
+      },
+      {
+        "mode": "1080p",
+        "encoder_dropped": 0,
+        "size": [
+          1920,
+          1080
+        ],
+        "frames": 900,
+        "unique": 900,
+        "source_fps": 57.91592420437028,
+        "fps": 57.09036826724658,
+        "p95_interval_ms": 27.20187499653548,
+        "max_interval_ms": 55.38195895496756,
+        "mbps": 19.420587683114533
+      }
+    ],
+    "input_http_ack_ms": {
+      "n": 3768,
+      "median": 1.7880005179904401,
+      "p95": 3.038541995920241,
+      "max": 30.880499980412424,
+      "errors": 0
+    },
+    "transport": "same-host LAN IP; not Android display or glass-to-glass latency"
+  },
+  "scene": "2560x1440, 192 animated colored lines, 60 Hz game setting; 1920x1080 output",
+  "validation": {
+    "stream_smoke": "PASS against installed application: authorization, parameter validation, first SPS/PPS/IDR, profile changes, touch, thumbnail, JPEG fallback, stop",
+    "java_logic_assertions": 11058,
+    "quality_assertions": 24,
+    "avc_config_tests": "PASS",
+    "python_host_tests": 10,
+    "independent_decode": "1020 frames, zero errors, 1920x1080; GPU scale quadrant orientation/colors visually checked",
+    "apk_signature": "v2/v3 verified; zipalign verified"
+  },
+  "limitations": [
+    "No Android device connected: decoder support, phone displayed FPS and end-to-end Wi-Fi input latency require phone testing.",
+    "Host measurements use LAN IP on same machine and do not measure Wi-Fi airtime.",
+    "Hardware encoding currently macOS only.",
+    "59 FPS observed in this run is not a guarantee of stable 60 FPS for every game or phone."
+  ]
+}

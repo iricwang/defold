@@ -115,6 +115,12 @@
           (is (= {:points 0 :uvs 0 :faces 0} @changes))
           (render! 640.0 480.0 [(assoc-in frame [:points 0] [15.0 25.0])])
           (is (= {:points 1 :uvs 0 :faces 0} @changes))
+          ;; Color animation changes only the material, never texture identity or geometry.
+          (render! 640.0 480.0 [(assoc frame :tint [0.25 0.5 0.75])])
+          (is (identical? image (.getDiffuseMap material)))
+          (is (= (Color/color 0.25 0.5 0.75 0.5) (.getDiffuseColor material)))
+          (is (= {:points 2 :uvs 0 :faces 0} @changes))
+          (is (thrown? clojure.lang.ExceptionInfo (render! 640.0 480.0 [(assoc frame :tint [1.0 ##NaN 0.0])])))
           (let [replacement (WritableImage. 1 1)]
             (render! 640.0 480.0 [(assoc frame :image replacement :opacity 0.25)])
             (is (identical? material (.getMaterial view)))

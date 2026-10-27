@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-25",
+  "editor_version": "1.14.1-patch.94",
+  "application": "/Applications/Defold.app",
+  "apk": {
+    "version": "0.4.0",
+    "version_code": 4,
+    "same_signature": true,
+    "sha256": "b7887f29e0a85ee32700f565ddd82ae563885e8a0dab7a988275a1642f5a612c",
+    "bytes": 315861
+  },
+  "download_matches": true,
+  "changes": [
+    "Companion-inspired graphite/orange native UI",
+    "Four-finger swipe opens controls instead of home",
+    "Run/stop/back/FPS/stream resolution controls",
+    "Input motion coalescing and 429 handling without home navigation",
+    "540p/720p/1080p/native-size streams"
+  ],
+  "validation": {
+    "client_logic_assertions": 11058,
+    "quality_assertions": 24,
+    "apk_compiled": true,
+    "apk_signature_v2_v3": true,
+    "apk_zipalign": true,
+    "installed_files_verified": 168,
+    "local_feed_download_verified": true,
+    "restart_verified": true,
+    "original_project_restored": true,
+    "temporary_game_closed": true,
+    "git_diff_check": true
+  },
+  "patch_chain": [
+    {
+      "from": 92,
+      "to": 93,
+      "feed": "local HTTP http://127.0.0.1:18393/manifest.json"
+    },
+    {
+      "from": 93,
+      "to": 94,
+      "feed": "local HTTP http://127.0.0.1:18394/manifest.json"
+    }
+  ],
+  "stream": {
+    "runs": [
+      {
+        "mode": "540p",
+        "size": [
+          960,
+          540
+        ],
+        "frames": 90,
+        "unique": 90,
+        "fps": 42.94422814092972
+      },
+      {
+        "mode": "720p",
+        "size": [
+          1280,
+          720
+        ],
+        "frames": 90,
+        "unique": 90,
+        "fps": 27.091434308095074
+      },
+      {
+        "mode": "1080p",
+        "size": [
+          1920,
+          1080
+        ],
+        "frames": 90,
+        "unique": 90,
+        "fps": 21.343086884646763
+      },
+      {
+        "mode": "original",
+        "size": [
+          2560,
+          1440
+        ],
+        "frames": 90,
+        "unique": 90,
+        "fps": 16.49308632875063
+      },
+      {
+        "mode": "720p",
+        "size": [
+          1280,
+          720
+        ],
+        "frames": 90,
+        "unique": 90,
+        "fps": 58.183412542434645
+      }
+    ],
+    "thumbnail": [
+      400,
+      225
+    ],
+    "invalid_resolution_rejected": true
+  },
+  "cleanup": {
+    "removed_backups": [
+      "/Applications/Defold.app.patch-backup-20bb1a08-2e3a-48bb-91ef-0c295c2e320c",
+      "/Applications/Defold.app.patch-backup-5785b4c8-72f0-4bb4-af70-40623b2f1150"
+    ],
+    "retained": "/Applications/Defold.app"
+  },
+  "limitations": [
+    "Android native layout, camera, gestures and control-bar lifecycle still require physical-device acceptance.",
+    "Stream FPS is a short computer-side LAN test of a 2560x1440 source, includes runtime warmup, not an Android FPS guarantee.",
+    "1080p/native resolution may reduce frame rate; hardware video encoding is not included.",
+    "Single-finger failure path identified in code and covered with deterministic queue and gesture tests; the reported phone was not directly inspected.",
+    "Local patch feeds only, not published to GitHub."
+  ]
+}

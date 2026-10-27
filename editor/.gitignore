@@ -37,3 +37,6 @@ pom.xml.asc
 /.portal
 /defunload-issues.txt
 /src/antlr
+
+# Optional local Remote video codec (built by remote/native/build-macos.sh).
+/resources/lib/*-macos/libremote_video.dylib

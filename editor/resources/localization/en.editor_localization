@@ -3131,13 +3131,13 @@ skeletal.select-help = Select a bone, attachment or IK constraint.
 skeletal.fit = Fit
 skeletal.bones = Bones
 skeletal.import = Import Spine
-skeletal.import-path = Spine JSON path, or browse…
+skeletal.import-path = Spine project / JSON, or browse…
 skeletal.export = Export for Defold
 skeletal.exported = Exported
 skeletal.hierarchy = Skeleton hierarchy
 skeletal.add-bone = + Bone
 skeletal.delete = Delete
-skeletal.add-ik = + IK target
+skeletal.add-ik = + IK
 skeletal.play = ▶ Play
 skeletal.pause = Ⅱ Pause
 skeletal.rewind = ↤ Start
@@ -3153,3 +3153,151 @@ skeletal.warnings = Import details
 skeletal.ik-root = Select a non-root bone before adding IK.
 skeletal.timeline = Timeline
 skeletal.curves = Curves
+
+skeletal.save-spine = Save .spine As…
+
+skeletal.converting = Converting with installed Spine…
+
+skeletal.select-skeleton = Choose a skeleton to edit
+
+skeletal.bridge-notice = Uses installed Spine; project-only settings are not preserved
+
+skeletal.shear-x = Shear X
+
+skeletal.shear-y = Shear Y
+
+skeletal.skin = Skin
+skeletal.copy-skin = Duplicate skin
+
+skeletal.edit-mesh = Edit mesh
+skeletal.mesh-setup-only = Edit mesh topology in Setup mode.
+skeletal.split-edge = Split edge
+skeletal.delete-vertices = Delete vertices
+skeletal.select-edge = Select two connected vertices.
+skeletal.weight-tools = Weights
+skeletal.brush-radius = Brush size (pixels)
+skeletal.brush-strength = Strength (0–1)
+skeletal.lock-weight-bone = Lock selected bone weight
+skeletal.auto-weights = Auto
+skeletal.smooth-weights = Smooth
+skeletal.prune-weights = Prune
+skeletal.normalize-weights = Normalize
+skeletal.inherit = Inheritance
+skeletal.constrained-bones = Constrained bones (comma separated)
+skeletal.constraint-order = Constraint order
+skeletal.add-transform = Transform
+skeletal.transform-constraint = Transform constraint
+skeletal.mix-rotate = Rotate mix
+skeletal.mix-x = Translate X mix
+skeletal.mix-y = Translate Y mix
+skeletal.mix-scale-x = Scale X mix
+skeletal.mix-scale-y = Scale Y mix
+skeletal.mix-shear-y = Shear Y mix
+skeletal.binding-bones = Binding bones (Cmd/Ctrl for multiple)
+skeletal.connect-edge = Connect
+skeletal.disconnect-edge = Free edge
+skeletal.mirror-bones = Bone pairs (left:right, …)
+skeletal.mirror-weights = Mirror weights
+skeletal.mirror-pair-error = Use bone pairs such as left:right.
+
+skeletal.softness = Softness
+
+skeletal.compress = Compress
+
+skeletal.stretch = Stretch
+
+skeletal.uniform = Uniform scale
+
+skeletal.copy-keys = Copy keys
+
+skeletal.paste-keys = Paste keys
+
+skeletal.reverse-keys = Reverse keys
+
+skeletal.snap-keys = Snap to frames
+
+skeletal.key-scale = Time scale
+
+skeletal.scale-keys = Scale keys
+
+skeletal.path-attachment = Path attachment
+
+skeletal.path-constraint = Path constraint
+
+skeletal.closed-path = Closed path
+
+skeletal.constant-speed = Constant speed
+
+skeletal.edit-path = Edit control points
+
+skeletal.add-path = Path
+
+skeletal.position = Position
+
+skeletal.spacing = Spacing
+
+skeletal.target-slot = Target slot
+
+skeletal.native-notice = Independent native codec · verified 4.2.43 subset
+skeletal.generate-iterations = Subdivisions
+skeletal.generate-mesh = Generate
+skeletal.reset-mesh = Reset
+skeletal.trace-threshold = Alpha threshold
+skeletal.trace-simplify = Simplification
+skeletal.trace-padding = Padding
+skeletal.trace-mesh = Trace outline
+skeletal.mesh-rebuild-notice = Generate, Reset and Trace clear weights and deform keys. Undo restores them. Reset restores the image rectangle at the slot origin.
+skeletal.add-physics = Physics
+skeletal.physics-constraint = Physics constraint
+skeletal.physics-scope = Animation scope
+skeletal.physics-global = Respond to global timeline
+skeletal.physics-reset-key = Key physics reset
+skeletal.inertia = Inertia
+skeletal.strength = Strength
+skeletal.damping = Damping
+skeletal.mass = Mass
+skeletal.wind = Wind
+skeletal.gravity = Gravity
+skeletal.limit = Limit
+skeletal.fps = Simulation FPS
+skeletal.rotate = Rotation influence
+
+skeletal.preview-attachment-readonly = The animation is displaying a different attachment. Switch to setup mode to edit its geometry.
+
+skeletal.project-menu = Project
+skeletal.new-menu = Create
+skeletal.animation-settings = Animation settings
+skeletal.properties = Properties
+skeletal.search-hierarchy = Search hierarchy…
+skeletal.draw-order = Draw order
+skeletal.skins = Skins
+skeletal.animations = Animations
+skeletal.events = Events
+skeletal.previous-key = Previous key
+skeletal.next-key = Next key
+skeletal.previous-frame = Previous frame
+skeletal.next-frame = Next frame
+skeletal.tool-rotate = Rotate
+skeletal.tool-move = Translate
+skeletal.tool-scale = Scale
+skeletal.tool-shear = Shear
+skeletal.tool-mesh = Mesh
+skeletal.tool-weights = Weights
+skeletal.tool-path = Path
+
+skeletal.space-local = Local
+skeletal.space-parent = Parent
+skeletal.space-world = World
+skeletal.auto-key = Auto Key
+skeletal.key-edited = Key Edited
+skeletal.tool-pose = Pose
+skeletal.tool-create = Create
+skeletal.create-setup-only = Bone creation is only available in Setup mode.
+skeletal.key-shown = Key Shown
+skeletal.images = Images
+skeletal.names = Names
+
+game-preview.pick-unsupported = This game engine does not support GUI resource picking. Rebuild with the updated engine.
+game-preview.pick-empty = No visible GUI node at this position.
+game-preview.pick-timeout = The running game did not respond to GUI resource picking.
+game-preview.pick-running = Run the game to locate the GUI under the pointer.

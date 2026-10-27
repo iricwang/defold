@@ -19,6 +19,7 @@
 // A nonblocking POSIX record lock protects both the frame and input snapshot.
 #if defined(DM_PLATFORM_MACOS) && !defined(DM_RELEASE)
 #include <platform/platform_window_osx.h>
+#include <gamesys/components/comp_gui.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -38,6 +39,8 @@ namespace dmEditorGame
     static uint32_t* g_Data = 0;
     static pid_t g_Parent = 0;
     static uint32_t g_Input[256];
+    static uint32_t g_PickSequence = 0;
+    static bool g_Picking = false;
 
     static bool Lock(short type)
     {
@@ -84,6 +87,9 @@ namespace dmEditorGame
             return false;
         }
         if (g_Simulator) g_Data[13] = 1;
+        g_Data[274] = 1; // GUI resource pick protocol version.
+        g_PickSequence = 0;
+        g_Picking = false;
         g_Data[14] = 1; // The built-in bridge owns capture when the extension is also linked.
         dmPlatform::ConfigureBackgroundApplication();
         memset(g_Input, 0, sizeof(g_Input));
@@ -112,6 +118,13 @@ namespace dmEditorGame
         {
             memcpy(g_Input, g_Data, sizeof(g_Input));
             g_Data[10] = 0;
+            if (g_Data[270] != g_PickSequence)
+            {
+                g_PickSequence = g_Data[270];
+                g_Picking = true;
+                dmGameSystem::BeginGuiResourcePick(dmMath::Min(g_Data[271], 65535U) / 65535.0f,
+                                                  dmMath::Min(g_Data[272], 65535U) / 65535.0f);
+            }
             Lock(F_UNLCK);
         }
         dmHID::HKeyboard keyboard = dmHID::GetKeyboard(hid, 0);
@@ -155,6 +168,19 @@ namespace dmEditorGame
     static void Frame(dmGraphics::HContext graphics)
     {
         if (!g_Data) return;
+        // Publish even when frame capture is throttled. Keep the completed result
+        // until the lock can be acquired, so editor and engine cannot lose a reply.
+        if (g_Picking && Lock(F_WRLCK))
+        {
+            const char* path = dmGameSystem::EndGuiResourcePick();
+            uint32_t length = (uint32_t) strlen(path);
+            memcpy((uint8_t*)g_Data + 1120, path, length);
+            g_Data[276] = length;
+            g_Data[275] = length ? 1 : 0;
+            g_Data[273] = g_PickSequence;
+            g_Picking = false;
+            Lock(F_UNLCK);
+        }
         if (g_Simulator && (!g_Data[265] || g_Data[267] == g_Served)) return;
         uint32_t w = dmGraphics::GetWindowWidth(graphics);
         uint32_t h = dmGraphics::GetWindowHeight(graphics);

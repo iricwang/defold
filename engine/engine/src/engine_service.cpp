@@ -29,6 +29,7 @@
 #include <resource/resource.h>
 #include <gameobject/gameobject.h>
 #include "engine_service.h"
+#include "engine_remote.h"
 #include "engine_service_private.h"
 #include "engine_service_discovery.h"
 #include "engine_service_openapi.h"
@@ -427,6 +428,11 @@ namespace dmEngineService
             openapi_params.m_Userdata = this;
             dmWebServer::AddHandler(web_server, "/openapi.json", &openapi_params, OPENAPI_OPENAPI);
 
+            dmWebServer::HandlerParams remote_params;
+            remote_params.m_Handler = RemoteState::Handler;
+            remote_params.m_Userdata = &m_Remote;
+            dmWebServer::AddHandler(web_server, "/remote", &remote_params);
+
             // Redirects from old profiler to the new
             if (web_server_redirect)
             {
@@ -460,6 +466,7 @@ namespace dmEngineService
 
         void FillState(EngineState* state)
         {
+            m_Remote.Reset();
             dmTemplate::Format(state, m_StateJson, sizeof(m_StateJson), STATE_TEMPLATE, ReplaceCallback);
         }
 
@@ -480,6 +487,7 @@ namespace dmEngineService
 
         ResourceHandlerParams m_ResourceHandlerParams;
         HProfile             m_Profile;
+        RemoteState          m_Remote;
     };
 
     HEngineService New(uint16_t port)
@@ -521,6 +529,21 @@ namespace dmEngineService
         engine_service->m_Profile = 0; // Don't leave a dangling pointer
 
         DiscoveryServiceUpdate(engine_service->m_DiscoveryService);
+    }
+
+    bool GetRemoteInput(HEngineService service, RemoteInput* input)
+    {
+        return service && service->m_Remote.Input(input);
+    }
+
+    void* GetRemoteFrameBuffer(HEngineService service, uint32_t width, uint32_t height)
+    {
+        return service ? service->m_Remote.Buffer(width, height) : 0;
+    }
+
+    void PublishRemoteFrame(HEngineService service)
+    {
+        service->m_Remote.Publish();
     }
 
     uint16_t GetPort(HEngineService engine_service)

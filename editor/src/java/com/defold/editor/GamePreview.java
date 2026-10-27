@@ -26,11 +26,13 @@ import java.io.*;
 import java.lang.foreign.Arena;
 import java.nio.*;
 import java.nio.channels.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /** An isolated game process presents BGRA frames through a private, locked shared file. */
 public final class GamePreview implements AutoCloseable {
@@ -40,6 +42,11 @@ public final class GamePreview implements AutoCloseable {
     private static final Map<String, GamePreview> VIEWS = new ConcurrentHashMap<>();
     private final String project;
     private final Runnable showGame;
+    private final RemoteGameServer.Game remote;
+    private final java.util.concurrent.ArrayBlockingQueue<int[]> remotePointers = new java.util.concurrent.ArrayBlockingQueue<>(64);
+    private volatile long remoteInputTime;
+    private int remoteX, remoteY;
+    private boolean remotePressed;
     private final BiConsumer<Object, String> localize;
     private final VBox root = new VBox();
     private final StackPane viewport = new StackPane();
@@ -72,11 +79,68 @@ public final class GamePreview implements AutoCloseable {
     private final ArrayDeque<Integer> text = new ArrayDeque<>();
     private int buttons, mouseX, mouseY, wheel, sequence;
     private boolean windowFocused;
+    private Consumer<String> revealGuiResource = path -> {};
+    private boolean resourcePickGesture;
+    private int pickSequence, pendingPick;
+    private double[] pickPoint;
+    private long pickDeadline, pickMessageUntil;
+
+    public void setRevealGuiResource(Consumer<String> callback) { revealGuiResource = callback; }
+
+    /** Returns null outside the displayed image; picking must never clamp letterbox clicks. */
+    public static double[] resourcePickPoint(double panelWidth, double panelHeight, double width, double height, double x, double y) {
+        if (panelWidth <= 0 || panelHeight <= 0 || width <= 0 || height <= 0) return null;
+        double scale = Math.min(panelWidth / width, panelHeight / height);
+        double px = (x - (panelWidth - width * scale) / 2) / (width * scale);
+        double py = (y - (panelHeight - height * scale) / 2) / (height * scale);
+        return px >= 0 && px < 1 && py >= 0 && py < 1 ? new double[]{px, py} : null;
+    }
+
+    private void pickMessage(String key) {
+        localize.accept(status, key);
+        pickMessageUntil = System.nanoTime() + 3_000_000_000L;
+        status.setVisible(true);
+    }
+
+    // Called with the shared file locked. Run navigation after releasing the lock.
+    private void updateResourcePick(Session current, ByteBuffer data) {
+        if (pickPoint != null) {
+            double[] point = pickPoint; pickPoint = null;
+            if (data.getInt(1096) != 1) {
+                pickMessage("game-preview.pick-unsupported");
+                pendingPick = 0;
+                return;
+            }
+            pendingPick = ++pickSequence;
+            if (pendingPick == 0) pendingPick = ++pickSequence;
+            data.putInt(1084, (int)Math.round(point[0] * 65535));
+            data.putInt(1088, (int)Math.round(point[1] * 65535));
+            data.putInt(1080, pendingPick);
+            pickDeadline = System.nanoTime() + 2_000_000_000L;
+        }
+        if (pendingPick == 0) return;
+        if (data.getInt(1092) == pendingPick) {
+            pendingPick = 0;
+            int length = data.getInt(1104);
+            if (data.getInt(1100) != 1 || length <= 0 || length >= 2048) {
+                pickMessage("game-preview.pick-empty");
+                return;
+            }
+            byte[] bytes = new byte[length];
+            data.get(1120, bytes);
+            String path = new String(bytes, StandardCharsets.UTF_8);
+            Platform.runLater(() -> { if (session == current && !current.closed) revealGuiResource.accept(path); });
+        } else if (System.nanoTime() >= pickDeadline) {
+            pendingPick = 0;
+            pickMessage("game-preview.pick-timeout");
+        }
+    }
 
     public GamePreview(String project, Runnable runCommand, Runnable showGame, BiConsumer<Object, String> localize) {
         this.project = project;
         this.showGame = showGame;
         this.localize = localize;
+        remote = RemoteGameServer.register(project, this, () -> { enabled = true; embedded.setSelected(true); runCommand.run(); });
         simulator = new GameSimulator(project, localize, () -> {
             simulatorChanged();
         });
@@ -136,7 +200,11 @@ public final class GamePreview implements AutoCloseable {
         HBox.setHgrow(previewResource, Priority.ALWAYS);
         previewResource.setTooltip(new Tooltip());
         previewResource.setText("Game");
-        HBox toolbar = new HBox(5, previewResource, spacer, embedded, frameRate, run, stop, previewLock);
+        Button remoteButton = new Button(remote == null ? "Remote unavailable" : remote.getLabel());
+        remoteButton.setId("game-remote-pairing"); remoteButton.setFocusTraversable(false);
+        remoteButton.setDisable(remote == null);
+        remoteButton.setOnAction(e -> remote.showPairing(root.getScene().getWindow(), remoteButton));
+        HBox toolbar = new HBox(5, previewResource, spacer, embedded, frameRate, run, stop, previewLock, remoteButton);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setMinHeight(26);
         toolbar.getStyleClass().add("game-preview-toolbar");
@@ -157,6 +225,20 @@ public final class GamePreview implements AutoCloseable {
         VBox.setVgrow(viewport, Priority.ALWAYS);
         root.getChildren().addAll(toolbar, simulator.toolbar, viewport);
         viewport.addEventFilter(MouseEvent.ANY, e -> {
+            boolean pickPress = e.getEventType() == MouseEvent.MOUSE_PRESSED
+                && e.getButton() == MouseButton.SECONDARY && e.isControlDown() && e.isShiftDown();
+            if (pickPress || resourcePickGesture) {
+                resourcePickGesture = e.isSecondaryButtonDown();
+                buttons &= ~2;
+                if (pickPress) {
+                    if (session == null) pickMessage("game-preview.pick-running");
+                    else if (session.data == null) pickMessage("game-preview.pick-unsupported");
+                    else if (pixels != null) pickPoint = resourcePickPoint(viewport.getWidth(), viewport.getHeight(),
+                            pixels.getWidth(), pixels.getHeight(), e.getX(), e.getY());
+                }
+                e.consume();
+                return;
+            }
             if (session == null) return;
             if (e.getEventType() == MouseEvent.MOUSE_PRESSED) viewport.requestFocus();
             if (pixels != null) {
@@ -299,6 +381,7 @@ public final class GamePreview implements AutoCloseable {
             return null;
         }
         view.stop();
+        if (view.remote != null) view.remote.resetFrames();
         Session next = new Session(view.targetFrameRate, view.simulator.active ? view.simulator.device : null, view.simulator.rotation);
         view.session = next;
         Platform.runLater(() -> { view.showGame.run(); view.updateTitle(); view.sequence = 0; view.image.setImage(null); view.image.setScaleY(next.simulatorWindow != null ? -1 : 1); view.pixels = null;
@@ -309,6 +392,8 @@ public final class GamePreview implements AutoCloseable {
 
     private void releaseInput() { Arrays.fill(keys, (byte)0); buttons = 0; text.clear(); }
     public void stop() {
+        pendingPick = 0; pickPoint = null; resourcePickGesture = false; pickMessageUntil = 0;
+        remoteRelease();
         Session old = session;
         session = null;
         if (old != null) {
@@ -351,7 +436,7 @@ public final class GamePreview implements AutoCloseable {
                 localize.accept(status, "game-preview.stopped"); status.setVisible(true); stop(); return;
             }
             if (current.isSimulator()) {
-                boolean showing = com.sun.javafx.scene.NodeHelper.isTreeShowing(root)
+                boolean showing = remote != null && remote.hasStream() || com.sun.javafx.scene.NodeHelper.isTreeShowing(root)
                     && viewport.getWidth() > 1 && viewport.getHeight() > 1
                     && !(root.getScene().getWindow() instanceof javafx.stage.Stage stage && stage.isIconified());
                 current.data.putInt(1060, showing ? 1 : 0);
@@ -397,12 +482,25 @@ public final class GamePreview implements AutoCloseable {
             try (FileLock lock = current.channel.tryLock()) {
                 if (lock == null) return;
                 ByteBuffer data = current.data;
+                updateResourcePick(current, data);
                 boolean nowFocused = root.getScene().getWindow().isFocused();
                 boolean focused = nowFocused && root.getScene().getFocusOwner() == viewport;
                 if (!focused || (windowFocused && !nowFocused)) releaseInput();
                 windowFocused = nowFocused;
-                data.putInt(20, focused ? 1 : 0);
-                data.putInt(24, mouseX); data.putInt(28, mouseY); data.putInt(32, buttons); data.putInt(36, wheel);
+                boolean remoteControl = remoteInputTime != 0 && System.nanoTime() - remoteInputTime < 1_000_000_000L;
+                int[] pointer = remotePointers.poll();
+                if (pointer != null && remotePressed && pointer[2] != 0) {
+                    int[] newer;
+                    while ((newer = remotePointers.peek()) != null && newer[2] != 0) {
+                        newer = remotePointers.poll(); if (newer == null) break; pointer = newer;
+                    }
+                }
+                if (pointer != null && remoteControl) { remoteX = pointer[0]; remoteY = pointer[1]; remotePressed = pointer[2] != 0; }
+                if (!remoteControl) { remotePressed = false; remotePointers.clear(); }
+                data.putInt(20, focused || remoteControl ? 1 : 0);
+                data.putInt(24, remoteControl ? (int)((long)remoteX * Math.max(0, data.getInt(4)-1) / 65535) : mouseX);
+                data.putInt(28, remoteControl ? (int)((long)remoteY * Math.max(0, data.getInt(8)-1) / 65535) : mouseY);
+                data.putInt(32, remoteControl ? (remotePressed ? 1 : 0) : buttons); data.putInt(36, wheel);
                 data.position(64); data.put(keys);
                 int count = Math.min(128, data.getInt(40));
                 while (count < 128 && !text.isEmpty()) data.putInt(512 + 4*count++, text.removeFirst());
@@ -431,15 +529,66 @@ public final class GamePreview implements AutoCloseable {
             if (current.simulatorWindow == null)
                 for (int i = 3; i < frame.capacity(); i += 4) frame.put(i, (byte)255);
             pixelBuffer.updateBuffer(buffer -> null);
-            status.setVisible(false);
+            status.setVisible(System.nanoTime() < pickMessageUntil);
         }
     }
 
     @Override public void close() {
         timer.stop(); stop(); VIEWS.remove(project, this);
+        if (remote != null) remote.close();
         if (idleDispose != null) idleDispose.run();
         idleDispose = null; idleRefresh = null; idleImage = null;
         image.setImage(null);
+    }
+
+    boolean remoteRunning() {
+        Session current = session;
+        return current != null && !current.closed && current.process != null && current.process.isAlive();
+    }
+    Path remoteAudioPath() {
+        Session current=session;
+        return current!=null&&!current.closed&&current.path!=null?RemoteAudioFile.path(current.path):null;
+    }
+    boolean remotePointer(int x, int y, boolean down) {
+        if (!remotePointers.offer(new int[]{x, y, down ? 1 : 0})) return false;
+        remoteInputTime = System.nanoTime(); return true;
+    }
+    void remoteRelease() { remoteInputTime = 0; remotePointers.clear(); }
+    static final class RemoteFrame {
+        final Object session;
+        final int sequence, width, height;
+        final int[] rgb;
+        RemoteFrame(Object session, int sequence, int width, int height, int[] rgb) {
+            this.session=session; this.sequence=sequence; this.width=width; this.height=height; this.rgb=rgb;
+        }
+    }
+    RemoteFrame remoteFrame(Object previousSession, int previousSequence, RemoteStreamQuality quality) throws IOException {
+        return remoteFrame(previousSession, previousSequence, quality, null);
+    }
+    RemoteFrame remoteFrame(Object previousSession, int previousSequence, RemoteStreamQuality quality, int[] reuse) throws IOException {
+        Session current = session;
+        if (current == null || current.data == null) return null;
+        synchronized (current) {
+            if (current.closed || current != session) return null;
+            try (FileLock lock=current.channel.tryLock()) {
+                if (lock==null) return null;
+                ByteBuffer data=current.data;
+                int sequence=data.getInt(12), width=data.getInt(4), height=data.getInt(8), slot=data.getInt(44);
+                if (current==previousSession && sequence==previousSequence || width<=0 || height<=0
+                    || width>4096 || height>4096 || (long)width*height*4>current.slotSize || slot<0 || slot>1) return null;
+                int[] dimensions=quality.dimensions(width,height);int outW=dimensions[0],outH=dimensions[1];
+                int base=HEADER+slot*current.slotSize;
+                // One bulk copy avoids a mapped-memory scope check for every pixel.
+                int[] source=reuse!=null&&reuse.length==width*height?reuse:new int[width*height];
+                ByteBuffer pixels=data.duplicate().order(data.order());pixels.position(base);pixels.asIntBuffer().get(source);
+                int[] rgb=source;
+                if(outW!=width||outH!=height){
+                    rgb=new int[outW*outH];
+                    for(int y=0;y<outH;y++)for(int x=0;x<outW;x++)rgb[y*outW+x]=source[(y*height/outH)*width+x*width/outW];
+                }
+                return new RemoteFrame(current, sequence, outW, outH, rgb);
+            }
+        }
     }
 
     public static final class Session implements AutoCloseable {
@@ -477,6 +626,7 @@ public final class GamePreview implements AutoCloseable {
             path = com.sun.jna.Platform.isWindows()
                 ? Files.createTempFile("defold-game-", ".shm")
                 : Files.createTempFile("defold-game-", ".shm", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+            if (com.sun.jna.Platform.isMac()) RemoteAudioFile.create(path);
             channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
             arena = Arena.ofShared();
             data = channel.map(FileChannel.MapMode.READ_WRITE, 0, HEADER + 2L * slotSize, arena).asByteBuffer();
@@ -519,10 +669,10 @@ public final class GamePreview implements AutoCloseable {
             }
             if (channel != null) {
                 arena.close();
-                try { channel.close(); Files.deleteIfExists(path); }
+                try { channel.close(); Files.deleteIfExists(path); Files.deleteIfExists(RemoteAudioFile.path(path)); }
                 catch (IOException ignored) {
                     if (process != null) process.onExit().thenRun(() -> {
-                        try { Files.deleteIfExists(path); } catch (IOException error) { path.toFile().deleteOnExit(); }
+                        try { Files.deleteIfExists(path); Files.deleteIfExists(RemoteAudioFile.path(path)); } catch (IOException error) { path.toFile().deleteOnExit(); }
                     });
                     else path.toFile().deleteOnExit();
                 }

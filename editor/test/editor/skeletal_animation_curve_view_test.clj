@@ -92,3 +92,14 @@
       (.handle (.getOnMouseDragged ^Canvas canvas) (mouse-event MouseEvent/MOUSE_DRAGGED -2000.0 y))
       (.handle (.getOnMouseReleased ^Canvas canvas) (mouse-event MouseEvent/MOUSE_RELEASED -2000.0 y))
       (is (= 0.0 (first (second (first @calls))))))))
+
+;; Shared graph bounds must include every visible channel, so selecting another
+;; channel does not change the coordinate system used by its handle hit tests.
+(deftest shared-channel-bounds-test
+  (let [channels [{:property "x" :keys [{:time 0.0 :value -100.0} {:time 1.0 :value 10.0}]}
+                  {:property "y" :keys [{:time 0.0 :value 200.0} {:time 1.0 :value 300.0}]}]
+        state {:duration 1.0 :channels channels}
+        bounds (curve/graph-bounds 800.0 250.0 state)]
+    (is (< (:low bounds) -100.0))
+    (is (> (:high bounds) 300.0))
+    (is (= bounds (curve/graph-bounds 800.0 250.0 (assoc state :active-track "y"))))))
