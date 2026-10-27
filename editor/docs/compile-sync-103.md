@@ -17,4 +17,6 @@
 
 工程的 `defold-background` 已注册到本机 Codex，使用隔离的 Python 依赖和本地编译的 macOS worker／guard；绑定测试 fixture 与当前 Dragon Burst 项目。修复了 macOS `lipo -verify_arch` 输入文件位置错误。
 
-实际 stdio 验证通过：49 个工具、项目发现、隔离构建、隐藏游戏启动、640×480 PNG、点击 HID 确认、报告导出和停止会话；基础测试 42 项通过。测试工程画面与报告位于 `tmp/local-update/mcp-smoke-2/`。点击回执仅证明 HID 已接收，不声称业务逻辑确认；Mac 同帧场景几何不支持，按服务能力列表处理。
+实际 stdio 验证通过：49 个工具、项目发现、隔离构建、隐藏游戏启动、640×480 PNG、点击 HID 确认、报告导出和停止会话；基础测试 42 项通过。测试工程画面与报告位于 `tmp/local-update/mcp-smoke-3/`。点击回执仅证明 HID 已接收，不声称业务逻辑确认；Mac 同帧场景几何不支持，按服务能力列表处理。
+
+补充实机截图检查发现并修复了 MCP worker 在 Mac 上重复翻转像素的问题，sidecar 已重新编译；验证了正确画面方向和非对称位置拖动的实际目标像素。该工具使用独立 worker classpath，不需要替换已安装的编辑器 JAR。

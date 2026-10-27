@@ -149,7 +149,7 @@ class Service:
                               'editor_available': (path / '.internal/editor.port').is_file()}
                              for key, path in self.projects.items()],
                 'platform': self.platform,
-                'capabilities': ['owned_hidden_opengl', 'disk_snapshot_build', 'device_resolution_safe_area',
+                'capabilities': ['owned_hidden_opengl' if self.windows else 'owned_hidden_gpu', 'disk_snapshot_build', 'device_resolution_safe_area',
                                  'input_ack', 'png_capture', 'image_crop', 'image_compare', 'runtime_scene_live', 'log_wait', 'reports', 'scenario_matrix',
                                  'disk_resource_search', 'isolated_resource_runtime_preview', 'compiled_resource_runtime_preview', 'compiled_incremental_import', 'preview_support_objects',
                                  'editor_gui_snapshot_transactions', 'opt_in_application_ack', 'device_inspection_overlay',
@@ -158,8 +158,8 @@ class Service:
                                     'scenario_semantic_steps', 'element_condition_wait', 'layout_annotation', 'node_drag'] if self.windows else []),
                 'scenario_versions': [1, 2],
                 'unsupported': ['attached_session', 'native_extension_build',
-                                'native_extension_source_preview', 'metal', 'hot_reload', 'text_glyph_geometry', 'custom_render_geometry']
-                               + ([] if self.windows else ['same_render_scene_snapshot']),
+                                'native_extension_source_preview', 'hot_reload', 'text_glyph_geometry', 'custom_render_geometry']
+                               + (['metal'] if self.windows else ['same_render_scene_snapshot']),
                 'conditional_capabilities': {'editor_gui_snapshot_transactions':'Requires a running editor with /automation/v1 routes',
                                              'same_render_scene_snapshot':'Windows exact PDB/ABI checks; capture metadata is authoritative',
                                              'opt_in_application_ack':'Requires explicit sdk/automation.lua integration and app_channel'},

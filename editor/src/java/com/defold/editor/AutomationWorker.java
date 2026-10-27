@@ -250,7 +250,10 @@ public final class AutomationWorker implements AutoCloseable {
             int offset = 4096 + get(11) * CAPACITY;
             int[] row = new int[width];
             for (int py = 0; py < height; ++py) {
-                for (int px = 0; px < width; ++px) row[px] = data.getInt(offset + ((height - py - 1) * width + px) * 4);
+                // The macOS engine ReadPixels API already returns top-left rows.
+                // The Windows OpenGL hook writes raw bottom-up rows instead.
+                int sourceY = MAC ? py : height - py - 1;
+                for (int px = 0; px < width; ++px) row[px] = data.getInt(offset + (sourceY * width + px) * 4);
                 image.setRGB(0, py, width, 1, row, 0, width);
             }
             metadata = new LinkedHashMap<>(Map.of("width", width, "height", height,
