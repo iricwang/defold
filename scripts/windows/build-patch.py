@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Windows editor patch using the matching archived engine, without an app bundle."""
+"""Build a Windows editor patch with matching archived or locally built engine artifacts."""
 import json
 import io
 import os
@@ -96,35 +96,59 @@ def build_windows_native(source, destination):
         subprocess.run(['cmd', '/d', '/c', str(script)], cwd=build, check=True)
 
 
-def main(*, baseline=None, full=False):
+def validate_engine_home(home):
+    """Require all local artifacts before touching editor build outputs."""
+    required = ('share/java/bob.jar', 'share/ref-doc.zip',
+                'bin/x86_64-win32/dmengine.exe', 'bin/x86_64-win32/dmengine.pdb',
+                'bin/x86_64-win32/launcher.exe',
+                'lib/x86_64-win32/particle_shared.dll',
+                'lib/x86_64-win32/mouse_capture_shared.dll')
+    missing = [name for name in required if not (home / name).is_file()]
+    if missing:
+        raise ValueError('Incomplete local engine build: ' + ', '.join(missing))
+    # The executable shipped inside Bob and its external debug symbols must be
+    # from the same local build, or Simulator symbol lookup cannot be trusted.
+    with zipfile.ZipFile(home / 'share/java/bob.jar') as bob:
+        if bob.read('libexec/x86_64-win32/dmengine.exe') != (home / 'bin/x86_64-win32/dmengine.exe').read_bytes():
+            raise ValueError('Local Bob engine differs from the engine build; rebuild Bob first')
+
+
+def main(*, baseline=None, full=False, engine_home=None):
     os.chdir(ROOT)
-    home = ROOT / 'tmp/windows-patch-home'
+    home = Path(engine_home).resolve() if engine_home else ROOT / 'tmp/windows-patch-home'
+    if engine_home:
+        validate_engine_home(home)
     os.environ['DYNAMO_HOME'] = str(home)
     os.environ['LEIN_HOME'] = str(ROOT / 'editor/build/lein')
     os.environ['PYTHONUTF8'] = '1'
-    # The compiler/native tools come from ENGINE, so use its generated protocols too.
+    # Reuse the selected Bob's protocols together with its compiler/native tools.
     os.environ['DM_EDITOR_USE_BOB_PROTOCOLS'] = '1'
     git_tools = Path(os.environ['ProgramFiles']) / 'Git/usr/bin'
     os.environ['PATH'] = str(git_tools) + os.pathsep + os.environ['PATH']
-    tools = ROOT / 'tmp/windows-patch-tools'
-    protoc = tools / 'protoc.zip'
-    download('https://github.com/protocolbuffers/protobuf/releases/download/v34.0/protoc-34.0-win64.zip', protoc)
-    with zipfile.ZipFile(protoc) as archive:
-        archive.extractall(tools / 'protoc')
-    shutil.copytree(tools / 'protoc/include', home / 'ext/include', dirs_exist_ok=True)
-    os.environ['PATH'] = str(tools / 'protoc/bin') + os.pathsep + os.environ['PATH']
-    for package in sorted((ROOT / 'packages').glob('luajit-*-common.tar.gz')):
-        with tarfile.open(package) as archive:
-            archive.extractall(home / 'ext', filter='data')
+    if engine_home:
+        os.environ['PATH'] = str(home / 'ext/bin/x86_64-win32') + os.pathsep + os.environ['PATH']
+    else:
+        tools = ROOT / 'tmp/windows-patch-tools'
+        protoc = tools / 'protoc.zip'
+        download('https://github.com/protocolbuffers/protobuf/releases/download/v34.0/protoc-34.0-win64.zip', protoc)
+        with zipfile.ZipFile(protoc) as archive:
+            archive.extractall(tools / 'protoc')
+        shutil.copytree(tools / 'protoc/include', home / 'ext/include', dirs_exist_ok=True)
+        os.environ['PATH'] = str(tools / 'protoc/bin') + os.pathsep + os.environ['PATH']
+        for package in sorted((ROOT / 'packages').glob('luajit-*-common.tar.gz')):
+            with tarfile.open(package) as archive:
+                archive.extractall(home / 'ext', filter='data')
     archive_url = f'https://d.defold.com/archive/alpha/{ENGINE}'
-    download(f'{archive_url}/bob/bob.jar', home / 'share/java/bob.jar')
+    if not engine_home:
+        download(f'{archive_url}/bob/bob.jar', home / 'share/java/bob.jar')
     editor_bob = home / 'share/java/bob-editor.jar'
     add_editor_debugger(home / 'share/java/bob.jar', editor_bob)
     os.environ['DM_BOB_JAR'] = str(editor_bob)
-    download(f'{archive_url}/engine/share/ref-doc.zip', home / 'share/ref-doc.zip')
-    for name in ('launcher.exe', 'dmengine.pdb', 'particle_shared.dll', 'mouse_capture_shared.dll'):
-        destination = home / ('bin' if name in ('launcher.exe', 'dmengine.pdb') else 'lib') / 'x86_64-win32' / name
-        download(f'{archive_url}/engine/x86_64-win32/{name}', destination)
+    if not engine_home:
+        download(f'{archive_url}/engine/share/ref-doc.zip', home / 'share/ref-doc.zip')
+        for name in ('launcher.exe', 'dmengine.pdb', 'particle_shared.dll', 'mouse_capture_shared.dll'):
+            destination = home / ('bin' if name in ('launcher.exe', 'dmengine.pdb') else 'lib') / 'x86_64-win32' / name
+            download(f'{archive_url}/engine/x86_64-win32/{name}', destination)
     subprocess.run([sys.executable, 'patch/manage.py', 'stage'], check=True)
     if not full and baseline is None:
         subprocess.run([sys.executable, 'patch/manage.py', 'prepare-base', '--directory', 'tmp/patch-base', '--platform', 'x86_64-win32'], check=True)
@@ -143,7 +167,7 @@ def main(*, baseline=None, full=False):
                          ROOT / 'editor/resources/_unpack/x86_64-win32/lib/game_window_hook.dll')
     bundle.invoke_lein(['run', '-m', 'editor.ns-batch-builder', 'resources/sorted_clojure_ns_list.edn'], jdk_path=jdk)
     bundle.invoke_lein(['prerelease'], jdk_path=jdk)
-    options.engine_sha1 = ENGINE
+    options.engine_sha1 = options.editor_sha1 if engine_home else ENGINE
     if full:
         # create_bundle uses editor/tmp as its staging directory.
         staging = ROOT / 'editor/tmp'

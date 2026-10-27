@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "name": "Named GUI actions, layout and correlated business checks",
+  "app_channel": true,
+  "devices": [
+    {"name": "Desktop 640x480", "device": {"width": 640, "height": 480}},
+    {"name": "Phone portrait", "device": {"width": 1170, "height": 2532, "top": 156, "bottom": 102}},
+    {"name": "Phone landscape", "device": {"width": 2532, "height": 1170, "left": 156, "right": 102}}
+  ],
+  "steps": [
+    {"kind": "wait_log", "contains": "AUTOMATION_READY", "after": "startup"},
+    {"kind": "capture", "name": "before"},
+    {"kind": "layout_assert", "rules": [
+      {"kind": "inside_safe_area", "selector": {"id": "verify_button"}},
+      {"kind": "no_overlap", "selector": {"id": "verify_button"}, "other": {"id": "drag_handle"}}
+    ]},
+    {"kind": "element_click_verified", "selector": {"id": "verify_button"}, "event": "button_clicked"},
+    {"kind": "application_command", "name": "state", "expect_result": {"clicks": 1}},
+    {"kind": "capture", "name": "after"},
+    {"kind": "compare", "before": "before", "after": "after", "expected": "different", "max_changed_ratio": 0},
+    {"kind": "element_click", "selector": {"id": "verify_button"}, "expect_log": "BUTTON_CLICKED 2"},
+    {"kind": "application_command", "name": "state", "expect_result": {"clicks": 2}}
+  ]
+}

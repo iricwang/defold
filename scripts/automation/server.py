@@ -23,6 +23,9 @@ from PIL import Image
 from core import AutomationError, Service
 from build import digest
 import scenarios
+import conditions
+import gestures
+import sequences
 
 
 def obj(properties, required=()):
@@ -40,6 +43,10 @@ PROJECT_CONFIG = {'type': 'object', 'maxProperties': 16, 'additionalProperties':
 POINT = {key: {'type': 'integer', 'minimum': 0, 'maximum': 4095} for key in ('x', 'y')}
 REGION = obj({**POINT, **{key: {'type': 'integer', 'minimum': 1, 'maximum': 4096} for key in ('width', 'height')}},
              ('x', 'y', 'width', 'height'))
+BASELINE_ID = {'type': 'string', 'pattern': '^[0-9a-f]{64}$'}
+COMPARISON_OPTIONS = {'channel_threshold': {'type': 'integer', 'minimum': 0, 'maximum': 255},
+                      'max_changed_ratio': {'type': 'number', 'minimum': 0, 'maximum': 1},
+                      'region': REGION, 'ignore': {'type': 'array', 'items': REGION, 'maxItems': 16}}
 BUTTON = {'type': 'integer', 'enum': [1, 2, 4]}
 ACTION = {'oneOf': [
     obj({'type': {'const': 'click'}, **POINT, 'button': BUTTON}, ('type', 'x', 'y')),
@@ -51,13 +58,13 @@ ACTION = {'oneOf': [
     obj({'type': {'const': 'text'}, 'text': {'type': 'string', 'maxLength': 4096}}, ('type', 'text')),
     obj({'type': {'const': 'wheel'}, **POINT, 'delta': {'type': 'integer', 'minimum': -100, 'maximum': 100}},
         ('type', 'x', 'y', 'delta'))]}
-SCENARIO = scenarios.schema(obj, STRING, DEVICE, ACTION, PROJECT_CONFIG, REGION)
 SUPPORT_OBJECTS = {'type': 'array', 'maxItems': 32, 'items': obj({
     'id': {'type': 'string', 'pattern': '^[A-Za-z0-9_-]{1,64}$'}, 'resource_path': STRING}, ('id', 'resource_path'))}
 SELECTOR = {**obj({key: STRING for key in ('id','element_id','type','text')}), 'minProperties':1}
 LAYOUT_RULE = obj({'kind': {'enum':['inside_viewport','inside_safe_area','no_overlap']},
                    'selector': SELECTOR, 'other': SELECTOR}, ('kind','selector'))
 LAYOUT_RULE['allOf']=[{'if':{'properties':{'kind':{'const':'no_overlap'}}},'then':{'required':['other']}}]
+SCENARIO = scenarios.schema(obj, STRING, DEVICE, ACTION, PROJECT_CONFIG, REGION, SELECTOR, LAYOUT_RULE)
 
 
 def tools():
@@ -117,6 +124,8 @@ def tools():
         ('capture', 'Capture a fresh original GPU frame with bridge metadata. Includes an inline thumbnail and original image resource.', obj(session, ('session_id',)), True),
         ('element_query', 'Query exact selectors in the immutable scene captured at this image render boundary. Verified default GUI rectangles only; unsupported text/custom projection/clipping is unknown.',
          obj({'artifact_id':STRING,'selector':SELECTOR,'offset':INTEGER,'limit':{'type':'integer','minimum':1,'maximum':100}},('artifact_id',)), True),
+        ('element_wait', 'Wait for a finite GUI condition in fresh render snapshots. Returns a cancellable job. Stable samples are distinct sampled renders, not proof of continuous visibility. Absent differs from hidden; unsupported visibility fails. Only final evidence PNG is retained.',
+         conditions.definition(obj, SELECTOR, {**session, **operation}, ('session_id', 'operation_id')), True),
         ('element_click', 'Resolve one GUI element again in a fresh frame and click its visible convex rectangle. Rejects ambiguous, stale, hidden and unsupported geometry. Does not prove business success or absence of occlusion.',
          obj({**session,**operation,'lease_id':STRING,'observation_id':STRING,'selector':SELECTOR},('session_id','operation_id','lease_id','observation_id','selector')),False),
         ('application_command', 'Call a command explicitly registered by the game QA SDK and wait for the exact operation ID result. Requires app_channel at startup; no eval or automatic source injection.',
@@ -125,8 +134,15 @@ def tools():
         ('element_click_verified', 'Arm an operation ID in the integrated game QA SDK, resolve/click an element and wait for the matching application event. Timeout does not undo a click and must not be blindly retried.',
          obj({**session,**operation,'lease_id':STRING,'observation_id':STRING,'selector':SELECTOR,'event':STRING,
               'timeout_ms':{'type':'integer','minimum':1,'maximum':30000}},('session_id','operation_id','lease_id','observation_id','selector','event')),False),
-        ('layout_check', 'Check GUI rectangle containment/safe area or explicit pair overlap in one captured frame. Returns unknown when geometry is unsupported; text/custom shaders are not pixel coverage checks.',
-         obj({'artifact_id':STRING,'rules':{'type':'array','minItems':1,'maxItems':64,'items':LAYOUT_RULE}},('artifact_id','rules')),True),
+        ('layout_check', 'Check GUI rectangles in one captured frame. Optional annotate creates a separate numbered PNG with safe area, target outlines and overlap, retaining the raw image. Unknown geometry gets no invented location. Rectangles are not pixel coverage or occlusion.',
+         obj({'artifact_id':STRING,'annotate':{'type':'boolean'},'rules':{'type':'array','minItems':1,'maxItems':64,'items':LAYOUT_RULE}},('artifact_id','rules')),True),
+        ('element_drag', 'Drag from a uniquely identified visible GUI rectangle to another node or a normalized frame point. Refreshes both endpoints in one snapshot and rejects replaced/unknown nodes. Straight path to a frozen endpoint; dispatch does not prove business success.',
+         obj({**session, **operation, 'lease_id':STRING, 'observation_id':STRING, **gestures.properties(obj, SELECTOR)},
+             ('session_id','operation_id','lease_id','observation_id','selector','destination')),False),
+        ('element_drag_verified', 'Arm the opt-in QA SDK, drag by node and wait for a matching operation ID and business event. Timeout retains dispatch evidence and must not be blindly retried. Requires app_channel.',
+         obj({**session, **operation, 'lease_id':STRING, 'observation_id':STRING, **gestures.properties(obj, SELECTOR),
+              'event':STRING, 'timeout_ms':{'type':'integer','minimum':1,'maximum':30000}},
+             ('session_id','operation_id','lease_id','observation_id','selector','destination','event')),False),
         ('device_overlay', 'Create a derived inspection image with catalog cutout rectangles and safe-area outline. Requires matching preset dimensions/insets; original PNG stays unchanged.',
          obj({'artifact_id':STRING,'name':STRING,'rotation':{'type':'integer','enum':[0,1,2,3]}},('artifact_id','name','rotation')),True),
         ('capture_region', 'Crop an immutable original runtime artifact. Returns source observation and pixel offset; map coordinates back before input. Does not capture a new frame.',
@@ -136,6 +152,16 @@ def tools():
               'channel_threshold': {'type': 'integer', 'minimum': 0, 'maximum': 255},
               'max_changed_ratio': {'type': 'number', 'minimum': 0, 'maximum': 1},
               'ignore': {'type': 'array', 'items': REGION, 'maxItems': 16}}, ('before_id', 'after_id')), True),
+        ('baseline_save', 'Explicitly save an original capture as an immutable project-scoped baseline revision. Same name may have multiple revisions/devices; never replaces an existing revision. Persists across service restarts.',
+         obj({'project_id': STRING, 'name': {'type': 'string', 'minLength': 1, 'maxLength': 128},
+              'artifact_id': STRING, **operation}, ('project_id', 'name', 'artifact_id', 'operation_id')), False),
+        ('baseline_list', 'List persisted baseline revisions for a registered project. Optional exact name filter. No implicit latest-baseline selection.',
+         obj({'project_id': STRING, 'name': STRING, 'offset': INTEGER,
+              'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}}, ('project_id',)), True),
+        ('baseline_get', 'Read a persisted baseline PNG and provenance by immutable revision ID. It is historical evidence, never a valid live input observation.',
+         obj({'project_id': STRING, 'baseline_id': BASELINE_ID}, ('project_id', 'baseline_id')), True),
+        ('baseline_compare', 'Compare a current capture with an explicit persisted baseline revision. Requires same project, device/safe area, preview context and QA config. Produces original/current/difference evidence; never updates the baseline.',
+         obj({'baseline_id': BASELINE_ID, 'artifact_id': STRING, **COMPARISON_OPTIONS}, ('baseline_id', 'artifact_id')), True),
         ('scene_query', 'Search live engine nodes by id/type/text substring. Sample paths are not persistent IDs. Independent of screenshots; no exact screen geometry.',
          obj({**session, 'selector': obj({key: STRING for key in ('id', 'type', 'text')}),
               'limit': {'type': 'integer', 'minimum': 1, 'maximum': 500}}, ('session_id',)), True),
@@ -145,8 +171,12 @@ def tools():
               'timeout_ms': {'type': 'integer', 'minimum': 1, 'maximum': 30000}},
              ('session_id', 'contains', 'after')), True),
         ('report_export', 'Write an offline HTML/JSON screenshot report for this session.', obj(session, ('session_id',)), False),
+        ('capture_sequence', 'Capture a bounded sequence of real GPU frames as a cancellable job. Defaults: 12 samples at 250ms; requested span <=15 seconds. Keeps raw PNGs and host capture timings; makes an overview and resized looping WebP. Not fixed-FPS video. Device changes fail with partial evidence.',
+         obj({**session, **operation, **sequences.properties()}, ('session_id','operation_id')), False),
+        ('sequence_get', 'Read temporal capture progress/result, overview preview and WebP resource link, including partial failure/cancelled evidence. The contact sheet is not an input coordinate space.',
+         obj({'sequence_id': STRING}, ('sequence_id',)), True),
         ('artifact_get', 'Read a previously captured artifact, even after stopping its game.', obj({'artifact_id': STRING}, ('artifact_id',)), True),
-        ('scenario_run', 'Run a bounded declarative scenario across up to 8 devices using one frozen build. Returns a job; result.state is passed/failed/cancelled. Every case owns and closes its game; retains failure images/logs. No arbitrary code.',
+        ('scenario_run', 'Run a bounded declarative scenario across up to 8 devices using one frozen build. V2 adds named GUI clicks, same-frame layout assertions and opt-in correlated QA callbacks. Unknown layout fails, never passes. Returns a job; check result.state. Every case closes its game and retains step evidence. No arbitrary code.',
          obj({'build_id': STRING, 'scenario': SCENARIO, **operation}, ('build_id', 'scenario', 'operation_id')), False),
         ('scenario_get', 'Read a compact run summary or a bounded page of device steps, including failed assertion evidence. Use the run_id from job progress or result.',
          obj({'run_id': STRING, 'case_index': INTEGER, 'offset': INTEGER,
@@ -182,11 +212,24 @@ def dispatch(service, name, arguments):
     if name == 'resource_search':
         return service.resources(**args)
     if name == 'element_query': return service.elements(**args)
+    if name == 'capture_sequence':
+        key = args.pop('operation_id')
+        try: sequences.validate(args.get('sample_count', 12), args.get('interval_ms', 250))
+        except ValueError as error: raise AutomationError('INVALID_SEQUENCE', str(error)) from error
+        return service.submit(key, {'tool': name, **args}, lambda job: sequences.run(service, job=job, **args))
+    if name == 'sequence_get':
+        if args['sequence_id'] not in service.sequences:
+            raise AutomationError('SEQUENCE_NOT_FOUND', args['sequence_id'])
+        return service.sequences[args['sequence_id']]
+    if name == 'element_wait':
+        key = args.pop('operation_id')
+        return service.submit(key, {'tool': name, **args}, lambda job: service.wait_element(
+            **args, cancel=job['cancel'], progress=lambda value: job.update(progress=value)))
     if name == 'layout_check': return service.layout_check(**args)
-    if name == 'element_click':
+    if name in ('element_click', 'element_drag'):
         key=args.pop('operation_id')
-        return service.operation(key, {'tool':name,**args}, lambda:service.element_click(**args))
-    if name in ('application_command','element_click_verified'):
+        return service.operation(key, {'tool':name,**args}, lambda:getattr(service,name)(**args))
+    if name in ('application_command','element_click_verified','element_drag_verified'):
         function=getattr(service,name)
         return service.operation(args['operation_id'],{'tool':name,**args},lambda:function(**args))
     if name == 'device_overlay':
@@ -237,6 +280,11 @@ def dispatch(service, name, arguments):
         return service.crop(**args)
     if name == 'image_compare':
         return service.compare(**args)
+    if name == 'baseline_save':
+        key = args.pop('operation_id')
+        return service.operation(key, {'tool': name, **args}, lambda: service.baseline_save(**args))
+    if name in ('baseline_list', 'baseline_get', 'baseline_compare'):
+        return getattr(service, name)(**args)
     if name == 'scene_query':
         return service.scene(**args)
     if name == 'logs_read':
@@ -282,7 +330,7 @@ def artifact_content(result):
         if isinstance(value,list): return [compact(v) for v in value]
         return value
     result = compact(result)
-    artifact = result if 'image_path' in result else result.get('after')
+    artifact = result if 'image_path' in result else result.get('overview', result.get('annotation', result.get('after')))
     content = [types.TextContent(type='text', text=json.dumps(result, ensure_ascii=False))]
     if artifact and 'image_path' in artifact:
         with Image.open(artifact['image_path']) as original:
@@ -292,11 +340,22 @@ def artifact_content(result):
             preview.save(output, format='PNG')
         content.extend([
             types.ImageContent(type='image', mimeType='image/png', data=base64.b64encode(output.getvalue()).decode()),
-            types.ResourceLink(type='resource_link', uri=artifact['uri'], name='Original runtime frame', mimeType='image/png')])
+            types.ResourceLink(type='resource_link', uri=artifact['uri'],
+                               name={'baseline': 'Saved baseline frame', 'layout_annotation': 'Layout annotation',
+                                     'difference': 'Pixel difference', 'crop': 'Cropped frame', 'device_overlay': 'Device overlay',
+                                     'sequence_sheet': 'Temporal frame overview'}.get(
+                                         artifact.get('artifact_kind'), 'Original runtime frame'),
+                               mimeType='image/png')])
         result = {**result, 'inline_preview': {'width': preview.width, 'height': preview.height,
                   'to_frame_scale': [artifact['width'] / preview.width, artifact['height'] / preview.height],
                   'to_frame_offset': artifact.get('to_frame_offset', [0, 0]),
                   'source_observation_id': artifact['observation_id']}}
+        if artifact.get('artifact_kind') == 'sequence_sheet':
+            result['inline_preview'] = {'width': preview.width, 'height': preview.height,
+                                        'coordinate_space': 'contact_sheet_not_input'}
+    if result.get('preview', {}).get('mime_type') == 'image/webp':
+        content.append(types.ResourceLink(type='resource_link', uri=result['preview']['uri'],
+                                          name='Temporal preview (sampled, looping)', mimeType='image/webp'))
     return types.CallToolResult(content=content, structuredContent=result)
 
 
@@ -314,15 +373,21 @@ def make_server(service):
             return await anyio.to_thread.run_sync(lambda: artifact_content(result))
         except Exception as error:
             payload = {'error': {'code': getattr(error, 'code', 'INTERNAL_ERROR'), 'message': str(error)}}
+            if getattr(error, 'details', None) is not None:
+                payload['error']['details'] = error.details
             return types.CallToolResult(content=[types.TextContent(type='text', text=json.dumps(payload))],
                                         structuredContent=payload, isError=True)
 
     @server.read_resource()
     async def read_resource(uri):
         uri = str(uri)
-        for item in service.artifacts.values():
+        for item in list(service.artifacts.values()):
             if uri == item['uri']:
                 return [ReadResourceContents(Path(item['image_path']).read_bytes(), 'image/png')]
+        for sequence in list(service.sequences.values()):
+            preview = sequence.get('preview', {})
+            if uri == preview.get('uri'):
+                return [ReadResourceContents(Path(preview['path']).read_bytes(), 'image/webp')]
         raise ValueError('Unknown artifact URI')
 
     return server
@@ -342,6 +407,7 @@ def main():
     parser.add_argument('--manifest', type=Path, default=ROOT / 'tmp/automation-runtime/manifest.json')
     parser.add_argument('--project', type=Path, action='append', required=True)
     parser.add_argument('--artifacts', type=Path, default=ROOT / 'tmp/automation-artifacts')
+    parser.add_argument('--baselines', type=Path, help='Persistent baseline store; defaults to <artifacts>/baselines')
     parser.add_argument('--engine', type=Path, help='Matching locally compiled custom engine (adjacent PDB on Windows)')
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text())
@@ -351,7 +417,7 @@ def main():
     for path, expected in {manifest['jar']: manifest['inputs'][manifest['jar']], **manifest['outputs']}.items():
         if not Path(path).is_file() or digest(path) != expected:
             raise RuntimeError('Automation build does not match installed files; rebuild the local automation sidecar: ' + path)
-    service = Service(manifest, args.project, args.artifacts, args.engine)
+    service = Service(manifest, args.project, args.artifacts, args.engine, args.baselines)
     anyio.run(serve, service)
 
 

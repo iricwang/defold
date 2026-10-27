@@ -56,3 +56,29 @@ class LocalEditorTest(unittest.TestCase):
         args = editor.parser().parse_args(['patch', '--app', 'Defold'])
         self.assertFalse(args.install)
         self.assertEqual('full', editor.parser().parse_args(['full']).command)
+
+    # Local native changes must use a complete, matching engine/Bob set.
+    def test_local_engine_requires_matching_bob(self):
+        builder = editor.builder()
+        with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as directory:
+            home = Path(directory)
+            with self.assertRaisesRegex(ValueError, 'Incomplete local engine'):
+                builder.validate_engine_home(home)
+            for name in ('share/ref-doc.zip', 'bin/x86_64-win32/dmengine.exe',
+                         'bin/x86_64-win32/dmengine.pdb', 'bin/x86_64-win32/launcher.exe',
+                         'lib/x86_64-win32/particle_shared.dll',
+                         'lib/x86_64-win32/mouse_capture_shared.dll'):
+                file = home / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_bytes(b'local')
+            (home / 'share/java').mkdir()
+            for engine, valid in ((b'archived', False), (b'local', True)):
+                with zipfile.ZipFile(home / 'share/java/bob.jar', 'w') as jar:
+                    jar.writestr('libexec/x86_64-win32/dmengine.exe', engine)
+                if valid:
+                    builder.validate_engine_home(home)
+                else:
+                    with self.assertRaisesRegex(ValueError, 'rebuild Bob'):
+                        builder.validate_engine_home(home)
+            args = editor.parser().parse_args(['patch', '--app', 'Defold', '--engine-home', directory])
+            self.assertEqual(home, args.engine_home)

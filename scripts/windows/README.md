@@ -60,6 +60,9 @@ scripts\windows\editor.cmd full --from-installed X:\Programs\Defold
 # 从当前源码完整编译，按本机精确文件基线生成增量 patch
 scripts\windows\editor.cmd patch --app X:\Programs\Defold
 
+# 修改过原生引擎或协议时，先按引擎构建指南编译引擎和 Bob，再使用配套产物
+scripts\windows\editor.cmd patch --app X:\Programs\Defold --engine-home tmp\dynamo_home
+
 # 保存项目并关闭 Defold 后，构建、校验并安装
 scripts\windows\editor.cmd patch --app X:\Programs\Defold --install
 
@@ -78,6 +81,12 @@ scripts\windows\editor.cmd install editor\target\editor\Defold-x86_64-win32-patc
 `patch` 要求源码版本高于安装版本，不自动改版本号。需要发布新修改时先显式运行
 `python patch/manage.py bump --notes "更新说明"`。同版本需要重编译时使用 `full`。
 基线包含所有应用文件哈希；本地与 CI 即使同版本也不能随意混用。
+
+`--engine-home` 同时支持 `patch` 和源码 `full`，指向完整的本地 `DYNAMO_HOME`。
+必须包含 Bob、引擎 EXE/PDB、编辑器启动器、粒子/鼠标原生库和参考文档。
+脚本检查 Bob 内的 Windows 引擎与该目录的 EXE 完全一致，并统一复用 Bob 的协议类，
+防止 GUI 新字段只在编辑器生效或旧引擎在运行时忽略新功能。原生符号另由最终包测试验证。
+该参数不会回退下载旧引擎；未传时沿用原有官方归档构建流程。
 
 `install` 只接受增量包，要求先保存项目、关闭该安装的编辑器与游戏。
 它先执行包内回归，再使用现有 PatchBootstrap 校验、备份、替换和重启，

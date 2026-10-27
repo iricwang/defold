@@ -117,9 +117,11 @@ def parser():
     patch = sub.add_parser('patch', help='Compile source and build an exact-baseline local patch')
     patch.add_argument('--app', type=Path, required=True)
     patch.add_argument('--install', action='store_true', help='Install after verification; close editor first')
+    patch.add_argument('--engine-home', type=Path, help='Use a complete local engine/Bob build instead of archived engine artifacts')
     full = sub.add_parser('full', help='Compile source into a complete portable ZIP including JDK')
     full.add_argument('--from-installed', type=Path, help='Package this installed editor instead of recompiling')
     full.add_argument('--output', type=Path, help='Only with --from-installed')
+    full.add_argument('--engine-home', type=Path, help='Use a complete local engine/Bob build')
     for name in ('verify', 'install'):
         command = sub.add_parser(name, help='Verify an archive' if name == 'verify' else 'Verify and install an incremental ZIP')
         command.add_argument('archive', type=Path)
@@ -150,7 +152,7 @@ def main(argv=None):
         from live_reload import reload_sources
         reload_sources(ROOT, args)
         return
-    for name in ('app', 'archive', 'from_installed', 'output'):
+    for name in ('app', 'archive', 'from_installed', 'output', 'engine_home'):
         value = getattr(args, name, None)
         if value is not None:
             setattr(args, name, value.resolve())
@@ -184,7 +186,7 @@ def main(argv=None):
         else:
             if args.output:
                 raise ValueError('--output requires --from-installed')
-            build.main(full=True)
+            build.main(full=True, engine_home=args.engine_home)
             output = ROOT / 'editor/target/editor/Defold-x86_64-win32.zip'
         write_checksum(output)
         print('Verified full archive:', output)
@@ -196,7 +198,7 @@ def main(argv=None):
         raise ValueError('Source revision must be newer than installation; bump patch/channel.json intentionally first')
     baseline = ROOT / 'tmp/local-editor-baseline.json'
     baseline.write_text(json.dumps(state, indent=2))
-    build.main(baseline=baseline)
+    build.main(baseline=baseline, engine_home=args.engine_home)
     output = ROOT / f"editor/target/editor/Defold-x86_64-win32-patch-{revision}-to-{metadata['revision']}.zip"
     write_checksum(output)
     print('Verified local patch:', output)

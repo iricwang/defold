@@ -89,9 +89,12 @@ macOS 与 Windows 可以使用不同的初始基线，发布清单会分别记�
 Windows 重启助手使用安装目录之外的临时 Java 运行时，避免自身占用待替换文件。
 替换保留原安装备份，失败会恢复原目录。运行时版本和文件保持不变。
 构建命令为 `python -X utf8 scripts/windows/build-patch.py`，只生成增量包。
-该脚本使用固定归档版本的 Bob 和原生编译工具，并设置
-`DM_EDITOR_USE_BOB_PROTOCOLS=1` 直接复用同一 Bob 的协议类，避免当前源码生成的
-协议类覆盖归档版本。Windows CI 还会从最终编辑器 JAR 编译包含默认字体的 GUI，
+默认使用固定归档版本的 Bob 和原生编译工具；包含原生 GUI RectTransform 等引擎改动时，
+使用 `scripts/windows/editor.py patch --app <安装目录> --engine-home <本地 DYNAMO_HOME>`
+传入已构建的配套引擎和 Bob（完整源码 ZIP 也支持该参数）。最终包检查会拒绝缺少
+RectTransform 协议字段的旧 Bob，不能仅打入编辑器界面而遗漏运行时实现。
+两种模式都设置 `DM_EDITOR_USE_BOB_PROTOCOLS=1` 直接复用所选 Bob 的协议类，
+避免当前源码生成的协议类覆盖配套版本。Windows CI 还会从最终编辑器 JAR 编译包含默认字体的 GUI，
 强制生成 HLSL，以检查材质编译时的二进制兼容性。
 归档 Bob 还会补入当前编辑器调试入口依赖的 `debugger.lua`、`mobdebug.lua` 和
 `edn.lua`，同时更新直接资源和 `lib/builtins.zip`。CI 检查两份资源一致，

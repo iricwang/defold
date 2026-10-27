@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 87,
-  "version": "1.14.1-patch.87",
+  "revision": 88,
+  "version": "1.14.1-patch.88",
   "repository": "iricwang/defold",
-  "notes": "Combine native GUI RectTransform and skeletal animation authoring with IDEA-style EmmyLua navigation, completion documentation, parameter intentions, Darcula highlighting and region folding. Preserve Game preview selection, Windows Simulator input fixes and the native-engine launch cache."
+  "notes": "Merge native GUI RectTransform and skeletal animation authoring with EmmyLua IDEA navigation, completion documentation, Lua highlighting/folding, Game preview and background MCP tools; ship matching local Windows engine and compiler."
 }

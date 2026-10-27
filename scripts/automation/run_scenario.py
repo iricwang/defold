@@ -20,6 +20,8 @@ async def execute(args):
     validate(spec, SCENARIO)
     command = [str(ROOT / 'scripts/automation/server.py'), '--manifest', str(args.manifest.resolve()),
                '--project', str(args.project.resolve()), '--artifacts', str(args.output.resolve())]
+    if args.baselines:
+        command.extend(['--baselines', str(args.baselines.resolve())])
     parameters = StdioServerParameters(command=sys.executable, args=['-X', 'utf8', *command])
     async with stdio_client(parameters) as (read, write):
         async with ClientSession(read, write) as client:
@@ -76,6 +78,7 @@ def main():
     parser.add_argument('--resource', help='Preview one saved .gui/.go/.collection project path, e.g. /gui/login.gui')
     parser.add_argument('--manifest', type=Path, default=ROOT / 'tmp/automation-runtime/manifest.json')
     parser.add_argument('--output', type=Path, default=ROOT / 'tmp/automation-runs' / uuid.uuid4().hex)
+    parser.add_argument('--baselines', type=Path, help='Persistent baseline store shared with the capture/acceptance session')
     args = parser.parse_args()
     result = asyncio.run(execute(args))
     print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -20,13 +20,19 @@ import images as image_evidence
 import resources as preview_resources
 import layout as gui_layout
 import editor_bridge
+import baselines
+import conditions
+import annotations
+import gestures
+import sequences
 
 CREATE_FLAGS = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 
 
 class AutomationError(Exception):
-    def __init__(self, code, message):
+    def __init__(self, code, message, details=None):
         self.code = code
+        self.details = details
         super().__init__(message)
 
 
@@ -108,12 +114,13 @@ class Worker:
 
 
 class Service:
-    def __init__(self, manifest, projects, artifact_root, engine=None):
+    def __init__(self, manifest, projects, artifact_root, engine=None, baseline_root=None):
         self.manifest = manifest
         self.platform = manifest.get('platform', host_platform())
         self.windows = self.platform.endswith('-win32')
         self.root = Path(artifact_root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
+        self.baselines = baselines.Store(baseline_root or self.root / 'baselines')
         self.engine = str(Path(engine).resolve()) if engine else manifest['engine']
         self.custom_engine = bool(engine)
         self.projects = {}
@@ -126,6 +133,7 @@ class Service:
         self.comparisons = {}
         self.evidence = {}
         self.runs = {}
+        self.sequences, self.sequence_active = {}, set()
         self.operations = {}
         self.lock = threading.RLock()
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='defold-automation')
@@ -144,8 +152,11 @@ class Service:
                 'capabilities': ['owned_hidden_opengl', 'disk_snapshot_build', 'device_resolution_safe_area',
                                  'input_ack', 'png_capture', 'image_crop', 'image_compare', 'runtime_scene_live', 'log_wait', 'reports', 'scenario_matrix',
                                  'disk_resource_search', 'isolated_resource_runtime_preview', 'compiled_resource_runtime_preview', 'compiled_incremental_import', 'preview_support_objects',
-                                 'editor_gui_snapshot_transactions', 'opt_in_application_ack', 'device_inspection_overlay']
-                                + (['same_render_scene_snapshot','gui_rectangle_queries','node_click','layout_checks'] if self.windows else []),
+                                 'editor_gui_snapshot_transactions', 'opt_in_application_ack', 'device_inspection_overlay',
+                                 'persistent_image_baselines', 'scenario_baseline_assert', 'temporal_capture_sequence']
+                                + (['same_render_scene_snapshot','gui_rectangle_queries','node_click','layout_checks',
+                                    'scenario_semantic_steps', 'element_condition_wait', 'layout_annotation', 'node_drag'] if self.windows else []),
+                'scenario_versions': [1, 2],
                 'unsupported': ['attached_session', 'native_extension_build',
                                 'native_extension_source_preview', 'metal', 'hot_reload', 'text_glyph_geometry', 'custom_render_geometry']
                                + ([] if self.windows else ['same_render_scene_snapshot']),
@@ -202,6 +213,9 @@ class Service:
                 except Exception as error:
                     job['state'] = 'cancelled' if job['cancel'].is_set() else 'failed'
                     job['error'] = str(error)
+                    job['error_code'] = getattr(error, 'code', 'INTERNAL_ERROR')
+                    if getattr(error, 'details', None) is not None:
+                        job['error_details'] = error.details
                 finally:
                     job['process'] = None
             self.executor.submit(run)
@@ -579,7 +593,7 @@ class Service:
                 session['lease_until'] = time.monotonic() + 60
             return {'lease_id': session['lease_id'], 'lease_seconds': 0 if release else 60}
 
-    def capture(self, session_id):
+    def capture(self, session_id, publish=True):
         session = self.session(session_id)
         with session['lock']:
             if sum(value['session_id'] == session_id for value in self.artifacts.values()) >= 256:
@@ -590,6 +604,7 @@ class Service:
                           artifact_kind='runtime_frame',
                           build_id=session['build']['build_id'], temporal_consistency='image_and_bridge_metadata',
                           device=session['device'], image_sha256=digest(result['image_path']))
+            result.update({key: session['build'].get(key) for key in ('project_id', 'source_policy', 'resource_fingerprint')})
             result['project_config'] = session['project_config']
             result['gui_projection_profile'] = session.get('gui_profile', 'unknown_renderer')
             if result.get('scene_snapshot', {}).get('supported'):
@@ -599,9 +614,78 @@ class Service:
                 result['preview'] = session['build']['preview']
             artifact_id = observation_id
             result.update(artifact_id=artifact_id, uri=f'defold://artifacts/{artifact_id}/frame.png')
-            self.artifacts[artifact_id] = result
-            atomic_json(Path(result['image_path']).with_suffix('.json'), result)
+            if publish:
+                self.publish_capture(result)
             return result
+
+    def publish_capture(self, frame):
+        with self.lock:
+            if frame['artifact_id'] not in self.artifacts:
+                if sum(item['session_id'] == frame['session_id'] for item in self.artifacts.values()) >= 256:
+                    raise AutomationError('ARTIFACT_LIMIT', '256 observations per session; cannot publish wait evidence')
+                atomic_json(Path(frame['image_path']).with_suffix('.json'), frame)
+                self.artifacts[frame['artifact_id']] = frame
+        return frame
+
+    def discard_capture(self, frame):
+        if frame and frame['artifact_id'] not in self.artifacts:
+            Path(frame['image_path']).unlink(missing_ok=True)
+
+    def wait_element(self, session_id, selector, condition, text=None, timeout_ms=5000, stable_samples=1, cancel=None, progress=None):
+        if not 100 <= timeout_ms <= 30000 or not 1 <= stable_samples <= 10:
+            raise AutomationError('INVALID_CONDITION', 'Wait timeout or stable sample count outside bounds')
+        started = time.monotonic()
+        deadline = started + timeout_ms / 1000
+        tracker = conditions.Stability()
+        frame, evaluation, samples = None, None, 0
+
+        def evidence():
+            result = {'selector': selector, 'condition': condition, 'expected_text': text,
+                      'samples': samples, 'consecutive_matches': tracker.count, 'required_samples': stable_samples,
+                      'sample_semantics': 'distinct_render_samples_not_continuous_frames',
+                      'elapsed_ms': round((time.monotonic() - started) * 1000), 'evidence': evaluation}
+            if frame:
+                result['after'] = self.publish_capture(frame)
+            return result
+
+        try:
+            while True:
+                if cancel is not None and cancel.is_set():
+                    raise AutomationError('CANCELLED', 'GUI condition wait cancelled')
+                if time.monotonic() >= deadline:
+                    raise AutomationError('CONDITION_TIMEOUT', 'GUI condition did not reach the required sample count')
+                sample = self.capture(session_id, publish=False)
+                self.discard_capture(frame)
+                frame = sample
+                samples += 1
+                try:
+                    items = gui_layout.elements(frame, frame.get('gui_projection_profile'))
+                    evaluation = conditions.evaluate(items, selector, condition, text)
+                except ValueError as error:
+                    raise AutomationError('GEOMETRY_UNAVAILABLE', str(error)) from error
+                if evaluation.get('error_code'):
+                    raise AutomationError(evaluation['error_code'], evaluation['reason'])
+                count = tracker.update(frame, evaluation)
+                if progress is not None:
+                    progress({'phase': 'waiting_for_gui', 'samples': samples, 'consecutive_matches': count,
+                              'required_samples': stable_samples, 'matched': evaluation['matched']})
+                if cancel is not None and cancel.is_set():
+                    raise AutomationError('CANCELLED', 'GUI condition wait cancelled')
+                if time.monotonic() >= deadline:
+                    raise AutomationError('CONDITION_TIMEOUT', 'GUI condition sampling exceeded its deadline')
+                if count >= stable_samples:
+                    result = {'state': 'condition_satisfied', **evidence()}
+                    self.record(session_id, {'kind': 'element_wait', **result})
+                    return result
+                delay = min(.1, max(0, deadline - time.monotonic()))
+                if cancel is None: time.sleep(delay)
+                else: cancel.wait(delay)
+        except AutomationError as error:
+            error.details = evidence()
+            self.record(session_id, {'kind': 'element_wait', 'state': error.code, **error.details})
+            raise
+        finally:
+            self.discard_capture(frame)
 
     def input(self, session_id, lease_id, action, observation_id=None):
         session = self.session(session_id)
@@ -660,10 +744,61 @@ class Service:
                                 'resolved_observation_id':fresh['observation_id']}
             return result
 
-    def application_wait(self, session_id, operation_id, after, event=None, timeout_ms=5000):
+    def element_drag(self, session_id, lease_id, observation_id, selector, destination, steps=12, cancel=None):
+        session = self.session(session_id)
+        with session['lock']:
+            if lease_id != session['lease_id'] or session['lease_until'] < time.monotonic():
+                raise AutomationError('INPUT_CONTROLLER_BUSY', 'Acquire or renew the input lease')
+            old = self.original(observation_id)
+            if old['session_id'] != session_id or old['device'] != session['device']:
+                raise AutomationError('INVALID_OBSERVATION', 'Use an observation from this session and device')
+            try:
+                gestures.validate(destination, steps)
+                before = gui_layout.elements(old, old.get('gui_projection_profile'))
+                gestures.unique(before, selector)
+                if 'selector' in destination: gestures.unique(before, destination['selector'])
+                fresh = self.capture(session_id)
+                if old['device_revision'] != fresh['device_revision']:
+                    raise AutomationError('STALE_OBSERVATION', 'Capture again after a device change')
+                current = gui_layout.elements(fresh, fresh.get('gui_projection_profile'))
+                source, target = gestures.resolve(before, current, selector, destination, fresh)
+            except gestures.GestureError as error:
+                raise AutomationError(error.code, str(error)) from error
+            except ValueError as error:
+                raise AutomationError('GEOMETRY_UNAVAILABLE', str(error)) from error
+            if cancel is not None and cancel.is_set():
+                raise AutomationError('CANCELLED', 'Drag cancelled before input')
+            result = self.input(session_id, lease_id, {'type': 'drag', 'x': source['point'][0], 'y': source['point'][1],
+                'to_x': target['point'][0], 'to_y': target['point'][1], 'steps': steps}, fresh['observation_id'])
+            result.update(source=source, destination=target, business_confirmed=False,
+                          path_semantics='straight_line_to_frozen_endpoint')
+            self.record(session_id, {'kind': 'element_drag', 'source': source, 'destination': target,
+                                    'steps': steps, 'after_id': result['after']['artifact_id']})
+            return result
+
+    def element_drag_verified(self, session_id, lease_id, observation_id, selector, destination,
+                              operation_id, event, steps=12, timeout_ms=5000, cancel=None):
+        session = self.session(session_id)
+        with session['lock']:
+            cursor = self.logs(session_id)['cursor']
+            self.application_command(session_id, lease_id, operation_id + ':arm', '__arm_input',
+                                     {'operation_id': operation_id, 'timeout_seconds': 30},
+                                     timeout_ms=timeout_ms, cancel=cancel)
+            result = self.element_drag(session_id, lease_id, observation_id, selector, destination, steps, cancel)
+            try:
+                result['application_ack'] = self.application_wait(session_id, operation_id, cursor, event, timeout_ms, cancel)
+            except AutomationError as error:
+                error.details = {'input_dispatched': True, 'receipt': result, 'after': result['after']}
+                raise
+            result.update(business_confirmed=True, ack_level='application_correlated')
+            return result
+
+    def application_wait(self, session_id, operation_id, after, event=None, timeout_ms=5000, cancel=None):
         deadline=time.monotonic()+timeout_ms/1000
         cursor=after
         while time.monotonic()<deadline:
+            if cancel is not None and cancel.is_set():
+                raise AutomationError('CANCELLED', 'Application wait cancelled; completed actions are not undone')
             logs=self.logs(session_id,cursor)
             if logs['overflow']: raise AutomationError('LOG_OVERFLOW','Application event cursor expired')
             for entry in logs['entries']:
@@ -676,12 +811,16 @@ class Service:
                 if message.get('kind') in ('result','event') and (event is None or message.get('event')==event):
                     self.record(session_id,{'kind':'application_ack','operation_id':operation_id,'evidence':entry,'message':message})
                     return message
-            cursor=logs['cursor']; time.sleep(.025)
+            cursor=logs['cursor']
+            if cancel is None: time.sleep(.025)
+            else: cancel.wait(.025)
         raise AutomationError('BUSINESS_TIMEOUT','No correlated application event for '+operation_id)
 
-    def application_command(self, session_id, lease_id, operation_id, name, arguments=None, timeout_ms=5000):
+    def application_command(self, session_id, lease_id, operation_id, name, arguments=None, timeout_ms=5000, cancel=None):
         session=self.session(session_id)
         with session['lock']:
+            if cancel is not None and cancel.is_set():
+                raise AutomationError('CANCELLED', 'Application command cancelled before dispatch')
             if session['lease_id']!=lease_id or time.monotonic()>session['lease_until']:
                 raise AutomationError('INPUT_CONTROLLER_BUSY','Acquire or renew the session lease')
             if 'app_inbox' not in session: raise AutomationError('UNSUPPORTED_CAPABILITY','Start with app_channel and integrate sdk/automation.lua')
@@ -689,22 +828,25 @@ class Service:
             if len(json.dumps(payload,ensure_ascii=False,indent=2).encode())>32768: raise AutomationError('INVALID_COMMAND','Application command exceeds 32 KiB')
             cursor=self.logs(session_id)['cursor']
             atomic_json(session['app_inbox'],payload)
-            ack=self.application_wait(session_id,operation_id,cursor,timeout_ms=timeout_ms)
+            ack=self.application_wait(session_id,operation_id,cursor,timeout_ms=timeout_ms,cancel=cancel)
             return {'ack_level':'application_correlated','business_confirmed':True,'message':ack}
 
-    def element_click_verified(self, session_id, lease_id, observation_id, selector, operation_id, event, timeout_ms=5000):
+    def element_click_verified(self, session_id, lease_id, observation_id, selector, operation_id, event, timeout_ms=5000, cancel=None):
         session=self.session(session_id)
         with session['lock']:
             cursor=self.logs(session_id)['cursor']
             self.application_command(session_id,lease_id,operation_id+':arm','__arm_input',
-                                     {'operation_id':operation_id,'timeout_seconds':timeout_ms/1000})
+                                     {'operation_id':operation_id,'timeout_seconds':timeout_ms/1000},
+                                     timeout_ms=timeout_ms,cancel=cancel)
+            if cancel is not None and cancel.is_set():
+                raise AutomationError('CANCELLED', 'Verified click cancelled before input')
             result=self.element_click(session_id,lease_id,observation_id,selector)
-            result['application_ack']=self.application_wait(session_id,operation_id,cursor,event,timeout_ms)
+            result['application_ack']=self.application_wait(session_id,operation_id,cursor,event,timeout_ms,cancel=cancel)
             result['business_confirmed']=True
             result['ack_level']='application_correlated'
             return result
 
-    def layout_check(self, artifact_id, rules):
+    def layout_check(self, artifact_id, rules, annotate=False):
         frame = self.original(artifact_id)
         try:
             items = gui_layout.elements(frame, frame.get('gui_projection_profile'))
@@ -712,6 +854,15 @@ class Service:
         except ValueError as error:
             raise AutomationError('GEOMETRY_UNAVAILABLE', str(error)) from error
         result.update(observation_id=frame['observation_id'], render_sequence=frame['render_sequence'])
+        if annotate:
+            if digest(frame['image_path']) != frame['image_sha256']:
+                raise AutomationError('ARTIFACT_CORRUPT', 'Original image changed after capture; cannot annotate this snapshot')
+            annotation = annotations.plan(items, result, frame)
+            def render(path):
+                annotations.render(frame['image_path'], path, annotation)
+                return {'layout_annotation': annotation, 'coordinate_space': 'frame_pixels_top_left',
+                        'raw_image_unchanged': True, 'to_frame_scale': [1, 1], 'to_frame_offset': [0, 0]}
+            result['annotation'] = self.derived(frame, 'layout_annotation', render)
         self.record(frame['session_id'], {'kind':'layout_check', **result})
         return result
 
@@ -814,6 +965,10 @@ class Service:
 
     def compare(self, before_id, after_id, channel_threshold=8, max_changed_ratio=0.005, region=None, ignore=None):
         before, after = self.original(before_id), self.original(after_id)
+        return self.compare_frames(before, after, channel_threshold, max_changed_ratio, region, ignore)
+
+    def compare_frames(self, before, after, channel_threshold=8, max_changed_ratio=0.005, region=None, ignore=None):
+        before_id, after_id = before['artifact_id'], after['artifact_id']
         if before['device'] != after['device']:
             raise AutomationError('DEVICE_MISMATCH', 'Compare frames captured with the same device dimensions and safe area')
         def render(path):
@@ -830,6 +985,60 @@ class Service:
         self.comparisons[result['comparison_id']] = result
         return result
 
+    def baseline_save(self, project_id, name, artifact_id):
+        self.project(project_id)
+        frame = self.original(artifact_id)
+        if frame.get('project_id') != project_id:
+            raise AutomationError('BASELINE_CONTEXT_MISMATCH', 'Capture belongs to another project or has no project provenance')
+        return self.baselines.save(project_id, name, frame)
+
+    def baseline_list(self, project_id, name=None, offset=0, limit=20):
+        self.project(project_id)
+        return self.baselines.list(project_id, name, offset, limit)
+
+    def baseline_get(self, project_id, baseline_id):
+        self.project(project_id)
+        metadata, data = self.baselines.load(project_id, baseline_id)
+        # Materialize an immutable report copy, never treat historical data as a live observation.
+        identifier = 'baseline-' + baseline_id
+        with self.lock:
+            if identifier not in self.artifacts:
+                directory = self.root / 'baseline-images'
+                directory.mkdir(exist_ok=True)
+                path = directory / (identifier + '.png')
+                temporary = path.with_suffix('.' + uuid.uuid4().hex + '.part')
+                temporary.write_bytes(data)
+                temporary.replace(path)
+                device = metadata['context']['device']
+                item = {'artifact_id': identifier, 'artifact_kind': 'baseline', 'source': 'persisted_baseline',
+                        'session_id': identifier, 'observation_id': metadata['source']['observation_id'],
+                        'device': device, 'width': device['width'], 'height': device['height'],
+                        'render_sequence': metadata['source']['render_sequence'],
+                        'input_sequence': metadata['source']['input_sequence'], 'image_path': str(path),
+                        'image_sha256': metadata['image_sha256'], 'baseline': metadata,
+                        'uri': f'defold://artifacts/{identifier}/frame.png'}
+                self.artifacts[identifier] = item
+            elif digest(self.artifacts[identifier]['image_path']) != metadata['image_sha256']:
+                raise AutomationError('BASELINE_CORRUPT', 'Materialized baseline image was changed')
+        return self.artifacts[identifier]
+
+    def baseline_compare(self, baseline_id, artifact_id, **options):
+        after = self.original(artifact_id)
+        project_id = after.get('project_id')
+        self.project(project_id)
+        before = self.baseline_get(project_id, baseline_id)
+        metadata = before['baseline']
+        if baselines.context(after) != metadata['context']:
+            raise AutomationError('BASELINE_CONTEXT_MISMATCH', 'Device, safe area, preview resource, QA config or render profile differs')
+        if digest(after['image_path']) != after['image_sha256']:
+            raise AutomationError('BASELINE_CORRUPT', 'Current capture was modified after publication')
+        # Canonicalize omitted zero insets; no pixel rescaling or other context substitution.
+        result = self.compare_frames(before, {**after, 'device': metadata['context']['device']}, **options)
+        result['baseline'] = metadata
+        self.record(after['session_id'], {'kind': 'baseline_comparison', 'baseline_id': baseline_id,
+                                         'comparison_id': result['comparison_id'], 'verdict': result['verdict']})
+        return result
+
     def report(self, session_id):
         images = [value for value in self.artifacts.values() if value['session_id'] == session_id]
         if not images:
@@ -844,7 +1053,8 @@ class Service:
         atomic_json(directory / 'report.json', report)
         cards = ''.join('<figure><img src="' + html.escape(Path(item['image_path']).name) + '"><figcaption>'
                         + html.escape(f"{item.get('artifact_kind', 'runtime_frame')} · {item['width']}×{item['height']} · render {item['render_sequence']} · input {item['input_sequence']}")
-                        + '</figcaption></figure>' for item in images)
+                        + '</figcaption>' + (annotations.legend_html(item['layout_annotation']) if item.get('layout_annotation') else '')
+                        + '</figure>' for item in images)
         comparison_cards = ''
         for item in comparisons:
             comparison_cards += '<section><h2>' + html.escape(f"{item['verdict']} · changed {item['changed_ratio']:.3%}") + '</h2><div class="compare">'
@@ -860,10 +1070,16 @@ class Service:
         event_cards = '<h2>操作与业务日志证据</h2>' + ''.join('<details><summary>'
             + html.escape(f"{item['sequence']} · {item['kind']}") + '</summary><pre>'
             + html.escape(json.dumps(item, ensure_ascii=False, indent=2)) + '</pre></details>' for item in events)
+        for sequence in self.sequences.values():
+            if sequence['session_id'] == session_id and sequence['state'] != 'running':
+                link = html.escape(Path(os.path.relpath(sequence['report_path'], directory)).as_posix(), quote=True)
+                event_cards += f'<p><a href="{link}">连续帧查验 · {sequence["captured_frames"]} 帧 · {html.escape(sequence["state"])}</a></p>'
         preview_title = '<p>资源运行预览：' + html.escape(report['preview']['resource_path']) + '</p>' if report['preview'] else ''
         (directory / 'report.html').write_text('<!doctype html><meta charset="utf-8"><title>Defold background verification</title>'
             '<style>body{background:#202124;color:#eee;font:16px system-ui;margin:24px}main,.compare{display:flex;flex-wrap:wrap;gap:20px}'
-            'figure{margin:0}img{max-width:420px;max-height:700px;object-fit:contain}figcaption{padding:10px}</style>'
+            'figure{margin:0;max-width:100%}img{max-width:420px;max-height:700px;object-fit:contain}figcaption{padding:10px}'
+            '.layout-legend{border-collapse:collapse;font-size:13px;max-width:680px;overflow-wrap:anywhere}'
+            '.layout-legend td,.layout-legend th{border:1px solid #555;padding:6px;text-align:left}</style>'
             '<h1>Defold 后台运行截图</h1>' + preview_title + '<p>原始游戏画面；业务结果应结合操作回执和日志确认。差异图中的粉色表示超过阈值的像素。</p>' + comparison_cards + event_cards + '<main>' + cards + '</main>', encoding='utf-8')
         return {'report_path': str(directory / 'report.html'), 'json_path': str(directory / 'report.json'),
                 'observations': len(images), 'comparisons': len(comparisons), 'events': len(events)}

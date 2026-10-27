@@ -89,4 +89,19 @@ class ImportTests(unittest.TestCase):
                 self.assertEqual('BUSINESS_TIMEOUT',error.exception.code)
             finally:service.close()
 
+    # Cancelled QA waits stop without waiting for the business timeout or consuming further log entries.
+    def test_cancel_application_wait(self):
+        with tempfile.TemporaryDirectory(dir=ROOT/"tmp") as directory:
+            service=Service({'engine':'unused'},[],directory)
+            cancel=threading.Event()
+            def logs(sid,cursor):
+                cancel.set()
+                return {'overflow':False,'cursor':1,'entries':[]}
+            service.logs=logs
+            try:
+                with self.assertRaises(AutomationError) as error:
+                    service.application_wait('test','wanted',0,timeout_ms=30000,cancel=cancel)
+                self.assertEqual('CANCELLED',error.exception.code)
+            finally:service.close()
+
 if __name__=='__main__':unittest.main()

@@ -13,6 +13,20 @@ import zipfile
 @unittest.skipUnless(os.name == 'nt' and os.environ.get('DEFOLD_PATCH_TEST_JAR'),
                      'Windows editor JAR required')
 class EditorPipelineTest(unittest.TestCase):
+    # Native RectTransform fields must survive the actual shipped Bob protocol.
+    def test_packaged_gui_rect_transform_protocol(self):
+        code = """(import 'com.dynamo.gamesys.proto.Gui$NodeDesc)
+                  (let [descriptor (Gui$NodeDesc/getDescriptor)]
+                    (doseq [field [\"rect_transform\" \"rect_anchor_min\" \"rect_anchor_max\" \"rect_reference\"]]
+                      (assert (.findFieldByName descriptor field)
+                              (str \"Missing GUI field \" field \"; build with matching local engine/Bob\"))))"""
+        result = subprocess.run(
+            [str(Path(os.environ['JAVA_HOME']) / 'bin/java.exe'),
+             '-cp', os.environ['DEFOLD_PATCH_TEST_JAR'], 'clojure.main', '-e', code],
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
+            creationflags=subprocess.CREATE_NO_WINDOW)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
     # Fresh patch cache paths must not consume session-wide DLL hook slots or lose native errors.
     def test_game_startup_across_fresh_native_cache_paths(self):
         root = Path(__file__).resolve().parents[1]
