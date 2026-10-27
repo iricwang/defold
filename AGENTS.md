@@ -38,6 +38,7 @@ specific language governing permissions and limitations under the License.
 
 ## Fork patch delivery
 
+- For day-to-day feature iteration, run targeted tests and hot-reload supported changes into the running editor for the user to validate first. Package only after the user confirms the behavior or explicitly requests packaging/installation. Hot reload is session-only; changes that require Java/native compilation or schema recreation need the appropriate build/restart instead.
 - For local Windows builds, packaging, verification and installation, use `scripts/windows/editor.cmd` (or `python -X utf8 scripts/windows/editor.py`); see `scripts/windows/README.md`. Do not create per-revision copies of the build/install workflow. Local full ZIPs are supported explicitly by `full`; CI publishing remains incremental-only.
 - Deliver subsequent user-facing changes on this fork through the incremental patch workflow in [patch/README.md](patch/README.md).
 - Before building each new update, increment the patch revision and describe the change with `python3.12 patch/manage.py bump --notes "..."`. Keep the released file inventory matching the installed baseline for local update verification. Retain the legacy bootstrap ZIP until its first patch-only upgrade has been verified.

@@ -41,11 +41,14 @@
            ["Alt+Delete" :code.delete-next-word]
            ["Alt+Down" :code.goto-line-end]
            ["Alt+Down" :edit.reorder-down]
+           ["Alt+Enter" :code.lua-intentions]
            ["Alt+Left" :code.goto-previous-word]
            ["Alt+F9" :breakpoints.edit-selected]
            ["Alt+F9" :debugger.edit-breakpoint]
            ["Alt+Meta+Close Bracket" :window.tab.move-right]
            ["Alt+Meta+E" :code.select-next-occurrence]
+           ["Alt+Meta+Left" :code.navigate-back]
+           ["Alt+Meta+Right" :code.navigate-forward]
            ["Alt+Meta+F" :code.replace-text]
            ["Alt+Meta+G" :code.replace-next]
            ["Alt+Meta+Open Bracket" :window.tab.move-left]
@@ -189,6 +192,7 @@
    :win32 [["A" :edit.add-embedded-component]
            ["A" :scene.free-camera.left]
            ["Alt+Down" :edit.reorder-down]
+           ["Alt+Enter" :code.lua-intentions]
            ["Alt+F9" :breakpoints.edit-selected]
            ["Alt+F9" :debugger.edit-breakpoint]
            ["Alt+R" :file.open-recent]
@@ -197,6 +201,8 @@
            ["Backspace" :code.delete-previous-char]
            ["Ctrl+'+'" :code.zoom.increase]
            ["Ctrl+Add" :code.zoom.increase]
+           ["Ctrl+Alt+Left" :code.navigate-back]
+           ["Ctrl+Alt+Right" :code.navigate-forward]
            ["Ctrl+'-'" :code.zoom.decrease]
            ["Ctrl+Subtract" :code.zoom.decrease]
            ["Ctrl+0" :code.zoom.reset]
@@ -324,6 +330,7 @@
    :linux [["A" :edit.add-embedded-component]
            ["A" :scene.free-camera.left]
            ["Alt+Down" :edit.reorder-down]
+           ["Alt+Enter" :code.lua-intentions]
            ["Alt+F9" :breakpoints.edit-selected]
            ["Alt+F9" :debugger.edit-breakpoint]
            ["Alt+R" :file.open-recent]
@@ -332,6 +339,8 @@
            ["Backspace" :code.delete-previous-char]
            ["Ctrl+'+'" :code.zoom.increase]
            ["Ctrl+Add" :code.zoom.increase]
+           ["Ctrl+Alt+Left" :code.navigate-back]
+           ["Ctrl+Alt+Right" :code.navigate-forward]
            ["Ctrl+'-'" :code.zoom.decrease]
            ["Ctrl+Subtract" :code.zoom.decrease]
            ["Ctrl+0" :code.zoom.reset]
@@ -715,13 +724,53 @@
   ([os]
    (default-keymap os)))
 
+(defn preset-keymap [os preset]
+  (let [base (default-keymap os)]
+    (if (= "Defold" preset)
+      base
+      (let [modifier (if (= :macos os) "Meta" "Ctrl")
+            bindings {(str modifier "+B") :code.goto-definition
+                      "Alt+F7" :code.show-references
+                      (str modifier "+Alt+F7") :code.show-references
+                      "Shift+F6" :edit.rename
+                      (str modifier "+F12") :code.jump-to-symbol
+                      (str modifier "+F9") :project.build
+                      (str "Shift+" modifier "+F9") :project.clean-build
+                      (str "Shift+" modifier "+N") :file.open
+                      (str modifier "+E") :file.open-recent}
+            ;; Remove occupied and reserved IDEA shortcuts before assigning them.
+            removed (into #{(str modifier "+P") (str modifier "+Q") (str "Shift+" modifier "+B")}
+                          (coll/keys bindings))
+            changes (reduce-kv
+                      (fn [changes command shortcuts]
+                        (let [remove (into #{} (filter #(contains? shortcuts (KeyCombination/valueOf %))) removed)]
+                          (cond-> changes (pos? (count remove)) (assoc command {:remove remove}))))
+                      {} (:command->shortcuts base))
+            changes (reduce-kv (fn [changes shortcut command]
+                                 (update-in changes [command :add] (fnil conj #{}) shortcut))
+                               changes bindings)]
+        (from base os changes)))))
+
+(defn base [keymap]
+  (or (::base (meta keymap)) (default)))
+
+(defn with-user-shortcuts [base os changes]
+  (let [assigned (into #{} (comp (mapcat :add) (map #(KeyCombination/valueOf %))) (coll/vals changes))
+        removals (reduce-kv
+                   (fn [removals command shortcuts]
+                     (let [remove (into #{} (comp (filter assigned) (map str)) shortcuts)]
+                       (cond-> removals (pos? (count remove)) (assoc command {:remove remove}))))
+                   {} (:command->shortcuts base))]
+    (from (from base os removals) os changes)))
+
 (defn from-prefs
   "Returns a keymap with changes taken from prefs"
   ([prefs]
    (from-prefs @prefs/global-state prefs))
   ([prefs-state prefs]
-   (let [os (os/os)]
-     (from (default-keymap os) os (prefs/get prefs-state prefs [:window :keymap])))))
+   (let [os (os/os)
+         base (preset-keymap os (prefs/get prefs-state prefs [:window :keymap-preset]))]
+     (with-meta (with-user-shortcuts base os (prefs/get prefs-state prefs [:window :keymap])) {::base base}))))
 
 (defn warnings
   ([keymap]

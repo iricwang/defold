@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "GUI button verification across devices",
+  "devices": [
+    {"name": "Desktop 640x480", "device": {"width": 640, "height": 480}},
+    {"name": "Phone portrait", "device": {"width": 1170, "height": 2532, "top": 156, "bottom": 102}},
+    {"name": "Phone landscape", "device": {"width": 2532, "height": 1170, "left": 156, "right": 102}}
+  ],
+  "steps": [
+    {"kind": "wait_log", "contains": "AUTOMATION_READY", "after": "startup"},
+    {"kind": "scene_assert", "selector": {"id": "verify_button"}, "min_count": 1, "max_count": 1},
+    {"kind": "capture", "name": "before"},
+    {"kind": "input", "coordinate_space": "frame_normalized", "action": {"type": "click", "x": 0.5, "y": 0.5}, "expect_log": "BUTTON_CLICKED 1"},
+    {"kind": "capture", "name": "after"},
+    {"kind": "compare", "before": "before", "after": "after", "expected": "different", "max_changed_ratio": 0},
+    {"kind": "input", "coordinate_space": "frame_pixels", "action": {"type": "key", "key": 32}, "expect_log": "KEY_RECEIVED"}
+  ]
+}

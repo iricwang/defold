@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+# Copyright 2020-2026 The Defold Foundation
+# Copyright 2014-2020 King
+# Copyright 2009-2014 Ragnar Svensson, Christian Murray
+# Licensed under the Defold License version 1.0 (the "License"); you may not use
+# this file except in compliance with the License.
+#
+# You may obtain a copy of the License, together with FAQs at
+# https://www.defold.com/license
+#
+# Unless required by applicable law or agreed to in writing, software distributed
+# under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+# CONDITIONS OF ANY KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations under the License.
+
 """Real-process regression for the pinned EmmyLua backend. No project is uploaded.
 
 Usage: python scripts/test_emmylua.py --server resources/_unpack/arm64-macos/bin/lsp/emmylua/emmylua_ls
@@ -42,7 +56,9 @@ class Client:
         result = self.request('initialize', {'processId': os.getpid(), 'rootUri': root.as_uri(),
             'workspaceFolders': [{'uri': root.as_uri(), 'name': 'regression'}],
             'capabilities': {'workspace': {'configuration': True}, 'window': {'workDoneProgress': True},
-                'textDocument': {'completion': {'completionItem': {'snippetSupport': True}},
+                'textDocument': {'completion': {'completionItem': {'snippetSupport': True, 'labelDetailsSupport': True,
+                    'documentationFormat': ['markdown', 'plaintext'],
+                    'resolveSupport': {'properties': ['detail', 'documentation', 'labelDetails', 'additionalTextEdits']}}},
                     'signatureHelp': {'signatureInformation': {'parameterInformation': {'labelOffsetSupport': True}}},
                     'semanticTokens': {'requests': {'full': True}, 'tokenTypes': ['class','parameter','variable','property','function','method','keyword','string','number','comment'], 'tokenModifiers': [], 'formats': ['relative']},
                     'inlayHint': {}, 'rename': {'prepareSupport': True}}}})
@@ -211,6 +227,22 @@ class EmmyLuaRegression(unittest.TestCase):
         item = next(item for item in items if item['label'] == 'score')
         resolved = self.client.request('completionItem/resolve', item)
         self.assertIn('count', json.dumps(resolved))
+
+    # Verifies IDEA-style signature labels and Chinese parameter/return docs survive the production adapter.
+    def test_completion_annotation_documentation(self):
+        text = ('---@class DocumentedContext\nlocal Context = {}\n'
+                '---创建窗口并返回实例。\n---@param url string 窗口资源路径\n'
+                '---@param count? integer 创建数量\n---@return DocumentedContext window 创建的窗口\n'
+                'function Context:newWidget(url, count) return self end\nContext:')
+        result = self.request_at('textDocument/completion', 'documented.lua', text, 7, 8)
+        items = result.get('items', []) if isinstance(result, dict) else result or []
+        item = next(i for i in items if i['label'] == 'newWidget')
+        self.assertEqual('(url, count) -> DocumentedContext', item['labelDetails']['detail'])
+        resolved = self.client.request('completionItem/resolve', item)
+        self.assertEqual(item['labelDetails'], resolved['labelDetails'])
+        documentation = resolved['documentation']['value']
+        for expected in ['DocumentedContext:newWidget', '创建窗口并返回实例', '窗口资源路径', '创建数量', '创建的窗口', 'integer?']:
+            self.assertIn(expected, documentation)
 
     # Verifies navigation into another module and hover type documentation.
     def test_definition_hover(self):

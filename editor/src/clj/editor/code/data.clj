@@ -15,6 +15,7 @@
 (ns editor.code.data
   (:require [clojure.set :as set]
             [clojure.string :as string]
+            [editor.code.folding :as folding]
             [editor.code.syntax :as syntax]
             [editor.code.util :as util]
             [util.coll :as coll :refer [pair]]
@@ -797,7 +798,7 @@
 (defn- scroll-height-ratio
   ^double [^LayoutInfo layout ^long line-count]
   (let [^double line-height (line-height (.glyph layout))
-        document-height (* line-count line-height)
+        document-height (* (folding/line-count layout line-count) line-height)
         canvas-height (.h ^Rect (.canvas layout))]
     (scroll-per-pixel document-height canvas-height)))
 
@@ -881,7 +882,7 @@
         visible-height (.h org-rect)
         ^double document-line-height (line-height (.glyph layout))
         ^double minimap-line-height (line-height glyph-metrics)
-        document-height (* ^double source-line-count document-line-height)
+        document-height (* (folding/line-count layout source-line-count) document-line-height)
         document-scroll-y-range (- document-height visible-height)
         minimap-visible-height (* document-line-height (/ visible-height minimap-line-height))
         minimap-scroll-y-range (max 0.0 (- document-height minimap-visible-height))
@@ -926,13 +927,14 @@
   ^double [^LayoutInfo layout ^long row]
   (+ (.scroll-y-remainder layout)
      (* ^double (line-height (.glyph layout))
-        (- row (.dropped-line-count layout)))))
+        (- (folding/visual-row layout row) (.dropped-line-count layout)))))
 
 (defn y->row
   ^long [^LayoutInfo layout ^double y]
-  (+ (.dropped-line-count layout)
-     (long (/ (- y (.scroll-y-remainder layout))
-              ^double (line-height (.glyph layout))))))
+  (folding/source-row layout
+    (+ (.dropped-line-count layout)
+       (long (/ (- y (.scroll-y-remainder layout))
+                ^double (line-height (.glyph layout)))))))
 
 (defn col->x
   ^double [^LayoutInfo layout ^long col ^String line]
@@ -1362,7 +1364,7 @@
                             (let [top (row->y layout start-row)
                                   left (col->x layout 0 "")
                                   width (- (+ (.x canvas) (.w canvas)) left)
-                                  height (* line-height (inc (- end-row start-row)))]
+                                  height (* line-height (inc (- (folding/visual-row layout end-row) (folding/visual-row layout start-row))))]
                               (->Rect left top width height)))
 
         {start-row :row start-col :col} (cursor-range-start adjusted-cursor-range)
@@ -1384,7 +1386,7 @@
 (defn- scroll-y-limit
   ^double [^LayoutInfo layout ^long line-count]
   (let [^double line-height (line-height (.glyph layout))
-        document-height (* line-count line-height)
+        document-height (* (folding/line-count layout line-count) line-height)
         canvas-height (.h ^Rect (.canvas layout))
         ^Rect scroll-tab-x (.scroll-tab-x layout)
         scroll-tab-x-h (double (if scroll-tab-x (.h scroll-tab-x) 0.0))]
@@ -1404,7 +1406,7 @@
 
 (defn scrolled-to-bottom? [^LayoutInfo layout ^long line-count]
   (let [^double line-height (line-height (.glyph layout))
-        document-height (* line-count line-height)
+        document-height (* (folding/line-count layout line-count) line-height)
         canvas-height (.h ^Rect (.canvas layout))
         scroll-min (- canvas-height document-height)]
     (>= scroll-min (.scroll-y layout))))
@@ -1524,9 +1526,9 @@
 
 (defn last-visible-row
   "Returns 1-indexed row number of the last visible row"
-  [^LayoutInfo layout]
+  ^long [^LayoutInfo layout]
   (let [start-row (.dropped-line-count layout)]
-    (+ start-row (.drawn-line-count layout))))
+    (folding/source-row layout (+ start-row (.drawn-line-count layout)))))
 
 (defn invalidate-syntax-info [syntax-info ^long invalidated-row ^long line-count]
   (into [] (subvec syntax-info 0 (min invalidated-row line-count (count syntax-info)))))
@@ -2810,8 +2812,8 @@
 (defn visible-cursor-ranges [lines ^LayoutInfo layout ascending-cursor-ranges]
   (assert (or (nil? ascending-cursor-ranges) (vector? ascending-cursor-ranges)))
   (when-not (empty? ascending-cursor-ranges)
-    (let [first-visible-row (.dropped-line-count layout)
-          last-visible-row (+ first-visible-row (.drawn-line-count layout))
+    (let [first-visible-row (folding/source-row layout (.dropped-line-count layout))
+          last-visible-row (last-visible-row layout)
           not-visible-range (->CursorRange (->Cursor Long/MIN_VALUE Long/MIN_VALUE) (->Cursor first-visible-row 0))
           compare-adjusted-end-cursors (partial compare-adjusted-end-cursors lines)
           binary-search-result (Collections/binarySearch ascending-cursor-ranges not-visible-range compare-adjusted-end-cursors)
@@ -2819,19 +2821,23 @@
       (assert (<= 0 start-index))
       (into []
             (comp (take-while (partial cursor-range-starts-before-row? last-visible-row))
-                  (map (partial adjust-cursor-range lines)))
+                  (map (partial adjust-cursor-range lines))
+                  (remove #(and (folding/hidden-row? layout (.row (cursor-range-start %)))
+                                (folding/hidden-row? layout (.row (cursor-range-end %))))))
             (subvec ascending-cursor-ranges start-index)))))
 
 (defn visible-occurrences [lines ^LayoutInfo layout case-sensitive? whole-word? needle-lines]
   (when (not-every? empty? needle-lines)
-    (loop [from-cursor (->Cursor (max 0 (- (.dropped-line-count layout) (count needle-lines))) 0)
+    (loop [from-cursor (->Cursor (max 0 (- (folding/source-row layout (.dropped-line-count layout)) (count needle-lines))) 0)
            visible-cursor-ranges (transient [])]
       (let [matching-cursor-range (find-next-occurrence lines needle-lines from-cursor case-sensitive? whole-word?)]
         (if (and (some? matching-cursor-range)
                  (< (.row (cursor-range-start matching-cursor-range))
-                    (+ (.dropped-line-count layout) (.drawn-line-count layout))))
+                    (last-visible-row layout)))
           (recur (cursor-range-end matching-cursor-range)
-                 (conj! visible-cursor-ranges matching-cursor-range))
+                 (if (folding/hidden-row? layout (.row (cursor-range-start matching-cursor-range)))
+                   visible-cursor-ranges
+                   (conj! visible-cursor-ranges matching-cursor-range)))
           (persistent! visible-cursor-ranges))))))
 
 (defn visible-occurrences-of-selected-word [lines cursor-ranges ^LayoutInfo layout visible-cursor-ranges]
@@ -3427,6 +3433,14 @@
       (merge {:cursor-ranges new-cursor-ranges}
              (scroll-to-any-cursor layout lines new-cursor-ranges)))))
 
+(defn- cursor-offset-visible [layout offset lines ^Cursor cursor]
+  (let [row (adjust-row lines (.row cursor))
+        target (folding/source-row layout (+ (folding/visual-row layout row) (long offset)))
+        delta (- target row)]
+    (if (neg? delta)
+      (cursor-offset-up (- delta) lines cursor)
+      (cursor-offset-down delta lines cursor))))
+
 (defn move [lines cursor-ranges ^LayoutInfo layout move-type cursor-type]
   (if (and (= :navigation move-type)
            (or (= :left cursor-type)
@@ -3444,8 +3458,8 @@
                                                              (map (partial adjust-cursor lines)))
                                                        cursor-ranges)))
                       :end cursor-line-end
-                      :up cursor-up
-                      :down cursor-down
+                      :up (if (:fold-visible-rows layout) (partial cursor-offset-visible layout -1) cursor-up)
+                      :down (if (:fold-visible-rows layout) (partial cursor-offset-visible layout 1) cursor-down)
                       :left cursor-left-grapheme
                       :right cursor-right-grapheme
                       :prev-word cursor-prev-word
@@ -3461,7 +3475,7 @@
         ^double line-height (line-height (.glyph layout))
         scroll-height (* row-count line-height)
         move-fn (move-type->move-fn move-type)
-        cursor-fn (partial cursor-offset-up row-count)]
+        cursor-fn (partial cursor-offset-visible layout (- row-count))]
     (some-> (apply-move lines cursor-ranges layout move-fn cursor-fn)
             (assoc :scroll-y (limit-scroll-y layout (count lines) (+ ^double scroll-y scroll-height))))))
 
@@ -3470,7 +3484,7 @@
         ^double line-height (line-height (.glyph layout))
         scroll-height (* row-count line-height)
         move-fn (move-type->move-fn move-type)
-        cursor-fn (partial cursor-offset-down row-count)]
+        cursor-fn (partial cursor-offset-visible layout row-count)]
     (some-> (apply-move lines cursor-ranges layout move-fn cursor-fn)
             (assoc :scroll-y (limit-scroll-y layout (count lines) (- ^double scroll-y scroll-height))))))
 

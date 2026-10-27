@@ -1005,6 +1005,8 @@ command.code.select-next-occurrence = Select Next Occurrence
 command.code.duplicate-selection = Duplicate Selection
 command.code.split-selection-into-lines = Split Selection Into Lines
 command.code.goto-definition = Go to Definition
+command.code.navigate-back = Navigate Back
+command.code.navigate-forward = Navigate Forward
 command.code.goto-line = Go to Line…
 command.code.jump-to-symbol = Jump to Symbol…
 command.code.show-references = Find References
@@ -3075,6 +3077,23 @@ prefs.label.code.signature-help = Function parameter hints
 prefs.label.code.semantic-highlighting = Semantic highlighting
 
 prefs.label.code.inlay-hints = Inline type hints
+
+prefs.label.window.keymap-preset = Keyboard preset
+prefs.help.window.keymap-preset = IDEA navigation: Ctrl+B definition, Alt+F7 references, Ctrl+F9 build. Custom shortcuts take precedence. Ctrl+P and Ctrl+Q are reserved.
+code.navigation.filter = Filter by file path or source code…
+code.navigation.results = {count} / {total} locations (including declaration) · Enter: navigate · Esc: close
+code.navigation.no-results = No matching symbol location found.
+
+command.code.lua-intentions = Lua parameter actions…
+code.intentions.field = Create field for parameter
+code.intentions.parameter = Create parameter annotation
+code.intentions.field-name = Field name
+code.intentions.field-doc = Add @field annotation to the class
+code.intentions.create = Create
+code.intentions.invalid-name = Enter a Lua identifier (not a keyword).
+code.intentions.duplicate-field = This field is already assigned or declared.
+code.intentions.no-class = No class declaration for this table was found in this file. Field assignment is still available.
+code.intentions.none = Place the caret on a parameter in a valid Lua function declaration. Existing annotations are not duplicated.
 
 gui-animation.go-title = GO Animation · Panthera
 gui-animation.go-empty = Create an animation, select a GO, then set a key. Nested GO paths and transform values follow Panthera runtime coordinates. Preview leaves the Collection unchanged.

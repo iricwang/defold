@@ -1,0 +1,5 @@
+name: "nested"
+collection_instances {
+  id: "child"
+  collection: "/standalone.collection"
+}

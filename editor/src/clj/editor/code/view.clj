@@ -39,9 +39,15 @@
             [clojure.string :as string]
             [dynamo.graph :as g]
             [editor.code-completion :as code-completion]
+            [editor.code.completion-presentation :as completion-presentation]
             [editor.code.data :as data]
+            [editor.code.folding :as folding]
             [editor.code.insight :as insight]
+            [editor.code.lua-highlight :as lua-highlight]
+            [editor.code.lua-intention-dialog :as lua-intention-dialog]
+            [editor.code.lua-intentions :as lua-intentions]
             [editor.code.resource :as r]
+            [editor.code.symbol-navigation :as symbol-navigation]
             [editor.code.util :refer [split-lines]]
             [editor.defold-project :as project]
             [editor.dialogs :as dialogs]
@@ -79,6 +85,7 @@
            [com.sun.javafx.font FontResource FontStrike PGFont]
            [com.sun.javafx.geom.transform BaseTransform]
            [com.sun.javafx.perf PerformanceTracker]
+           [com.sun.javafx.scene.control ContextMenuContent]
            [com.sun.javafx.scene.text FontHelper TextLayout TextLayout$CaretGeometry$Single TextLayout$CaretGeometry$Split TextLayout$GeometryCallback]
            [com.sun.javafx.text GlyphLayout GlyphLayoutManager]
            [com.sun.javafx.tk Toolkit]
@@ -95,12 +102,12 @@
            [javafx.geometry HPos Point2D Rectangle2D VPos]
            [javafx.scene Node Parent Scene]
            [javafx.scene.canvas Canvas GraphicsContext]
-           [javafx.scene.control Button CheckBox Tab TextField TreeItem TreeView]
+           [javafx.scene.control Button CheckBox ContextMenu Label MenuItem Skin Tab TextField TreeItem TreeView]
            [javafx.scene.input Clipboard DataFormat InputMethodEvent InputMethodRequests KeyCode KeyEvent MouseButton MouseDragEvent MouseEvent ScrollEvent]
-           [javafx.scene.layout ColumnConstraints GridPane Pane Priority]
+           [javafx.scene.layout ColumnConstraints GridPane Pane Priority VBox]
            [javafx.scene.paint Color LinearGradient Paint]
            [javafx.scene.shape Rectangle]
-           [javafx.scene.text Font FontSmoothingType Text TextAlignment]
+           [javafx.scene.text Font FontPosture FontSmoothingType FontWeight Text TextAlignment]
            [javafx.stage PopupWindow Screen Stage]))
 
 (set! *warn-on-reflection* true)
@@ -343,6 +350,16 @@
      ["editor.info" (Color/valueOf "#CCCFD3")]
      ["editor.debug" (Color/valueOf "#3B8CF8")]]))
 
+(def ^:private lua-color-scheme
+  (make-color-scheme (mapv (fn [[scope color]] [scope (Color/valueOf ^String color)]) lua-highlight/paints)))
+
+(def ^:private syntax-fonts
+  (memoize
+    (fn [^Font font]
+      {:normal font
+       :italic (Font/font (.getFamily font) FontWeight/NORMAL FontPosture/ITALIC (.getSize font))
+       :bold-italic (Font/font (.getFamily font) FontWeight/BOLD FontPosture/ITALIC (.getSize font))})))
+
 (defn color-lookup
   ^Paint [color-scheme key]
   (or (some (fn [[pattern paint]]
@@ -471,7 +488,7 @@
         (recur lines (dec row))))))
 
 (defn- find-prior-indentation-guide-positions [^LayoutInfo layout lines]
-  (let [dropped-line-count (.dropped-line-count layout)]
+  (let [dropped-line-count (folding/source-row layout (.dropped-line-count layout))]
     (loop [row (find-prior-unindented-row lines dropped-line-count)
            guide-positions []]
       (let [line (get lines row)]
@@ -557,8 +574,10 @@
 
 (defn- draw-code! [^GraphicsContext gc ^Font font ^LayoutInfo layout color-scheme lines syntax-info indent-type visible-whitespace]
   (let [^Rect canvas-rect (.canvas layout)
+        lua-theme (identical? color-scheme lua-color-scheme)
+        fonts (when lua-theme (syntax-fonts font))
         source-line-count (count lines)
-        dropped-line-count (.dropped-line-count layout)
+        dropped-line-count (folding/source-row layout (.dropped-line-count layout))
         drawn-line-count (.drawn-line-count layout)
         ^double ascent (data/ascent (.glyph layout))
         ^double line-height (data/line-height (.glyph layout))
@@ -616,13 +635,20 @@
                                                    next-run-index)))
                                              (if (= end run-end) (inc run-index) run-index)))]
                   (.setFill gc (color-match color-scheme scope))
+                  (when lua-theme (.setFont gc (get fonts (lua-highlight/font-style scope))))
                   (let [glyph-offset (fill-text! gc layout line complex-ranges start end glyph-offset line-y)]
+                    (when-let [underline (when lua-theme (lua-highlight/underline scope))]
+                      (.setStroke gc (Color/valueOf ^String underline))
+                      (.setLineWidth gc 1.0)
+                      (.strokeLine gc (max (.x canvas-rect) (data/col->x layout start line)) (+ line-y 2.0)
+                                   (min (+ (.x canvas-rect) (.w canvas-rect)) (data/col->x layout end line)) (+ line-y 2.0)))
                     (when (some? glyph-offset)
                       (recur next-run-index end (double glyph-offset)))))))
 
             ;; Just draw line as plain text.
             (when-not (string/blank? line)
               (.setFill gc foreground-color)
+              (.setFont gc font)
               (fill-text! gc layout line complex-ranges 0 (count line) line-x line-y)))
 
           (let [line-length (count line)
@@ -692,8 +718,20 @@
                                range-index
                                next-i
                                next-x))))))))
+          (when-let [region (get (:fold-collapsed-by-row layout) source-line-index)]
+            (let [x (+ 8.0 (data/col->x layout (count line) line))
+                  label (str " … " (- (long (:end region)) (long (:start region))))
+                  width (+ 12.0 (data/text-width (.glyph layout) label))]
+              (.setFont gc font)
+              (.setFill gc (color-lookup color-scheme "editor.gutter.cursor.line.background"))
+              (.fillRoundRect gc x (+ (- line-y ascent) 2.0) width (- line-height 4.0) 4.0 4.0)
+              (.setStroke gc (color-lookup color-scheme "editor.gutter.foreground"))
+              (.setLineWidth gc 1.0)
+              (.strokeRoundRect gc (+ x 0.5) (+ (- line-y ascent) 2.5) width (- line-height 5.0) 4.0 4.0)
+              (.setFill gc (color-lookup color-scheme "editor.foreground"))
+              (.fillText gc label (+ x 4.0) line-y)))
           (recur (inc drawn-line-index)
-                 (inc source-line-index)))))))
+                 (folding/next-row layout source-line-index)))))))
 
 (defn- fill-minimap-run!
   [^GraphicsContext gc ^Color color ^LayoutInfo minimap-layout ^String text start-index end-index x y]
@@ -723,7 +761,7 @@
 (defn- draw-minimap-code! [^GraphicsContext gc ^LayoutInfo minimap-layout color-scheme lines syntax-info]
   (let [^Rect minimap-rect (.canvas minimap-layout)
         source-line-count (count lines)
-        dropped-line-count (.dropped-line-count minimap-layout)
+        dropped-line-count (folding/source-row minimap-layout (.dropped-line-count minimap-layout))
         drawn-line-count (.drawn-line-count minimap-layout)
         ^double ascent (data/ascent (.glyph minimap-layout))
         ^double line-height (data/line-height (.glyph minimap-layout))
@@ -753,12 +791,12 @@
               (fill-minimap-run! gc foreground-color minimap-layout line 0 (count line) line-x line-y)))
 
           (recur (inc drawn-line-index)
-                 (inc source-line-index)))))))
+                 (folding/next-row minimap-layout source-line-index)))))))
 
 (defn- draw! [^GraphicsContext gc ^Font font gutter-view hovered-element ^LayoutInfo layout ^LayoutInfo minimap-layout color-scheme lines regions syntax-info cursor-range-draw-infos minimap-cursor-range-draw-infos indent-type visible-cursor-ranges focus-state visible-indentation-guides? visible-minimap? visible-whitespace]
   (let [^Rect canvas-rect (.canvas layout)
         source-line-count (count lines)
-        dropped-line-count (.dropped-line-count layout)
+        dropped-line-count (folding/source-row layout (.dropped-line-count layout))
         drawn-line-count (.drawn-line-count layout)
         ^double line-height (data/line-height (.glyph layout))
         background-color (color-lookup color-scheme "editor.background")
@@ -793,7 +831,7 @@
               (doseq [guide-x guide-positions]
                 (.strokeLine gc guide-x line-y guide-x (+ line-y (dec line-height)))))
             (recur (inc drawn-line-index)
-                   (inc source-line-index)
+                   (folding/next-row layout source-line-index)
                    (if line-has-text? (conj guide-positions guide-x) guide-positions))))))
 
     ;; Draw syntax-highlighted code.
@@ -892,9 +930,23 @@
 (g/defnk produce-gutter-metrics [gutter-view lines regions glyph-metrics]
   (gutter-metrics gutter-view lines regions glyph-metrics))
 
-(g/defnk produce-layout [canvas-width canvas-height document-width scroll-x scroll-y lines gutter-metrics glyph-metrics tab-spaces visible-minimap?]
-  (let [[gutter-width gutter-margin] gutter-metrics]
-    (data/layout-info canvas-width canvas-height document-width scroll-x scroll-y lines gutter-width gutter-margin glyph-metrics tab-spaces visible-minimap?)))
+(g/defnk produce-fold-regions [grammar lines]
+  (when (= "source.lua" (:scope-name grammar))
+    (folding/regions lines)))
+
+(g/defnk produce-effective-folds [fold-regions collapsed-folds cursor-ranges execution-markers]
+  (folding/effective-collapsed fold-regions collapsed-folds cursor-ranges execution-markers))
+
+(g/defnk produce-fold-mapping [lines effective-folds]
+  (folding/mapping (count lines) effective-folds))
+
+(g/defnk produce-layout [canvas-width canvas-height document-width scroll-x scroll-y lines gutter-metrics glyph-metrics tab-spaces visible-minimap? fold-regions effective-folds fold-mapping]
+  (let [[gutter-width gutter-margin] gutter-metrics
+        display-lines (or (:fold-visible-rows fold-mapping) lines)]
+    (merge (data/layout-info canvas-width canvas-height document-width scroll-x scroll-y display-lines gutter-width gutter-margin glyph-metrics tab-spaces visible-minimap?)
+           fold-mapping
+           {:fold-regions-by-row (into {} (map (juxt :start identity)) fold-regions)
+            :fold-collapsed-by-row (into {} (map (juxt :start identity)) effective-folds)})))
 
 (defn- invalidated-row
   "Find the first invalidated row by comparing ever-growing histories of all
@@ -955,7 +1007,7 @@
     :current-frame
     (cursor-range-draw-info :word nil frame-color execution-marker)))
 
-(g/defnk produce-cursor-range-draw-infos [color-scheme lines cursor-ranges focus-state layout visible-cursors visible-cursor-ranges visible-regions visible-matching-braces highlighted-find-term find-case-sensitive? find-whole-word? execution-markers]
+(g/defnk produce-cursor-range-draw-infos [navigation-link color-scheme lines cursor-ranges focus-state layout visible-cursors visible-cursor-ranges visible-regions visible-matching-braces highlighted-find-term find-case-sensitive? find-whole-word? execution-markers]
   (let [background-color (color-lookup color-scheme "editor.background")
         ^Color selection-background-color (color-lookup color-scheme "editor.selection.background")
         selection-background-color (if (not= :not-focused focus-state) selection-background-color (color-lookup color-scheme "editor.selection.background.inactive"))
@@ -981,7 +1033,11 @@
       (concat
         (map (partial cursor-range-draw-info :range selection-background-color background-color)
              visible-cursor-ranges)
-        (map (partial cursor-range-draw-info :underline nil matching-brace-color)
+        (when (and (= lines (:lines navigation-link)) (= :input-focused focus-state))
+          [(cursor-range-draw-info :underline nil foreground-color (:range navigation-link))])
+        (map (if (identical? color-scheme lua-color-scheme)
+               (partial cursor-range-draw-info :range (color-lookup color-scheme "editor.matching.brace.background") nil)
+               (partial cursor-range-draw-info :underline nil matching-brace-color))
              visible-matching-braces)
         (map (partial cursor-range-draw-info :underline nil foreground-color)
              (visible-regions-by-type :resource-reference))
@@ -1063,7 +1119,9 @@
       (.setTextAlign gc TextAlignment/LEFT)
       (.setFill gc (.deriveColor ^Color (color-lookup color-scheme "editor.foreground") 0.0 1.0 1.0 0.55))
       (doseq [[row labels] hints
-              :when (<= (.dropped-line-count layout) (long row) (data/last-visible-row layout))
+              :when (and (<= (folding/source-row layout (.dropped-line-count layout)) (long row) (data/last-visible-row layout))
+                         (not (folding/hidden-row? layout row))
+                         (not (contains? (:fold-collapsed-by-row layout) row)))
               :let [line (get lines row)]
               :when line]
         (.fillText gc (coll/join-to-string "  ·  " labels)
@@ -1667,6 +1725,8 @@
   ;; property on the `CodeEditorView` itself when viewing these resources.
   (property fallback-cursor-ranges r/CursorRanges (default [data/document-start-cursor-range]) (dynamic visible (g/constantly false)))
 
+  (property collapsed-folds g/Any (default #{}) (dynamic visible (g/constantly false)))
+  (property navigation-link g/Any (dynamic visible (g/constantly false)))
   (property localization g/Any (dynamic visible (g/constantly false)))
   (property repaint-trigger g/Num (default 0) (dynamic visible (g/constantly false)))
   (property undo-grouping-info UndoGroupingInfo (dynamic visible (g/constantly false)))
@@ -1723,7 +1783,7 @@
 
   (property code-insights g/Any (default {}) (dynamic visible (g/constantly false)))
   (property completions-showing g/Bool (default false) (dynamic visible (g/constantly false)))
-  (property completions-doc g/Bool (default false) (dynamic visible (g/constantly false)))
+  (property completions-doc g/Bool (default true) (dynamic visible (g/constantly false)))
   (property completions-insert-cursor g/Any (dynamic visible (g/constantly false)))
   (property completions-built-in g/Any (default []) (dynamic visible (g/constantly false)))
   (property completions-lsp g/Any)
@@ -1836,6 +1896,9 @@
   (output font Font :cached produce-font)
   (output glyph-metrics data/GlyphMetrics :cached produce-glyph-metrics)
   (output gutter-metrics GutterMetrics :cached produce-gutter-metrics)
+  (output fold-regions g/Any :cached produce-fold-regions)
+  (output effective-folds g/Any :cached produce-effective-folds)
+  (output fold-mapping g/Any :cached produce-fold-mapping)
   (output layout LayoutInfo :cached produce-layout)
   (output matching-braces MatchingBraces :cached produce-matching-braces)
   (output tab-trigger-scope-regions r/Regions :cached produce-tab-trigger-scope-regions)
@@ -1882,20 +1945,28 @@
                (get-property view-node :completions-doc evaluation-context))
       (when-let [completion (get-property view-node :completions-selection evaluation-context)]
         (when-let [index (::index (meta completion))]
-          (when-not (::resolved (meta completion))
-            (let [lsp (lsp/get-lsp (:basis evaluation-context))]
-              (lsp/resolve-completion!
-                lsp completion
-                (fn [resolved-completion]
-                  (ui/run-later
-                    (g/with-auto-evaluation-context evaluation-context
-                      (when-let [completions-lsp (get-property view-node :completions-lsp evaluation-context)]
-                        (when (= completion (get (:items completions-lsp) index))
-                          (set-properties!
-                            view-node nil
-                            {:completions-lsp
-                             (update completions-lsp :items assoc index
-                                     (vary-meta resolved-completion assoc ::resolved true))}))))))))))))))
+          (let [completions-lsp (get-property view-node :completions-lsp evaluation-context)]
+            (when-not (or (contains? (:resolved completions-lsp) index)
+                          (contains? (:resolving completions-lsp) index))
+              (let [lsp (lsp/get-lsp (:basis evaluation-context))
+                    request-id (:request-id completions-lsp)]
+                (set-properties! view-node nil
+                                 {:completions-lsp (update completions-lsp :resolving (fnil conj #{}) index)})
+                (lsp/resolve-completion!
+                  lsp completion
+                  (fn [resolved-completion]
+                    (ui/run-later
+                      (g/with-auto-evaluation-context evaluation-context
+                        (when-let [completions-lsp (get-property view-node :completions-lsp evaluation-context)]
+                          (when (and (identical? request-id (:request-id completions-lsp))
+                                     (= completion (get (:items completions-lsp) index)))
+                            (set-properties!
+                              view-node nil
+                              {:completions-lsp
+                               (-> completions-lsp
+                                   (update :items assoc index resolved-completion)
+                                   (update :resolving disj index)
+                                   (update :resolved (fnil conj #{}) index))})))))))))))))))
 
 (defn- refresh-completion-selected-index! [view-node]
   (g/with-auto-evaluation-context evaluation-context
@@ -1913,7 +1984,7 @@
       (when (and (get-property view-node :completions-showing evaluation-context)
                  (= insert-cursor (get-property view-node :completions-insert-cursor evaluation-context)))
         (set-properties! view-node nil
-                         {:completions-lsp (assoc completions :request-cursor request-cursor)})
+                         {:completions-lsp (assoc completions :request-cursor request-cursor :request-id (Object.))})
         (refresh-completion-selected-index! view-node)))))
 
 (defn- show-suggestions! [view-node & {:keys [explicit typed] :or {explicit false}}]
@@ -2373,7 +2444,7 @@
 
 (defn- completion-list-cell-view [view-node completion]
   (if completion
-    (let [text (:display-string completion)
+    (let [{:keys [label description]} (completion-presentation/label-parts completion)
           matching-indices (fuzzy-choices/matching-indices completion)]
       {:graphic {:fx/type fx.h-box/lifecycle
                  :alignment :center-left
@@ -2386,8 +2457,13 @@
                                            :type type}]
                                          [])}
                             (fuzzy-choices/make-matched-text-flow-cljfx
-                              text matching-indices
-                              :deprecated (contains? (:tags completion) :deprecated))]}
+                              label matching-indices
+                              :deprecated (contains? (:tags completion) :deprecated))
+                             {:fx/type fx.region/lifecycle :h-box/hgrow :always}
+                             {:fx/type fx.label/lifecycle
+                              :style {:-fx-opacity 0.65}
+                              :text description
+                              :min-width :use-pref-size}]}
        :on-mouse-clicked (fn [_]
                            (accept-suggestion! view-node (code-completion/insertion completion)))})
     {}))
@@ -2435,7 +2511,8 @@
             display-string-widths (eduction
                                     (take 512)
                                     (map #(-> text
-                                              (doto (.setText (:display-string %)))
+                                              (doto (.setText (let [{:keys [label description]} (completion-presentation/label-parts %)]
+                                                                (str label "    " description))))
                                               .getLayoutBounds
                                               .getWidth))
                                     completions-combined)
@@ -2528,30 +2605,18 @@
                :content [{:fx/type fx/ext-get-ref :ref :content}]}}]
             completions-doc
             (conj
-              (let [pref-doc-width 350.0
+              (let [pref-doc-width 440.0
                     doc-max-height (- (.getMaxY screen-bounds) (.getY anchor))
                     spacing 6.0
-                    left-space (- (.getX anchor) spacing)
+                    left-space (- (.getX anchor) (.getMinX screen-bounds) spacing)
                     right-space (- (.getMaxX screen-bounds)
                                    (+ (.getX anchor) completions-width spacing))
                     align-right (or (<= pref-doc-width right-space)
                                     (<= left-space right-space))
-                    doc-width (if align-right
-                                (min pref-doc-width right-space)
-                                (min pref-doc-width left-space))
-                    {:keys [detail doc type tags]} selected-completion
-                    deprecated (contains? tags :deprecated)
-                    small-text (or detail (some-> type name (string/replace "-" " ")))
-                    small-string (when (or deprecated small-text)
-                                   (format "<small>%s</small>"
-                                           (cond
-                                             (and small-text deprecated) (str small-text " (deprecated)")
-                                             small-text small-text
-                                             deprecated "deprecated")))
-                    doc-string (when doc
-                                 (case (:type doc)
-                                   :markdown (:value doc)
-                                   :plaintext (format "<pre>%s</pre>" (:value doc))))]
+                    doc-width (max 0.0 (if align-right
+                                        (min pref-doc-width right-space)
+                                        (min pref-doc-width left-space)))
+                    doc (:doc selected-completion)]
                 {:fx/type fxui/with-popup-window
                  :desc {:fx/type fx/ext-get-ref :ref :content}
                  :popup
@@ -2562,7 +2627,7 @@
                                 (- x doc-width spacing)))
                   :anchor-y (- (.getY anchor) 5.0)
                   :anchor-location :window-top-left
-                  :showing true
+                  :showing (pos? doc-width)
                   :auto-fix false
                   :auto-hide false
                   :hide-on-escape false
@@ -2582,13 +2647,11 @@
                                                                (ui/send-event! target e)
                                                                (.consume e))))
                                            :max-width doc-width
+                                           :min-width doc-width
+                                           :pref-width doc-width
                                            :max-height doc-max-height
                                            :project project
-                                           :content (cond
-                                                      (and small-string doc-string) (str small-string "\n\n" doc-string)
-                                                      small-string small-string
-                                                      doc-string doc-string
-                                                      :else "<small>no documentation</small>")}
+                                           :content (completion-presentation/documentation selected-completion)}
                                           (not align-right)
                                           (assoc :min-width doc-width))]}]}})))}}))))
 
@@ -2800,7 +2863,41 @@
           (show-suggestions! view-node :typed typed)
           (hide-suggestions! view-node))))))
 
+(defn- clear-navigation-link! [view-node]
+  (g/user-data! view-node ::link-request nil)
+  (set-properties! view-node nil {:navigation-link nil})
+  (ui/set-cursor (get-property view-node :canvas) javafx.scene.Cursor/TEXT))
+
+(defn- update-navigation-link! [view-node shortcut]
+  (let [event ^MouseEvent (g/user-data view-node ::pointer-event)
+        lines (get-property view-node :lines)
+        layout (get-property view-node :layout)
+        cursor (when (and shortcut event (not (get-property view-node :gesture-start))
+                          (data/rect-contains? (.canvas ^LayoutInfo layout) (.getX event) (.getY event)))
+                 (data/canvas->character-cursor layout lines (.getX event) (.getY event)))
+        range (when cursor (symbol-navigation/identifier-range lines cursor))
+        request (when range {:range range :lines lines})]
+    (when (not= request (g/user-data view-node ::link-request))
+      (clear-navigation-link! view-node)
+      (when request
+        (let [resource (g/node-value (get-property view-node :resource-node) :resource)
+              lsp (lsp/get-lsp)]
+          (when (lsp/has-language-servers-running-for-resource? lsp resource)
+            (g/user-data! view-node ::link-request request)
+            (lsp/goto-definition! lsp resource cursor
+              (fn [results]
+                (fx/on-fx-thread
+                  (when (and (g/node-exists? view-node)
+                             (= request (g/user-data view-node ::link-request))
+                             (= lines (get-property view-node :lines))
+                             (.isFocused ^Canvas (get-property view-node :canvas))
+                             (pos? (count results)))
+                    (set-properties! view-node nil {:navigation-link request})
+                    (ui/set-cursor (get-property view-node :canvas) javafx.scene.Cursor/HAND)))))))))))
+
 (defn handle-key-pressed! [view-node prefs ^KeyEvent event editable]
+  (when (.isShortcutDown event)
+    (update-navigation-link! view-node (not (or (.isAltDown event) (.isShiftDown event)))))
   ;; Only handle bare key events that cannot be bound to handlers here.
   (when-not (or (.isAltDown event)
                 (.isMetaDown event)
@@ -2837,6 +2934,23 @@
                (not= (int (.charAt character 0)) 0x7f))
       (insert-text! view-node prefs character))))
 
+(defn- fold-at-position [layout lines x y]
+  (let [right (.x ^Rect (:canvas layout))
+        width (data/line-height (:glyph layout))
+        row (data/y->row layout y)
+        region (get (:fold-regions-by-row layout) row)]
+    (when region
+      (if (<= (- right (double width)) (double x) right)
+        region
+        (when (contains? (:fold-collapsed-by-row layout) row)
+          (let [line (lines row)
+                left (+ 8.0 (data/col->x layout (count line) line))
+                label (str " … " (- (long (:end region)) (long (:start region))))
+                end (+ left 12.0 (data/text-width (:glyph layout) label))]
+            (when (and (<= right (double x))
+                       (<= left (double x) end))
+              region)))))))
+
 (defn refresh-mouse-cursor! [view-node ^MouseEvent event]
   (let [hovered-element (get-property view-node :hovered-element)
         gesture-type (:type (get-property view-node :gesture-start))
@@ -2851,6 +2965,12 @@
                      (= :scroll-bar-y-hold-up gesture-type)
                      (= :scroll-bar-y-hold-down gesture-type))
                  javafx.scene.Cursor/DEFAULT
+
+                 (fold-at-position layout (get-property view-node :lines) x y)
+                 javafx.scene.Cursor/HAND
+
+                 (get-property view-node :navigation-link)
+                 javafx.scene.Cursor/HAND
 
                  (some? (:on-click! (:region hovered-element)))
                  javafx.scene.Cursor/HAND
@@ -2870,6 +2990,21 @@
    (menu-items/separator-with-id :editor.code-view/context-menu-end)
    (menu-items/separator-with-id :editor.app-view/edit-end)])
 
+(defn toggle-fold! [view-node region]
+  (let [collapsed (get-property view-node :effective-folds)]
+    (if (contains? collapsed region)
+      (set-properties! view-node nil {:collapsed-folds (disj collapsed region)})
+      (let [cursor-ranges (get-property view-node :cursor-ranges)
+            cursor (data/->Cursor (:start region) 0)
+            relocated (mapv (fn [range]
+                              (if (or (folding/contains-row? region (get-in range [:from :row]))
+                                      (folding/contains-row? region (get-in range [:to :row])))
+                                (data/->CursorRange cursor cursor)
+                                range))
+                            cursor-ranges)]
+        (set-properties! view-node :navigation {:collapsed-folds (conj collapsed region)
+                                               :cursor-ranges relocated})))))
+
 (defn handle-mouse-pressed! [view-node ^MouseEvent event]
   (let [^Node target (.getTarget event)
         scene ^Scene (.getScene target)
@@ -2880,7 +3015,10 @@
     (refresh-mouse-cursor! view-node event)
     (hide-hover! view-node)
     (hide-suggestions! view-node)
-    (set-properties! view-node (if (< 1 (.getClickCount event)) :selection :navigation)
+    (if-let [region (when (= button :primary)
+                      (fold-at-position layout (get-property view-node :lines) (.getX event) (.getY event)))]
+      (toggle-fold! view-node region)
+      (set-properties! view-node (if (< 1 (.getClickCount event)) :selection :navigation)
                      (data/mouse-pressed (get-property view-node :lines)
                                          (get-property view-node :cursor-ranges)
                                          (get-property view-node :regions)
@@ -2892,7 +3030,7 @@
                                          (.getY event)
                                          (.isAltDown event)
                                          (.isShiftDown event)
-                                         (.isShortcutDown event)))
+                                         (.isShortcutDown event))))
 
     (when (and (= button :secondary)
                (not (data/in-gutter? layout (.getX event))))
@@ -2984,6 +3122,10 @@
               (merge
                 (let [hover-character-cursor (data/canvas->character-cursor layout lines x y)]
                   (request-lsp-hover! view-node lsp resource-node hover-character-cursor evaluation-context))))))))
+  (g/user-data! view-node ::pointer-event event)
+  (update-navigation-link! view-node (and (.isShortcutDown event)
+                                        (not (.isAltDown event))
+                                        (not (.isShiftDown event))))
   (refresh-mouse-cursor! view-node event))
 
 (defn handle-mouse-released! [view-node ^MouseEvent event]
@@ -3005,7 +3147,40 @@
                (.getY event))]
     (set-properties! view-node :selection values-by-prop-kw)))
 
+(defn- handle-navigation-mouse-pressed! [view-node ^MouseEvent event]
+  (clear-navigation-link! view-node)
+  (g/user-data! view-node ::navigation-press nil)
+  (if (and (= MouseButton/PRIMARY (.getButton event)) (.isShortcutDown event)
+           (not (.isAltDown event)) (not (.isShiftDown event)))
+    (let [layout (get-property view-node :layout)
+          lines (get-property view-node :lines)
+          cursor (when (data/rect-contains? (.canvas ^LayoutInfo layout) (.getX event) (.getY event))
+                   (data/canvas->character-cursor layout lines (.getX event) (.getY event)))]
+      (if-not (and cursor (symbol-navigation/identifier-range lines cursor))
+        (handle-mouse-pressed! view-node event)
+        (do
+          (.consume event)
+          (.requestFocus ^Canvas (get-property view-node :canvas))
+          (hide-hover! view-node)
+          (hide-suggestions! view-node)
+          (g/user-data! view-node ::navigation-press {:cursor cursor :x (.getX event) :y (.getY event)}))))
+    (handle-mouse-pressed! view-node event)))
+
+(defn- handle-navigation-mouse-released! [view-node ^MouseEvent event]
+  (if-let [{:keys [cursor x y]} (g/user-data view-node ::navigation-press)]
+    (do
+      (.consume event)
+      (g/user-data! view-node ::navigation-press nil)
+      (when (and (.isShortcutDown event)
+                 (= MouseButton/PRIMARY (.getButton event))
+                 (< (Math/abs (- (.getX event) (double x))) 5.0)
+                 (< (Math/abs (- (.getY event) (double y))) 5.0))
+        (ui/run-command (get-property view-node :canvas) :code.goto-definition {:cursor cursor})))
+    (handle-mouse-released! view-node event)))
+
 (defn handle-mouse-exited! [view-node ^MouseEvent event]
+  (g/user-data! view-node ::pointer-event nil)
+  (clear-navigation-link! view-node)
   (.consume event)
   (set-properties!
     view-node :selection
@@ -3227,43 +3402,72 @@
           ^Canvas canvas (get-property view-node :canvas evaluation-context)
           ^LayoutInfo layout (get-property view-node :layout evaluation-context)
           lines (get-property view-node :lines evaluation-context)
-          cursor-bottom (cursor-bottom layout lines cursor)
-          font-name (get-property view-node :font-name evaluation-context)
-          font-size (get-property view-node :font-size evaluation-context)
+          project (get-property view-node :project evaluation-context)
+          localization (get-property view-node :localization evaluation-context)
+          results (mapv (fn [{:keys [resource cursor-range] :as result}]
+                          (let [path (resource/proj-path resource)
+                                node (project/get-resource-node project path evaluation-context)
+                                source-lines (when node (g/node-value node :lines evaluation-context))
+                                snippet (string/trim (get source-lines (:row (data/cursor-range-start cursor-range)) ""))]
+                            (assoc result :path path :snippet (subs snippet 0 (min 240 (count snippet))))))
+                        (symbol-navigation/ordered-results results))
           list-view (popup/make-choices-list-view
-                      (data/line-height (.-glyph layout))
-                      (fn [{:keys [resource cursor-range]}]
+                      (+ 12.0 (* 2.0 (double (data/line-height (.-glyph layout)))))
+                      (fn [{:keys [path snippet cursor-range]}]
                         {:graphic
-                         (doto (Text.
-                                 (str (resource/proj-path resource)
-                                      ":"
-                                      (data/CursorRange->line-number cursor-range)))
-                           (.setFont (Font/font font-name font-size)))}))
-          [width height] (popup/update-list-view! list-view 200.0 results 0)
-          anchor (pref-suggestions-popup-position canvas width height cursor-bottom)
-          popup (doto (popup/make-choices-popup canvas list-view)
-                  (.addEventHandler Event/ANY (ui/event-handler event (.consume event))))
-          accept! (fn [{:keys [resource cursor-range]}]
-                    (.hide popup)
-                    (open-resource-fn resource {:cursor-range cursor-range}))]
+                         (doto (VBox. 3.0)
+                           (ui/children!
+                             [(doto (Label. (str path ":" (data/CursorRange->line-number cursor-range)))
+                                (.setMaxWidth 660.0))
+                              (doto (Label. snippet)
+                                (.setMaxWidth 660.0)
+                                (.setFont (Font/font (get-property view-node :font-name) (get-property view-node :font-size))))]))}))
+          search (doto (TextField.)
+                   (.setId "symbol-results-filter")
+                   (.setPromptText ((deref localization) (localization/message "code.navigation.filter"))))
+          count-label (doto (Label.) (ui/add-style! "completion-popup-hint"))
+          popup (popup/make-choices-popup canvas list-view)
+          content (doto (VBox. 4.0)
+                    (ui/add-style! "completion-popup-background")
+                    (.setPadding (javafx.geometry.Insets. 6.0))
+                    (ui/children! [count-label search list-view]))
+          refresh! (fn [query]
+                     (let [filtered (symbol-navigation/matching-results results query)]
+                       (.setText count-label
+                         ((deref localization) (localization/message "code.navigation.results"
+                           {"count" (count filtered) "total" (count results)})))
+                       (popup/update-list-view! list-view 560.0 filtered 0)))
+          accept! (fn [result]
+                    (when result
+                      (.hide popup)
+                      (open-resource-fn (:resource result) {:cursor-range (:cursor-range result)})))]
       (hide-hover! view-node)
       (hide-suggestions! view-node)
-      (doto list-view
-        ui/apply-css!
-        (.setOnMouseClicked
-          (ui/event-handler event
-            (when-let [item (ui/cell-item-under-mouse event)]
-              (accept! item))))
-        (.setOnKeyPressed
-          (ui/event-handler event
-            (let [^KeyEvent event event]
-              (when (and (= KeyEvent/KEY_PRESSED (.getEventType event)))
-                (condp = (.getCode event)
-                  KeyCode/ENTER (accept! (first (ui/selection list-view)))
-                  KeyCode/ESCAPE (.hide popup)
-                  nil))))))
-      (.show popup (.getWindow (.getScene canvas)) (.getX anchor) (.getY anchor))
-      (popup/update-list-view! list-view 200.0 results 0))))
+      (.setMaxWidth list-view 700.0)
+      (ui/apply-css! content)
+      (.setSkin popup (reify Skin
+                        (getSkinnable [_] popup)
+                        (getNode [_] content)
+                        (dispose [_])))
+      (ui/observe (.textProperty search) (fn [_ _ value] (refresh! value)))
+      (.setOnKeyPressed content
+        (ui/event-handler event
+          (condp = (.getCode ^KeyEvent event)
+            KeyCode/ENTER (do (.consume event) (accept! (first (ui/selection list-view))))
+            KeyCode/ESCAPE (do (.consume event) (.hide popup))
+            KeyCode/DOWN (when (= search (.getTarget event))
+                           (.consume event) (.requestFocus list-view))
+            nil)))
+      (.setOnMouseClicked list-view
+        (ui/event-handler event
+          (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
+            (accept! (ui/cell-item-under-mouse event)))))
+      (let [[width height] (refresh! "")
+            anchor (pref-suggestions-popup-position canvas width (+ (double height) 65.0) (cursor-bottom layout lines cursor))]
+        (.show popup (.getWindow (.getScene canvas)) (.getX anchor) (.getY anchor)))
+      (refresh! "")
+      (.requestFocus search)
+      (g/user-data! view-node ::navigation-popup popup))))
 
 (defn- show-no-language-server-for-resource-language-notification! [resource]
   (let [language (resource/language resource)]
@@ -3375,49 +3579,117 @@
           (format-selected-rows! view-node lsp resource indent-type lines cursor-ranges)
           (format-whole-document! view-node lsp resource indent-type lines fn/constantly-nil))))))
 
+(defn- request-symbol-navigation! [view-node open-resource-fn cursor references]
+  (let [resource (g/node-value (get-property view-node :resource-node) :resource)
+        lines (get-property view-node :lines)
+        lsp (lsp/get-lsp)
+        selections (get-property view-node :cursor-ranges)
+        request (Object.)]
+    (g/user-data! view-node ::navigation-request request)
+    (if-not (lsp/has-language-servers-running-for-resource? lsp resource)
+      (show-no-language-server-for-resource-language-notification! resource)
+      ((if references lsp/find-references! lsp/goto-definition!)
+       lsp resource cursor
+       (fn [results]
+         (fx/on-fx-thread
+           (when (and (g/node-exists? view-node)
+                      (identical? request (g/user-data view-node ::navigation-request))
+                      (= selections (get-property view-node :cursor-ranges))
+                      (= lines (get-property view-node :lines)))
+             (let [results (symbol-navigation/ordered-results results)]
+               (cond
+                 (zero? (count results))
+                 (notifications/show! (workspace/notifications (resource/workspace resource))
+                   {:type :info :id ::no-symbol-results
+                    :message (localization/message "code.navigation.no-results")})
+
+                 (and (not references) (symbol-navigation/at-definition? resource cursor results))
+                 (request-symbol-navigation! view-node open-resource-fn cursor true)
+
+                 (and (not references) (= 1 (count results)))
+                 (open-resource-fn (:resource (first results)) {:cursor-range (:cursor-range (first results))})
+
+                 :else
+                 (show-goto-popup! view-node open-resource-fn results))))))))))
+
+(defn- show-lua-intentions! [view-node]
+  (g/with-auto-evaluation-context evaluation-context
+    (let [lines (get-property view-node :lines evaluation-context)
+          selections (get-property view-node :cursor-ranges evaluation-context)
+          cursor (data/CursorRange->Cursor (first selections))
+          context (when (= 1 (count selections)) (lua-intentions/parameter-context lines cursor))
+          actions (lua-intentions/actions context)
+          ^Canvas canvas (get-property view-node :canvas evaluation-context)
+          ^LayoutInfo layout (get-property view-node :layout evaluation-context)
+          localization (deref (get-property view-node :localization evaluation-context))
+          current? #(and (g/node-exists? view-node)
+                         (= lines (get-property view-node :lines))
+                         (= selections (get-property view-node :cursor-ranges)))]
+      (when-let [^PopupWindow previous (g/user-data view-node ::intention-popup)] (.hide previous))
+      (if (coll/empty? actions)
+        (notifications/show!
+          (workspace/notifications (resource/workspace (g/node-value (get-property view-node :resource-node) :resource)))
+          {:type :info :id ::no-intentions :message (localization/message "code.intentions.none")})
+        (let [popup (doto (ContextMenu.) (.setConsumeAutoHidingEvents true))
+              accept! (fn [action]
+                        (.hide popup)
+                        (when (and action (current?))
+                          (let [edit (case action
+                                       :parameter (lua-intentions/parameter-edit context)
+                                       :field (when-let [{:keys [name create-doc]} (lua-intention-dialog/show-field-dialog! context localization)]
+                                                (lua-intentions/field-edit lines context name (get-property view-node :indent-type) create-doc)))]
+                            (when (and edit (current?))
+                              (let [layout (get-property view-node :layout)
+                                    result (data/apply-edits lines (get-property view-node :regions) selections (:edits edit) layout)]
+                                (set-properties! view-node nil
+                                  (-> result
+                                      (assoc :cursor-ranges [(:selection edit)])
+                                      (data/frame-cursor layout))))))
+                          (.requestFocus canvas)))]
+          (hide-hover! view-node)
+          (hide-suggestions! view-node)
+          (.addAll (.getItems popup)
+            ^java.util.Collection
+            (mapv (fn [action]
+                    (doto (MenuItem. (localization (localization/message (str "code.intentions." (name action)))))
+                      (.setUserData action)
+                      (.setOnAction (ui/event-handler _ (accept! action)))))
+                  actions))
+          ;; The opening key can be forwarded to the new window in the same
+          ;; dispatch. Consume modified Enter before the native menu handles it.
+          (.addEventFilter popup KeyEvent/KEY_PRESSED
+            (ui/event-handler event
+              (when (and (= KeyCode/ENTER (.getCode ^KeyEvent event))
+                         (or (.isAltDown ^KeyEvent event)
+                             (.isControlDown ^KeyEvent event)
+                             (.isMetaDown ^KeyEvent event)))
+                (.consume event))))
+          (ui/set-show-relative-to-window! popup true)
+          (let [point (cursor-bottom layout lines cursor)
+                anchor (.localToScreen canvas (.getX point) (.getY point))]
+            (.show popup canvas (.getX anchor) (.getY anchor)))
+          (.requestFocusOnIndex ^ContextMenuContent (.getNode (.getSkin popup)) 0)
+          (g/user-data! view-node ::intention-popup popup))))))
+
+(handler/defhandler :code.lua-intentions :code-view
+  (active? [editable] editable)
+  (enabled? [view-node evaluation-context]
+    (= "lua" (resource/language (g/node-value (get-property view-node :resource-node evaluation-context) :resource evaluation-context))))
+  (run [view-node] (show-lua-intentions! view-node)))
+
 (handler/defhandler :code.goto-definition :code-view
   (enabled? [view-node evaluation-context]
-    (let [resource-node (get-property view-node :resource-node evaluation-context)
-          resource (g/node-value resource-node :resource evaluation-context)]
-      (resource/file-resource? resource)))
+    (resource/file-resource? (g/node-value (get-property view-node :resource-node evaluation-context) :resource evaluation-context)))
   (run [view-node user-data open-resource-fn]
-    (let [resource-node (get-property view-node :resource-node)
-          resource (g/node-value resource-node :resource)
-          lsp (lsp/get-lsp)]
-      (if (lsp/has-language-servers-running-for-resource? lsp resource)
-        (lsp/goto-definition!
-          lsp
-          resource
-          (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges)))
-          (fn [results]
-            (fx/on-fx-thread
-              (case (count results)
-                0 nil
-                1 (open-resource-fn
-                    (:resource (first results))
-                    {:cursor-range (:cursor-range (first results))})
-                (show-goto-popup! view-node open-resource-fn results)))))
-        (show-no-language-server-for-resource-language-notification! resource)))))
+    (request-symbol-navigation! view-node open-resource-fn
+      (or (:cursor user-data) (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges)))) false)))
 
 (handler/defhandler :code.show-references :code-view
   (enabled? [view-node evaluation-context]
-    (let [resource-node (get-property view-node :resource-node evaluation-context)
-          resource (g/node-value resource-node :resource evaluation-context)]
-      (resource/file-resource? resource)))
-  (run [view-node user-data open-resource-fn]
-    (let [resource-node (get-property view-node :resource-node)
-          lsp (lsp/get-lsp)
-          resource (g/node-value resource-node :resource)]
-      (if (lsp/has-language-servers-running-for-resource? lsp resource)
-        (lsp/find-references!
-          lsp
-          resource
-          (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges)))
-          (fn [results]
-            (when (pos? (count results))
-              (fx/on-fx-thread
-                (show-goto-popup! view-node open-resource-fn results)))))
-        (show-no-language-server-for-resource-language-notification! resource)))))
+    (resource/file-resource? (g/node-value (get-property view-node :resource-node evaluation-context) :resource evaluation-context)))
+  (run [view-node open-resource-fn]
+    (request-symbol-navigation! view-node open-resource-fn
+      (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges))) true)))
 
 (defn- flatten-document-symbols [document-symbols]
   (coll/into-> document-symbols []
@@ -3938,7 +4210,10 @@
    {:command :code.split-selection-into-lines :label (localization/message "command.code.split-selection-into-lines")}
    {:label :separator}
    {:command :edit.rename :label (localization/message "command.edit.rename")}
+   {:command :code.lua-intentions :label (localization/message "command.code.lua-intentions")}
    {:command :code.goto-definition :label (localization/message "command.code.goto-definition")}
+   {:command :code.navigate-back :label (localization/message "command.code.navigate-back")}
+   {:command :code.navigate-forward :label (localization/message "command.code.navigate-forward")}
    {:command :code.show-references :label (localization/message "command.code.show-references")}
    {:label :separator}
    {:command :debugger.toggle-breakpoint :label (localization/message "command.debugger.toggle-breakpoint")}
@@ -4095,10 +4370,11 @@
                lsp (lsp/get-lsp (:basis evaluation-context))]
       (when (and lsp (resource/file-resource? resource))
         (let [cursor (:to (first ranges))
+              local-highlight-cache (g/user-data view-node ::local-highlight-cache)
               server-state (into {} (map (fn [[server state]] [server [(:status state) (:capabilities state) (get-in state [:diagnostics resource])]])) (:server->server-state (lsp)))
-              visible-range (data/->CursorRange (data/->Cursor (.dropped-line-count ^LayoutInfo layout) 0)
-                                                (data/->Cursor (min (dec (count lines)) (long (data/last-visible-row layout)))
-                                                               (count (get lines (min (dec (count lines)) (long (data/last-visible-row layout))) ""))))]
+              visible-range (data/->CursorRange (data/->Cursor (folding/source-row layout (.dropped-line-count ^LayoutInfo layout)) 0)
+                                                (data/->Cursor (min (dec (count lines)) (data/last-visible-row layout))
+                                                               (count (get lines (min (dec (count lines)) (data/last-visible-row layout)) ""))))]
           (doseq [[kind preference] [[:signature-help :signature-help]
                                    [:semantic-tokens :semantic-highlighting]
                                    [:inlay-hints :inlay-hints]]]
@@ -4128,16 +4404,26 @@
                               (lsp/code-insight!
                                 lsp resource kind (if (= kind :signature-help) (data/->CursorRange cursor cursor) visible-range)
                                 (fn [result]
-                                  (let [converted (case kind
+                                  (future
+                                  (let [lua (= "lua" (resource/language resource))
+                                        converted (case kind
                                                     :signature-help (insight/signature result)
-                                                    :semantic-tokens (insight/semantic-tokens result lines)
+                                                    :semantic-tokens (let [tokens (insight/semantic-tokens (assoc result :lua lua) lines)]
+                                                                       (if lua
+                                                                         (let [cached @local-highlight-cache
+                                                                               spans (if (= lines (:lines cached))
+                                                                                       (:spans cached)
+                                                                                       (lua-highlight/local-spans lines))]
+                                                                           (reset! local-highlight-cache {:lines lines :spans spans})
+                                                                           (lua-highlight/merge-spans spans tokens lines))
+                                                                         tokens))
                                                     :inlay-hints (insight/line-hints result lines))]
                                     (ui/run-later
                                       (when (and (g/node-exists? view-node)
                                                  (= key (:key (g/user-data view-node state-key)))
                                                  (= lines (g/node-value view-node :lines)))
                                         (g/transact {:undoable false}
-                                                    (g/update-property view-node :code-insights assoc kind converted))))))))))]
+                                                    (g/update-property view-node :code-insights assoc kind converted)))))))))))]
                     (g/user-data! view-node state-key {:key key :timer timer})))))))))))
 
 (defn- signature-popup-view [{:keys [canvas-repaint-info signature cursor view-node]}]
@@ -4166,6 +4452,14 @@
 (defn repaint-view! [view-node elapsed-time {:keys [cursor-visible editable] :as _opts}]
   (assert (boolean? cursor-visible))
   (request-code-insights! view-node)
+  (let [collapsed (get-property view-node :collapsed-folds)
+        effective (get-property view-node :effective-folds)]
+    (when (not= collapsed effective)
+      (set-properties! view-node nil
+                       (merge {:collapsed-folds effective}
+                              (data/scroll-to-any-cursor (get-property view-node :layout)
+                                                        (get-property view-node :lines)
+                                                        (get-property view-node :cursor-ranges))))))
 
   ;; Since the elapsed time updates at 60 fps, we store it as user-data to avoid transaction churn.
   (g/user-data! view-node :elapsed-time elapsed-time)
@@ -4308,6 +4602,10 @@
           glyph-metrics (.glyph layout)
           ^double line-height (data/line-height glyph-metrics)
           gutter-foreground-color (color-lookup color-scheme "editor.gutter.foreground")
+          cursor-rows (into #{} (map #(-> % data/CursorRange->Cursor :row)) visible-cursor-ranges)
+          cursor-foreground-color (if (identical? color-scheme lua-color-scheme)
+                                    (color-lookup color-scheme "editor.gutter.cursor.foreground")
+                                    gutter-foreground-color)
           gutter-background-color (color-lookup color-scheme "editor.gutter.background")
           gutter-shadow-color (color-lookup color-scheme "editor.gutter.shadow")
           gutter-breakpoint-color (color-lookup color-scheme "editor.gutter.breakpoint")
@@ -4339,7 +4637,7 @@
       (let [^Rect line-numbers-rect (.line-numbers layout)
             ^double ascent (data/ascent glyph-metrics)
             drawn-line-count (.drawn-line-count layout)
-            dropped-line-count (.dropped-line-count layout)
+            dropped-line-count (folding/source-row layout (.dropped-line-count layout))
             source-line-count (count lines)
             indicator-offset 3.0
             indicator-diameter (- line-height indicator-offset indicator-offset)
@@ -4422,12 +4720,23 @@
                       {:keys [xs ys n]} (make-execution-marker-arrow x y w h)]
                   (.setFill gc gutter-execution-marker-frame-color)
                   (.fillPolygon gc xs ys n)))
-              (.setFill gc gutter-foreground-color)
+              (.setFill gc (if (contains? cursor-rows source-line-index) cursor-foreground-color gutter-foreground-color))
+              (when (contains? (:fold-regions-by-row layout) source-line-index)
+                (let [x (- (.x ^Rect (.canvas layout)) (/ line-height 2.0))
+                      cy (+ y (/ line-height 2.0))
+                      collapsed (contains? (:fold-collapsed-by-row layout) source-line-index)]
+                  (.setStroke gc gutter-foreground-color)
+                  (.setLineWidth gc 1.2)
+                  (if collapsed
+                    (do (.strokeLine gc (- x 2.0) (- cy 4.0) (+ x 2.0) cy)
+                        (.strokeLine gc (+ x 2.0) cy (- x 2.0) (+ cy 4.0)))
+                    (do (.strokeLine gc (- x 4.0) (- cy 2.0) x (+ cy 2.0))
+                        (.strokeLine gc x (+ cy 2.0) (+ x 4.0) (- cy 2.0))))))
               (.fillText gc (str (inc source-line-index))
                          (+ (.x line-numbers-rect) (.w line-numbers-rect))
                          (+ ascent y))
               (recur (inc drawn-line-index)
-                     (inc source-line-index)))))))))
+                     (folding/next-row layout source-line-index)))))))))
 
 (defn make-property-change-setter
   (^ChangeListener [node-id prop-kw]
@@ -4662,7 +4971,7 @@
                         (g/make-nodes
                           [view [CodeEditorView
                                  :canvas canvas
-                                 :color-scheme code-color-scheme
+                                 :color-scheme (if (= "source.lua" (:scope-name grammar)) lua-color-scheme code-color-scheme)
                                  :font-size (.getValue font-size-property)
                                  :font-name (.getValue font-name-property)
                                  :grammar grammar
@@ -4692,6 +5001,7 @@
                      :open-resource-fn open-resource-fn}]
 
     (g/user-data! view-node ::insight-prefs prefs)
+    (g/user-data! view-node ::local-highlight-cache (atom nil))
 
     ;; Canvas stretches to fit view, and updates properties in view node.
     (b/bind! (.widthProperty canvas) (.widthProperty canvas-pane))
@@ -4707,15 +5017,25 @@
                     {:undoable false}
                     (g/set-property view-node :canvas-height height))))
 
+    (ui/observe (.focusedProperty canvas)
+      (fn [_ _ focused]
+        (when (and (not focused) (g/node-exists? view-node))
+          (g/user-data! view-node ::navigation-request nil)
+          (g/user-data! view-node ::pointer-event nil)
+          (g/user-data! view-node ::navigation-press nil)
+          (clear-navigation-link! view-node))))
+
     ;; Configure canvas.
     (doto canvas
       (.setFocusTraversable true)
       (.setCursor javafx.scene.Cursor/TEXT)
       (.addEventFilter KeyEvent/KEY_PRESSED (ui/event-handler event (handle-key-pressed! view-node prefs event editable)))
+      (.addEventFilter KeyEvent/KEY_RELEASED (ui/event-handler event
+        (when-not (.isShortcutDown ^KeyEvent event) (clear-navigation-link! view-node))))
       (.addEventHandler MouseEvent/MOUSE_MOVED (ui/event-handler event (handle-mouse-moved! view-node prefs event)))
-      (.addEventHandler MouseEvent/MOUSE_PRESSED (ui/event-handler event (handle-mouse-pressed! view-node event)))
+      (.addEventHandler MouseEvent/MOUSE_PRESSED (ui/event-handler event (handle-navigation-mouse-pressed! view-node event)))
       (.addEventHandler MouseEvent/MOUSE_DRAGGED (ui/event-handler event (handle-mouse-moved! view-node prefs event)))
-      (.addEventHandler MouseEvent/MOUSE_RELEASED (ui/event-handler event (handle-mouse-released! view-node event)))
+      (.addEventHandler MouseEvent/MOUSE_RELEASED (ui/event-handler event (handle-navigation-mouse-released! view-node event)))
       (.addEventHandler MouseEvent/MOUSE_EXITED (ui/event-handler event (handle-mouse-exited! view-node event)))
       (.addEventHandler ScrollEvent/SCROLL (ui/event-handler event (handle-scroll! view-node (prefs/get prefs [:code :zoom-on-scroll]) event))))
 
@@ -4941,6 +5261,13 @@
                      (data/select-and-frame (get-property view-node :lines)
                                             (get-property view-node :layout)
                                             cursor-range)))
+  (when-let [{:keys [cursor-ranges scroll-x scroll-y]} (:navigation-location opts)]
+    (let [lines (get-property view-node :lines)
+          layout (get-property view-node :layout)]
+      (set-properties! view-node :navigation
+                       {:cursor-ranges (mapv (partial data/adjust-cursor-range lines) cursor-ranges)
+                        :scroll-x (data/limit-scroll-x layout scroll-x)
+                        :scroll-y (data/limit-scroll-y layout (count lines) scroll-y)})))
   (done-fn))
 
 (def ^:private positive-integer-coercer

@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <dbghelp.h>
+#include "automation-scene.h"
 
 static HANDLE simulator_file = INVALID_HANDLE_VALUE;
 static HANDLE simulator_mapping;
@@ -28,6 +29,59 @@ static LONG simulator_capturing;
 static uint32_t simulator_area[6];
 static uint32_t simulator_served;
 static LARGE_INTEGER simulator_last_capture;
+static HWND simulator_window;
+static POINT simulator_cursor;
+static BOOL simulator_capture;
+static uint32_t simulator_render_sequence;
+static int (WSAAPI *original_bind)(SOCKET, const struct sockaddr*, int);
+
+/* Owned automation processes must not expose the debug engine service on LAN. */
+static int WSAAPI SimulatorBind(SOCKET socket, const struct sockaddr* address, int length)
+{
+    if (simulator_data && simulator_data[268] == 0x41555431 && address
+        && address->sa_family == AF_INET && length >= sizeof(struct sockaddr_in))
+    {
+        struct sockaddr_in local;
+        memcpy(&local, address, sizeof(local));
+        if (local.sin_addr.s_addr == INADDR_ANY)
+            local.sin_addr.s_addr = 0x0100007F; /* 127.0.0.1, network byte order on Windows x64. */
+        return original_bind(socket, (const struct sockaddr*)&local, sizeof(local));
+    }
+    return original_bind(socket, address, length);
+}
+
+/* GLFW polls GetCursorPos even after receiving WM_MOUSEMOVE. The drawable is
+ * off-screen, so supply the forwarded client position in screen coordinates.
+ * Only the game window's thread uses this virtual pointer; the desktop cursor
+ * and any unrelated windows retain their normal Win32 behavior. */
+static BOOL SimulatorInputThread(void)
+{
+    return simulator_window && GetWindowThreadProcessId(simulator_window, NULL) == GetCurrentThreadId();
+}
+
+static BOOL WINAPI SimulatorGetCursorPos(LPPOINT point)
+{
+    if (!point || !SimulatorInputThread()) return GetCursorPos(point);
+    *point = simulator_cursor;
+    return ClientToScreen(simulator_window, point);
+}
+
+/* JavaFX owns capture for the visible viewport. A synthetic button message
+ * must not transfer desktop capture to the hidden game window during a drag. */
+static HWND WINAPI SimulatorSetCapture(HWND window)
+{
+    if (window != simulator_window || !SimulatorInputThread()) return SetCapture(window);
+    HWND previous = simulator_capture ? simulator_window : NULL;
+    simulator_capture = TRUE;
+    return previous;
+}
+
+static BOOL WINAPI SimulatorReleaseCapture(void)
+{
+    if (!SimulatorInputThread() || !simulator_capture) return ReleaseCapture();
+    simulator_capture = FALSE;
+    return TRUE;
+}
 
 /* Debug engines ship a matching PDB. Resolve the platform boundary before launch
  * instead of relying on an address or instruction pattern from a particular build. */
@@ -110,10 +164,17 @@ static BOOL WINAPI SimulatorSwapBuffers(HDC dc)
 {
     if (simulator_parent && WaitForSingleObject(simulator_parent, 0) != WAIT_TIMEOUT) ExitProcess(0);
     HWND window = WindowFromDC(dc);
+    if (simulator_data && simulator_data[268] == 0x41555431
+        && GetPropW(window, L"DefoldEditorGameShowRequested"))
+    {
+        simulator_data[269] = 1;
+        InterlockedExchange((volatile LONG*)&simulator_data[270], ++simulator_render_sequence);
+    }
     LARGE_INTEGER now, frequency;
     QueryPerformanceCounter(&now); QueryPerformanceFrequency(&frequency);
     uint32_t request = simulator_data ? ((volatile uint32_t*)simulator_data)[267] : 0;
     if (simulator_data && ((volatile uint32_t*)simulator_data)[265] && request != simulator_served
+        && AutomationSceneReady(request, simulator_render_sequence)
         && now.QuadPart - simulator_last_capture.QuadPart >= frequency.QuadPart / 60
         && GetPropW(window, L"DefoldEditorGameShowRequested")
         && !InterlockedExchange(&simulator_capturing, 1))
@@ -148,6 +209,14 @@ static BOOL WINAPI SimulatorSwapBuffers(HDC dc)
             {
                 simulator_data[1] = width; simulator_data[2] = height;
                 simulator_data[4] = GetCurrentProcessId(); simulator_data[11] = slot; ++simulator_data[3];
+                if (simulator_data[268] == 0x41555431)
+                {
+                    CaptureAutomationScene(simulator_render_sequence);
+                    simulator_data[272] = simulator_render_sequence;
+                    simulator_data[273] = simulator_data[271];
+                    simulator_data[274] = simulator_data[275];
+                    simulator_data[276] = request;
+                }
                 simulator_served = request;
                 simulator_last_capture = now;
                 UnlockFileEx(simulator_file, 0, MAXDWORD, MAXDWORD, &lock);
@@ -158,7 +227,7 @@ static BOOL WINAPI SimulatorSwapBuffers(HDC dc)
     return original_swap_buffers(dc);
 }
 
-/* Patch only this launched process's imported presentation function. No engine
+/* Patch only this launched process's imported presentation/input functions. No engine
  * SDK, game-source upload, or system-wide hook is involved. */
 static void InitSimulatorCapture(void)
 {
@@ -186,6 +255,7 @@ static void InitSimulatorCapture(void)
     IMAGE_DOS_HEADER* dos = (IMAGE_DOS_HEADER*)base;
     IMAGE_NT_HEADERS* nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
     InstallSimulatorSafeArea(base, nt);
+    if (simulator_data[268] == 0x41555431) InitAutomationScene(simulator_data, &simulator_render_sequence);
     DWORD rva = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
     if (!rva) return;
     IMAGE_IMPORT_DESCRIPTOR* descriptor = (IMAGE_IMPORT_DESCRIPTOR*)(base + rva);
@@ -196,15 +266,36 @@ static void InitSimulatorCapture(void)
         IMAGE_THUNK_DATA* addresses = (IMAGE_THUNK_DATA*)(base + descriptor->FirstThunk);
         for (; names->u1.AddressOfData; ++names, ++addresses)
         {
-            if (IMAGE_SNAP_BY_ORDINAL(names->u1.Ordinal)) continue;
-            IMAGE_IMPORT_BY_NAME* name = (IMAGE_IMPORT_BY_NAME*)(base + names->u1.AddressOfData);
-            if (strcmp((const char*)name->Name, "SwapBuffers") != 0) continue;
+            const char* imported_name;
+            if (IMAGE_SNAP_BY_ORDINAL(names->u1.Ordinal))
+            {
+                /* MSVC commonly imports Winsock bind by its stable ordinal, not by name. */
+                if (IMAGE_ORDINAL(names->u1.Ordinal) != 2
+                    || (_stricmp((const char*)(base + descriptor->Name), "WS2_32.dll") != 0
+                        && _stricmp((const char*)(base + descriptor->Name), "WSOCK32.dll") != 0)) continue;
+                imported_name = "bind";
+            }
+            else imported_name = (const char*)((IMAGE_IMPORT_BY_NAME*)(base + names->u1.AddressOfData))->Name;
+            PVOID replacement = NULL;
+            if (strcmp(imported_name, "SwapBuffers") == 0)
+                replacement = (PVOID)SimulatorSwapBuffers;
+            else if (strcmp(imported_name, "GetCursorPos") == 0)
+                replacement = (PVOID)SimulatorGetCursorPos;
+            else if (strcmp(imported_name, "SetCapture") == 0)
+                replacement = (PVOID)SimulatorSetCapture;
+            else if (strcmp(imported_name, "ReleaseCapture") == 0)
+                replacement = (PVOID)SimulatorReleaseCapture;
+            else if (strcmp(imported_name, "bind") == 0 && simulator_data[268] == 0x41555431)
+                replacement = (PVOID)SimulatorBind;
+            if (!replacement) continue;
             DWORD protection;
-            if (!VirtualProtect(&addresses->u1.Function, sizeof(void*), PAGE_READWRITE, &protection)) return;
-            original_swap_buffers = (BOOL (WINAPI*)(HDC))addresses->u1.Function;
-            InterlockedExchangePointer((PVOID volatile*)&addresses->u1.Function, (PVOID)SimulatorSwapBuffers);
+            if (!VirtualProtect(&addresses->u1.Function, sizeof(void*), PAGE_READWRITE, &protection)) continue;
+            if (replacement == (PVOID)SimulatorSwapBuffers)
+                original_swap_buffers = (BOOL (WINAPI*)(HDC))addresses->u1.Function;
+            if (replacement == (PVOID)SimulatorBind)
+                original_bind = (int (WSAAPI*)(SOCKET, const struct sockaddr*, int))addresses->u1.Function;
+            InterlockedExchangePointer((PVOID volatile*)&addresses->u1.Function, replacement);
             VirtualProtect(&addresses->u1.Function, sizeof(void*), protection, &protection);
-            return;
         }
     }
 }

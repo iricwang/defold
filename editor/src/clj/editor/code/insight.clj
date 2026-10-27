@@ -73,16 +73,31 @@
    "string" "string" "number" "constant.numeric" "operator" "keyword.operator"
    "decorator" "storage.type"})
 
-(defn semantic-tokens [{:keys [data legend]} lines]
+(defn semantic-tokens [{:keys [data legend lua]} lines]
   (loop [groups (into [] (partition-all 5) data) row 0 col 0 result {}]
-    (if-let [[delta-row delta-col length token-type _modifiers :as group] (first groups)]
+    (if-let [[delta-row delta-col length token-type modifiers :as group] (first groups)]
       (if (not= 5 (count group))
         result
         (let [row (+ (long row) (long delta-row))
               col (+ (if (zero? (long delta-row)) (long col) 0) (long delta-col))
               end (+ col (long length))
               line (get lines row)
-              scope (get semantic-scopes (get (:tokenTypes legend) token-type))]
+              type (get (:tokenTypes legend) token-type)
+              modifiers (into #{} (keep-indexed (fn [index name]
+                                                 (when (bit-test (long modifiers) index) name)))
+                              (:tokenModifiers legend))
+              scope (if lua
+                      (cond
+                        (and (contains? modifiers "defaultLibrary")
+                             (contains? #{"variable" "function" "method" "property" "namespace"} type)) "lua.std"
+                        (and (= type "variable") (contains? modifiers "global")) "lua.global"
+                        (and (= type "variable") (contains? modifiers "definition")) "lua.self"
+                        (= type "parameter") "lua.parameter"
+                        (= type "property") "lua.field"
+                        (= type "method") "lua.method"
+                        (= type "function") (if (contains? modifiers "global") "lua.global" "lua.local")
+                        :else (get semantic-scopes type))
+                      (get semantic-scopes type))]
           (recur (subvec groups 1) row col
                  (cond-> result
                    (and scope line (<= 0 col) (< col end) (<= end (count line)))

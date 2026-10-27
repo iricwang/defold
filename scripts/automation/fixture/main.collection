@@ -1,0 +1,5 @@
+name: "main"
+embedded_instances {
+  id: "gui"
+  data: "components { id: \"gui\" component: \"/main.gui\" }\n"
+}

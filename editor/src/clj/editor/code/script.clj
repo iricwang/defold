@@ -321,7 +321,8 @@
                                    "punctuation.definition.comment.lua"
                                    "comment.block.lua"
                                    "comment.line.double-dash.lua"
-                                   "comment.line.documentation.lua"}
+                                   "comment.line.documentation.lua"
+                                   "comment.line.documentation.lua.doc"}
                  :open-scopes {\' "punctuation.definition.string.quoted.begin.lua"
                                \" "punctuation.definition.string.quoted.begin.lua"
                                \[ "punctuation.definition.string.begin.lua"}
@@ -365,16 +366,19 @@
                :name "comment.block.lua"}
               {:begin #"(---\s*)(@\w+)"
                :begin-captures {1 {:name "punctuation.definition.comment.lua"}
-                                2 {:name "storage.type.annotation.lua"}}
+                                2 {:name "comment.lua.doc.tag"}}
                :end #"$"
-               :name "comment.line.documentation.lua"
+               :name "comment.line.documentation.lua.doc"
                :patterns [{:match #"\b(string|number|integer|boolean|table|function|nil|any|unknown|self)\b"
-                           :name "storage.type.lua"}
-                          {:match #"\b[A-Z][\w.]*\b" :name "entity.name.type.lua"}]}
+                           :name "comment.lua.doc.primitive"}
+                          {:match #"\b[A-Z][\w.]*\b" :name "comment.lua.doc.type"}]}
+              {:match #"(---?\s*region\b)(.*)"
+               :captures {1 {:name "comment.lua.doc"} 2 {:name "comment.lua.doc.region"}}}
+              {:match #"---.*" :name "comment.lua.doc"}
               {:captures {1 {:name "punctuation.definition.comment.lua"}}
                :match #"(--).*"
                :name "comment.line.double-dash.lua"}
-              {:match #"\b(and|or|not|break|do|else|for|if|elseif|return|then|repeat|while|until|end|function|local|in|goto)\b"
+              {:match #"\b(and|or|break|do|else|for|if|elseif|return|then|repeat|while|until|end|function|local|in|goto)\b"
                :name "keyword.control.lua"}
               {:match #"(?<![^.]\.|:)\b([A-Z_][0-9A-Z_]*|false|nil|true|math\.(pi|huge))\b|(?<![.])\.{3}(?!\.)"
                :name "constant.language.lua"}
@@ -388,7 +392,8 @@
                :name "support.function.any-method.lua"}
               {:match #"(?<=[^.]\.|:)\b([A-Za-z_]\w*)"
                :name "variable.other.lua"}
-              {:match #"\+|-|%|#|\*|\/|\^|==?|~=|<=?|>=?|(?<!\.)\.{2}(?!\.)"
+              {:match #"[,;]" :name "punctuation.separator.lua"}
+              {:match #"\bnot\b|\+|-|%|#|\*|\/|\^|==?|~=|<=?|>=?|(?<!\.)\.{2}(?!\.)"
                :name "keyword.operator.lua"}]})
 
 (def lua-code-opts {:code {:grammar lua-grammar}})

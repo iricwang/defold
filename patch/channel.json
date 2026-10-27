@@ -4,5 +4,5 @@
   "revision": 99,
   "version": "1.14.1-patch.99",
   "repository": "iricwang/defold",
-  "notes": "Rebuild current editor sources and synchronize local Spine game engine with runtime GUI picking"
+  "notes": "Expand Spine authoring, pose and compensation tools, multichannel curves and selection gestures; add Remote streaming and runtime GUI picking; integrate Lua tooling, background automation and Game preview improvements."
 }

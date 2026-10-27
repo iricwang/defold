@@ -142,6 +142,11 @@ final class WindowsGameWindow {
         if (window != null) User32.INSTANCE.PostMessageW(window, message, new Pointer(wparam), new Pointer(lparam));
     }
 
+    /** FIFO acknowledgement for an owned automation session; does not affect human Game input. */
+    void automationMarker(int sequence) {
+        post(0x8000 + 0x3D1, Integer.toUnsignedLong(sequence), 0);
+    }
+
     void input(int mouseX, int mouseY, int buttons, int wheel, byte[] keys, java.util.ArrayDeque<Integer> text) {
         if (window == null) return;
         long point = (mouseX & 0xffffL) | ((mouseY & 0xffffL) << 16);

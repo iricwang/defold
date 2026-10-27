@@ -38,7 +38,7 @@ public final class WindowsGameProcess extends Process {
     private final InputStream output;
     private final CompletableFuture<Integer> exit = new CompletableFuture<>();
 
-    private WindowsGameProcess(HANDLE process, long pid, HANDLE output) {
+    private WindowsGameProcess(HANDLE process, long pid, HANDLE output, HANDLE ownedJob) {
         this.process = process;
         this.pid = pid;
         this.processHandle = ProcessHandle.of(pid).orElse(null);
@@ -75,6 +75,7 @@ public final class WindowsGameProcess extends Process {
                 // Complete before closing so destroy() never uses a recycled handle.
                 exit.complete(code.getValue());
                 Kernel32.INSTANCE.CloseHandle(process);
+                if (ownedJob != null) Kernel32.INSTANCE.CloseHandle(ownedJob);
             }
         });
     }
@@ -148,6 +149,17 @@ public final class WindowsGameProcess extends Process {
             if (!Kernel32.INSTANCE.CreateProcessW(command.getFirst(), Native.toCharArray(line),
                     null, null, true, new DWORD(0x08000404), nativeEnvironment,
                     directory.getAbsolutePath(), startup, info)) throw failure("Start embedded game");
+            HANDLE ownedJob = null;
+            if ("1".equals(overrides.get("DM_EDITOR_AUTOMATION"))) {
+                var job = hookLibrary.getFunction("CreateOwnedGameJob").invokePointer(new Object[]{info.hProcess.getPointer()});
+                if (job == null) {
+                    Kernel32.INSTANCE.TerminateProcess(info.hProcess, 1);
+                    Kernel32.INSTANCE.CloseHandle(info.hThread);
+                    Kernel32.INSTANCE.CloseHandle(info.hProcess);
+                    throw new IOException("Cannot establish owned automation process lifetime");
+                }
+                ownedJob = new HANDLE(job);
+            }
             int guardError = startGuarded.invokeInt(
                     new Object[]{info.hProcess.getPointer(), info.hThread.getPointer()});
             if (guardError != 0) {
@@ -155,10 +167,11 @@ public final class WindowsGameProcess extends Process {
                 Kernel32.INSTANCE.TerminateProcess(info.hProcess, 1);
                 Kernel32.INSTANCE.CloseHandle(info.hThread);
                 Kernel32.INSTANCE.CloseHandle(info.hProcess);
+                if (ownedJob != null) Kernel32.INSTANCE.CloseHandle(ownedJob);
                 throw error;
             }
             Kernel32.INSTANCE.CloseHandle(info.hThread);
-            WindowsGameProcess result = new WindowsGameProcess(info.hProcess, info.dwProcessId.longValue(), read.getValue());
+            WindowsGameProcess result = new WindowsGameProcess(info.hProcess, info.dwProcessId.longValue(), read.getValue(), ownedJob);
             transferred = true;
             return result;
         } finally {

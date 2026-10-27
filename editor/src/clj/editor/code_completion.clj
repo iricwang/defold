@@ -51,6 +51,8 @@
 ;; Detail is rendered after :display-string less prominently, e.g. function
 ;; signature or type annotation
 (s/def ::detail string?)
+(s/def ::label-detail string?)
+(s/def ::label-description string?)
 (s/def :editor.code-completion.doc/type #{:markdown :plaintext})
 (s/def :editor.code-completion.doc/value string?)
 (s/def :editor.code-completion.doc/base-url #(instance? URI %))
@@ -66,7 +68,7 @@
              :kind vector?))
 (s/def ::completion
   (s/keys :req-un [::name ::display-string ::insert]
-          :opt-un [::type ::commit-characters ::detail ::doc ::additional-edits ::tags]))
+          :opt-un [::type ::commit-characters ::detail ::label-detail ::label-description ::doc ::additional-edits ::tags]))
 
 (defn make
   "Create a code completion
@@ -96,6 +98,8 @@
                           selected
     :detail               string with additional information to display in the
                           completion popup, e.g. type or symbol information
+    :label-detail         signature suffix supplied by the language server
+    :label-description    qualified name or type supplied by the language server
     :doc                  if a string, it is assumed to be a markdown
                           documentation, otherwise, it can be either:
                           - {:type :plaintext
@@ -105,7 +109,7 @@
                              :base-url URI} (optional URI for resolving links)
     :tags                 a set of tag keywords contextualizing the completion,
                           currently the only supported tag is :deprecated"
-  [name & {:keys [insert additional-edits display-string type commit-characters detail doc tags]}]
+  [name & {:keys [insert additional-edits display-string type commit-characters detail label-detail label-description doc tags]}]
   {:post [(s/assert ::completion %)]}
   (cond-> {:name name
            :display-string (or display-string name)
@@ -123,6 +127,10 @@
     (assoc :commit-characters commit-characters)
     detail
     (assoc :detail detail)
+    label-detail
+    (assoc :label-detail label-detail)
+    label-description
+    (assoc :label-description label-description)
     doc
     (assoc :doc (if (string? doc)
                   {:type :markdown :value doc}
