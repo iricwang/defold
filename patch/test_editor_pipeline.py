@@ -99,7 +99,7 @@ class EditorPipelineTest(unittest.TestCase):
                             source (java.io.File. original "x86_64-win32/lib/game_window_hook.dll")]
                         (try
                           (dotimes [i 40]
-                            (let [cache (java.io.File. {json.dumps(directory)} (str {json.dumps('cache 路径 ')} i))
+                            (let [cache (java.io.File. {json.dumps(directory)} (str {json.dumps('cache 路径 😀 ')} i))
                                   dll (java.io.File. cache "x86_64-win32/lib/game_window_hook.dll")]
                               (.mkdirs (.getParentFile dll))
                               (clojure.java.io/copy source dll)

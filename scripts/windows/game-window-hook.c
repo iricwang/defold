@@ -19,6 +19,7 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <tlhelp32.h>
+#include <psapi.h>
 #include "game-simulator.h"
 
 static HINSTANCE module;
@@ -157,16 +158,21 @@ __declspec(dllexport) void CALLBACK InstallGameWindowGuard(ULONG_PTR parameter)
     if (error) ExitThread(error);
 }
 
-static uintptr_t GameModuleBase(DWORD process_id, const WCHAR* name)
+static uintptr_t GameModuleBase(HANDLE process, const WCHAR* name)
 {
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, process_id);
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetProcessId(process));
     if (snapshot == INVALID_HANDLE_VALUE) return 0;
     MODULEENTRY32W entry = {0};
     entry.dwSize = sizeof(entry);
     uintptr_t base = 0;
     if (Module32FirstW(snapshot, &entry)) do
     {
-        if (!_wcsicmp(entry.szExePath, name)) { base = (uintptr_t)entry.modBaseAddr; break; }
+        /* Toolhelp can round-trip szExePath through the system ANSI code page,
+         * even for MODULEENTRY32W. Query the module's Unicode path directly. */
+        WCHAR module_path[32768];
+        DWORD length = K32GetModuleFileNameExW(process, entry.hModule, module_path, 32768);
+        if (length && length < 32768 && !_wcsicmp(module_path, name))
+        { base = (uintptr_t)entry.modBaseAddr; break; }
     } while (Module32NextW(snapshot, &entry));
     CloseHandle(snapshot);
     return base;
@@ -213,7 +219,7 @@ __declspec(dllexport) DWORD StartGuardedGameProcess(HANDLE process, HANDLE main_
      * terminates the failed child, which releases its remaining allocations. */
     if (error) return error;
     VirtualFreeEx(process, remote_path, 0, MEM_RELEASE);
-    uintptr_t remote_module = GameModuleBase(GetProcessId(process), path);
+    uintptr_t remote_module = GameModuleBase(process, path);
     if (!remote_module) return ERROR_MOD_NOT_FOUND;
     PAPCFUNC install = (PAPCFUNC)(remote_module +
         (uintptr_t)InstallGameWindowGuard - (uintptr_t)module);
