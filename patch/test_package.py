@@ -122,7 +122,7 @@ class PackageTest(unittest.TestCase):
             def gh(*args):
                 calls.append(args)
                 if args[0] == 'api':
-                    return json.dumps([[{'tag_name': 'patch-dev-4', 'draft': False}, {'tag_name': 'patch-dev', 'draft': False}]])
+                    return json.dumps([[{'tag_name': 'patch-dev-4', 'draft': False, 'assets': [{'name': f'Defold-{p}-state.json'} for p in manage.PLATFORMS]}, {'tag_name': 'patch-dev', 'draft': False}]])
                 return ''
             with patch.object(manage, 'channel', return_value=data), patch.object(manage, 'gh', side_effect=gh):
                 manage.publish(root, 'new')
@@ -138,14 +138,16 @@ class PackageTest(unittest.TestCase):
         import hashlib
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            data = {'schema': 1, 'revision': 6, 'version': 'patch.6', 'channel': 'dev', 'repository': 'owner/repo', 'notes': 'Next'}
+            data = {'schema': 1, 'revision': 7, 'version': 'patch.7', 'channel': 'dev', 'repository': 'owner/repo', 'notes': 'Next'}
             metadata = {**data, 'revision': 5, 'version': 'patch.5', 'commit': 'previous'}
             state_bytes = json.dumps({'platform': 'arm64-macos', 'metadata': metadata}).encode()
             manifest = {**metadata, 'states': {'arm64-macos': {'size': len(state_bytes), 'sha256': hashlib.sha256(state_bytes).hexdigest()}}}
             downloads = []
             def gh(*args):
                 if args[0] == 'api':
-                    return json.dumps([[{'tag_name': 'patch-dev-5', 'draft': False}]])
+                    return json.dumps([[{'tag_name': 'patch-dev-5', 'draft': False, 'assets': [{'name': 'Defold-arm64-macos-state.json'}]},
+                                        {'tag_name': 'patch-dev-6', 'draft': False, 'assets': [{'name': 'Defold-x86_64-win32-state.json'}]}]])
+                self.assertEqual('patch-dev-5', args[2])
                 name = args[args.index('--pattern') + 1]
                 downloads.append(name)
                 if name == 'manifest.json':
@@ -166,6 +168,51 @@ if __name__ == '__main__':
 
 # Migration publication is separate from the ordinary chain and refuses a divergent CI target.
 class MigrationPublicationTest(unittest.TestCase):
+    def test_platform_selection_validation(self):
+        self.assertEqual(list(manage.PLATFORMS), manage.selected_platforms({}))
+        self.assertEqual(['x86_64-win32'], manage.selected_platforms({'platforms': ['x86_64-win32']}))
+        for invalid in ([], ['unknown'], ['x86_64-win32'] * 2, 'x86_64-win32'):
+            with self.assertRaises(ValueError):
+                manage.selected_platforms({'platforms': invalid})
+
+    def test_windows_only_then_all_platform_publication(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = {'schema': 1, 'revision': 102, 'version': 'patch.102', 'channel': 'dev',
+                    'repository': 'owner/repo', 'notes': 'Windows Remote', 'platforms': ['x86_64-win32']}
+            releases = [{'tag_name': 'patch-dev-48', 'draft': False,
+                         'assets': [{'name': f'Defold-{p}-state.json'} for p in manage.PLATFORMS]}]
+            calls = []
+            def gh(*args):
+                calls.append(args)
+                return json.dumps([releases]) if args[0] == 'api' else ''
+            def artifact(platform, baseline):
+                manage.write_json(root / f'Defold-{platform}-state.json', {
+                    'platform': platform, 'metadata': {**data, 'commit': 'new'},
+                    'base_metadata': {'revision': baseline}, 'files': []})
+                with zipfile.ZipFile(root / f'Defold-{platform}-patch-{baseline}-to-{data["revision"]}.zip', 'w') as archive:
+                    archive.writestr('patch.json', json.dumps({'base_revision': baseline, 'revision': data['revision'], 'target': []}))
+            with patch.object(manage, 'channel', return_value=data), patch.object(manage, 'gh', side_effect=gh):
+                artifact('x86_64-win32', 48)
+                manage.publish(root, 'new')
+                manifest = json.loads((root / 'manifest.json').read_text())
+                self.assertEqual({'x86_64-win32'}, set(manifest['assets']))
+                self.assertTrue(manifest['previous'].endswith('/patch-dev-48/manifest.json'))
+                releases.append({'tag_name': 'patch-dev-102', 'draft': False,
+                                 'assets': [{'name': 'Defold-x86_64-win32-state.json'}]})
+                self.assertEqual('patch-dev-48', manage.platform_release(releases, 'arm64-macos')['tag_name'])
+                self.assertEqual('patch-dev-102', manage.platform_release(releases, 'x86_64-win32')['tag_name'])
+                data.update(revision=103, version='patch.103')
+                del data['platforms']
+                for platform in manage.PLATFORMS:
+                    artifact(platform, 102 if platform == 'x86_64-win32' else 48)
+                manage.publish(root, 'new')
+                manifest = json.loads((root / 'manifest.json').read_text())
+                self.assertEqual(set(manage.PLATFORMS), set(manifest['assets']))
+                self.assertEqual(48, manifest['assets']['arm64-macos']['base_revision'])
+                self.assertEqual(102, manifest['assets']['x86_64-win32']['base_revision'])
+                self.assertTrue(manifest['previous'].endswith('/patch-dev-102/manifest.json'))
+
     def test_compatibility_feed_is_separate_and_verified(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -187,7 +234,7 @@ class MigrationPublicationTest(unittest.TestCase):
             calls = []
             def gh(*args):
                 calls.append(args)
-                return json.dumps([[{'tag_name': 'patch-dev-27', 'draft': False}, {'tag_name': 'patch-dev', 'draft': False}]]) if args[0] == 'api' else ''
+                return json.dumps([[{'tag_name': 'patch-dev-27', 'draft': False, 'assets': [{'name': f'Defold-{p}-state.json'} for p in manage.PLATFORMS]}, {'tag_name': 'patch-dev', 'draft': False}]]) if args[0] == 'api' else ''
             with patch.object(manage, 'ROOT', root), patch.object(manage, 'channel', return_value=data), patch.object(manage, 'gh', side_effect=gh):
                 manage.publish(output, 'new')
                 regular = json.loads((output / 'manifest.json').read_text())

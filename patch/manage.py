@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare branch patch metadata and publish verified macOS packages."""
+"""Prepare branch patch metadata and publish verified desktop packages."""
 import argparse
 import hashlib
 import json
@@ -15,6 +15,28 @@ ROOT = Path(__file__).resolve().parents[1]
 PLATFORMS = ("arm64-macos", "x86_64-macos", "x86_64-win32")
 
 
+def selected_platforms(data):
+    platforms = data.get('platforms', list(PLATFORMS))
+    if (not isinstance(platforms, list) or not platforms
+            or any(p not in PLATFORMS for p in platforms)
+            or len(set(platforms)) != len(platforms)):
+        raise ValueError('Invalid patch platforms')
+    return platforms
+
+
+def platform_release(releases, platform):
+    """Find the last inventory for this platform, skipping other-platform releases."""
+    names = {f'Defold-{platform}-state.json', f'Defold-{platform}.zip'}
+    ordered = sorted(releases, key=lambda r: int(r['tag_name'].rsplit('-', 1)[1]), reverse=True)
+    for release in ordered:
+        if any(asset['name'] in names for asset in release['assets']):
+            return release
+    # Windows predates its first published inventory with a checked-in local baseline.
+    if platform == 'x86_64-win32' and ordered:
+        return ordered[0]
+    raise ValueError(f'No published baseline for {platform}')
+
+
 def channel():
     data = json.loads((ROOT / "patch/channel.json").read_text())
     if not (data["schema"] == 1 and type(data["revision"]) is int
@@ -24,6 +46,7 @@ def channel():
             and isinstance(data["version"], str) and data["version"].strip()
             and isinstance(data["notes"], str)):
         raise ValueError("Invalid patch/channel.json")
+    selected_platforms(data)
     return data
 
 
@@ -72,18 +95,22 @@ def publish(directory, commit):
                        key=lambda r: int(r["tag_name"].rsplit("-", 1)[1]), default=None)
         if not previous:
             raise ValueError("Patch-only publication requires an existing installation baseline")
-        previous_revision = int(previous["tag_name"].rsplit("-", 1)[1])
         base_url = f"https://github.com/{repo}/releases/download/{tag}"
         result = {**data, "installers": {}, "assets": {}, "states": {},
                   "previous": f"https://github.com/{repo}/releases/download/{previous['tag_name']}/manifest.json"}
         assets = []
-        for platform in PLATFORMS:
+        candidates = [r for r in releases if not r['draft']
+                      and re.fullmatch(re.escape(feed_tag) + r'-\d+', r['tag_name'])
+                      and int(r['tag_name'].rsplit('-', 1)[1]) < data['revision']]
+        for platform in selected_platforms(data):
+            baseline_release = platform_release(candidates, platform)
+            platform_revision = int(baseline_release['tag_name'].rsplit('-', 1)[1])
             state_name = f"Defold-{platform}-state.json"
             state = json.loads((directory / state_name).read_text())
-            base_revision = state.get('base_metadata', {}).get('revision', previous_revision)
-            if base_revision != previous_revision:
+            base_revision = state.get('base_metadata', {}).get('revision', platform_revision)
+            if base_revision != platform_revision:
                 initial = json.loads((ROOT / 'patch/baselines' / f'{platform}.json').read_text())
-                if (platform != 'x86_64-win32' or previous_revision >= initial['metadata']['revision']
+                if (platform != 'x86_64-win32' or platform_revision >= initial['metadata']['revision']
                         or state.get('base_metadata') != initial['metadata']):
                     raise ValueError('Unexpected platform baseline')
             name = f"Defold-{platform}-patch-{base_revision}-to-{data['revision']}.zip"
@@ -151,7 +178,9 @@ def prepare_base(directory, platform):
     pages = json.loads(gh('api', '--paginate', '--slurp', f'repos/{repo}/releases?per_page=100'))
     candidates = [release for page in pages for release in page if not release['draft']
                   and re.fullmatch(re.escape(prefix) + r'\d+', release['tag_name'])]
-    latest = max(candidates, key=lambda release: int(release['tag_name'].rsplit('-', 1)[1]))
+    if any(int(r['tag_name'].rsplit('-', 1)[1]) >= data['revision'] for r in candidates):
+        raise ValueError('Increment patch/channel.json before building a new patch')
+    latest = platform_release(candidates, platform)
     directory.mkdir(parents=True, exist_ok=True)
     tag = latest['tag_name']
     gh('release', 'download', tag, '--repo', repo, '--pattern', 'manifest.json', '--dir', str(directory), '--clobber')
@@ -223,6 +252,8 @@ def main():
         base_version = re.sub(r"-patch\.\d+$", "", data["version"])
         data["version"] = f'{base_version}-patch.{data["revision"]}'
         data["notes"] = args.notes.strip()
+        # A platform-only release is an explicit exception, not the next release's default.
+        data.pop('platforms', None)
         write_json(ROOT / "patch/channel.json", data)
         stage()
         print(data["version"])

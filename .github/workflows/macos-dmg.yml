@@ -21,18 +21,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      windows: ${{ steps.platforms.outputs.windows }}
+      macos: ${{ steps.platforms.outputs.macos }}
+      mac_matrix: ${{ steps.platforms.outputs.mac_matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: platforms
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, 'patch')
+          import manage
+          selected = manage.selected_platforms(manage.channel())
+          runners = {'arm64-macos': 'macos-26', 'x86_64-macos': 'macos-26-intel'}
+          matrix = [{'platform': p, 'runner': runners[p]} for p in selected if p in runners]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              print('windows=' + str('x86_64-win32' in selected).lower(), file=output)
+              print('macos=' + str(bool(matrix)).lower(), file=output)
+              print('mac_matrix=' + json.dumps({'include': matrix}), file=output)
+          PY
+
   build:
+    needs: plan
+    if: needs.plan.outputs.macos == 'true'
     name: Patch (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: arm64-macos
-            runner: macos-26
-          - platform: x86_64-macos
-            runner: macos-26-intel
+      matrix: ${{ fromJSON(needs.plan.outputs.mac_matrix) }}
     defaults:
       run:
         shell: bash
@@ -125,6 +147,8 @@ jobs:
           retention-days: 7
 
   build-windows:
+    needs: plan
+    if: needs.plan.outputs.windows == 'true'
     name: Patch (x86_64-win32)
     runs-on: windows-2025-vs2026
     timeout-minutes: 120
@@ -189,15 +213,16 @@ jobs:
 
           root = Path.cwd()
           editor = root / 'editor'
+          bash = str(Path(os.environ['ProgramFiles']) / 'Git/bin/bash.exe')
           shutil.move(editor / 'target/classes', editor / 'target/release-classes')
           env = dict(os.environ,
                      DM_BOB_JAR=str(Path(os.environ['DYNAMO_HOME']) / 'share/java/bob-editor.jar'),
                      DM_EDITOR_USE_BOB_PROTOCOLS='1', LEIN_HOME=str(editor / 'build/lein'))
           code = "(javafx.application.Platform/startup (fn [] (javafx.application.Platform/setImplicitExit false))) (require 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test 'editor.code.insight-test 'editor.lsp.defold-lua-test) (let [r (clojure.test/run-tests 'editor.docking-test 'editor.dock-windows-test 'editor.game-preview-test 'editor.code.insight-test 'editor.lsp.defold-lua-test)] (System/exit (if (zero? (+ (:fail r) (:error r))) 0 1)))"
-          subprocess.run(['bash', 'scripts/lein', 'with-profile', '+offline', 'run',
+          subprocess.run([bash, 'scripts/lein', 'with-profile', '+offline', 'run',
                           '-m', 'clojure.main', '-e', code], cwd=editor, env=env, check=True)
           with (root / 'tmp/emmy-test-classpath.txt').open('w') as output:
-              subprocess.run(['bash', 'scripts/lein', 'with-profile', '+offline', 'classpath'], cwd=editor, env=env, stdout=output, check=True)
+              subprocess.run([bash, 'scripts/lein', 'with-profile', '+offline', 'classpath'], cwd=editor, env=env, stdout=output, check=True)
           subprocess.run(['python', '-X', 'utf8', 'scripts/test_emmylua.py', '--server',
                           'resources/_unpack/x86_64-win32/bin/lsp/emmylua/emmylua_ls.exe',
                           '--bridge-classpath', '../tmp/emmy-test-classpath.txt'], cwd=editor, env=env, check=True)
@@ -215,8 +240,12 @@ jobs:
 
   publish-patch:
     name: Publish branch patch
-    needs: [build, build-windows]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/editor-docking-patch4' && github.repository == 'iricwang/defold'
+    needs: [plan, build, build-windows]
+    if: >-
+      always() && !cancelled() && needs.plan.result == 'success' &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
+      (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped') &&
+      github.event_name == 'push' && github.ref == 'refs/heads/codex/editor-docking-patch4' && github.repository == 'iricwang/defold'
     runs-on: ubuntu-latest
     permissions:
       contents: write

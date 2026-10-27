@@ -4,5 +4,6 @@
   "revision": 102,
   "version": "1.14.1-patch.102",
   "repository": "iricwang/defold",
+  "platforms": ["x86_64-win32"],
   "notes": "Fix Windows Remote touch delivery and release coordinates; add hardware H.264 encoding through Media Foundation with JPEG fallback; improve capture pacing and detached Game streaming performance."
 }
