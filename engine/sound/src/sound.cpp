@@ -31,6 +31,7 @@
 #include "sound_codec.h"
 #include "sound_private.h"
 #include "sound_dsp.h"
+#include "sound_remote.h"
 
 #include <math.h>
 
@@ -230,6 +231,7 @@ namespace dmSound
         dmSoundCodec::HCodecContext   m_CodecContext;
         DeviceType*                   m_DeviceType;
         HDevice                       m_Device;
+        dmSoundRemote::Capture        m_RemoteCapture;
         OpenDeviceParams              m_DeviceParams;
         dmThread::Thread              m_Thread;
         dmMutex::HMutex               m_Mutex;
@@ -576,6 +578,7 @@ namespace dmSound
         dmAtomicStore32(&sound->m_IsPaused, 0);
         dmAtomicStore32(&sound->m_Status, (int)RESULT_NOTHING_TO_PLAY);
 
+        dmSoundRemote::Open(&sound->m_RemoteCapture, sound->m_MixRate);
         sound->m_Thread = 0;
         sound->m_Mutex = 0;
         if (use_thread)
@@ -604,6 +607,7 @@ namespace dmSound
             dmMutex::Delete(sound->m_Mutex);
         }
 
+        dmSoundRemote::Close(&sound->m_RemoteCapture);
         PlatformFinalize();
 
         Result result = RESULT_OK;
@@ -2158,6 +2162,7 @@ namespace dmSound
             // resulting in a huge performance hit. Also, you'll fast forward the sounds.
             {
                 DM_PROFILE("QueueBuffer");
+                dmSoundRemote::Write(&sound->m_RemoteCapture, sound->m_OutBuffers[buffer_index], frame_count, sound->m_UseFloatOutput, sound->m_NormalizeFloatOutput);
                 queue_result = sound->m_DeviceType->m_Queue(sound->m_Device, sound->m_OutBuffers[buffer_index], frame_count);
             }
 

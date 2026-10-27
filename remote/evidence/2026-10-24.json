@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-24",
+  "platform": "Apple Silicon macOS; Metal",
+  "engine": {
+    "debug_build": "passed",
+    "release_build": "passed",
+    "remote_tests": 6,
+    "remote_assertions": 117,
+    "service_regression_tests": 6
+  },
+  "host": {
+    "tests": 9,
+    "passed": true,
+    "udp_discovery": true
+  },
+  "runtime": {
+    "transport": "local HTTP feed (loopback)",
+    "cycles": [
+      {
+        "pid": 1587,
+        "distinct_frames": 3,
+        "frame_responses": 3,
+        "start_idempotent": true,
+        "touch_edges": true,
+        "stopped": true
+      },
+      {
+        "pid": 1596,
+        "distinct_frames": 3,
+        "frame_responses": 3,
+        "start_idempotent": true,
+        "touch_edges": true,
+        "stopped": true
+      }
+    ],
+    "passed": true
+  },
+  "apk": {
+    "file": "android/build/DefoldRemote-debug.apk",
+    "package": "com.defold.remote",
+    "version": "0.1.0",
+    "min_sdk": 26,
+    "target_sdk": 36,
+    "size": 20883,
+    "sha256": "77b7e4fe27f6edac4d166c4fb443d7193f3ee3373dc1b6931e32f3b912b103f7",
+    "signature_v2": true,
+    "signature_v3": true,
+    "device_tested": false
+  },
+  "patch": {
+    "base": 86,
+    "revision": 88,
+    "feed": "local HTTP http://127.0.0.1:18390/manifest.json",
+    "download_sha256_verified": true,
+    "exact_baseline_verified": true,
+    "target_files_verified": 168,
+    "restart_verified": true,
+    "application": "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch/Defold.app",
+    "installed_user_application_modified": false
+  },
+  "patch_regression": {
+    "tests": 28,
+    "passed": 17,
+    "skipped": 11
+  },
+  "limitations": [
+    "No Android device or Wi-Fi end-to-end test",
+    "Windows/Linux/Intel macOS not built or tested",
+    "PNG video only, up to 15 FPS, max edge 960",
+    "Single finger maps to left mouse; no audio or hardware video encoding",
+    "User installation unchanged; patch verified on a test copy; no GitHub publication"
+  ]
+}

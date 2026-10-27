@@ -154,3 +154,35 @@
                {:id "target" :x 4.0 :y 6.0}]
         solved (geometry/solve-ik bones [{:bones ["a" "b"] :target "target"}])]
     (is (coll/every? geometry/finite-number? (endpoint solved "b")))))
+
+;; Authoring Pose supports chains longer than the runtime two-bone constraint,
+;; preserving bind offsets and unrelated bones even for unreachable targets.
+(deftest authoring-pose-chain-test
+  (let [bones [{:id "a" :x 0.0 :y 0.0 :rotation 10.0 :length 10.0}
+               {:id "b" :parent "a" :x 10.0 :y 0.0 :rotation 20.0 :length 10.0}
+               {:id "c" :parent "b" :x 10.0 :y 0.0 :rotation -10.0 :length 10.0}
+               {:id "other" :x 50.0 :y 0.0}]
+        chain ["a" "b" "c"]
+        solved (geometry/solve-pose-chain bones chain [15.0 15.0])]
+    (is (near? [15.0 15.0] (endpoint solved "c")))
+    (is (= (mapv #(dissoc % :rotation) bones) (mapv #(dissoc % :rotation) solved)))
+    (is (= (peek bones) (peek solved)))
+    (let [unreachable (geometry/solve-pose-chain bones chain [100.0 0.0])]
+      (is (< 29.9 (first (endpoint unreachable "c")) 30.01)))
+    (is (thrown? clojure.lang.ExceptionInfo (geometry/solve-pose-chain bones ["a" "c"] [1.0 2.0])))
+    (is (thrown? clojure.lang.ExceptionInfo (geometry/solve-pose-chain bones chain [Double/NaN 0.0])))))
+
+;; Region compensation preserves topology and rejects unrepresentable shear
+;; instead of silently converting an image into a mesh.
+(deftest region-compensation-type-test
+  (let [region {:type "region" :path "/image.png" :width 20.0 :height 30.0 :x 5.0 :y 7.0 :rotation 15.0}
+        old (geometry/local-transform {:rotation 30.0 :scale-x 2.0 :scale-y 2.0})
+        new (geometry/local-transform {:rotation 75.0 :scale-x 3.0 :scale-y 3.0})
+        result (geometry/compensate-region region old new)]
+    (is (= "region" (:type result)))
+    (is (= "/image.png" (:path result)))
+    (is (nil? (:vertices result)))
+    (is (near? (geometry/compose-transforms old (geometry/local-transform region))
+               (geometry/compose-transforms new (geometry/local-transform result))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (geometry/compensate-region region old (geometry/local-transform {:rotation 70.0 :scale-x 3.0 :scale-y 1.0}))))))

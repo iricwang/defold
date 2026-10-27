@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include "audio.h"
 
 static const uint32_t HEADER = 4096;
 static uint32_t g_Slot = 2048 * 2048 * 4;
@@ -116,6 +117,7 @@ static dmExtension::Result AppInitialize(dmExtension::AppParams* params)
         return dmExtension::RESULT_INIT_ERROR;
     }
     g_Data = (uint32_t*)data;
+    dmEditorRemoteAudio::Open(path);
     if (g_Simulator) g_Data[13] = 1;
     g_Hid = (dmHID::HContext)ContextRegistryGet(ExtensionAppParamsGetContextRegistry(params), "hid");
     Method order = class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:));
@@ -185,6 +187,7 @@ static dmExtension::Result Update(dmExtension::Params*)
 
 static dmExtension::Result AppFinalize(dmExtension::AppParams*)
 {
+    dmEditorRemoteAudio::Close();
     if (g_Data)
     {
         method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), g_OrderWindow);

@@ -2,4 +2,4 @@ name: DefoldEditorGameBridge
 platforms:
   osx:
     context:
-      frameworks: [AppKit]
+      frameworks: [AppKit, AVFoundation]

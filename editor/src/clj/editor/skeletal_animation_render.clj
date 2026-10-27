@@ -14,6 +14,7 @@
 
 (ns editor.skeletal-animation-render
   "Batched textured slot meshes. No per-triangle clipping or offscreen canvases."
+  (:require [util.coll :as coll])
   (:import [javafx.application ConditionalFeature Platform]
            [javafx.scene AmbientLight DepthTest Group ParallelCamera SceneAntialiasing SubScene]
            [javafx.scene.control Label]
@@ -75,11 +76,13 @@
     {:mesh mesh :material material :view view :last-image ::unset}))
 
 (defn- update-slot! [{:keys [^TriangleMesh mesh ^PhongMaterial material] :as entry}
-                     {:keys [points uvs triangles ^Image image opacity] :as slot}]
+                     {:keys [points uvs triangles ^Image image opacity tint] :or {tint [1.0 1.0 1.0]} :as slot}]
   (when-not (= (count points) (count uvs))
     (throw (ex-info "Mesh UV count must match its vertex count." {:slot (:id slot)})))
   (when-not (and (number? opacity) (Double/isFinite (double opacity)) (<= 0.0 (double opacity) 1.0))
     (throw (ex-info "Mesh opacity must be between zero and one." {:slot (:id slot)})))
+  (when-not (and (= 3 (count tint)) (coll/every? #(and (number? %) (Double/isFinite (double %)) (<= 0.0 (double %) 1.0)) tint))
+    (throw (ex-info "Mesh tint needs three finite channels between zero and one." {:slot (:id slot)})))
   (when (not= points (:last-points entry))
     (.setAll (.getPoints mesh) (point-buffer points)))
   (when (not= uvs (:last-uvs entry))
@@ -88,16 +91,16 @@
     (.setAll (.getFaces mesh) (face-buffer triangles (count points))))
   (when (not (identical? image (:last-image entry)))
     (.setDiffuseMap material image))
-  (when (or (not (identical? image (:last-image entry))) (not= opacity (:last-opacity entry)))
+  (when (or (not (identical? image (:last-image entry))) (not= opacity (:last-opacity entry)) (not= tint (:last-tint entry)))
     ;; Material alpha multiplies texture alpha directly on the GPU. Node opacity
     ;; can create an intermediate surface, defeating the batched mesh renderer.
-    (.setDiffuseColor material (if image (Color/color 1.0 1.0 1.0 opacity) (Color/web "#584455" opacity))))
-  (assoc entry :last-points points :last-uvs uvs :last-triangles triangles :last-image image :last-opacity opacity))
+    (.setDiffuseColor material (if image (Color/color (tint 0) (tint 1) (tint 2) opacity) (Color/web "#584455" opacity))))
+  (assoc entry :last-points points :last-uvs uvs :last-triangles triangles :last-image image :last-opacity opacity :last-tint tint))
 
 (defn make-renderer
   "Return {:node :render!}. render! accepts width, height and ordered slots:
   {:id :points [[screen-x screen-y] ...] :uvs [[u v] ...]
-   :triangles [[a b c] ...] :image Image-or-nil :opacity 0..1}.
+   :triangles [[a b c] ...] :image Image-or-nil :opacity 0..1 :tint [r g b]}.
   Calls belong on the JavaFX thread. Missing hardware support displays an
   explicit message; it never falls back to costly per-triangle Canvas clips."
   []

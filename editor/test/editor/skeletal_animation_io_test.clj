@@ -20,6 +20,7 @@
             [editor.fs :as fs]
             [editor.skeletal-animation-data :as data]
             [editor.skeletal-animation-io :as skeletal-io]
+            [editor.skeletal-animation-spine :as spine]
             [util.coll :as coll])
   (:import [java.awt.image BufferedImage]
            [java.io File]
@@ -104,4 +105,79 @@
           (is (thrown? clojure.lang.ExceptionInfo
                        (skeletal-io/export-project! (data/new-document "hero") project "../outside"))))
         (is (not (.exists (io/file directory "outside")))))
+      (finally (fs/delete-directory! directory {:fail :silently})))))
+
+;; Native metadata must survive ordinary document save/reload without turning
+;; Spine JSON keys into keywords or discarding unselected skeletons.
+(deftest native-project-metadata-save-reload-test
+  (let [directory (fs/create-temp-directory! "skeleton-native-metadata")]
+    (try
+      (let [{:keys [project file]} (fixture! directory)
+            source (json/read-str (slurp file))
+            skeletons [{:name "edited" :source source}
+                       {:name "untouched" :source (assoc source "events" {"marker" {"string" "keep"}})}]
+            imported (:document (skeletal-io/read-native-skeleton! file project skeletons "edited"))
+            saved (data/read-json (data/write-json imported))
+            saved (data/update-bone saved "root" {:x 25})
+            exported (atom nil)]
+        (with-redefs [spine/write-project! (fn [skeletons _ _] (reset! exported skeletons))]
+          (skeletal-io/write-native-project! saved project (io/file directory "new.spine") {:timeout-seconds 1}))
+        (is (= ["edited" "untouched"] (mapv :name @exported)))
+        (is (= 25 (get-in @exported [0 :source "bones" 0 "x"])))
+        (is (= {"marker" {"string" "keep"}} (get-in @exported [1 :source "events"])))
+        (is (= (.getCanonicalPath project) (get-in @exported [0 :source "skeleton" "images"])))
+        (is (= saved (data/read-json (data/write-json saved))))
+        (is (thrown? clojure.lang.ExceptionInfo (skeletal-io/read-native-skeleton! file project skeletons "missing"))))
+      (finally (fs/delete-directory! directory {:fail :silently})))))
+
+;; The exported model must select the same nondefault skin as the authoring
+;; preview; otherwise a valid export silently displays a different character.
+(deftest exported-model-selects-active-skin-test
+  (let [directory (fs/create-temp-directory! "skeleton-export-skin")]
+    (try
+      (let [{:keys [project file]} (fixture! directory)
+            document (data/duplicate-skin (:document (skeletal-io/read-spine-file! file project)) "winter")
+            result (skeletal-io/export-project! document project "generated")
+            model (slurp (io/file project (subs (:spinemodel result) 1)))
+            source (json/read-str (slurp (io/file project (subs (:spinejson result) 1))))]
+        (is (string/includes? model "skin: \"winter\""))
+        (is (= ["base" "winter"] (mapv #(get % "name") (get source "skins")))))
+      (finally (fs/delete-directory! directory {:fail :silently})))))
+
+;; Independent Save As must create and reopen real native projects without ever
+;; launching the installed Spine bridge or replacing the user's original file.
+(deftest independent-native-save-edit-reopen-test
+  (let [directory (fs/create-temp-directory! "skeleton-independent")]
+    (try
+      (with-redefs [spine/write-project! (fn [& _] (throw (AssertionError. "Native save invoked Spine")))]
+        (let [{:keys [project file]} (fixture! directory)
+              original-document (:document (skeletal-io/read-spine-file! file project))
+              target (io/file directory "independent.spine")
+              _ (skeletal-io/write-independent-project! original-document project target)
+              original-bytes (slurp target :encoding "ISO-8859-1")
+              decoded (skeletal-io/read-independent-project! target)
+              imported (:document (skeletal-io/read-independent-skeleton! target project decoded "hero"))
+              edited (data/update-bone imported "root" {:x 42.0})
+              edited-target (io/file directory "edited.spine")]
+          (is (= ["hero"] (mapv :name (:skeletons decoded))))
+          (is (= "independent-4.2.43" (get-in imported [:native-project :codec])))
+          (is (= 0 (get-in imported [:native-project :selected-index])))
+          (skeletal-io/write-independent-project! edited project edited-target)
+          (is (= 42.0 (get-in (skeletal-io/read-independent-project! edited-target) [:skeletons 0 :source "bones" 0 "x"])))
+          (is (= original-bytes (slurp target :encoding "ISO-8859-1")))
+          (is (thrown? clojure.lang.ExceptionInfo (skeletal-io/write-independent-project! edited project target)))
+          (is (= original-bytes (slurp target :encoding "ISO-8859-1")))
+          (is (thrown? clojure.lang.ExceptionInfo (skeletal-io/write-independent-project! edited project (io/file directory "wrong.json"))))))
+      (finally (fs/delete-directory! directory {:fail :silently})))))
+
+;; Unsupported native features fail before creating a target instead of silently
+;; dropping content or delegating conversion to an installed external editor.
+(deftest independent-native-failure-is-atomic-test
+  (let [directory (fs/create-temp-directory! "skeleton-independent-reject")]
+    (try
+      (let [document (assoc (data/new-document "unsupported") :spine-source (json/write-str {"bones" [{"name" "root"}] "animations" {"default" {"futureTimeline" [{"time" 0.0}]}}}))
+            target (io/file directory "output" "unsupported.spine")]
+        (is (thrown? clojure.lang.ExceptionInfo (skeletal-io/write-independent-project! document directory target)))
+        (is (not (.exists target)))
+        (is (not (.exists (.getParentFile target)))))
       (finally (fs/delete-directory! directory {:fail :silently})))))

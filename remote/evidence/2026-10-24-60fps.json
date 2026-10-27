@@ -1,0 +1,151 @@
+{
+  "date": "2026-10-24",
+  "revision": 89,
+  "apk_version": "0.2.0",
+  "apk_version_code": 2,
+  "apk_sha256": "01393db80728e43bce40b9aa8018bb8cb3449263900db7e001f3bd148e026816",
+  "apk_signature_schemes": [
+    "v2",
+    "v3"
+  ],
+  "download_url_verified": "http://192.168.101.33:8393/DefoldRemote.apk",
+  "target_fps": 60,
+  "frame_dimensions": [
+    640,
+    360
+  ],
+  "performance": {
+    "transport": "local HTTP feed (loopback)",
+    "cycles": [
+      {
+        "pid": 5574,
+        "distinct_frames": 3,
+        "frame_responses": 3,
+        "unique_stream_frames": 600,
+        "stream_fps": 59.90226006462792,
+        "start_idempotent": true,
+        "touch_edges": true,
+        "stopped": true
+      },
+      {
+        "pid": 5603,
+        "distinct_frames": 3,
+        "frame_responses": 3,
+        "unique_stream_frames": 600,
+        "stream_fps": 59.90075125109677,
+        "start_idempotent": true,
+        "touch_edges": true,
+        "stopped": true
+      }
+    ],
+    "passed": true
+  },
+  "host_unit_tests": {
+    "passed": 10
+  },
+  "engine_remote_tests": {
+    "passed": 7,
+    "assertions": 122
+  },
+  "incremental_update": {
+    "base": 88,
+    "revision": 89,
+    "feed": "local HTTP http://127.0.0.1:18390/manifest.json",
+    "download_sha256_verified": true,
+    "exact_baseline_verified": true,
+    "target_files_verified": 168,
+    "restart_verified": true,
+    "application": "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-89/Defold.app",
+    "installed_user_application_modified": false,
+    "old": [
+      {
+        "id": "remote-patch-check",
+        "ns": "user",
+        "session": "3e60ad01-db96-4e10-ae4f-4dac1825e179",
+        "value": "nil"
+      },
+      {
+        "id": "remote-patch-check",
+        "ns": "user",
+        "session": "3e60ad01-db96-4e10-ae4f-4dac1825e179",
+        "value": "\"{:pid 5383, :version \\\"1.14.1-patch.88\\\", :windows [\\\"Defold 1.14.1-patch.88\\\"]}\""
+      },
+      {
+        "id": "remote-patch-check",
+        "session": "3e60ad01-db96-4e10-ae4f-4dac1825e179",
+        "status": [
+          "done"
+        ]
+      }
+    ],
+    "new": [
+      {
+        "id": "remote-patch-check",
+        "ns": "user",
+        "session": "f27d4b5e-5a1b-4b94-adb1-bcea930cfd0e",
+        "value": "nil"
+      },
+      {
+        "id": "remote-patch-check",
+        "ns": "user",
+        "session": "f27d4b5e-5a1b-4b94-adb1-bcea930cfd0e",
+        "value": "\"{:pid 5396, :version \\\"1.14.1-patch.89\\\", :windows [\\\"Defold 1.14.1-patch.89\\\"]}\""
+      },
+      {
+        "id": "remote-patch-check",
+        "session": "f27d4b5e-5a1b-4b94-adb1-bcea930cfd0e",
+        "status": [
+          "done"
+        ]
+      }
+    ]
+  },
+  "live": {
+    "host": "192.168.101.33",
+    "port": 8390,
+    "discovery": {
+      "service": "defold-remote",
+      "protocol": 1,
+      "name": "applemima1111deMac-mini.local",
+      "port": 8390
+    },
+    "changing_frames": 2,
+    "editor": [
+      {
+        "id": "remote-ready",
+        "ns": "user",
+        "session": "c3768956-d53b-4aec-abae-bb7935a00618",
+        "value": "nil"
+      },
+      {
+        "id": "remote-ready",
+        "ns": "user",
+        "session": "c3768956-d53b-4aec-abae-bb7935a00618",
+        "value": "nil"
+      },
+      {
+        "id": "remote-ready",
+        "ns": "user",
+        "session": "c3768956-d53b-4aec-abae-bb7935a00618",
+        "value": "\"{:version \\\"1.14.1-patch.89\\\", :windows [\\\"Defold Remote Smoke - Defold 1.14.1-patch.89\\\"]}\""
+      },
+      {
+        "id": "remote-ready",
+        "session": "c3768956-d53b-4aec-abae-bb7935a00618",
+        "status": [
+          "done"
+        ]
+      }
+    ],
+    "scope": "Computer using its own LAN address; previous APK phone video confirmed by user; new APK display FPS pending"
+  },
+  "android_phone": {
+    "previous_apk_video_confirmed_by_user": true,
+    "updated_apk_display_fps_verified": false
+  },
+  "limitations": [
+    "PNG encoding and Wi-Fi throughput can reduce FPS on complex frames",
+    "No audio or H.264 hardware encoding",
+    "Windows, Linux and Intel macOS not built in this update"
+  ]
+}

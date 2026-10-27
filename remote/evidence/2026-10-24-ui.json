@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-24",
+  "editor_version": "1.14.1-patch.91",
+  "apk_version": "0.3.0",
+  "apk_version_code": 3,
+  "platform_tested": "macOS Apple Silicon",
+  "apk": {
+    "bytes": 303573,
+    "sha256": "7eda42dd8f84b3d60de5b10963120d5a18a161228024a98eca456fb91ad0884d",
+    "download_matches_build": true,
+    "signature_verified": [
+      "v2",
+      "v3"
+    ]
+  },
+  "stream": {
+    "game": "Defold Remote Smoke",
+    "protocol": 2,
+    "frames": 600,
+    "unique_frames": 600,
+    "fps": 58.509339293579536,
+    "input_accepted": true,
+    "authentication_checked": true,
+    "malformed_json_rejected": true,
+    "transport": "HTTP to 127.0.0.1",
+    "left_running": true
+  },
+  "logic": {
+    "assertions_passed": 31,
+    "actual_editor_qr_decoded": true,
+    "clj_kondo_errors": 0,
+    "clj_kondo_warnings": 0
+  },
+  "catalog": {
+    "two_registered_games": true,
+    "cross_game_auth_rejected": true,
+    "first_game_kept_running": true,
+    "second_game_used_test_start_callback": true
+  },
+  "restart": {
+    "credential_survived_editor_restart": true,
+    "game_id_survived_restart": true,
+    "multicast_discovery": true
+  },
+  "incremental_updates": [
+    {
+      "base": 89,
+      "revision": 90,
+      "feed": "local HTTP http://127.0.0.1:18390/manifest.json",
+      "download_sha256_verified": true,
+      "exact_baseline_verified": true,
+      "target_files_verified": 168,
+      "restart_verified": true,
+      "application": "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-90/Defold.app",
+      "installed_user_application_modified": false
+    },
+    {
+      "base": 90,
+      "revision": 91,
+      "feed": "local HTTP http://127.0.0.1:18390/manifest.json",
+      "download_sha256_verified": true,
+      "exact_baseline_verified": true,
+      "target_files_verified": 168,
+      "restart_verified": true,
+      "application": "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-patch-91/Defold.app",
+      "installed_user_application_modified": false
+    }
+  ],
+  "screenshots": [
+    "tmp/remote-live-91/game-panel.png",
+    "tmp/remote-live-91/pairing.png"
+  ],
+  "limitations": [
+    "Android physical-device camera, layout, lifecycle, external-app launch and gestures await user acceptance.",
+    "FPS measured over computer loopback, not Android display.",
+    "Windows, Linux and Intel macOS not verified.",
+    "Original /Applications/Defold.app unchanged; updated task application is running.",
+    "Local HTTP patch feed verified; not published to GitHub."
+  ]
+}

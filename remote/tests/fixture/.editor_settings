@@ -1,0 +1,13 @@
+{
+  :code {
+    :breakpoints [
+    ]
+  }
+  :scene {
+    :resource-settings {
+    }
+  }
+  :window {
+    :floating-layout "{:version 1, :docked {:layout {:left [:assets], :right [:outline :inspector :preview], :bottom [:tools], :center [:game]}, :trees {:left {:tabs [:assets]}, :right {:axis :vertical, :children [{:tabs [:outline]} {:tabs [:inspector]} {:tabs [:preview]}], :dividers [0.33252623083131555 0.6658595641646489]}, :bottom {:tabs [:tools]}, :center {:tabs [:game]}}, :positions {\"main-split\" [0.11453488372093024], \"workbench-split\" [0.908642786723628], \"center-split\" [0.8910411622276029], \"scene-game-split\" [0.5123099203475743]}, :hidden #{}}, :windows []}"
+  }
+}

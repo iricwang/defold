@@ -61,3 +61,17 @@ void dmEngineService::InitProfiler(HEngineService engine_service, dmResource::HF
 void dmEngineService::InitState(HEngineService engine_service, EngineState* state)
 {	
 }
+
+bool dmEngineService::GetRemoteInput(HEngineService, RemoteInput*)
+{
+    return false;
+}
+
+void* dmEngineService::GetRemoteFrameBuffer(HEngineService, uint32_t, uint32_t)
+{
+    return 0;
+}
+
+void dmEngineService::PublishRemoteFrame(HEngineService)
+{
+}

@@ -403,12 +403,22 @@ namespace dmHttpServer
                 return "Insufficient Storage";
             case 200:
                 return "OK";
+            case 204:
+                return "No Content";
+            case 400:
+                return "Bad Request";
+            case 403:
+                return "Forbidden";
             case 404:
                 return "Not Found";
             case 405:
                 return "Method Not Allowed";
+            case 413:
+                return "Content Too Large";
             case 414:
                 return "URI Too Long";
+            case 429:
+                return "Too Many Requests";
             case 500:
                 return "Internal Server Error";
             case 302:
@@ -536,13 +546,15 @@ namespace dmHttpServer
 
     Result Send(const Request* request, const void* data, uint32_t data_length)
     {
+        InternalRequest* internal_req = (InternalRequest*) request->m_Internal;
+        if (internal_req->m_StatusCode == 204 && data_length != 0)
+            return RESULT_ERROR_INVAL;
         // Do not send empty chunks as the empty chunk is
         // interpreted as the last and terminating chunk
         if (data_length == 0) {
             return RESULT_OK;
         }
 
-        InternalRequest* internal_req = (InternalRequest*) request->m_Internal;
         if (internal_req->m_Connection->m_Response && internal_req->m_Connection->m_Response->m_Read)
         {
             return RESULT_ERROR_INVAL;

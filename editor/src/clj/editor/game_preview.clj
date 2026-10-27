@@ -13,7 +13,8 @@
 ;; specific language governing permissions and limitations under the License.
 
 (ns editor.game-preview
-  (:require [dynamo.graph :as g]
+  (:require [clojure.string :as string]
+            [dynamo.graph :as g]
             [editor.defold-project :as project]
             [editor.error-reporting :as error-reporting]
             [editor.gui-preview :as gui-preview]
@@ -21,6 +22,7 @@
             [editor.scene :as scene]
             [editor.ui :as ui])
   (:import [com.defold.editor GamePreview]
+           [java.util.function Consumer]
            [javafx.scene.image ImageView]))
 
 (defn render-size [panel-width panel-height aspect]
@@ -42,12 +44,30 @@
           (recur (subvec remaining 1) (conj retained candidate) next-bytes)))
       retained)))
 
+(defn gui-source-path
+  "Validate a runtime GUI resource path before resolving it in the current project."
+  [path]
+  (when (and (string? path)
+             (string/starts-with? path "/")
+             (string/ends-with? path ".guic")
+             (not (re-find #"[\\\x00]|(?:^|/)\.\.?(?:/|$)" path)))
+    (subs path 0 (dec (count path)))))
+
 (defn attach! [^GamePreview pane app-view project]
   (let [{:keys [render! dispose!]} (scene/make-game-preview-renderer)
         previous (volatile! nil)
         selected (volatile! nil)
         images (volatile! [])
         last-error (volatile! nil)]
+    (.setRevealGuiResource
+      pane
+      (reify Consumer
+        (accept [_ path]
+          (when-let [source-path (gui-source-path path)]
+            (when-let [resource-node (project/get-resource-node project source-path)]
+              (let [target (g/node-value resource-node :resource)]
+                (when (resource/exists? target)
+                  (ui/run-command (.getNode pane) :file.show-in-assets target))))))))
     (.setIdleRenderer
       pane
       (fn []

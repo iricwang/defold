@@ -2056,6 +2056,20 @@ bail:
                     has_input = dmHID::Update(engine->m_HidContext);
                     dmEditorGame::Input(engine->m_HidContext);
                     has_input = has_input || dmEditorGame::Active();
+                    dmEngineService::RemoteInput remote_input;
+                    if (dmEngineService::GetRemoteInput(engine->m_EngineService, &remote_input))
+                    {
+                        dmHID::HMouse mouse = dmHID::GetMouse(engine->m_HidContext, 0);
+                        uint32_t width = dmGraphics::GetWindowWidth(engine->m_GraphicsContext);
+                        uint32_t height = dmGraphics::GetWindowHeight(engine->m_GraphicsContext);
+                        if (width && height)
+                        {
+                            dmHID::SetMousePosition(mouse, remote_input.m_X * (width - 1) / 65535,
+                                                   remote_input.m_Y * (height - 1) / 65535);
+                            dmHID::SetMouseButton(mouse, dmHID::MOUSE_BUTTON_LEFT, remote_input.m_Pressed);
+                            has_input = true;
+                        }
+                    }
                 }
 
                 // Check if we should skip this frame
@@ -2242,6 +2256,19 @@ bail:
                     dmExtension::PostRender(ext_params);
                 }
 
+                if (!dmGraphics::GetWindowStateParam(engine->m_GraphicsContext, WINDOW_STATE_ICONIFIED))
+                {
+                    uint32_t width = dmGraphics::GetWindowWidth(engine->m_GraphicsContext);
+                    uint32_t height = dmGraphics::GetWindowHeight(engine->m_GraphicsContext);
+                    void* frame = dmEngineService::GetRemoteFrameBuffer(engine->m_EngineService, width, height);
+                    if (frame)
+                    {
+                        dmGraphics::RenderTargetBindingParams params = {};
+                        dmGraphics::SetRenderTarget(engine->m_GraphicsContext, 0, params);
+                        dmGraphics::ReadPixels(engine->m_GraphicsContext, 0, 0, width, height, frame, width * height * 4);
+                        dmEngineService::PublishRemoteFrame(engine->m_EngineService);
+                    }
+                }
                 dmEditorGame::Frame(engine->m_GraphicsContext);
                 dmGraphics::Flip(engine->m_GraphicsContext);
 

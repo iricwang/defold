@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 88,
-  "version": "1.14.1-patch.88",
+  "revision": 99,
+  "version": "1.14.1-patch.99",
   "repository": "iricwang/defold",
-  "notes": "Merge native GUI RectTransform and skeletal animation authoring with EmmyLua IDEA navigation, completion documentation, Lua highlighting/folding, Game preview and background MCP tools; ship matching local Windows engine and compiler."
+  "notes": "Expand Spine authoring, pose and compensation tools, multichannel curves and selection gestures; add Remote streaming and runtime GUI picking; integrate Lua tooling, background automation and Game preview improvements."
 }

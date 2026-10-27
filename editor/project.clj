@@ -56,6 +56,7 @@
                      [org.slf4j/jul-to-slf4j                      "1.7.22"]
                      [commons-io/commons-io                       "2.4"]
                      [commons-codec/commons-codec                 "1.10"]
+                     [com.google.zxing/core                      "3.5.3"]
                      [org.projectodd.shimdandy/shimdandy-api      "1.2.0"]
                      [org.projectodd.shimdandy/shimdandy-impl     "1.2.0"]
                      [potemkin                                    "0.4.3"]

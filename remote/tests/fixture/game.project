@@ -1,0 +1,11 @@
+[project]
+title = Defold Remote Smoke
+[bootstrap]
+main_collection = /main.collectionc
+[input]
+game_binding = /game.input_bindingc
+[display]
+width = 640
+height = 360
+[engine]
+run_while_iconified = 1

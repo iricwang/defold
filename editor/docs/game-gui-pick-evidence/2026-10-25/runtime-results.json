@@ -1,0 +1,37 @@
+[
+  {
+    "case": "overlap-front",
+    "expected": "/front.guic",
+    "actual": "/front.guic"
+  },
+  {
+    "case": "back-only",
+    "expected": "/back.guic",
+    "actual": "/back.guic"
+  },
+  {
+    "case": "disabled-front",
+    "expected": "/back.guic",
+    "actual": "/back.guic"
+  },
+  {
+    "case": "transparent-front",
+    "expected": "/back.guic",
+    "actual": "/back.guic"
+  },
+  {
+    "case": "clip-inside",
+    "expected": "/front.guic",
+    "actual": "/front.guic"
+  },
+  {
+    "case": "clip-outside",
+    "expected": "",
+    "actual": ""
+  },
+  {
+    "case": "empty",
+    "expected": "",
+    "actual": ""
+  }
+]

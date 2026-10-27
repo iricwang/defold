@@ -55,6 +55,7 @@ python patch/manage.py prepare-base --directory tmp/patch-base --platform="$plat
 python scripts/build.py install_ext check_sdk --platform="$platform"
 python scripts/build.py build_engine --platform="$platform" --skip-tests -- --skip-build-tests
 python scripts/build.py build_bob --platform="$platform" --skip-tests --keep-bob-uncompressed
+bash remote/native/build-macos.sh "${platform%-macos}"
 repo_root="$PWD"
 version="$(cat VERSION)"
 (cd editor && python scripts/bundle.py --platform="$platform" --channel=dev \
