@@ -1,9 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 102,
-  "version": "1.14.1-patch.102",
+  "revision": 103,
+  "version": "1.14.1-patch.103",
   "repository": "iricwang/defold",
-  "platforms": ["x86_64-win32"],
-  "notes": "Fix Windows Remote touch delivery and release coordinates; add hardware H.264 encoding through Media Foundation with JPEG fallback; improve capture pacing and detached Game streaming performance."
+  "notes": "Local macOS rebuild of remote 61ce841dbe: synchronize engine, Bob and editor with current upstream and fork improvements."
 }
