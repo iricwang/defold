@@ -1,4 +1,4 @@
-# 后台 Game MCP（Windows 已验证，macOS 适配待实机验证）
+# 后台 Game MCP（Windows 已验证，macOS 基础运行已验证）
 
 本版提供可运行的 **stdio MCP 服务 + 独立 Java 会话 worker + 本地编译的原生桥接**。
 后台游戏使用真实 OpenGL 渲染，不需要打开 Game 面板，不移动桌面鼠标，不激活窗口。
@@ -67,8 +67,11 @@ python -X utf8 scripts/windows/editor.py automation-build --app X:\Programs\Defo
 已经加入 macOS `.app` 路径、Apple Silicon/Intel 平台选择、无 Windows 启动标志的 worker、
 原生共享输入确认与帧标记，以及独立的本地 `kqueue` 退出监护/loopback 监听 guard。
 Python 依赖中的 `pywin32` 只在 Windows 安装。
-**当前仅通过 Windows 回归和平台逻辑单测；尚未在 Mac 编译或运行，不作为已验证交付。**
-按本轮要求先继续 Windows，Mac 上的隐藏窗口、输入、安全区、guard 加载及崩溃回收均待实机验证。
+2026-10-28 在 Apple Silicon Mac、Xcode 26.6、Java 25 与本地 patch.103 上完成基础实机验证：
+构建 worker 和 guard，MCP 初始化并列出 49 个工具，发现正在运行的编辑器，隔离构建测试项目，
+启动隐藏游戏、获取 640×480 PNG、派发点击并收到 HID 输入确认，导出报告并正常停止会话。
+42 项协议／资源／场景基础测试通过。证据保存在 `tmp/local-update/mcp-smoke-2/verified.json`。
+这不是完整的 macOS 功能验收；安全区、异常崩溃回收和同帧节点几何仍需独立验证。
 
 Mac 必须使用从本 checkout **本地编译**的 debug GPU `dmengine`，不能使用官方旧引擎、
 `dmengine_headless` 或 `dmengine_release`。含 Spine 等扩展的工程也需要对应的本地定制引擎。

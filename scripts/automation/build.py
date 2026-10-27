@@ -113,7 +113,7 @@ def prepare_macos(app, output, engine, target):
     engine = Path(engine).resolve()
     validate_macos_engine(engine)
     architecture = target.removesuffix('-macos')
-    subprocess.run(['lipo', '-verify_arch', architecture, str(engine)], check=True)
+    subprocess.run(['lipo', str(engine), '-verify_arch', architecture], check=True)
     output = Path(output or ROOT / 'tmp/automation-runtime').resolve()
     output.mkdir(parents=True, exist_ok=True)
     source = ROOT / 'editor/src/java/com/defold/editor'
