@@ -51,6 +51,7 @@
             [editor.code.util :refer [split-lines]]
             [editor.defold-project :as project]
             [editor.dialogs :as dialogs]
+            [editor.editor-tab :as editor-tab]
             [editor.editor-extensions.coerce :as coerce]
             [editor.editor-extensions.node-types :as node-types]
             [editor.error-reporting :as error-reporting]
@@ -95,7 +96,8 @@
            [java.util BitSet Collection]
            [java.util.concurrent ConcurrentHashMap]
            [java.util.regex Pattern]
-           [javafx.beans.binding ObjectBinding]
+           [javafx.beans Observable]
+           [javafx.beans.binding Bindings ObjectBinding]
            [javafx.beans.property Property SimpleBooleanProperty SimpleDoubleProperty SimpleObjectProperty SimpleStringProperty]
            [javafx.beans.value ChangeListener]
            [javafx.event Event EventHandler]
@@ -2459,11 +2461,11 @@
                             (fuzzy-choices/make-matched-text-flow-cljfx
                               label matching-indices
                               :deprecated (contains? (:tags completion) :deprecated))
-                             {:fx/type fx.region/lifecycle :h-box/hgrow :always}
-                             {:fx/type fx.label/lifecycle
-                              :style {:-fx-opacity 0.65}
-                              :text description
-                              :min-width :use-pref-size}]}
+                            {:fx/type fx.region/lifecycle :h-box/hgrow :always}
+                            {:fx/type fx.label/lifecycle
+                             :style {:-fx-opacity 0.65}
+                             :text description
+                             :min-width :use-pref-size}]}
        :on-mouse-clicked (fn [_]
                            (accept-suggestion! view-node (code-completion/insertion completion)))})
     {}))
@@ -2614,8 +2616,8 @@
                     align-right (or (<= pref-doc-width right-space)
                                     (<= left-space right-space))
                     doc-width (max 0.0 (if align-right
-                                        (min pref-doc-width right-space)
-                                        (min pref-doc-width left-space)))
+                                         (min pref-doc-width right-space)
+                                         (min pref-doc-width left-space)))
                     doc (:doc selected-completion)]
                 {:fx/type fxui/with-popup-window
                  :desc {:fx/type fx/ext-get-ref :ref :content}
@@ -2885,15 +2887,15 @@
           (when (lsp/has-language-servers-running-for-resource? lsp resource)
             (g/user-data! view-node ::link-request request)
             (lsp/goto-definition! lsp resource cursor
-              (fn [results]
-                (fx/on-fx-thread
-                  (when (and (g/node-exists? view-node)
-                             (= request (g/user-data view-node ::link-request))
-                             (= lines (get-property view-node :lines))
-                             (.isFocused ^Canvas (get-property view-node :canvas))
-                             (pos? (count results)))
-                    (set-properties! view-node nil {:navigation-link request})
-                    (ui/set-cursor (get-property view-node :canvas) javafx.scene.Cursor/HAND)))))))))))
+                                  (fn [results]
+                                    (fx/on-fx-thread
+                                      (when (and (g/node-exists? view-node)
+                                                 (= request (g/user-data view-node ::link-request))
+                                                 (= lines (get-property view-node :lines))
+                                                 (.isFocused ^Canvas (get-property view-node :canvas))
+                                                 (pos? (count results)))
+                                        (set-properties! view-node nil {:navigation-link request})
+                                        (ui/set-cursor (get-property view-node :canvas) javafx.scene.Cursor/HAND)))))))))))
 
 (defn handle-key-pressed! [view-node prefs ^KeyEvent event editable]
   (when (.isShortcutDown event)
@@ -3003,7 +3005,7 @@
                                 range))
                             cursor-ranges)]
         (set-properties! view-node :navigation {:collapsed-folds (conj collapsed region)
-                                               :cursor-ranges relocated})))))
+                                                :cursor-ranges relocated})))))
 
 (defn handle-mouse-pressed! [view-node ^MouseEvent event]
   (let [^Node target (.getTarget event)
@@ -3019,18 +3021,18 @@
                       (fold-at-position layout (get-property view-node :lines) (.getX event) (.getY event)))]
       (toggle-fold! view-node region)
       (set-properties! view-node (if (< 1 (.getClickCount event)) :selection :navigation)
-                     (data/mouse-pressed (get-property view-node :lines)
-                                         (get-property view-node :cursor-ranges)
-                                         (get-property view-node :regions)
-                                         layout
-                                         (get-property view-node :minimap-layout)
-                                         button
-                                         (.getClickCount event)
-                                         (.getX event)
-                                         (.getY event)
-                                         (.isAltDown event)
-                                         (.isShiftDown event)
-                                         (.isShortcutDown event))))
+                       (data/mouse-pressed (get-property view-node :lines)
+                                           (get-property view-node :cursor-ranges)
+                                           (get-property view-node :regions)
+                                           layout
+                                           (get-property view-node :minimap-layout)
+                                           button
+                                           (.getClickCount event)
+                                           (.getX event)
+                                           (.getY event)
+                                           (.isAltDown event)
+                                           (.isShiftDown event)
+                                           (.isShortcutDown event))))
 
     (when (and (= button :secondary)
                (not (data/in-gutter? layout (.getX event))))
@@ -3124,8 +3126,8 @@
                   (request-lsp-hover! view-node lsp resource-node hover-character-cursor evaluation-context))))))))
   (g/user-data! view-node ::pointer-event event)
   (update-navigation-link! view-node (and (.isShortcutDown event)
-                                        (not (.isAltDown event))
-                                        (not (.isShiftDown event))))
+                                          (not (.isAltDown event))
+                                          (not (.isShiftDown event))))
   (refresh-mouse-cursor! view-node event))
 
 (defn handle-mouse-released! [view-node ^MouseEvent event]
@@ -3434,8 +3436,8 @@
           refresh! (fn [query]
                      (let [filtered (symbol-navigation/matching-results results query)]
                        (.setText count-label
-                         ((deref localization) (localization/message "code.navigation.results"
-                           {"count" (count filtered) "total" (count results)})))
+                                 ((deref localization) (localization/message "code.navigation.results"
+                                                                             {"count" (count filtered) "total" (count results)})))
                        (popup/update-list-view! list-view 560.0 filtered 0)))
           accept! (fn [result]
                     (when result
@@ -3451,17 +3453,17 @@
                         (dispose [_])))
       (ui/observe (.textProperty search) (fn [_ _ value] (refresh! value)))
       (.setOnKeyPressed content
-        (ui/event-handler event
-          (condp = (.getCode ^KeyEvent event)
-            KeyCode/ENTER (do (.consume event) (accept! (first (ui/selection list-view))))
-            KeyCode/ESCAPE (do (.consume event) (.hide popup))
-            KeyCode/DOWN (when (= search (.getTarget event))
-                           (.consume event) (.requestFocus list-view))
-            nil)))
+                        (ui/event-handler event
+                          (condp = (.getCode ^KeyEvent event)
+                            KeyCode/ENTER (do (.consume event) (accept! (first (ui/selection list-view))))
+                            KeyCode/ESCAPE (do (.consume event) (.hide popup))
+                            KeyCode/DOWN (when (= search (.getTarget event))
+                                           (.consume event) (.requestFocus list-view))
+                            nil)))
       (.setOnMouseClicked list-view
-        (ui/event-handler event
-          (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
-            (accept! (ui/cell-item-under-mouse event)))))
+                          (ui/event-handler event
+                            (when (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
+                              (accept! (ui/cell-item-under-mouse event)))))
       (let [[width height] (refresh! "")
             anchor (pref-suggestions-popup-position canvas width (+ (double height) 65.0) (cursor-bottom layout lines cursor))]
         (.show popup (.getWindow (.getScene canvas)) (.getX anchor) (.getY anchor)))
@@ -3600,8 +3602,8 @@
                (cond
                  (zero? (count results))
                  (notifications/show! (workspace/notifications (resource/workspace resource))
-                   {:type :info :id ::no-symbol-results
-                    :message (localization/message "code.navigation.no-results")})
+                                      {:type :info :id ::no-symbol-results
+                                       :message (localization/message "code.navigation.no-results")})
 
                  (and (not references) (symbol-navigation/at-definition? resource cursor results))
                  (request-symbol-navigation! view-node open-resource-fn cursor true)
@@ -3642,19 +3644,19 @@
                               (let [layout (get-property view-node :layout)
                                     result (data/apply-edits lines (get-property view-node :regions) selections (:edits edit) layout)]
                                 (set-properties! view-node nil
-                                  (-> result
-                                      (assoc :cursor-ranges [(:selection edit)])
-                                      (data/frame-cursor layout))))))
+                                                 (-> result
+                                                     (assoc :cursor-ranges [(:selection edit)])
+                                                     (data/frame-cursor layout))))))
                           (.requestFocus canvas)))]
           (hide-hover! view-node)
           (hide-suggestions! view-node)
           (.addAll (.getItems popup)
-            ^java.util.Collection
-            (mapv (fn [action]
-                    (doto (MenuItem. (localization (localization/message (str "code.intentions." (name action)))))
-                      (.setUserData action)
-                      (.setOnAction (ui/event-handler _ (accept! action)))))
-                  actions))
+                   ^java.util.Collection
+                   (mapv (fn [action]
+                           (doto (MenuItem. (localization (localization/message (str "code.intentions." (name action)))))
+                             (.setUserData action)
+                             (.setOnAction (ui/event-handler _ (accept! action)))))
+                         actions))
           ;; The opening key can be forwarded to the new window in the same
           ;; dispatch. Consume modified Enter before the native menu handles it.
           (.addEventFilter popup KeyEvent/KEY_PRESSED
@@ -3682,14 +3684,14 @@
     (resource/file-resource? (g/node-value (get-property view-node :resource-node evaluation-context) :resource evaluation-context)))
   (run [view-node user-data open-resource-fn]
     (request-symbol-navigation! view-node open-resource-fn
-      (or (:cursor user-data) (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges)))) false)))
+                                (or (:cursor user-data) (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges)))) false)))
 
 (handler/defhandler :code.show-references :code-view
   (enabled? [view-node evaluation-context]
     (resource/file-resource? (g/node-value (get-property view-node :resource-node evaluation-context) :resource evaluation-context)))
   (run [view-node open-resource-fn]
     (request-symbol-navigation! view-node open-resource-fn
-      (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges))) true)))
+                                (data/CursorRange->Cursor (first (get-property view-node :cursor-ranges))) true)))
 
 (defn- flatten-document-symbols [document-symbols]
   (coll/into-> document-symbols []
@@ -4376,8 +4378,8 @@
                                                 (data/->Cursor (min (dec (count lines)) (data/last-visible-row layout))
                                                                (count (get lines (min (dec (count lines)) (data/last-visible-row layout)) ""))))]
           (doseq [[kind preference] [[:signature-help :signature-help]
-                                   [:semantic-tokens :semantic-highlighting]
-                                   [:inlay-hints :inlay-hints]]]
+                                     [:semantic-tokens :semantic-highlighting]
+                                     [:inlay-hints :inlay-hints]]]
             (let [enabled (prefs/get preferences [:code preference])
                   selection (case kind :signature-help cursor :inlay-hints visible-range nil)
                   key [lines selection enabled server-state]
@@ -4389,12 +4391,12 @@
                 ;; Keep the last result while the debounced replacement is in flight.
                 ;; Clearing first makes all hints and semantic colors blink on each keystroke.
                 (g/transact {:undoable false}
-                            (if enabled
-                              (g/update-property view-node :code-insights update kind
-                                                 (fn [value]
-                                                   (insight/pending-value kind value (first (:key previous)) lines
-                                                                          (second (:key previous)) selection)))
-                              (g/update-property view-node :code-insights dissoc kind)))
+                  (if enabled
+                    (g/update-property view-node :code-insights update kind
+                                       (fn [value]
+                                         (insight/pending-value kind value (first (:key previous)) lines
+                                                                (second (:key previous)) selection)))
+                    (g/update-property view-node :code-insights dissoc kind)))
                 (when enabled
                   (let [timer
                         (ui/->future
@@ -4405,25 +4407,25 @@
                                 lsp resource kind (if (= kind :signature-help) (data/->CursorRange cursor cursor) visible-range)
                                 (fn [result]
                                   (future
-                                  (let [lua (= "lua" (resource/language resource))
-                                        converted (case kind
-                                                    :signature-help (insight/signature result)
-                                                    :semantic-tokens (let [tokens (insight/semantic-tokens (assoc result :lua lua) lines)]
-                                                                       (if lua
-                                                                         (let [cached @local-highlight-cache
-                                                                               spans (if (= lines (:lines cached))
-                                                                                       (:spans cached)
-                                                                                       (lua-highlight/local-spans lines))]
-                                                                           (reset! local-highlight-cache {:lines lines :spans spans})
-                                                                           (lua-highlight/merge-spans spans tokens lines))
-                                                                         tokens))
-                                                    :inlay-hints (insight/line-hints result lines))]
-                                    (ui/run-later
-                                      (when (and (g/node-exists? view-node)
-                                                 (= key (:key (g/user-data view-node state-key)))
-                                                 (= lines (g/node-value view-node :lines)))
-                                        (g/transact {:undoable false}
-                                                    (g/update-property view-node :code-insights assoc kind converted)))))))))))]
+                                    (let [lua (= "lua" (resource/language resource))
+                                          converted (case kind
+                                                      :signature-help (insight/signature result)
+                                                      :semantic-tokens (let [tokens (insight/semantic-tokens (assoc result :lua lua) lines)]
+                                                                         (if lua
+                                                                           (let [cached @local-highlight-cache
+                                                                                 spans (if (= lines (:lines cached))
+                                                                                         (:spans cached)
+                                                                                         (lua-highlight/local-spans lines))]
+                                                                             (reset! local-highlight-cache {:lines lines :spans spans})
+                                                                             (lua-highlight/merge-spans spans tokens lines))
+                                                                           tokens))
+                                                      :inlay-hints (insight/line-hints result lines))]
+                                      (ui/run-later
+                                        (when (and (g/node-exists? view-node)
+                                                   (= key (:key (g/user-data view-node state-key)))
+                                                   (= lines (g/node-value view-node :lines)))
+                                          (g/transact {:undoable false}
+                                            (g/update-property view-node :code-insights assoc kind converted)))))))))))]
                     (g/user-data! view-node state-key {:key key :timer timer})))))))))))
 
 (defn- signature-popup-view [{:keys [canvas-repaint-info signature cursor view-node]}]
@@ -4458,8 +4460,8 @@
       (set-properties! view-node nil
                        (merge {:collapsed-folds effective}
                               (data/scroll-to-any-cursor (get-property view-node :layout)
-                                                        (get-property view-node :lines)
-                                                        (get-property view-node :cursor-ranges))))))
+                                                         (get-property view-node :lines)
+                                                         (get-property view-node :cursor-ranges))))))
 
   ;; Since the elapsed time updates at 60 fps, we store it as user-data to avoid transaction churn.
   (g/user-data! view-node :elapsed-time elapsed-time)
@@ -5003,27 +5005,36 @@
     (g/user-data! view-node ::insight-prefs prefs)
     (g/user-data! view-node ::local-highlight-cache (atom nil))
 
-    ;; Canvas stretches to fit view, and updates properties in view node.
-    (b/bind! (.widthProperty canvas) (.widthProperty canvas-pane))
-    (b/bind! (.heightProperty canvas) (.heightProperty canvas-pane))
-    (ui/observe (.widthProperty canvas)
+    ;; Hidden docked tabs release canvas GPU resources. Detached documents keep
+    ;; rendering even when their home tab is no longer selected.
+    (b/bind! (.widthProperty canvas)
+             (Bindings/createDoubleBinding
+               (fn canvas-width [] (if (.get (editor-tab/rendering-active-property tab)) (.getWidth canvas-pane) 0.0))
+               (into-array Observable [(editor-tab/rendering-active-property tab)
+                                       (.widthProperty canvas-pane)])))
+    (b/bind! (.heightProperty canvas)
+             (Bindings/createDoubleBinding
+               (fn canvas-height [] (if (.get (editor-tab/rendering-active-property tab)) (.getHeight canvas-pane) 0.0))
+               (into-array Observable [(editor-tab/rendering-active-property tab)
+                                       (.heightProperty canvas-pane)])))
+    (ui/observe (.widthProperty canvas-pane)
                 (fn [_ _ width]
                   (g/transact
                     {:undoable false}
                     (g/set-property view-node :canvas-width width))))
-    (ui/observe (.heightProperty canvas)
+    (ui/observe (.heightProperty canvas-pane)
                 (fn [_ _ height]
                   (g/transact
                     {:undoable false}
                     (g/set-property view-node :canvas-height height))))
 
     (ui/observe (.focusedProperty canvas)
-      (fn [_ _ focused]
-        (when (and (not focused) (g/node-exists? view-node))
-          (g/user-data! view-node ::navigation-request nil)
-          (g/user-data! view-node ::pointer-event nil)
-          (g/user-data! view-node ::navigation-press nil)
-          (clear-navigation-link! view-node))))
+                (fn [_ _ focused]
+                  (when (and (not focused) (g/node-exists? view-node))
+                    (g/user-data! view-node ::navigation-request nil)
+                    (g/user-data! view-node ::pointer-event nil)
+                    (g/user-data! view-node ::navigation-press nil)
+                    (clear-navigation-link! view-node))))
 
     ;; Configure canvas.
     (doto canvas
@@ -5031,7 +5042,7 @@
       (.setCursor javafx.scene.Cursor/TEXT)
       (.addEventFilter KeyEvent/KEY_PRESSED (ui/event-handler event (handle-key-pressed! view-node prefs event editable)))
       (.addEventFilter KeyEvent/KEY_RELEASED (ui/event-handler event
-        (when-not (.isShortcutDown ^KeyEvent event) (clear-navigation-link! view-node))))
+                                               (when-not (.isShortcutDown ^KeyEvent event) (clear-navigation-link! view-node))))
       (.addEventHandler MouseEvent/MOUSE_MOVED (ui/event-handler event (handle-mouse-moved! view-node prefs event)))
       (.addEventHandler MouseEvent/MOUSE_PRESSED (ui/event-handler event (handle-navigation-mouse-pressed! view-node event)))
       (.addEventHandler MouseEvent/MOUSE_DRAGGED (ui/event-handler event (handle-mouse-moved! view-node prefs event)))
@@ -5063,6 +5074,7 @@
     (ui/observe (.selectedProperty tab)
                 (fn [_ _ became-selected?]
                   (when became-selected?
+                    (g/user-data! view-node :canvas-repaint-info nil)
                     ;; Must run-later here since we're not part of the Scene when we observe the property change.
                     ;; Also note that we don't want to steal focus from the inactive tab pane, if present.
                     (ui/run-later

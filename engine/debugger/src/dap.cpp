@@ -77,7 +77,16 @@ namespace dmDebugger
         }
         uint32_t old = Size();
         if (m_Data.Capacity() < old + size + 1)
-            m_Data.SetCapacity(old + size + 1024);
+        {
+            // Quoted Lua values append a few bytes at a time. Linear growth
+            // repeatedly copies megabytes and can stall a paused debug session.
+            uint32_t capacity = m_Data.Capacity() ? m_Data.Capacity() * 2 : 1024;
+            if (capacity < old + size + 1)
+                capacity = old + size + 1;
+            if (capacity > MAX_QUEUE_SIZE + 1)
+                capacity = MAX_QUEUE_SIZE + 1;
+            m_Data.SetCapacity(capacity);
+        }
         m_Data.SetSize(old + size);
         memcpy(m_Data.Begin() + old, data, size);
         m_Data.Begin()[Size()] = 0;

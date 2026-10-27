@@ -18,7 +18,11 @@ ENGINE = '65f2d1f306c461d2793359ea9aee94f20398c54c'
 
 
 def add_editor_debugger(source, destination):
-    """Include the current editor's Lua debugger in both Bob resource views."""
+    """Preserve native DAP builds; supply Lua modules only for legacy editors."""
+    start = (ROOT / 'editor/bundle-resources/_defold/debugger/start.lua').read_text(encoding='utf-8')
+    if 'builtins.scripts.debugger' not in start:
+        shutil.copyfile(source, destination)
+        return
     modules = {
         f'builtins/scripts/{name}.lua':
             (ROOT / f'engine/engine/content/builtins/scripts/{name}.lua').read_bytes()

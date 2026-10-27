@@ -58,7 +58,8 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "Use static MSVC run
 # Compiler options for MSVC or clang-cl
 if(_DEFOLD_MSVC_LIKE)
     # /Oy- Disable frame pointer omission (keeps stack traces reliable)
-    target_compile_options(defold_sdk INTERFACE /Oy-)
+    # Source and narrow string literals are UTF-8, independent of Windows locale.
+    target_compile_options(defold_sdk INTERFACE /Oy- /utf-8)
     # Prefer CMake's MSVC debug info format setting over explicit /Z7
     # Equivalent to /Z7 (debug info in .obj)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")

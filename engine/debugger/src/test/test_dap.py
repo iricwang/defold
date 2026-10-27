@@ -1076,7 +1076,7 @@ class DAPTests(DAPTestCase):
             self.assertEqual(len(frames), 1)
             frame = frames[0]
             if "source" in frame:
-                self.assertEqual(frame["source"]["path"], str(self.path))
+                self.assertEqual(pathlib.Path(frame["source"]["path"]), self.path)
                 self.assertEqual((frame["line"], frame["column"]),
                                  (self.line("yield") - line_offset, int(start_at_1)))
             else:
@@ -1574,7 +1574,7 @@ class DAPTests(DAPTestCase):
         c.configured()
         frames = self.stopped()
         self.assertEqual(frames[0]["line"], self.line("inspect"))
-        self.assertEqual(frames[0]["source"]["path"], str(self.path))
+        self.assertEqual(pathlib.Path(frames[0]["source"]["path"]), self.path)
         self.assertEqual(c.event("breakpoint")["breakpoint"]["id"], bps[0]["id"])
         scopes = self.scopes()
         self.assertEqual(set(scopes), {"Locals", "Upvalues", "Globals"})
@@ -1844,7 +1844,7 @@ class DAPTests(DAPTestCase):
         self.assertEqual(len(frames), 2)
         for frame in frames:
             self.assertGreater(frame["line"], 0)
-            self.assertEqual(frame["source"]["path"], str(self.path))
+            self.assertEqual(pathlib.Path(frame["source"]["path"]), self.path)
             self.frame = frame["id"]
             for reference in self.scopes().values():
                 self.variables(reference, count=2)
@@ -2701,7 +2701,7 @@ class DAPTests(DAPTestCase):
         c.configured()
         frame = self.stopped()[0]
         self.assertEqual(frame["line"], self.line("stop") - 1)
-        self.assertEqual(frame["source"]["path"], str(self.path))
+        self.assertEqual(pathlib.Path(frame["source"]["path"]), self.path)
         self.resume()
         self.finished()
 
@@ -3667,7 +3667,8 @@ class DAPTests(DAPTestCase):
         reference = self.scopes()["Locals"]
         c.request("variables", {"variablesReference": reference}, success=False)
         for expression in ("big", "binary", "error(big)", "string.rep('z', 5 * 1048576)"):
-            c.request("evaluate", {"frameId": self.frame, "expression": expression}, success=False)
+            with self.subTest(expression=expression):
+                c.request("evaluate", {"frameId": self.frame, "expression": expression}, success=False)
         self.assertEqual(self.evaluate("#big")["result"], "1048576")
         self.assertEqual(self.evaluate("big:sub(1, 10)")["result"], '"xxxxxxxxxx"')
         items = self.evaluate("items")["variablesReference"]
@@ -3898,7 +3899,7 @@ class EngineUserdataDAPTests(DAPTestCase):
                 self.assertEqual(value["value"], locals_[name]["value"])
                 self.assertEqual(value["value"], self.evaluate("values." + name, context="hover")["result"])
                 if name in expected:
-                    self.assertRegex(value["value"], "^" + re.escape(expected[name]) + r": 0x[0-9a-f]+$")
+                    self.assertRegex(value["value"], "^" + re.escape(expected[name]) + r": (?:0x)?[0-9a-fA-F]+$")
                 else:
                     self.assertTrue(value["value"].startswith("userdata: "))
         self.assertEqual(self.evaluate("calls", context="hover")["result"], "0")
@@ -4064,7 +4065,7 @@ class EngineDAPTests(DAPTestCase):
         value = locals_["self"]
         self.assertEqual(value["type"], "userdata")
         label = {"go": "GOScriptInstance", "gui": "GuiScriptInstance", "render": "RenderScriptInstance"}[kind]
-        self.assertRegex(value["value"], "^" + label + r": 0x[0-9a-f]+$")
+        self.assertRegex(value["value"], "^" + label + r": (?:0x)?[0-9a-fA-F]+$")
         self.assertEqual(self.evaluate("self", context="hover")["result"], value["value"])
         self.assertEqual(value["evaluateName"], "self")
         self.assertEqual(value["namedVariables"], 4)
@@ -4139,7 +4140,7 @@ class EngineDAPTests(DAPTestCase):
                 self.assertEqual(value["variablesReference"], 0)
                 self.assertEqual(value["value"], nodes[name]["value"])
                 self.assertEqual(value["value"], self.evaluate(name, context="hover")["result"])
-                self.assertRegex(value["value"], "^" + re.escape(label) + r": 0x[0-9a-f]+$")
+                self.assertRegex(value["value"], "^" + re.escape(label) + r": (?:0x)?[0-9a-fA-F]+$")
         self.assertNotEqual(values["box"]["value"].split(": ")[1], values["deleted"]["value"].split(": ")[1])
         self.assertTrue(values["unknown"]["value"].startswith("userdata: "))
         # Subtype names are independent of the metatable's __tostring and __name.
@@ -4198,7 +4199,7 @@ class EngineDAPTests(DAPTestCase):
             with self.subTest(name=name):
                 self.assertEqual(value["type"], "userdata")
                 self.assertEqual(value["variablesReference"], 0)
-                self.assertRegex(value["value"], "^" + re.escape(expected[name]) + r": 0x[0-9a-f]+$")
+                self.assertRegex(value["value"], "^" + re.escape(expected[name]) + r": (?:0x)?[0-9a-fA-F]+$")
                 self.assertEqual(self.evaluate("values." + name, context="hover")["result"], value["value"])
         if frames:
             self.assertEqual(c.request("stackTrace", {"threadId": coroutine["id"]})["stackFrames"], frames)

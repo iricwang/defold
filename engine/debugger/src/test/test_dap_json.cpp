@@ -172,6 +172,34 @@ TEST(DapJson, NodeLimit)
     ASSERT_TRUE(json.Boolean(json.Field(0, "valid")));
 }
 
+// Byte-wise formatting must not cause thousands of whole-buffer copies, and
+// rejection at the queue limit must preserve termination and Clear() recovery.
+TEST(DapJson, BoundedBufferGrowth)
+{
+    Buffer text;
+    uint32_t growths = 0;
+    for (uint32_t i = 0; i < MAX_QUEUE_SIZE; ++i)
+    {
+        uint32_t capacity = text.m_Data.Capacity();
+        text.Add("x", 1);
+        growths += capacity != text.m_Data.Capacity();
+    }
+    ASSERT_LT(growths, 32U);
+    ASSERT_TRUE(text.m_Valid);
+    ASSERT_EQ(MAX_QUEUE_SIZE, text.Size());
+    ASSERT_LE(text.m_Data.Capacity(), MAX_QUEUE_SIZE + 1);
+    ASSERT_EQ('x', text.Data()[0]);
+    ASSERT_EQ('x', text.Data()[MAX_QUEUE_SIZE - 1]);
+    ASSERT_EQ(0, text.Data()[MAX_QUEUE_SIZE]);
+    text.Add("x", 1);
+    ASSERT_FALSE(text.m_Valid);
+    ASSERT_EQ(MAX_QUEUE_SIZE, text.Size());
+    text.Clear();
+    text.String("ready");
+    ASSERT_TRUE(text.m_Valid);
+    ASSERT_STREQ("\"ready\"", text.Data());
+}
+
 int main(int argc, char** argv)
 {
     jc_test_init(&argc, argv);

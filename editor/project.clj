@@ -91,7 +91,7 @@
 
                      [com.github.ben-manes.caffeine/caffeine "3.1.2"]
 
-                     [cljfx "1.10.362"
+                     [cljfx "1.10.363"
                       :exclusions [org.clojure/clojure
                                    org.openjfx/javafx-base
                                    org.openjfx/javafx-graphics
@@ -112,6 +112,8 @@
 
                      [net.objecthunter/exp4j "0.4.8"]]
 
+  ;; ci/cache_key.py reads this :version. If keys or the map structure change,
+  ;; check and update that script as needed.
   :icu4j {:version "77.1"}
 
   :source-paths      ["src/clj"]
@@ -125,18 +127,18 @@
   ;; Archived Bob contains protocol classes matching its compiler and native tools.
   ;; Regenerating these from another engine revision shadows Bob's compatible classes.
   :proto-paths       ~(if (= "1" (System/getenv "DM_EDITOR_USE_BOB_PROTOCOLS"))
-                       []
-                       ["../engine/ddf/src"
-                        "../engine/engine/proto"
-                        "../engine/gameobject/proto"
-                        "../engine/gamesys/proto"
-                        "../engine/graphics/proto"
-                        "../engine/input/proto"
-                        "../engine/particle/proto/particle"
-                        "../engine/render/proto"
-                        "../engine/resource/proto"
-                        "../engine/rig/proto"
-                        "../engine/script/src"])
+                        []
+                        ["../engine/ddf/src"
+                         "../engine/engine/proto"
+                         "../engine/gameobject/proto"
+                         "../engine/gamesys/proto"
+                         "../engine/graphics/proto"
+                         "../engine/input/proto"
+                         "../engine/particle/proto/particle"
+                         "../engine/render/proto"
+                         "../engine/resource/proto"
+                         "../engine/rig/proto"
+                         "../engine/script/src"])
 
   :protobuf-includes ["../engine/gameobject/proto"
                       "../engine/gamesys/proto"
@@ -162,6 +164,8 @@
                                                       "x86_64-macos" "abc9cbe2e8d28624e0d441fa55055b1196f73251b034356d717b0e58b562f182"
                                                       "x86_64-linux" "8f4096468da37654049169dc2e1283e7685348e5215cc144a27f9988befac590"
                                                       "x86_64-win32" "82efa133287f67be09e1a624d8efecd8063832ec2b9bf9279c37afc5f42118bd"}}
+                      ;; ci/cache_key.py reads this :version. If keys or the map structure change,
+                      ;; check and update that script as needed.
                       :lua-language-server {:version "3.19.1"
                                             :sha256 {"arm64-macos" "0bc077f4447f076b4c92c14e9fd303f5b569eda2ec74b4dca2b55f75fae2e90c"
                                                      "x86_64-macos" "eb373c159cbe556711d7cd316315de2dce969bfd54b31edb7eb9cab2937f2cca"
@@ -192,8 +196,8 @@
                       "--add-opens=java.desktop/sun.awt.image=ALL-UNNAMED"
                       "--enable-native-access=ALL-UNNAMED"
                       "--sun-misc-unsafe-memory-access=allow"
-                      "-XX:+UseCompactObjectHeaders"]
                       ;; "-XX:MaxJavaStackTraceDepth=1073741823"
+                      "-XX:+UseCompactObjectHeaders"]
 
   :main ^:skip-aot   com.defold.editor.Main
 
@@ -250,6 +254,7 @@
                                                       [commons-io/commons-io "2.4"]
                                                       [prismatic/schema "1.1.9"]
                                                       [org.luaj/luaj-jse "3.0.1"]
+                                                      [com.github.ben-manes.caffeine/caffeine "3.1.2"]
                                                       ;; editor.code.data reaches util.diff,
                                                       ;; which needs jgit
                                                       [org.eclipse.jgit/org.eclipse.jgit "7.6.0.202603022253-r"]
@@ -367,7 +372,7 @@
                                                     "-Ddefold.extension.rive.url=https://github.com/defold/extension-rive/archive/refs/tags/13.2.2.zip"
                                                     "-Ddefold.extension.simpledata.url=https://github.com/defold/extension-simpledata/archive/refs/tags/v1.3.0.zip"
                                                     "-Ddefold.extension.spine.url=https://github.com/defold/extension-spine/archive/refs/tags/4.9.2.zip"
-                                                    "-Ddefold.extension.teal.url=https://github.com/defold/extension-teal/archive/refs/tags/v1.5.zip"
+                                                    "-Ddefold.extension.teal.url=https://github.com/defold/extension-teal/archive/refs/tags/v1.6.zip"
                                                     "-Ddefold.extension.texturepacker.url=https://github.com/defold/extension-texturepacker/archive/refs/tags/2.9.0.zip"
                                                     "-Ddefold.unpack.path=tmp/unpack"
                                                     "-Ddefold.nrepl=true"
@@ -379,6 +384,7 @@
                                                     "-Djogl.debug.DebugGL" ; TraceGL is also useful
                                                     "-Djogl.windows.cpu_affinity_mode=0"
                                                     "-Djogl.texture.notexrect=true"
+                                                    "-Dprism.maxvram=1G"
                                                     "-XX:MaxRAMPercentage=75"
                                                     ;"-XX:+UnlockCommercialFeatures"
                                                     ;"-XX:+FlightRecorder"

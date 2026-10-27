@@ -128,7 +128,8 @@ public final class AutomationWorker implements AutoCloseable {
                 "DM_EDITOR_GAME_FILE", directory.resolve("runtime.shared").toString(),
                 "DM_EDITOR_GAME_PARENT", Long.toString(ProcessHandle.current().pid()),
                 "DM_EDITOR_AUTOMATION_SCENE", directory.resolve("runtime.scene.json").toString(),
-                "DM_EDITOR_AUTOMATION", "1", "DM_SERVICE_PORT", "dynamic");
+                "DM_EDITOR_AUTOMATION", "1", "DM_SERVICE_PORT", "dynamic",
+                "DM_WINDOW_STATE", "");
         if (MAC) {
             ProcessBuilder builder = new ProcessBuilder(command).directory(project.toFile()).redirectErrorStream(true);
             builder.environment().putAll(environment);

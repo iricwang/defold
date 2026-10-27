@@ -17,9 +17,10 @@ class EditorPipelineTest(unittest.TestCase):
     def test_packaged_gui_rect_transform_protocol(self):
         code = """(import 'com.dynamo.gamesys.proto.Gui$NodeDesc)
                   (let [descriptor (Gui$NodeDesc/getDescriptor)]
-                    (doseq [field [\"rect_transform\" \"rect_anchor_min\" \"rect_anchor_max\" \"rect_reference\"]]
-                      (assert (.findFieldByName descriptor field)
-                              (str \"Missing GUI field \" field \"; build with matching local engine/Bob\"))))"""
+                    (doseq [[field number] {\"rect_transform\" 52 \"rect_anchor_min\" 53
+                                           \"rect_anchor_max\" 54 \"rect_reference\" 55 \"font_size\" 56}]
+                      (assert (= number (some-> (.findFieldByName descriptor field) .getNumber))
+                              (str \"GUI wire field changed: \" field))))"""
         result = subprocess.run(
             [str(Path(os.environ['JAVA_HOME']) / 'bin/java.exe'),
              '-cp', os.environ['DEFOLD_PATCH_TEST_JAR'], 'clojure.main', '-e', code],
@@ -237,9 +238,13 @@ class EditorPipelineTest(unittest.TestCase):
             encoding='utf-8', errors='replace', timeout=60)
         self.assertEqual(0, result.returncode, result.stdout)
 
-    # Verifies the editor debugger and all of its Lua dependencies in both resource views.
+    # Native DAP needs no legacy module; older editors must include every Lua dependency.
     def test_packaged_editor_debugger_resources(self):
         with zipfile.ZipFile(os.environ['DEFOLD_PATCH_TEST_JAR']) as editor:
+            start = editor.read('_unpack/_defold/debugger/start.lua')
+            if b'builtins.scripts.debugger' not in start:
+                self.assertIn(b'debugger.start(', start)
+                return
             with zipfile.ZipFile(io.BytesIO(editor.read('lib/builtins.zip'))) as builtins:
                 for name in ('debugger', 'mobdebug', 'edn', 'socket'):
                     path = f'builtins/scripts/{name}.lua'
@@ -279,7 +284,7 @@ class EditorPipelineTest(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stdout)
             self.assertTrue((root / 'build/default/builtins/fonts/font-df.materialc').is_file(),
                             result.stdout)
-            self.assertTrue((root / 'build/default/builtins/scripts/debugger.luac').is_file(),
+            self.assertTrue((root / 'build/default/debugger_start.luac').is_file(),
                             result.stdout)
 
 

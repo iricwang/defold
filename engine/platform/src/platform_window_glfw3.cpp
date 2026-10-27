@@ -23,6 +23,7 @@
 #include <glfw/glfw3.h>
 
 #include <dlib/platform.h>
+#include <dlib/array.h>
 #include <dlib/log.h>
 #include <dlib/math.h>
 
@@ -51,6 +52,7 @@ namespace dmPlatform
     {
         HWindow window = (HWindow) glfwGetWindowUserPointer(glfw_window);
         UpdateWindowSize(window);
+        WindowPlacementChanged(window);
 
         if (window->m_ResizeCallback != 0x0)
         {
@@ -61,10 +63,16 @@ namespace dmPlatform
     static void OnWindowClose(GLFWwindow* glfw_window)
     {
         HWindow window = (HWindow) glfwGetWindowUserPointer(glfw_window);
+        UpdateWindowPlacement(window, true);
         if (window->m_CloseCallback != 0x0)
         {
             window->m_CloseCallback(window->m_CloseCallbackUserData);
         }
+    }
+
+    static void OnWindowPosition(GLFWwindow* glfw_window, int, int)
+    {
+        WindowPlacementChanged((HWindow) glfwGetWindowUserPointer(glfw_window));
     }
 
     static void OnWindowFocus(GLFWwindow* glfw_window, int focus)
@@ -183,6 +191,7 @@ namespace dmPlatform
 
     void DeleteWindow(HWindow window)
     {
+        DeleteWindowPlacement(window);
         delete window;
         glfwTerminate();
     }
@@ -328,9 +337,11 @@ namespace dmPlatform
         // A reboot doesn't shut down GLFW, so we reset all window hints here to defaults first.
         glfwDefaultWindowHints();
 
-        // This hint saves both size and position, but we need only position
-        // That's why we hide window here and then later set default size and show window
-        glfwWindowHintString(GLFW_COCOA_FRAME_NAME, params.m_Title);
+        InitWindowPlacement(window, params);
+        // Preserve standalone Cocoa behavior. Editor launches use project-scoped
+        // state instead of the window title, which may be shared by projects.
+        if (!window->m_Placement)
+            glfwWindowHintString(GLFW_COCOA_FRAME_NAME, params.m_Title);
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
         glfwWindowHint(GLFW_FOCUS_ON_SHOW, params.m_FocusOnShow ? GLFW_TRUE : GLFW_FALSE);
@@ -356,7 +367,7 @@ namespace dmPlatform
 
         if (res == WINDOW_RESULT_OK)
         {
-            if (!params.m_Hidden && params.m_FocusOnShow)
+            if (!window->m_Placement && !params.m_Hidden && params.m_FocusOnShow)
             {
                 FocusWindowNative(window);
             }
@@ -378,6 +389,7 @@ namespace dmPlatform
             glfwGetWindowContentScale(window->m_Window, &window->m_XScale, &window->m_YScale);
             glfwSetWindowUserPointer(window->m_Window, (void*) window);
             glfwSetWindowSizeCallback(window->m_Window, OnWindowResize);
+            glfwSetWindowPosCallback(window->m_Window, OnWindowPosition);
             glfwSetWindowCloseCallback(window->m_Window, OnWindowClose);
             glfwSetWindowFocusCallback(window->m_Window, OnWindowFocus);
             glfwSetWindowIconifyCallback(window->m_Window, OnWindowIconify);
@@ -392,9 +404,15 @@ namespace dmPlatform
 
             SetSwapInterval(window, 1);
 
-            if (windowed)
+            if (windowed && !RestoreWindowPlacement(window))
             {
                 CenterWindowNative(window, glfwGetPrimaryMonitor());
+            }
+            UpdateWindowSize(window);
+
+            if (window->m_Placement && !params.m_Hidden && params.m_FocusOnShow)
+            {
+                FocusWindowNative(window);
             }
 
             // glfwSetWindowBackgroundColor does not exist in GLFW3, but we could potentially
@@ -426,20 +444,24 @@ namespace dmPlatform
 
     void CloseWindow(HWindow window)
     {
+        UpdateWindowPlacement(window, true);
+        DeleteWindowPlacement(window);
         UninstallWindowCloseHandlerNative(window);
         glfwDestroyWindow(window->m_Window);
         if (window->m_AuxWindow)
             glfwDestroyWindow(window->m_AuxWindow);
     }
 
-    void PollEvents(HWindow)
+    void PollEvents(HWindow window)
     {
         glfwPollEvents();
+        UpdateWindowPlacement(window, false);
     }
 
     void ShowWindow(HWindow window)
     {
         glfwShowWindow(window->m_Window);
+        WindowPlacementShown(window);
     }
 
     void HideWindow(HWindow window)
@@ -490,6 +512,17 @@ namespace dmPlatform
         return true;
     }
 
+    void GetReservedAreas(HWindow window, dmArray<WindowReservedArea>& areas)
+    {
+        areas.SetSize(0);
+    }
+
+    uint32_t GetReservedAreas(HWindow window, const WindowReservedArea** areas)
+    {
+        *areas = 0;
+        return 0;
+    }
+
     void SetSwapInterval(HWindow window, uint32_t swap_interval)
     {
         if (window->m_SwapIntervalSupported)
@@ -505,7 +538,9 @@ namespace dmPlatform
 
     void SetWindowSize(HWindow window, uint32_t width, uint32_t height)
     {
+        WindowPlacementSizeRequested(window);
         glfwSetWindowSize(window->m_Window, (int) width, (int) height);
+        ClampWindowPlacement(window);
         UpdateWindowSize(window);
 
         // The callback is not called from glfw when the size is set manually
@@ -518,6 +553,7 @@ namespace dmPlatform
     void SetWindowPosition(HWindow window, int32_t x, int32_t y)
     {
         glfwSetWindowPos(window->m_Window, x, y);
+        WindowPlacementChanged(window);
     }
 
     float GetDisplayScaleFactor(HWindow window)

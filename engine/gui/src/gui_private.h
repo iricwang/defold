@@ -182,6 +182,7 @@ namespace dmGui
         void**                  m_NodeDescTable;
         TextureSetAnimDesc      m_TextureSetAnimDesc;
         float                   m_FlipbookAnimPosition;
+        float                   m_FontSize;
         uint16_t                m_LayerIndex;
         PieBounds               m_OuterBounds;
         NodeTextureType         m_TextureType;

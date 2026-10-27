@@ -280,6 +280,40 @@ class GraphicsImagesTest(unittest.TestCase):
         self.assertIn('First render', page)
         self.assertIn('Repeated render', page)
 
+    # Verifies PVRTC async failures retain portable image diagnostics and remove them before another capture.
+    def test_pvrtc_async_failure_diagnostics_and_cleanup(self):
+        self.add_backend('metal')
+        cases = ('texture_pvrtc4_rgb', 'texture_pvrtc4_rgba')
+        for case in cases:
+            record = next(record for record in self.records if record['case'] == case)
+            record.update(status='fail', exit_code=1, reason='Capture process exited with 1')
+            original = self.images / 'metal' / (case + '.png')
+            image = report.read_png(original)
+            image.putpixel((0, 0), (38, 73, 109))
+            image.save(report.diagnostic_path(original, 'async-upload'))
+        (self.images / 'captures.json').write_text(json.dumps(self.records))
+        moved = self.root / 'moved'
+        self.images.rename(moved)
+        result = self.make_report([moved])
+        self.assertEqual({'pass': len(report.CASES) - 2, 'fail': 2, 'skip': 0}, result['counts'])
+        page = (self.output / 'index.html').read_text(encoding='utf-8')
+        for case in cases:
+            with self.subTest(case=case):
+                checks = [check for check in result['comparisons'] if check['case'] == case]
+                self.assertEqual(['reference', 'async-upload'], [check['kind'] for check in checks])
+                self.assertEqual(['pass', 'fail'], [check['status'] for check in checks])
+                self.assertTrue(checks[1]['exact_pixels'])
+                self.assertGreater(checks[1]['likeness_percent'], 99)
+                original = moved / 'metal' / (case + '.png')
+                diagnostic = report.diagnostic_path(original, 'async-upload')
+                for path in (original, diagnostic, Path(checks[1]['difference'])):
+                    self.assertIn(report.base64.b64encode(path.read_bytes()).decode(), page)
+                report.capture(self.root / 'missing-executable', moved, 'metal', case)
+                self.assertFalse(original.exists())
+                self.assertFalse(diagnostic.exists())
+        self.assertIn('Asynchronous upload', page)
+        self.assertIn('Synchronous upload', page)
+
     # Verifies moved continuation diagnostics remain usable and failures count once.
     def test_continuation_diagnostics_relocate_and_count_once(self):
         self.add_backend('metal')
@@ -328,13 +362,15 @@ class GraphicsImagesTest(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertTrue(all(not path.exists() for path in diagnostics))
 
-    # Verifies process failures and invalid backend identity are recorded as failures.
+    # Verifies process failures, sanitizer errors and invalid backend identity remain failures.
     def test_crash_timeout_identity_and_graphics_errors(self):
         outcomes = (
             subprocess.CompletedProcess([], -11, 'crashed'),
             subprocess.TimeoutExpired([], 60, output=b'partial log'),
             subprocess.CompletedProcess([], 0, 'INFO:GRAPHICS: GRAPHICS_CAPTURE_BACKEND=opengl\n'),
             subprocess.CompletedProcess([], 0, 'INFO:GRAPHICS: GRAPHICS_CAPTURE_BACKEND=metal\nERROR:GRAPHICS: invalid state'),
+            subprocess.CompletedProcess([], 1, 'INFO:GRAPHICS: GRAPHICS_CAPTURE_BACKEND=metal\nERROR: LeakSanitizer: detected memory leaks'),
+            subprocess.CompletedProcess([], 0, 'INFO:GRAPHICS: GRAPHICS_CAPTURE_BACKEND=metal\nERROR: LeakSanitizer: detected memory leaks'),
         )
         for outcome in outcomes:
             with self.subTest(outcome=outcome):
@@ -346,6 +382,142 @@ class GraphicsImagesTest(unittest.TestCase):
                 self.assertTrue((self.images / 'metal/clear.json').is_file())
         with mock.patch.object(report.subprocess, 'run', side_effect=subprocess.TimeoutExpired([], 60, output=b'partial')):
             self.assertIn('partial', report.capture(Path('capture'), self.images, 'metal', 'clear')['log'])
+
+    # Only a format-support skip from the requested backend may hide a texture case.
+    def test_texture_support_skip_requires_identity_and_explicit_exit(self):
+        log = 'INFO:GRAPHICS: GRAPHICS_CAPTURE_BACKEND=metal\nGRAPHICS_CAPTURE_SKIP=Texture format etc2_r is not supported by metal\n'
+        output = self.images / 'metal/texture_etc2_r.png'
+        output.parent.mkdir(parents=True)
+        self.fixture('clear').save(output)
+        with mock.patch.object(report.subprocess, 'run', return_value=subprocess.CompletedProcess([], 77, log)):
+            result = report.capture(Path('capture'), self.images, 'metal', 'texture_etc2_r')
+        self.assertEqual('skip', result['status'])
+        self.assertIn('etc2_r', result['reason'])
+        self.assertFalse(output.exists())
+        for case, code, text in (
+            ('clear', 77, log), ('texture_etc2_r', 1, log),
+            ('texture_etc2_r', 77, log.replace('BACKEND=metal', 'BACKEND=opengl')),
+            ('texture_etc2_r', 77, 'INFO:GRAPHICS: GRAPHICS_CAPTURE_BACKEND=metal\n'),
+            ('texture_etc2_r', 77, log + 'ERROR:GRAPHICS: upload failed\n'),
+            ('texture_etc2_r', 1, log + 'ERROR: LeakSanitizer: detected memory leaks\n'),
+            ('texture_etc2_r', 77, log + 'ERROR: LeakSanitizer: detected memory leaks\n'),
+        ):
+            with self.subTest(case=case, code=code, log=text):
+                with mock.patch.object(report.subprocess, 'run', return_value=subprocess.CompletedProcess([], code, text)):
+                    self.assertEqual('fail', report.capture(Path('capture'), self.images, 'metal', case)['status'])
+
+    # A successful simctl exit must not mask an app crash or duplicate completion markers.
+    def test_simulator_requires_an_explicit_completion_result(self):
+        from graphics_capture_simulator import completed_capture
+        for code, log, expected in (
+            (0, 'GRAPHICS_CAPTURE_RESULT=0\n', 0),
+            (0, 'GRAPHICS_CAPTURE_RESULT=77\n', 77),
+            (0, 'GRAPHICS_CAPTURE_RESULT=1\n', 1),
+            (0, 'app crashed\n', 1),
+            (1, 'GRAPHICS_CAPTURE_RESULT=0\n', 1),
+            (0, 'GRAPHICS_CAPTURE_RESULT=0\nGRAPHICS_CAPTURE_RESULT=0\n', 1),
+        ):
+            with self.subTest(code=code, log=log):
+                result = completed_capture(subprocess.CompletedProcess(['simctl'], code, log))
+                self.assertEqual(expected, result.returncode)
+
+    # Buffer regressions must fail on crashes, validation errors or missing completion,
+    # even if the launcher reports success, and must invoke the intended CLI mode.
+    def test_buffer_replacement_runner(self):
+        import run_graphics_buffer_replacement as buffers
+        for code, log, expected in (
+            (0, 'GRAPHICS_BUFFER_REPLACEMENT_RESULT=0\n', 0),
+            (1, 'GRAPHICS_BUFFER_REPLACEMENT_RESULT=0\n', 1),
+            (0, 'GRAPHICS_BUFFER_REPLACEMENT_RESULT=1\n', 1),
+            (0, 'app crashed\n', 1),
+            (0, 'GRAPHICS_BUFFER_REPLACEMENT_RESULT=0\nERROR:GRAPHICS: invalid buffer\n', 1),
+        ):
+            with self.subTest(code=code, log=log):
+                with mock.patch.object(buffers.subprocess, 'run', return_value=subprocess.CompletedProcess([], code, log)) as run:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        result = buffers.main(['--executable', 'capture', '--target-platform', 'arm64-macos', '--available', 'metal'])
+                    self.assertEqual(expected, result)
+                    self.assertEqual(['metal', 'buffer-replacement'], run.call_args.args[0][1:])
+
+    # Unsupported builds and the explicit hosted-CI policy must not launch a GPU test.
+    def test_buffer_replacement_runner_skip(self):
+        import run_graphics_buffer_replacement as buffers
+        for extra in (['--available', 'vulkan'], ['--available', 'metal', '--skip-all', 'CI policy']):
+            with mock.patch.object(buffers.subprocess, 'run') as run:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    result = buffers.main(['--executable', 'capture', '--target-platform', 'arm64-macos'] + extra)
+                self.assertEqual(0, result)
+                run.assert_not_called()
+
+    # The simulator must validate buffer test completion independently of capture results.
+    def test_simulator_buffer_replacement_result(self):
+        from graphics_capture_simulator import completed_capture
+        for log, expected in (('GRAPHICS_BUFFER_REPLACEMENT_RESULT=0\n', 0), ('GRAPHICS_CAPTURE_RESULT=0\n', 1)):
+            result = completed_capture(subprocess.CompletedProcess(['simctl'], 0, log), 'GRAPHICS_BUFFER_REPLACEMENT_RESULT')
+            self.assertEqual(expected, result.returncode)
+
+    # Non-capture simulator tests have no image path to rewrite or copy back.
+    def test_simulator_buffer_launch_without_output_file(self):
+        from graphics_capture_simulator import SimulatorCapture
+        simulator = mock.Mock(runtime='com.apple.CoreSimulator.SimRuntime.iOS-18-0', udid='device')
+        simulator.name = 'test device'
+        launcher = SimulatorCapture(mock.Mock(), simulator, 'test.bundle', self.images)
+        process = subprocess.CompletedProcess([], 0, 'GRAPHICS_BUFFER_REPLACEMENT_RESULT=0\n')
+        with mock.patch('graphics_capture_simulator.subprocess.run', return_value=process) as run:
+            result = launcher.run(['capture', 'metal', 'buffer-replacement'],
+                                  result_key='GRAPHICS_BUFFER_REPLACEMENT_RESULT', text=True)
+        self.assertEqual(0, result.returncode)
+        self.assertEqual(['metal', 'buffer-replacement'], run.call_args.args[0][-2:])
+        self.assertNotIn('result_key', run.call_args.kwargs)
+
+    # Reject a native capture when the requested target is the iOS simulator.
+    def test_capture_requires_the_requested_target_platform(self):
+        log = 'INFO:GRAPHICS: GRAPHICS_CAPTURE_BACKEND=metal\nGRAPHICS_CAPTURE_PLATFORM=arm64-macos\n'
+        with mock.patch.object(report.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, log)):
+            result = report.capture(Path('capture'), self.images, 'metal', 'clear', target_platform='arm64_sim-ios')
+        self.assertEqual('fail', result['status'])
+        self.assertIn('target platform identity', result['reason'])
+
+    # Simulator reports identify the tested platform, rather than the host running the report.
+    def test_report_header_uses_tested_platform_not_host(self):
+        self.add_backend('metal')
+        for record in self.records:
+            record.update(target_platform='arm64_sim-ios', platform='iOS Simulator 26.5', machine='arm64')
+        (self.images / 'captures.json').write_text(json.dumps(self.records))
+        self.make_report()
+        page = (self.output / 'index.html').read_text(encoding='utf-8')
+        self.assertIn('<h1>Graphics likeness tests · arm64_sim-ios</h1>', page)
+        self.assertIn('iOS Simulator 26.5', page)
+
+    # Preserve simulator identity even when no backend was available to run.
+    def test_skipped_simulator_does_not_use_host_platform(self):
+        records = report.run_matrix(Path('capture'), self.images, ['metal', 'vulkan'], [],
+                                    target_platform='arm64_sim-ios')
+        self.assertTrue(all(record['target_platform'] == 'arm64_sim-ios' for record in records))
+        self.assertTrue(all(record['platform'] == 'iOS Simulator (not run)' for record in records))
+
+    # Guard the shared format sizes, original palette, and sensitivity to flipped images.
+    def test_texture_payload_sizes_and_reference_orientation(self):
+        import re
+        root = Path(report.__file__).with_name('texture_formats')
+        entries = re.findall(r'^TEXTURE_FORMAT_CASE\((\w+), (\w+), (\d+), (\d+), (\d+)\)',
+                             (root / 'formats.inc').read_text(encoding='utf-8'), re.MULTILINE)
+        self.assertEqual(len(report.TEXTURE_CASES), len(entries))
+        for suffix, _, width, height, size in entries:
+            with self.subTest(format=suffix):
+                expected = ((256 + int(width) - 1) // int(width)) * ((256 + int(height) - 1) // int(height)) * int(size)
+                self.assertEqual(expected, (root / ('testimage.' + suffix)).stat().st_size)
+                reference = root.parent / 'graphics_reference' / ('texture_' + suffix + '.png')
+                self.assertEqual(report.SIZE, report.read_png(reference).size)
+        source = report.read_png(root / 'testimage.png')
+        self.assertEqual((85, 139, 123), source.getpixel((0, 0)))
+        self.assertEqual((246, 230, 151), source.getpixel((0, 255)))
+        self.assertEqual(source.convert('RGBA').tobytes(), (root / 'testimage.rgba').read_bytes())
+        for operation in (report.likeness.Image.Transpose.FLIP_TOP_BOTTOM, report.likeness.Image.Transpose.FLIP_LEFT_RIGHT):
+            actual = self.root / 'flipped.png'
+            source.transpose(operation).save(actual)
+            result = report.comparison(actual, root / 'testimage.png', self.root / 'difference.png', 'texture_rgba')
+            self.assertEqual('fail', result['status'])
 
     # Verifies dmLogInfo backend identity is accepted once and duplicates are rejected.
     def test_logged_backend_identity(self):
@@ -393,7 +565,7 @@ class GraphicsImagesTest(unittest.TestCase):
         (self.images / 'captures.json').write_text(json.dumps(self.records))
         self.make_report()
         page = (self.output / 'index.html').read_text(encoding='utf-8')
-        self.assertNotIn('<script>', page)
+        self.assertNotIn('<script>alert(1)</script>', page)
         self.assertIn('&lt;script&gt;', page)
 
     # Verifies case enumeration and rejects invalid or ambiguous capture arguments.
@@ -405,7 +577,7 @@ class GraphicsImagesTest(unittest.TestCase):
         names = [line for line in process.stdout.splitlines() if not line.startswith('INFO:DLIB:')]
         self.assertEqual(list(report.CASES), names)
         for args in (
-            ['--case'], ['--case', 'missing', '--backend', 'metal'],
+            ['--show'], ['--list-cases', '--show'], ['--case'], ['--case', 'missing', '--backend', 'metal'],
             ['--case', 'clear', '--backend', 'unknown'],
             ['--case', 'clear', '--backend', 'metal', '--output', 'a', '--output-file', 'b'],
             ['--list-cases', '--case', 'clear'], ['--backend', 'metal', '--backend', 'vulkan'],

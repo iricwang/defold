@@ -24,7 +24,9 @@
             [editor.protobuf :as protobuf]
             [editor.resource :as resource]
             [editor.system :as system]
-            [util.coll :as coll])
+            [service.log :as log]
+            [util.coll :as coll]
+            [util.path :as path])
   (:import [com.defold.editor GamePreview WindowsGameProcess]
            [com.dynamo.bob Platform]
            [com.dynamo.render.proto Render$Resize]
@@ -35,11 +37,15 @@
            [java.net HttpURLConnection InetSocketAddress Socket URI]
            [java.nio.file Files LinkOption NoSuchFileException]
            [java.nio.file.attribute BasicFileAttributes]
+           [java.util UUID]
            [java.util.zip ZipEntry ZipFile]))
 
 (set! *warn-on-reflection* true)
 
 (def ^:const timeout 2000)
+
+(defn debugger-port [target]
+  (+ 8172 (long (:instance-index target 0))))
 
 (defn- get-connection [^URI uri]
   (doto ^HttpURLConnection (.openConnection (.toURL uri))
@@ -55,7 +61,7 @@
   (let [buffer (byte-array 1024)]
     (try
       (while (not= -1 (.read is buffer)))
-      (catch IOException e
+      (catch IOException _
         ;; For instance socket closed because engine was killed
         nil))))
 
@@ -112,21 +118,32 @@
         instance-index (:instance-index target)
         args (cond-> [(str "--config=resource.uri=" local-url)]
                debug
-               (conj "--config=bootstrap.debug_init_script=/_defold/debugger/start.luac")
+               (into ["--config=debugger.enabled=1"
+                      (str "--config=debugger.port=" (debugger-port target))
+                      "--config=debugger.wait=1"])
 
-               true
-               (conj (str local-url "/game.projectc"))
+               ;; Targets without a local process are reached over the network.
+               (and debug (not (contains? target :process)))
+               (conj "--config=debugger.address=0.0.0.0")
 
-               (and instance-index (> instance-index 0))
+               (and instance-index (pos? (long instance-index)))
                (conj (format "--config=project.instance_index=%d" instance-index))
 
                (not focus)
-               (conj "--config=display.focus_on_show=0"))]
+               (conj "--config=display.focus_on_show=0")
+
+               ;; The engine recognizes a project file only as the final
+               ;; argument.
+               true
+               (conj (str local-url "/game.projectc")))]
     (try
       (with-open [os (.getOutputStream conn)]
         (.write os ^bytes (protobuf/map->bytes
                             com.dynamo.system.proto.System$Reboot
-                            (zipmap (map #(keyword (str "arg" (inc %))) (range)) args))))
+                            (into {}
+                                  (map-indexed (fn [index argument]
+                                                 (coll/pair (keyword (str "arg" (inc (long index)))) argument)))
+                                  args))))
       (with-open [is (.getInputStream conn)]
         (ignore-all-output is))
       :ok
@@ -194,7 +211,11 @@
               :address loopback-address})
            (when log-port
              {:log-port log-port
-              :address loopback-address}))))
+              :address loopback-address})
+           (when-let [[_ port] (re-find #"Lua DAP debugger (?:listening on [^\s]+:|port: )(\d+)" output)]
+             (let [port (parse-long port)]
+               (when (and port (<= 1 (long port) 65535))
+                 {:debugger-port port}))))))
 
 ;; Parse a line from engine output to extract engine version info.
 (defn parse-engine-version-line [line]
@@ -241,15 +262,6 @@
         (native-extensions/get-engine-archive project platform prefs evaluation-context)
         (bundled-engine platform))))
 
-(defn- unpack-dmengine!
-  [^File engine-archive entry-name ^File engine-file]
-  (with-open [zip-file (ZipFile. engine-archive)]
-    (let [dmengine-entry (.getEntry zip-file entry-name)
-          stream (.getInputStream zip-file dmengine-entry)]
-      (io/copy stream engine-file)
-      (fs/set-executable! engine-file true)
-      engine-file)))
-
 (defn- zip-entries! [^ZipFile zipfile]
   (enumeration-seq (.entries zipfile)))
 
@@ -260,7 +272,7 @@
       (let [savePath (str dir File/separatorChar (.getName entry))
             saveFile (File. savePath)]
         (if (.isDirectory entry)
-          (if-not (.exists saveFile)
+          (when-not (.exists saveFile)
             (.mkdirs saveFile))
           (let [parentDir (File. (.substring savePath 0 (.lastIndexOf savePath (int File/separatorChar))))
                 stream (.getInputStream zip-file entry)]
@@ -269,7 +281,8 @@
             (io/copy stream saveFile)))))))
 
 (def ^:private dmengine-dependencies
-  ; Mapping between platform name and list of file names: {"x86_64-win32" #{"OpenAL32.dll" "wrap_oal.dll"}}
+  ;; Mapping between platform name and list of file names:
+  ;; {"x86_64-win32" #{"OpenAL32.dll" "wrap_oal.dll"}}
   {})
 
 (defn- copy-dmengine-dependencies!
@@ -278,7 +291,8 @@
     (doseq [dep (dmengine-dependencies extender-platform)]
       (fs/copy! (io/file bundled-engine-dir dep) (io/file unpack-dir dep)))))
 
-(defn- engine-install-path ^File [^File project-directory engine-descriptor]
+(defn- engine-install-path
+  ^File [^File project-directory engine-descriptor]
   (let [unpack-dir (io/file project-directory "build" (:extender-platform engine-descriptor))]
     (io/file unpack-dir (dmengine-filename (current-platform)))))
 
@@ -287,7 +301,7 @@
 (defn- engine-file-state [^File file]
   (try
     (let [^BasicFileAttributes attributes (Files/readAttributes (.toPath file) BasicFileAttributes
-                                                               ^"[Ljava.nio.file.LinkOption;" (make-array LinkOption 0))]
+                                                                ^"[Ljava.nio.file.LinkOption;" (make-array LinkOption 0))]
       [(.fileKey attributes) (.size attributes) (.lastModifiedTime attributes) (.creationTime attributes)])
     (catch NoSuchFileException _ nil)))
 
@@ -337,6 +351,31 @@
   (let [path (.normalize (.toAbsolutePath (.toPath engine)))]
     (or (.startsWith path (.normalize (.toAbsolutePath (.toPath unpack-directory))))
         (.startsWith path (.normalize (.toAbsolutePath (.toPath (io/file project-directory "build"))))))))
+(defn reset-window-size! [project-directory]
+  ;; The engine owns geometry files. A separate token invalidates their saved
+  ;; size, including for stopped players and inactive desktop backends.
+  (try
+    (path/atomic-replace!
+      (path/of project-directory ".internal" "window-state" "reset-size")
+      #(spit % (str (UUID/randomUUID))))
+    (catch IOException error
+      ;; Persistence must not prevent resetting preferences and a live player.
+      (log/warn :message "Unable to save player window size reset" :exception error))))
+
+(defn- window-state-prefix!
+  [project-directory instance-index]
+  (try
+    (let [directory (path/of ".internal" "window-state")
+          ;; Single launches use index 0, multiple instances start at 1.
+          slot (max 0 (dec (long instance-index)))
+          operating-system (.getOs (Platform/getHostPlatform))]
+      (path/create-directories! (path/of project-directory directory))
+      ;; The player runs in the project directory. Keep its state prefix ASCII
+      ;; so Windows' narrow file APIs never encode the Unicode project path.
+      (str (path/of directory (str operating-system "-" slot))))
+    (catch IOException error
+      (log/warn :message "Unable to create player window state directory" :exception error)
+      nil)))
 
 (defn launch! [^File engine project-directory prefs debug instance-index focus]
   (let [game-session (GamePreview/prepare (.getAbsolutePath ^File project-directory)
@@ -355,9 +394,11 @@
                       (format "--config=project.log_dir=%s" defold-log-dir)])
 
                debug
-               (conj "--config=bootstrap.debug_init_script=/_defold/debugger/start.luac")
+               (into ["--config=debugger.enabled=1"
+                      "--config=debugger.port=0"
+                      "--config=debugger.wait=1"])
 
-               (> instance-index 0)
+               (pos? (long instance-index))
                (conj (format "--config=project.instance_index=%d" instance-index))
 
                (not focus)
@@ -380,9 +421,15 @@
                       (str "--config=display.window_height=" (.getDeviceHeight game-session))]))
         env {"DM_SERVICE_PORT" (or (validate-service-port (System/getenv "DM_SERVICE_PORT"))
                                    "dynamic")
+             ;; The engine adds the active GLFW backend to this file prefix.
+             ;; Environment survives both editor- and game-triggered reboots.
+             "DM_WINDOW_STATE" (when-not game-session
+                                 (window-state-prefix! project-directory instance-index))
              "DM_QUIT_ON_ESC" (if (prefs/get prefs [:run :quit-on-escape])
                                 "1" "0")
-             ;; Windows only. Sets the correct symbol search path, since we're also setting the cwd (https://docs.microsoft.com/en-us/windows/win32/debug/symbol-paths)
+             ;; Windows only. Sets the correct symbol search path, since we're
+             ;; also setting the cwd
+             ;; (https://docs.microsoft.com/en-us/windows/win32/debug/symbol-paths)
              "_NT_ALT_SYMBOL_PATH" (.getAbsolutePath (.getParentFile engine))
              "MESA_GL_VERSION_OVERRIDE" nil
              "MESA_LOADER_DRIVER_OVERRIDE" nil}
@@ -392,7 +439,8 @@
                      "DM_QUIT_ON_ESC" "0"))
         opts {:dir project-directory
               :err :stdout
-              :env env}
+              :env env
+              :windows-default-error-mode true}
         ;; Closing "is" seems to cause any dmengine output to stdout/err
         ;; to generate SIGPIPE and close/crash. Also, we need to read
         ;; the output of dmengine because there is a risk of the stream

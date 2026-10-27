@@ -16,10 +16,28 @@
   (:require [dynamo.graph :as g]
             [editor.resource :as resource]
             [editor.ui :as ui])
-  (:import [javafx.scene.control Tab]))
+  (:import [javafx.beans.binding BooleanBinding]
+           [javafx.beans.property BooleanProperty SimpleBooleanProperty]
+           [javafx.scene.control Tab]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+
+(defn floating-property
+  "Observable docking state, shared by the scene and code renderers."
+  ^BooleanProperty [^Tab tab]
+  (or (ui/user-data tab ::floating)
+      (let [property (SimpleBooleanProperty. false)]
+        (ui/user-data! tab ::floating property)
+        property)))
+
+(defn rendering-active-property
+  "Keep detached documents rendering when their home tab loses selection."
+  ^BooleanBinding [^Tab tab]
+  (or (ui/user-data tab ::rendering-active)
+      (let [property (.or (.selectedProperty tab) (floating-property tab))]
+        (ui/user-data! tab ::rendering-active property)
+        property)))
 
 (defn view-type
   "Returns the map describing the view-type of the view associated with the
