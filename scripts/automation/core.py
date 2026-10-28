@@ -153,7 +153,8 @@ class Service:
                                  'input_ack', 'png_capture', 'image_crop', 'image_compare', 'runtime_scene_live', 'log_wait', 'reports', 'scenario_matrix',
                                  'disk_resource_search', 'isolated_resource_runtime_preview', 'compiled_resource_runtime_preview', 'compiled_incremental_import', 'preview_support_objects',
                                  'editor_gui_snapshot_transactions', 'opt_in_application_ack', 'device_inspection_overlay',
-                                 'persistent_image_baselines', 'scenario_baseline_assert', 'temporal_capture_sequence']
+                                 'persistent_image_baselines', 'scenario_baseline_assert', 'temporal_capture_sequence',
+                                 'bounded_job_wait']
                                 + (['same_render_scene_snapshot','gui_rectangle_queries','node_click','layout_checks',
                                     'scenario_semantic_steps', 'element_condition_wait', 'layout_annotation', 'node_drag'] if self.windows else []),
                 'scenario_versions': [1, 2],
@@ -174,18 +175,22 @@ class Service:
                 if existing['fingerprint'] != fingerprint:
                     raise AutomationError('IDEMPOTENCY_MISMATCH', 'Operation ID was used with different parameters')
                 if 'error' in existing:
-                    raise AutomationError('OPERATION_FAILED', existing['error'])
+                    raise AutomationError(existing.get('error_code', 'OPERATION_FAILED'), existing['error'])
                 if 'result' not in existing:
                     raise AutomationError('OPERATION_PENDING', 'Operation is still running; do not replay')
                 return existing['result']
+            if self.closed:
+                raise AutomationError('SERVICE_CLOSED', 'Automation service is shutting down')
+            journal = self.root / ('operation-' + hashlib.sha256(key.encode()).hexdigest() + '.json')
             record = {'operation_id': key, 'fingerprint': fingerprint, 'state': 'accepted'}
             self.operations[key] = record
-        journal = self.root / ('operation-' + hashlib.sha256(key.encode()).hexdigest() + '.json')
-        if journal.exists():
-            # A new process cannot safely recreate an old session result or repeat a partial input.
-            raise AutomationError('RECOVERY_REQUIRED', 'Operation exists from an earlier service process; inspect journal')
-        atomic_json(journal, record)
+            if journal.exists():
+                # Never turn a recovered operation into a permanently pending in-memory request.
+                record.update(state='recovery_required', error_code='RECOVERY_REQUIRED',
+                              error='Operation exists from an earlier service process; inspect journal')
+                raise AutomationError(record['error_code'], record['error'])
         try:
+            atomic_json(journal, record)
             result = function()
             with self.lock:
                 record.update(state='complete', result=result)
@@ -200,38 +205,75 @@ class Service:
     def submit(self, operation_id, payload, function):
         def create():
             job_id = uuid.uuid4().hex
-            job = {'job_id': job_id, 'state': 'queued', 'cancel': threading.Event(), 'process': None}
-            with self.lock:
-                self.jobs[job_id] = job
+            job = {'job_id': job_id, 'state': 'queued', 'cancel': threading.Event(), 'process': None,
+                   'done': threading.Event(), 'created_at': time.time()}
             def run():
-                job['state'] = 'running'
+                with self.lock:
+                    job.update(state='running', started_at=time.time())
+                outcome = {'state': 'failed', 'error_code': 'JOB_INTERRUPTED', 'error': 'Job interrupted'}
                 try:
                     if job['cancel'].is_set():
                         raise AutomationError('CANCELLED', 'Job cancelled before execution')
-                    job['result'] = function(job)
-                    job['state'] = 'cancelled' if job['cancel'].is_set() else 'complete'
+                    result = function(job)
+                    outcome = {'state': 'complete', 'result': result}
                 except Exception as error:
-                    job['state'] = 'cancelled' if job['cancel'].is_set() else 'failed'
-                    job['error'] = str(error)
-                    job['error_code'] = getattr(error, 'code', 'INTERNAL_ERROR')
+                    outcome = {'state': 'failed', 'error': str(error),
+                               'error_code': getattr(error, 'code', 'INTERNAL_ERROR')}
                     if getattr(error, 'details', None) is not None:
-                        job['error_details'] = error.details
+                        outcome['error_details'] = error.details
                 finally:
-                    job['process'] = None
-            self.executor.submit(run)
+                    with self.lock:
+                        job.update(outcome)
+                        if job['cancel'].is_set():
+                            job['state'] = 'cancelled'
+                        job.update(process=None, finished_at=time.time())
+                        job['done'].set()
+            def finished(future):
+                if future.cancelled():
+                    with self.lock:
+                        job.update(state='cancelled', error_code='CANCELLED',
+                                   error='Job cancelled before execution', finished_at=time.time())
+                        job['done'].set()
+            with self.lock:
+                if self.closed:
+                    raise AutomationError('SERVICE_CLOSED', 'Automation service is shutting down')
+                future = self.executor.submit(run)
+                job['future'] = future
+                self.jobs[job_id] = job
+                future.add_done_callback(finished)
             return {'job_id': job_id}
         return self.operation(operation_id, payload, create)
 
     def job_status(self, job_id, cancel=False):
-        job = self.jobs.get(job_id)
-        if not job:
-            raise AutomationError('JOB_NOT_FOUND', job_id)
-        if cancel and job['state'] in ('queued', 'running'):
-            job['cancel'].set()
-            process = job.get('process')
-            if process and process.poll() is None:
+        process = None
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                raise AutomationError('JOB_NOT_FOUND', job_id)
+            if cancel and not job['done'].is_set():
+                job['cancel'].set()
+                job['future'].cancel()
+                process = job.get('process')
+        if process and process.poll() is None:
+            try:
                 process.terminate()
-        return {key: value for key, value in job.items() if key not in ('cancel', 'process')}
+            except OSError:
+                if process.poll() is None:
+                    raise
+        with self.lock:
+            return {**{key: value for key, value in job.copy().items()
+                       if key not in ('cancel', 'process', 'done', 'future')},
+                    'terminal': job['done'].is_set(), 'cancel_requested': job['cancel'].is_set()}
+
+    def job_wait(self, job_id, timeout_ms=10000):
+        if type(timeout_ms) is not int or not 0 <= timeout_ms <= 10000:
+            raise AutomationError('INVALID_TIMEOUT', 'timeout_ms must be an integer from 0 to 10000')
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                raise AutomationError('JOB_NOT_FOUND', job_id)
+        job['done'].wait(timeout_ms / 1000)
+        return self.job_status(job_id)
 
     def resources(self, project_id, query='', types=None, offset=0, limit=50):
         try:
@@ -1085,10 +1127,16 @@ class Service:
                 'observations': len(images), 'comparisons': len(comparisons), 'events': len(events)}
 
     def close(self):
-        if self.closed:
-            return
-        self.closed = True
-        for job_id in list(self.jobs):
+        with self.lock:
+            if self.closed:
+                return
+            self.closed = True
+            job_ids = list(self.jobs)
+            # Mark every job before releasing workers; they must not pick up new queued work on shutdown.
+            for job_id in job_ids:
+                if not self.jobs[job_id]['done'].is_set():
+                    self.jobs[job_id]['cancel'].set()
+        for job_id in job_ids:
             self.job_status(job_id, cancel=True)
         self.executor.shutdown(wait=True, cancel_futures=True)
         for session_id in list(self.sessions):

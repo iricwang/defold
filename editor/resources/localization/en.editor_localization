@@ -3089,6 +3089,8 @@ gui-animation.exported = Animation matches the last export.
 
 dock.return = Return to original position
 dock.game = Game
+dock.restore-game = Restore Game to its previous position
+dock.game-drag-help = Drag to combine panels; double-click to collapse to the menu bar
 dock.gui-scene = GUI Scene
 dock.gui-animation = GUI Animation
 dock.editors = Editors
@@ -3398,3 +3400,8 @@ game-preview.pick-unsupported = This game engine does not support GUI resource p
 game-preview.pick-empty = No visible GUI node at this position.
 game-preview.pick-timeout = The running game did not respond to GUI resource picking.
 game-preview.pick-running = Run the game to locate the GUI under the pointer.
+
+notification.play-build.preparing = Preparing Play in the background...
+notification.play-build.ready = Play is ready. Unchanged content starts without rebuilding.
+notification.play-build.failed = Play preparation failed. Run or Compile to view the errors and retry.
+notification.play-build.changed = Content changed during preparation. Wait for preparation or run again; the previous build was not launched.

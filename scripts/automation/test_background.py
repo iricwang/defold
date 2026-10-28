@@ -42,11 +42,12 @@ async def run():
             async def finished(job):
                 deadline = time.monotonic() + 90
                 while time.monotonic() < deadline:
-                    status = await call('job_status', job_id=job['job_id'])
+                    status = await call('job_wait', job_id=job['job_id'], timeout_ms=10000)
                     if status['state'] == 'complete':
+                        assert status['terminal'] and not status['cancel_requested'], status
+                        assert status['finished_at'] >= status['started_at'] >= status['created_at'], status
                         return status['result']
                     assert status['state'] not in ('failed', 'cancelled'), status
-                    await asyncio.sleep(0.05)
                 raise AssertionError('Job completion timeout')
 
             projects = await call('project_discover')

@@ -35,8 +35,10 @@ import java.util.concurrent.*;
 import org.json.*;
 
 public final class MainActivity extends Activity {
+    private static volatile String internalGame = "";
+    static void openManagedGame(android.content.Context context,String base){internalGame=base;context.startActivity(new Intent(context,MainActivity.class).putExtra("manager_game",base));}
     private static final int BG=0xff181818, PANEL=0xff222222, INPUT=0xff333333, LINE=0xff303030,
-        TEXT=0xffededed, MUTED=0xffaaa9a6, ACCENT=0xffe2763e, PRIMARY=0xffb95221, WARM=0xff30251f;
+        TEXT=0xffededed, MUTED=0xffaaa9a6, ACCENT=0xff4386e5, PRIMARY=0xff286bcc, WARM=0xff233650;
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final ExecutorService commands=Executors.newSingleThreadExecutor();
     private final ExecutorService frames=Executors.newSingleThreadExecutor();
@@ -83,6 +85,7 @@ public final class MainActivity extends Activity {
     private static final class Session {
         final String base,token,id,name;
         final boolean qualitySupported,h264,audio;
+        int deviceRevision;
         Session(String base,String token,String id,String name,boolean qualitySupported,boolean h264,boolean audio){this.audio=audio;this.h264=h264;this.base=base;this.token=token;this.id=id;this.name=name;this.qualitySupported=qualitySupported;}
     }
     private static final class Reply {
@@ -135,12 +138,12 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onCreate(Bundle state){
-        super.onCreate(state);setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);preferences=getPreferences(0);
+        super.onCreate(state);RemoteHosts.init(this);setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);preferences=getPreferences(0);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         streamQuality=preferences.getString("streamQuality","720p");loadHistory(); showHome("");
         if(state!=null){resumeStream=state.getBoolean("resumeStream");resumeAddress=state.getString("resumeAddress","");resumePaused=state.getBoolean("resumePaused");}
         if(state!=null || !handleIntent(getIntent())){
-            if(state==null) {resumeAddress=preferences.getString("lastAddress","");resumeStream=!resumeAddress.isEmpty();}
+            if(state==null) {resumeAddress=preferences.getString("lastAddress","");resumeStream=!resumeAddress.isEmpty()&&!resumeAddress.startsWith("https:");}
         }
         inputs.scheduleWithFixedDelay(this::sendPointer,0,8,TimeUnit.MILLISECONDS);
         monitor.scheduleWithFixedDelay(()->{
@@ -152,6 +155,9 @@ public final class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleIntent(intent);}
     private boolean handleIntent(Intent intent){
         if(intent==null)return false;
+        if(intent.getBooleanExtra("manager_scan",false)){intent.removeExtra("manager_scan");resumeStream=false;ui.post(this::scan);return true;}
+        String managed=intent.getStringExtra("manager_game");
+        if(managed!=null&&managed.equals(internalGame)){internalGame="";intent.removeExtra("manager_game");try{RemoteAddress target=new RemoteAddress(managed,"");resumeStream=false;if(foreground)connect(target);else pendingExternal=target;}catch(Exception e){showHome(e.getMessage());}return true;}
         if(intent.getData()==null&&!intent.hasExtra("address"))return false;
         try{
             RemoteAddress address=intent.getData()!=null?RemoteAddress.fromLink(intent.getData().toString()):new RemoteAddress(intent.getStringExtra("address"),intent.hasExtra("pairing_code")?intent.getStringExtra("pairing_code"):intent.getStringExtra("code"));
@@ -170,7 +176,7 @@ public final class MainActivity extends Activity {
     @Override public void onStop(){
         resumeStream=page.equals("stream")||page.equals("connecting");resumePaused=paused;
         if(session!=null)resumeAddress=session.base;
-        foreground=false;if(activeSheet!=null)activeSheet.dismiss();ui.removeCallbacks(heartbeat);endInput();++generation;session=null;closeStream();closeCamera();super.onStop();
+        foreground=false;if(activeSheet!=null)activeSheet.dismiss();ui.removeCallbacks(heartbeat);endInput();releaseManaged();++generation;session=null;closeStream();closeCamera();super.onStop();
     }
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putBoolean("resumeStream",resumeStream||page.equals("stream")||page.equals("connecting"));out.putString("resumeAddress",resumeAddress);out.putBoolean("resumePaused",paused);}
     @Override public void onDestroy(){closeCamera();closeStream();commands.shutdownNow();frames.shutdownNow();discovery.shutdownNow();monitor.shutdownNow();inputs.shutdown();super.onDestroy();}
@@ -188,7 +194,8 @@ public final class MainActivity extends Activity {
     private void newRoot(){if(activeSheet!=null)activeSheet.dismiss();controlPanel=null;fpsLabel=null;root=new FrameLayout(this);root.setBackgroundColor(BG);
         root.setOnApplyWindowInsetsListener((v,insets)->{boolean full=page.equals("stream")||page.equals("connecting");v.setPadding(full?0:insets.getSystemWindowInsetLeft(),full?0:insets.getSystemWindowInsetTop(),full?0:insets.getSystemWindowInsetRight(),full?0:insets.getSystemWindowInsetBottom());return insets;});
         setContentView(root);applySystemBars();}
-    private void goHome(String message){endInput();++generation;session=null;resumeStream=false;paused=false;controlBusy=false;frameRate.reset();closeStream();closeCamera();if(screen!=null)screen.clear();showHome(message);refreshDiscovery();}
+    private void goHome(String message){endInput();releaseManaged();++generation;session=null;resumeStream=false;paused=false;controlBusy=false;frameRate.reset();closeStream();closeCamera();if(screen!=null)screen.clear();showHome(message);refreshDiscovery();}
+    private void releaseManaged(){Session current=session;if(current!=null&&current.base.startsWith("https:"))try{inputs.execute(()->{try{request(current.base,current.token,"POST","/release",new byte[0]);}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}}
     private void showHome(String message){
         page="home";setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);newRoot();
         LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));
@@ -202,7 +209,7 @@ public final class MainActivity extends Activity {
         gamesHeading.addView(title("你的游戏",28),new LinearLayout.LayoutParams(0,-2,1));
         gamesHeading.addView(iconButton("scan","扫码连接",this::scan),new LinearLayout.LayoutParams(dp(48),dp(48)));
         gamesHeading.addView(iconButton("link","手动连接",()->manual(null)),new LinearLayout.LayoutParams(dp(48),dp(48)));
-        content.addView(gamesHeading);gap(content,20);
+        content.addView(gamesHeading);gap(content,12);content.addView(button("我的电脑  ›",()->{resumeStream=false;startActivity(new Intent(this,ManagerActivity.class));}));gap(content,20);
         homeStatus=label("",12,ACCENT);homeStatus.setPadding(0,0,0,dp(16));content.addView(homeStatus);
         homeMessage(message);
         cards=column();content.addView(cards);renderCards();
@@ -252,7 +259,7 @@ public final class MainActivity extends Activity {
         card.setContentDescription(game.name+"，"+state+"，点击连接");return card;
     }
     private void openGame(Game game){try{if(token(game.address).isEmpty())manual(game);else connect(new RemoteAddress(game.address,""));}catch(Exception e){homeMessage(e.getMessage());}}
-    private String token(String address){return preferences.getString("token:"+address,"");}
+    private String token(String address){return address.startsWith("https:")?RemoteHosts.token(address):preferences.getString("token:"+address,"");}
     private void gameMenu(Game game){
         LinearLayout options=column();Dialog[] holder=new Dialog[1];
         String[] names={"连接游戏","停止电脑上的游戏","重新配对","移除连接记录"};String[] icons={"play","stop","scan","close"};
@@ -288,10 +295,19 @@ public final class MainActivity extends Activity {
     }
     private void connect(RemoteAddress target){connect(target,true);}
     private void connect(RemoteAddress target,boolean autoStart){
-        endInput();closeCamera();closeStream();session=null;paused=false;controlBusy=false;frameRate.reset();final int attempt=++generation;resumeAddress=target.base;showStream("正在连接电脑…");
+        connect(target,autoStart,false);
+    }
+    private void connect(RemoteAddress target,boolean autoStart,boolean takeover){
+        endInput();releaseManaged();closeCamera();closeStream();session=null;paused=false;controlBusy=false;frameRate.reset();final int attempt=++generation;resumeAddress=target.base;showStream("正在连接电脑…");
         commands.execute(()->{
             try{
-                String base=target.code.isEmpty()?rediscover(target.base):target.base;
+                boolean managed=target.base.startsWith("https:");
+                if(managed&&!target.base.contains("/games/")){
+                    if(!target.code.isEmpty())RemoteHosts.pair(target);
+                    if(token(target.base).isEmpty())throw new Exception("请扫描电脑管理器中的二维码");
+                    ui.post(()->{if(attempt!=generation||!foreground)return;goHome("");startActivity(new Intent(this,ManagerActivity.class).putExtra("host",target.base));});return;
+                }
+                String base=target.code.isEmpty()&&!managed?rediscover(target.base):target.base;
                 if(!base.equals(target.base)&&!token(target.base).isEmpty())preferences.edit().putString("token:"+base,token(target.base)).apply();
                 if(!base.contains("/games/")){
                     try{JSONArray list=request(base,"","GET","/games",null).json().getJSONArray("games");
@@ -303,21 +319,51 @@ public final class MainActivity extends Activity {
                 String credential=token(base);
                 if(!target.code.isEmpty())credential=request(base,"","POST","/pair",new JSONObject().put("code",target.code).toString().getBytes(StandardCharsets.UTF_8)).json().getString("token");
                 if(credential.isEmpty())throw new Exception("需要重新配对，请扫描电脑 Game 面板的二维码");
-                JSONObject status=request(base,credential,"GET","/status",null).json();
+                JSONObject status=startupRequest(base,credential,"GET","/status",null,attempt).json();
                 if(attempt!=generation || !foreground)return;
-                if(autoStart&&!status.optString("state").equals("running")){ui.post(()->{if(attempt==generation)overlay.setText("正在启动游戏…");});request(base,credential,"POST","/start",new byte[0]);}
-                long deadline=System.currentTimeMillis()+30000;
+                if(autoStart&&!status.optString("state").equals("running")){ui.post(()->{if(attempt==generation)overlay.setText("正在启动游戏…");});startupRequest(base,credential,"POST","/start",new byte[0],attempt);}
+                long deadline=System.currentTimeMillis()+(managed?1260000:30000);
                 while(autoStart&&!status.optString("state").equals("running")){
                     if(attempt!=generation || !foreground)return;
-                    if(System.currentTimeMillis()>deadline)throw new Exception("游戏启动超时，请查看编辑器的构建结果");
-                    Thread.sleep(150);status=request(base,credential,"GET","/status",null).json();
-                    if(status.optString("state").equals("error"))throw new Exception(status.optString("error","游戏启动失败"));
+                    if(System.currentTimeMillis()>deadline)throw new Exception("游戏启动超时，请查看电脑端的构建结果");
+                    Thread.sleep(300);status=startupRequest(base,credential,"GET","/status",null,attempt).json();
+                    if(managed){String stage=status.optString("stage","正在启动游戏…");ui.post(()->{if(attempt==generation&&!TextUtils.equals(overlay.getText(),stage))overlay.setText(stage);});}
+                    if(status.optString("state").equals("error"))throw new Exception(status.optString("failed_stage","")+"\n"+status.optString("error","游戏启动失败"));
                 }
                 String id=status.optString("id",base),name=status.optString("name","Defold 游戏");
+                if(managed&&status.optString("state").equals("running")){
+                    try{status=startupRequest(base,credential,"POST","/claim",new JSONObject().put("takeover",takeover).toString().getBytes(StandardCharsets.UTF_8),attempt).json();credential=status.getString("token");}
+                    catch(RequestError e){if(e.status!=409)throw e;ui.post(()->{if(attempt!=generation||!foreground)return;new AlertDialog.Builder(this).setTitle("接管游戏？").setMessage(e.getMessage()+"。接管后另一台设备会断开控制。").setNegativeButton("取消",(d,w)->goHome("")).setPositiveButton("接管",(d,w)->connect(target,autoStart,true)).show();});return;}
+                }
                 Session connected=new Session(base,credential,id,name,status.has("resolutions"),status.optJSONArray("video_codecs")!=null&&status.getJSONArray("video_codecs").toString().contains("h264"),status.optBoolean("audio",false));
+                connected.deviceRevision=status.optInt("device_revision",0);
                 ui.post(()->{if(attempt!=generation||!foreground)return;session=connected;lastName=connected.name;page="stream";applySystemBars();overlay.setText("正在接收游戏画面…");if(autoStart)frames.execute(()->readStream(connected,attempt));else pauseRemote("游戏已停止，点击运行继续");});
-            }catch(Exception e){ui.post(()->{if(attempt==generation)goHome(e.getMessage());});}
+            }catch(Exception e){android.util.Log.e("DefoldRemote","Connection failed: "+RemoteTls.origin(target.base),e);ui.post(()->{if(attempt==generation){if(target.base.startsWith("https:")&&target.base.contains("/games/"))showBuildFailure(target,RemoteTls.explain(e,target.base));else goHome(RemoteTls.explain(e,target.base));}});}
         });
+    }
+    private void showBuildFailure(RemoteAddress target,String error){
+        goHome("连接未完成，请查看错误详情");
+        LinearLayout content=column();TextView details=label(error==null?"启动失败":error,12,TEXT);details.setTextIsSelectable(true);
+        ScrollView area=new ScrollView(this);area.addView(details);content.addView(area,new LinearLayout.LayoutParams(-1,dp(260)));gap(content,16);
+        content.addView(primary("重新连接",()->connect(target)));gap(content,8);
+        content.addView(button("返回电脑项目列表",()->{if(activeSheet!=null)activeSheet.dismiss();startActivity(new Intent(this,ManagerActivity.class).putExtra("host",RemoteTls.origin(target.base)));}));
+        sheet("无法连接项目",content);
+    }
+    // A slow status/claim response is not a build failure. These operations are idempotent
+    // for this host/device, so retry bounded transport failures while the UI stays cancellable.
+    private Reply startupRequest(String base,String token,String method,String path,byte[] body,int attempt)throws Exception{
+        long deadline=SystemClock.elapsedRealtime()+45000;
+        boolean waitingShown=false;
+        for(;;){
+            if(attempt!=generation||!foreground)throw new InterruptedException("连接已取消");
+            try{return request(base,token,method,path,body);}
+            catch(Exception error){
+                if(!base.startsWith("https:")||!RemoteTls.transientFailure(error)||SystemClock.elapsedRealtime()>=deadline)throw error;
+                android.util.Log.w("DefoldRemote","Retrying startup request "+path,error);
+                if(!waitingShown){waitingShown=true;ui.post(()->{if(attempt==generation&&overlay!=null)overlay.setText("正在等待电脑响应，自动重连中…");});}
+                Thread.sleep(500);
+            }
+        }
     }
     private void firstFrame(Session current,int attempt,int width,int height){
         if(session!=current||attempt!=generation||!foreground)return;
@@ -325,20 +371,25 @@ public final class MainActivity extends Activity {
         ((View)overlay.getTag()).setVisibility(View.GONE);
         frameWidth=width;frameHeight=height;controlBusy=false;hideControls();
         if(current.audio&&audioPlayer==null)audioPlayer=new RemoteAudioPlayer(this,current.base,current.token);
-        preferences.edit().putString("lastAddress",current.base).putString("lastId",current.id).putString("token:"+current.base,current.token).apply();
+        preferences.edit().putString("lastAddress",current.base).putString("lastId",current.id).apply();
+        if(!current.base.startsWith("https:"))preferences.edit().putString("token:"+current.base,current.token).apply();
         Game old=games.get(current.id);games.put(current.id,new Game(current.id,current.base,current.name,old==null?"电脑":old.computer,"running",System.currentTimeMillis()));saveHistory();
         if(!preferences.getBoolean("controlGestureHint",false)){Toast.makeText(this,"四指下滑打开运行、停止和 FPS 控制栏",Toast.LENGTH_LONG).show();preferences.edit().putBoolean("controlGestureHint",true).apply();}
     }
     private void readStream(Session current,int attempt){
-        int failures=0;
-        boolean hardware=current.h264;
+        StreamRecovery recovery=new StreamRecovery(current.h264);
         while(session==current&&attempt==generation&&foreground){
             HttpURLConnection connection=null;
+            boolean hardware=recovery.hardware();
+            String stage=hardware?"H.264 连接":"JPEG 连接";
+            recovery.beginAttempt();
             try{
-                connection=(HttpURLConnection)new URL(current.base+(hardware?"/video":"/stream")+(current.qualitySupported?"?resolution="+streamQuality:"")).openConnection();streamConnection=connection;
+                connection=RemoteTls.open(current.base+(hardware?"/video":"/stream")+(current.qualitySupported?"?resolution="+streamQuality:"")+"");streamConnection=connection;
                 connection.setConnectTimeout(2500);connection.setReadTimeout(3500);connection.setInstanceFollowRedirects(false);connection.setRequestProperty("Authorization","Bearer "+current.token);
-                if(connection.getResponseCode()!=200)throw new Exception("串流授权失效，请重新扫码");
-                if(hardware){readVideo(connection,current,attempt);if(attempt==generation&&foreground)throw new EOFException();return;}
+                int response=connection.getResponseCode();
+                if(response!=200)throw new RequestError(response,"串流连接失败 ("+response+")");
+                if(hardware){stage="H.264 接收/解码";readVideo(connection,current,attempt,recovery);if(attempt==generation&&foreground)throw new EOFException();return;}
+                stage="JPEG 接收/解码";
                 videoMode="JPEG";ui.post(()->{if(session==current&&attempt==generation){screen.video(false,0,0);videoSurface.configure(1,1,null);frameRate.reset();}});
                 boolean first=true;long firstDeadline=System.currentTimeMillis()+10000;
                 try(DataInputStream input=new DataInputStream(new BufferedInputStream(connection.getInputStream(),65536))){
@@ -347,23 +398,47 @@ public final class MainActivity extends Activity {
                         if(size<0||size>24*1024*1024)throw new Exception("画面超过大小限制");
                         if(size==0){if(first&&System.currentTimeMillis()>firstDeadline)throw new Exception("没有收到画面，请确认 Game 已运行且内嵌已开启");continue;}
                         byte[] data=new byte[size];input.readFully(data);Bitmap bitmap=decode(data);
-                        if(bitmap==null)throw new Exception("无法解码画面");failures=0;
+                        if(bitmap==null)throw new Exception("无法解码画面");recovery.frame(SystemClock.elapsedRealtime());
                         if(first){first=false;int width=bitmap.getWidth(),height=bitmap.getHeight();ui.post(()->firstFrame(current,attempt,width,height));}
                         screen.offer(current,attempt,bitmap);
                     }
                 }
             }catch(Exception e){
                 if(session!=current||attempt!=generation)return;
-                if(hardware){hardware=false;continue;}
+                final String failure=stage+"："+streamError(e);
+                android.util.Log.w("DefoldRemote",failure,e);
+                if(e instanceof RequestError && (((RequestError)e).status==401 || ((RequestError)e).status==403)){
+                    ui.post(()->{if(session==current&&attempt==generation)goHome("配对已失效，请重新扫码");});return;
+                }
                 try{String state=request(current.base,current.token,"GET","/status",null).json().optString("state");
                     if(state.equals("stopped")||state.equals("error")){ui.post(()->{if(session==current&&attempt==generation)pauseRemote("电脑游戏已停止");});return;}
                 }catch(Exception ignored){}
-                if(++failures>=2){ui.post(()->{if(session==current&&attempt==generation)pauseRemote("画面连接中断，点击运行重试");});return;}
-                ui.post(()->{if(session==current&&attempt==generation){release();overlay.setText("连接中断，正在重连…");((View)overlay.getTag()).setVisibility(View.VISIBLE);}});
+                boolean unsupported=hardware&&e instanceof RequestError&&(((RequestError)e).status==404||((RequestError)e).status==503);
+                if(!recovery.failed(unsupported)){ui.post(()->{if(session==current&&attempt==generation)pauseRemote("画面连接中断 · "+failure);});return;}
+                if(connection!=null)connection.disconnect();
+                ui.post(()->{if(session==current&&attempt==generation){release();overlay.setText(failure+"\n正在重连…");((View)overlay.getTag()).setVisibility(View.VISIBLE);}});
+                long retryAt=SystemClock.elapsedRealtime()+recovery.delayMillis();
+                while(session==current&&attempt==generation&&foreground&&SystemClock.elapsedRealtime()<retryAt){
+                    try{Thread.sleep(Math.min(100,Math.max(1,retryAt-SystemClock.elapsedRealtime())));}
+                    catch(InterruptedException interrupted){Thread.currentThread().interrupt();return;}
+                }
             }finally{if(connection!=null)connection.disconnect();if(streamConnection==connection)streamConnection=null;}
         }
     }
-    private void readVideo(HttpURLConnection connection,Session current,int attempt)throws Exception{
+    private static String streamError(Exception e){
+        if(e instanceof SocketTimeoutException)return "等待数据超时";
+        if(e instanceof EOFException)return "电脑关闭了视频流";
+        if(e instanceof RequestError)return "HTTP "+((RequestError)e).status;
+        String message=e.getMessage();
+        if("Video surface unavailable".equals(message))return "手机显示表面未就绪";
+        if("Hardware H.264 decoder unavailable".equals(message))return "手机硬件解码器不可用";
+        if("Decoder produced no picture".equals(message))return "已接收视频但未显示首帧";
+        if("Video decoder stalled".equals(message))return "手机解码器阻塞";
+        if("Video decoder failed".equals(message))return "手机解码器报错";
+        if("Stream must start with SPS/PPS and IDR".equals(message))return "视频首帧缺少解码参数";
+        return e.getClass().getSimpleName();
+    }
+    private void readVideo(HttpURLConnection connection,Session current,int attempt,StreamRecovery recovery)throws Exception{
         if(!"application/x-defold-h264".equals(connection.getContentType()))throw new IOException("Unsupported video protocol");
         final VideoSurface view=videoSurface;final StreamView touch=screen;
         try(DataInputStream input=new DataInputStream(new BufferedInputStream(connection.getInputStream(),65536))){
@@ -379,6 +454,7 @@ public final class MainActivity extends Activity {
                     view.configure(width,height,new Runnable(){public void run(){
                         if(session!=current||attempt!=generation||paused)return;
                         frameRate.presented(SystemClock.elapsedRealtime());
+                        recovery.frame(SystemClock.elapsedRealtime());
                         if(displayed.compareAndSet(false,true))firstFrame(current,attempt,width,height);
                     }});
                 });
@@ -449,6 +525,9 @@ public final class MainActivity extends Activity {
     }
     private void stopRemote(){
         Session current=session;if(current==null||controlBusy)return;
+        if(current.base.startsWith("https:")){
+            pauseRemote("正在停止游戏…");controlBusy=true;commands.execute(()->{try{request(current.base,current.token,"POST","/stop",new byte[0]);ui.post(()->{if(session==current){String host=RemoteTls.origin(current.base);goHome("游戏已停止");startActivity(new Intent(this,ManagerActivity.class).putExtra("host",host));}});}catch(Exception e){ui.post(()->{if(session==current){controlBusy=false;showControls(e.getMessage());}});}});return;
+        }
         pauseRemote("正在停止游戏…");controlBusy=true;showControls("正在停止游戏…");int attempt=generation;
         commands.execute(()->{try{
             if(session!=current||attempt!=generation)return;
@@ -462,6 +541,7 @@ public final class MainActivity extends Activity {
     private void runRemote(){
         Session current=session;if(current==null||controlBusy)return;
         if(!paused){hideControls();return;}
+        if(current.base.startsWith("https:")){try{connect(new RemoteAddress(current.base,""));}catch(Exception e){goHome(e.getMessage());}return;}
         release();pointerBuffer.clear();controlBusy=true;int attempt=++generation;showControls("正在启动游戏…");
         commands.execute(()->{try{
             if(session!=current||attempt!=generation)return;
@@ -473,7 +553,11 @@ public final class MainActivity extends Activity {
         }catch(Exception e){ui.post(()->{if(session==current&&attempt==generation)pauseRemote("启动失败："+e.getMessage());});}});
     }
     private static Reply request(String base,String token,String method,String path,byte[] body)throws Exception{
-        HttpURLConnection c=(HttpURLConnection)new URL(base+path).openConnection();c.setConnectTimeout(2200);c.setReadTimeout(path.equals("/start")?20000:3000);c.setInstanceFollowRedirects(false);c.setRequestMethod(method);c.setRequestProperty("Authorization","Bearer "+token);c.setRequestProperty("Content-Type",path.equals("/pair")?"application/json":"application/octet-stream");
+        return request(base,token,method,path,body,-1);
+    }
+    private static Reply request(String base,String token,String method,String path,byte[] body,int revision)throws Exception{
+        HttpURLConnection c=RemoteTls.open(base+path);c.setConnectTimeout(2200);c.setReadTimeout(path.equals("/start")?20000:3000);c.setInstanceFollowRedirects(false);c.setRequestMethod(method);c.setRequestProperty("Authorization","Bearer "+token);c.setRequestProperty("Content-Type",path.equals("/pair")||path.equals("/claim")?"application/json":"application/octet-stream");
+        if(revision>=0)c.setRequestProperty("X-Defold-Device-Revision",Integer.toString(revision));
         try{
             if(body!=null){c.setDoOutput(true);c.setFixedLengthStreamingMode(body.length);try(OutputStream out=c.getOutputStream()){out.write(body);}}
             int status=c.getResponseCode();InputStream source=status>=400?c.getErrorStream():c.getInputStream();ByteArrayOutputStream bytes=new ByteArrayOutputStream();
@@ -489,7 +573,7 @@ public final class MainActivity extends Activity {
     private void sendPointer(){
         Session current=session;int attempt=generation,epoch=inputEpoch;PointerBuffer.Event event=pointerBuffer.poll();if(current==null||event==null)return;
         byte[] body={(byte)event.x,(byte)(event.x>>8),(byte)event.y,(byte)(event.y>>8),(byte)(event.down?1:0)};
-        try{request(current.base,current.token,"POST","/input",body);}
+        try{request(current.base,current.token,"POST","/input",body,current.deviceRevision);}
         catch(RequestError e){
             if(session!=current||attempt!=generation||epoch!=inputEpoch)return;
             if(e.status==429){pointerBuffer.retry(event);return;}
@@ -504,7 +588,7 @@ public final class MainActivity extends Activity {
     private void endInput(){
         Session current=session;++inputEpoch;pressed=false;pointerBuffer.clear();if(current==null)return;
         int x=pointerX,y=pointerY;
-        try{inputs.execute(()->{try{request(current.base,current.token,"POST","/input",new byte[]{(byte)x,(byte)(x>>8),(byte)y,(byte)(y>>8),0});}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}
+        try{inputs.execute(()->{try{request(current.base,current.token,"POST","/input",new byte[]{(byte)x,(byte)(x>>8),(byte)y,(byte)(y>>8),0},current.deviceRevision);}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}
     }
     private void release(){if(pressed){pressed=false;pointerBuffer.offer(pointerX,pointerY,false);}}
     private final Runnable heartbeat=new Runnable(){public void run(){if(pressed)pointer(pointerX,pointerY,true);updateFps();if(foreground)ui.postDelayed(this,200);}};
@@ -527,7 +611,7 @@ public final class MainActivity extends Activity {
                 }
             }catch(Exception ignored){}
             HashSet<String> checked=new HashSet<>();
-            for(Game old:known){if(found.containsKey(old.id))continue;String base=old.address.split("/games/")[0];if(!checked.add(base))continue;try{collect(found,base,request(base,"","GET","/games",null).json().getJSONArray("games"));}catch(Exception ignored){}}
+            for(Game old:known){if(found.containsKey(old.id)||old.address.startsWith("https:"))continue;String base=old.address.split("/games/")[0];if(!checked.add(base))continue;try{collect(found,base,request(base,"","GET","/games",null).json().getJSONArray("games"));}catch(Exception ignored){}}
             HashMap<String,Bitmap> pictures=new HashMap<>();
             for(Game game:found.values()){
                 String credential=token(game.address);
@@ -538,6 +622,7 @@ public final class MainActivity extends Activity {
         });
     }
     private String rediscover(String address) {
+        if(address.startsWith("https:"))return address;
         if(!address.contains("/games/"))return address;
         String id=address.substring(address.lastIndexOf('/')+1);
         try(DatagramSocket udp=new DatagramSocket()) {
@@ -566,9 +651,9 @@ public final class MainActivity extends Activity {
         LinearLayout layout=column();root.addView(layout,new FrameLayout.LayoutParams(-1,-1));layout.addView(pageHeader("扫码连接",()->goHome("")));divider(layout);
         boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         LinearLayout content=new LinearLayout(this);content.setOrientation(wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);content.setPadding(dp(20),dp(20),dp(20),dp(20));layout.addView(content,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout copy=column();copy.addView(title("连接电脑上的游戏",23));gap(copy,8);TextView hint=label("点击电脑 Game 面板的配对码，\n将二维码放入取景框。",14,MUTED);hint.setLineSpacing(dp(4),1);copy.addView(hint);
+        LinearLayout copy=column();copy.addView(title("扫码连接电脑",23));gap(copy,8);TextView hint=label("在电脑 Remote Manager 点击“扫码连接电脑”。\n配对成功后显示该电脑的游戏项目列表。\n也支持扫描编辑器 Game 面板的游戏二维码。",14,MUTED);hint.setLineSpacing(dp(4),1);copy.addView(hint);
         FrameLayout cameraArea=new FrameLayout(this);cameraArea.setBackground(background(PANEL,20));cameraArea.setClipToOutline(true);
-        TextView tip=label("识别后自动配对并进入游戏",12,MUTED);
+        TextView tip=label("识别后自动配对并显示项目列表",12,MUTED);
         Button manual=button("手动输入连接信息",()->{goHome("");manual(null);});
         if(wide){
             ScrollView instructions=new ScrollView(this);copy.setPadding(0,0,dp(20),0);instructions.addView(copy);content.addView(instructions,new LinearLayout.LayoutParams(0,-1,1));gap(copy,20);copy.addView(tip);gap(copy,16);copy.addView(manual,new LinearLayout.LayoutParams(-1,dp(50)));content.addView(cameraArea,new LinearLayout.LayoutParams(0,-1,1));
@@ -576,7 +661,7 @@ public final class MainActivity extends Activity {
             content.addView(copy);gap(content,20);content.addView(cameraArea,new LinearLayout.LayoutParams(-1,0,1));gap(content,16);tip.setGravity(Gravity.CENTER);content.addView(tip);gap(content,16);content.addView(manual,new LinearLayout.LayoutParams(-1,dp(50)));
         }
         if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.CAMERA},40);return;}
-        scanner=new QRScanner(this,new QRScanner.Listener(){public void result(String text){try{RemoteAddress address=RemoteAddress.fromLink(text);closeCamera();connect(address);}catch(Exception e){Toast.makeText(MainActivity.this,e.getMessage(),Toast.LENGTH_SHORT).show();}}public void error(String message){Toast.makeText(MainActivity.this,message,Toast.LENGTH_LONG).show();}});cameraArea.addView(scanner,new FrameLayout.LayoutParams(-1,-1));cameraArea.addView(new ScanGuide(this),new FrameLayout.LayoutParams(-1,-1));
+        scanner=new QRScanner(this,new QRScanner.Listener(){public void result(String text){try{RemoteAddress address=RemoteAddress.fromLink(text);closeCamera();connect(address);}catch(Exception e){tip.setText(e.getMessage());}}public void status(String message){tip.setText(message);}public void error(String message){tip.setText(message);}});cameraArea.addView(scanner,new FrameLayout.LayoutParams(-1,-1));cameraArea.addView(new ScanGuide(this),new FrameLayout.LayoutParams(-1,-1));
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==40&&page.equals("scan")){if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)scan();else{goHome("相机权限未开启，可手动输入连接信息");manual(null);}}}
     private void closeCamera(){if(scanner!=null){scanner.close();scanner=null;}}

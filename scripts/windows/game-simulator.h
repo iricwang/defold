@@ -23,6 +23,7 @@ static HANDLE simulator_file = INVALID_HANDLE_VALUE;
 static HANDLE simulator_mapping;
 static HANDLE simulator_parent;
 static uint32_t* simulator_data;
+static BOOL simulator_capture_only;
 static uint32_t simulator_slot;
 static BOOL (WINAPI *original_swap_buffers)(HDC);
 static LONG simulator_capturing;
@@ -56,7 +57,8 @@ static int WSAAPI SimulatorBind(SOCKET socket, const struct sockaddr* address, i
  * and any unrelated windows retain their normal Win32 behavior. */
 static BOOL SimulatorInputThread(void)
 {
-    return simulator_window && GetWindowThreadProcessId(simulator_window, NULL) == GetCurrentThreadId();
+    return simulator_window && (!simulator_capture_only || ((volatile uint32_t*)simulator_data)[5])
+        && GetWindowThreadProcessId(simulator_window, NULL) == GetCurrentThreadId();
 }
 
 static BOOL WINAPI SimulatorGetCursorPos(LPPOINT point)
@@ -248,7 +250,8 @@ static void InitSimulatorCapture(void)
     simulator_mapping = CreateFileMappingW(simulator_file, NULL, PAGE_READWRITE, 0, 0, NULL);
     if (simulator_mapping) simulator_data = (uint32_t*)MapViewOfFile(simulator_mapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
     if (!simulator_data) return;
-    if (simulator_data[0] != 0x44464733 || size.QuadPart != 4096 + 2LL*simulator_data[12])
+    simulator_capture_only = simulator_data[0] == 0x44464734;
+    if ((!simulator_capture_only && simulator_data[0] != 0x44464733) || size.QuadPart != 4096 + 2LL*simulator_data[12])
     { UnmapViewOfFile(simulator_data); simulator_data = NULL; return; }
     simulator_slot = simulator_data[12];
     memcpy(simulator_area, simulator_data + 256, sizeof(simulator_area));
@@ -258,7 +261,7 @@ static void InitSimulatorCapture(void)
     uint8_t* base = (uint8_t*)GetModuleHandleW(NULL);
     IMAGE_DOS_HEADER* dos = (IMAGE_DOS_HEADER*)base;
     IMAGE_NT_HEADERS* nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
-    InstallSimulatorSafeArea(base, nt);
+    if (!simulator_capture_only) InstallSimulatorSafeArea(base, nt);
     if (simulator_data[268] == 0x41555431) InitAutomationScene(simulator_data, &simulator_render_sequence);
     DWORD rva = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
     if (!rva) return;

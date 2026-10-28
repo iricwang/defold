@@ -1,0 +1,19 @@
+[package]
+name = "defold-remote-manager"
+version = "0.1.2"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+tauri = { version = "2.12.5", features = ["tray-icon", "custom-protocol"] }
+tauri-plugin-single-instance = "2.5.4"
+serde_json = "1"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+rfd = "0.17"
+
+[build-dependencies]
+tauri-build = "2.7.4"
+
+[profile.release]
+opt-level = "s"
+strip = true

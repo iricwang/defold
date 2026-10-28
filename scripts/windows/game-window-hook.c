@@ -65,7 +65,7 @@ static LRESULT CALLBACK HoldWindow(HWND window, UINT message, WPARAM wparam, LPA
             simulator_cursor.y = (short)HIWORD(lparam);
         }
     }
-    if (message == WM_GETMINMAXINFO && simulator_data)
+    if (message == WM_GETMINMAXINFO && simulator_data && !simulator_capture_only)
     {
         LRESULT result = CallWindowProcW(original, window, message, wparam, lparam);
         MINMAXINFO* limits = (MINMAXINFO*)lparam;
@@ -76,8 +76,10 @@ static LRESULT CALLBACK HoldWindow(HWND window, UINT message, WPARAM wparam, LPA
     {
         if ((GetWindowLongPtrW(window, GWL_STYLE) & WS_CHILD) && GetParent(window))
         {
-            SetWindowLongPtrW(window, GWLP_WNDPROC, (LONG_PTR)original);
-            RemovePropW(window, original_proc_key);
+            if (!simulator_capture_only) {
+                SetWindowLongPtrW(window, GWLP_WNDPROC, (LONG_PTR)original);
+                RemovePropW(window, original_proc_key);
+            }
         }
         else
         {
@@ -85,7 +87,7 @@ static LRESULT CALLBACK HoldWindow(HWND window, UINT message, WPARAM wparam, LPA
             /* Hidden helper/context windows must never be selected as the game. */
             if (position->flags & SWP_SHOWWINDOW)
                 SetPropW(window, L"DefoldEditorGameShowRequested", (HANDLE)1);
-            if (simulator_data && GetPropW(window, L"DefoldEditorGameShowRequested"))
+            if (simulator_data && !simulator_capture_only && GetPropW(window, L"DefoldEditorGameShowRequested"))
             {
                 RECT rectangle = {0, 0, (LONG)simulator_data[256], (LONG)simulator_data[257]};
                 AdjustWindowRectExForDpi(&rectangle, (DWORD)GetWindowLongPtrW(window, GWL_STYLE), FALSE,

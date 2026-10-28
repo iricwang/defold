@@ -25,7 +25,8 @@
 - 连续帧查验：后台采样原始 GPU 帧，输出实际捕帧时间、帧总览、循环 WebP 和逐帧报告，支持取消与部分证据。
 - 按资源路径构建并运行 GUI、GO、Collection（包括嵌套 Collection），所有临时启动文件只写入独立副本。
 - 从已冻结的完整构建派生单资源预览，保留原生扩展引擎，无需重新编译扩展。
-- 本版包含 49 个 MCP 工具；实际列表以 `tools/list` 为准。
+- 后台任务支持有时限的等待、排队取消和明确的取消完成状态；重复旧操作会明确要求恢复检查。
+- 本版包含 50 个 MCP 工具；实际列表以 `tools/list` 为准。
 
 ## 本地准备
 
@@ -95,12 +96,26 @@ manifest 必须在 Mac 本机生成，服务会拒绝加载其他平台的 manif
 
 1. `defold_project_discover` 获得项目 ID 与能力。
 2. 普通项目使用 `defold_build_run`；含原生扩展的现有项目先在本地编辑器完成构建，再使用 `defold_build_import`。
-3. `defold_job_status` 等待构建完成，得到 `build_id`。
+3. `defold_job_wait` 等待构建完成，得到 `build_id`；`defold_job_status` 可立即查询状态。
 4. `defold_session_start` 指定 `build_id` 和设备，等待 job 完成，取得 `session_id` 和 `lease_id`。
 5. `defold_capture` 取得图片和 `observation_id`；查询日志游标。
 6. `defold_input_perform` 携带该截图、租约、唯一 `operation_id` 和动作。
 7. `defold_wait` 从动作前日志游标等待业务标记；返回新的截图。
 8. `defold_report_export` 输出报告，`defold_session_stop` 释放游戏。
+
+### 等待与取消后台任务
+
+`defold_job_wait(job_id, timeout_ms=10000)` 最多等待 10 秒，任务完成时立即返回。
+`timeout_ms=0` 立即查询；等待到期只返回当前状态，不会取消任务，也不会重新执行操作。
+返回的 `terminal` 表示任务是否已结束。只有 `state=complete` 才是成功；取消任务也可能包含部分 `result`，不能据此判断成功。
+
+`defold_job_cancel` 对排队任务立即取消；运行中的任务返回 `cancel_requested=true`，
+继续等待 `terminal=true` 才代表任务已完成取消清理。已经完成的任务不会被改写为取消。
+状态包含秒制 Unix 时间 `created_at`、开始后的 `started_at` 和结束后的 `finished_at`。
+命令行 `run_scenario.py` 已改用等待接口，不再每 100 毫秒轮询任务。
+
+服务重启后重复使用旧 `operation_id` 会持续返回 `RECOVERY_REQUIRED`，
+`operation_status` 标记 `recovery_required`，原操作日志保留。先检查已有回执和现场，不能盲目换 ID 重放点击。
 
 输入示例：
 

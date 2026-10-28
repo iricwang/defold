@@ -73,6 +73,43 @@ From `editor/`, run `lein with-profile +performance run` when measuring editor r
 
 
 ## Running Tests
+
+### Prepared Play
+
+The editor prepares a debug-capable Play build after a project opens and after
+saved resource changes settle for one second. Unchanged Play checks the existing
+artifacts on an IO thread and launches the existing engine without entering the
+resource compiler, native-extension build or build hooks again. Play requested
+during preparation joins that task; repeated Play requests share one launch.
+
+Preparation runs only while the project is saved, no game is running, and no
+other build/save/reload is active. Changes made during preparation prevent that
+result from launching. Failed or cancelled preparation never falls back to an
+older successful build; explicit Play/Compile can retry. Compile and Clean Build
+remain available for intentional rebuilding, including projects whose build hooks
+depend on inputs outside the editor's resource graph. External resource edits
+follow the existing resource reload workflow.
+
+Readiness is session-local and includes project resource invalidation, settings,
+host platform, engine SHA, extension preferences and custom engine selection.
+Windows, Intel macOS and Apple Silicon macOS use the same controller, with
+separate platform identities and the existing platform-specific launch code.
+Artifact and engine file metadata are rechecked before reuse. The normal Game,
+Simulator and Remote Play actions use the same prepared launch path; edit-only
+GUI/Collection/GO previews remain independent of builds. Explicit debugging and
+hot reload retain their existing build paths and invalidate prepared Play.
+
+Targeted regression tests (run on each host platform):
+
+```sh
+lein test editor.play-build-test integration.play-build-test
+```
+
+These tests cover platform isolation, preparation races, failed/changed builds,
+file deletion, actual resource compilation, saved changes and reuse without a
+compiler invocation. Windows-host results do not substitute for macOS native
+launch or Remote-stream verification.
+
 Run all the tests including the integration tests:
 
 ```sh

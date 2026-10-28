@@ -16,6 +16,8 @@ import com.defold.remote.RemoteAddress;
 import com.defold.remote.FourFingerGesture;
 import com.defold.remote.PointerBuffer;
 import com.defold.remote.FrameRate;
+import com.defold.remote.RemoteTls;
+import com.defold.remote.QRDecoder;
 import com.google.zxing.*;
 import com.google.zxing.common.*;
 import com.google.zxing.qrcode.QRCodeWriter;
@@ -28,7 +30,8 @@ public class RemoteLogicTest {
     static void addresses() throws Exception {
         check(new RemoteAddress("192.168.1.3:8390/games/demo","1234 5678").base.equals("http://192.168.1.3:8390/games/demo"));
         check(new RemoteAddress("10.1.2.3","").base.equals("http://10.1.2.3:8390"));
-        String[] bad={"https://192.168.1.1:8390","http://8.8.8.8:8390","127.0.0.1:0","192.168.1.256:8390","http://u@192.168.1.1:8390","192.168.1.1:8390/games/../secret","192.168.1.1:8390/games/demo?code=x"};
+        check(new RemoteAddress("https://192.168.1.1:8390","").base.equals("https://192.168.1.1:8390"));
+        String[] bad={"http://8.8.8.8:8390","127.0.0.1:0","192.168.1.256:8390","http://u@192.168.1.1:8390","192.168.1.1:8390/games/../secret","192.168.1.1:8390/games/demo?code=x"};
         for(String input:bad){try{new RemoteAddress(input,"");throw new AssertionError(input);}catch(Exception expected){assertions++;}}
         String link="defoldremote://connect?v=1&address="+URLEncoder.encode("http://192.168.1.1:8390/games/demo","UTF-8")+"&code=12345678";
         check(RemoteAddress.fromLink(link).code.equals("12345678"));
@@ -87,6 +90,32 @@ public class RemoteLogicTest {
         for(int y=0;y<256;y++)for(int x=0;x<256;x++)pixels[y*256+x]=matrix.get(x,y)?0xff000000:0xffffffff;
         String decoded=new MultiFormatReader().decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(256,256,pixels)))).getText();
         check(link.equals(decoded));check(RemoteAddress.fromLink(decoded).base.endsWith("/games/abc"));
+        String hostLink="defoldremote://connect?v=2&address=https%3A%2F%2F192.168.101.33%3A8390&code=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG&fingerprint="+new String(new char[64]).replace('\0','a');
+        BitMatrix host=new QRCodeWriter().encode(hostLink,BarcodeFormat.QR_CODE,230,230);
+        // Manager QR is denser than the legacy game QR; exercise the APK's Y-plane decoder.
+        byte[] luminance=new byte[230*230];
+        for(int y=0;y<230;y++)for(int x=0;x<230;x++)luminance[y*230+x]=host.get(x,y)?0:(byte)255;
+        java.util.Map<DecodeHintType,Object> hints=new java.util.EnumMap<>(DecodeHintType.class);
+        hints.put(DecodeHintType.POSSIBLE_FORMATS,java.util.Collections.singletonList(BarcodeFormat.QR_CODE));
+        hints.put(DecodeHintType.TRY_HARDER,Boolean.TRUE);
+        String manager=new MultiFormatReader().decode(new BinaryBitmap(new HybridBinarizer(new PlanarYUVLuminanceSource(luminance,230,230,0,0,230,230,false))),hints).getText();
+        check(hostLink.equals(manager));check(RemoteAddress.fromLink(manager).fingerprint.length()==64);
+        check(hostLink.equals(QRDecoder.decode(luminance,230,230)));
+        byte[] camera=new byte[1280*720];java.util.Arrays.fill(camera,(byte)180);
+        for(int y=0;y<230;y++)System.arraycopy(luminance,y*230,camera,(245+y)*1280+525,230);
+        check(hostLink.equals(QRDecoder.decode(camera,1280,720)));
+        for(int i=0;i<camera.length;i++)camera[i]=(byte)(255-(camera[i]&255));
+        check(hostLink.equals(QRDecoder.decode(camera,1280,720)));
+        byte[] rotated=new byte[luminance.length];
+        for(int y=0;y<230;y++)for(int x=0;x<230;x++)rotated[x*230+229-y]=luminance[y*230+x];
+        check(hostLink.equals(QRDecoder.decode(rotated,230,230)));
+        check(RemoteTls.transientFailure(new java.net.SocketTimeoutException()));
+        check(!RemoteTls.transientFailure(new javax.net.ssl.SSLHandshakeException("untrusted certificate")));
+        check(RemoteTls.transientFailure(new javax.net.ssl.SSLHandshakeException("Connection closed by peer")));
+        check(RemoteTls.transientFailure(new javax.net.ssl.SSLHandshakeException("SSL handshake aborted: ssl=0x1234: I/O error during system call, Connection reset by peer")));
+        javax.net.ssl.SSLHandshakeException certificate=new javax.net.ssl.SSLHandshakeException("Connection closed by peer");
+        certificate.initCause(new java.security.cert.CertificateException("pin mismatch"));
+        check(!RemoteTls.transientFailure(certificate));
     }
     public static void main(String[] args) throws Exception {
         addresses();gestures();singleFinger();pointerBackpressure();frameRate();qr();
@@ -95,8 +124,9 @@ public class RemoteLogicTest {
             int width=image.getWidth(),height=image.getHeight();
             int[] pixels=image.getRGB(0,0,width,height,null,0,width);
             String value=new MultiFormatReader().decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(width,height,pixels)))).getText();
-            check(RemoteAddress.fromLink(value).base.contains("/games/"));
-            System.out.println("Actual editor QR decoded successfully");
+            RemoteAddress target=RemoteAddress.fromLink(value);
+            check(target.base.contains("/games/")||target.fingerprint.length()==64);
+            System.out.println("Actual editor/manager QR decoded successfully");
         }
         System.out.println(assertions+" assertions passed");
     }

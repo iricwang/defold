@@ -712,3 +712,18 @@ Windows 隔离样例验证：75 项单元测试；桌面 640×480、手机 1170�
 逐帧引擎几何与 GPU 边界误差不超过 1 像素。原始哈希、WebP 编码帧数/资源哈希、并发拒绝、取消部分证据、设备变化排除、进程清理通过。
 已查看三设备总览图。证据：`tmp/automation-sequence-verification/ffc773e8361b4e10a01c3657a306cd0d/verification.json`。
 这一步提供离散动效采样；高帧率连续录制、MP4、音频同步及 Mac 实机验证仍未实现/完成。本轮不打包或发布，新 MCP 服务会话直接加载。
+
+## 2026-10-28 后台任务等待和生命周期修复
+
+新增 `defold_job_wait`，工具数为 50。最多等待 10 秒，完成即返回；到期只返回当前状态，不取消也不重放操作。
+任务状态提供 terminal、cancel_requested 和创建/开始/结束时间。排队任务可立即取消，运行中取消等待清理结束，部分结果不能当作成功。
+关闭服务前统一标记全部任务取消，防止队列被其他结束任务抢先执行；取消的 Future 也发布终态。
+修复跨服务重启旧操作首次返回 RECOVERY_REQUIRED、随后误报 OPERATION_PENDING，以及初次日志写入失败遗留 pending 状态的问题。
+CLI 已接入等待接口，并拒绝把带部分结果的取消任务当成功。
+
+验证：84 项 Python 单元测试通过（含 9 项新生命周期回归）；Windows 真实 stdio 后台游戏通过 32 张观测、2 项比较和 16 条事件检查。
+连续帧三设备各 8 张通过，等待期间取消采样保留 2 张部分画面，调用者游戏继续运行；三设备进程均正常回收。
+CLI 三设备共 21 步通过。已查看三张连续帧总览。
+证据：`tmp/automation-verification/e3826f7847874e15849ab80df751ae0d`、
+`tmp/automation-sequence-verification/7c2e429e205e4470a93186b889d9846a/verification.json`、
+`tmp/automation-job-wait-cli-result.json`。本轮为 Python 端更新，无需编辑器打包，新 MCP 服务会话加载；Mac 实机仍待验证。

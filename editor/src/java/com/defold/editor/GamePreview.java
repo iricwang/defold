@@ -474,8 +474,9 @@ public final class GamePreview implements AutoCloseable {
                     stop();
                     localize.accept(status, "game-preview.connection-closed");
                     status.setVisible(true);
+                    return;
                 }
-                return;
+                current.data.putInt(1060, remote != null && remote.hasStream() ? 1 : 0);
             }
             current.refreshDevice(simulator.rotation);
             if (current.simulatorWindow != null) {
@@ -485,7 +486,7 @@ public final class GamePreview implements AutoCloseable {
                     error.printStackTrace(); stop(); return;
                 }
             }
-            if (current.data.getInt(12) == 0 && System.nanoTime() - current.started > 30_000_000_000L) {
+            if (current.window == null && current.data.getInt(12) == 0 && System.nanoTime() - current.started > 30_000_000_000L) {
                 stop();
                 localize.accept(status, "game-preview.simulator-timeout"); status.setVisible(true);
                 return;
@@ -516,7 +517,7 @@ public final class GamePreview implements AutoCloseable {
                 }
                 if (!remoteControl) { remotePressed = false; remotePointers.clear(); }
                 boolean useRemote = remoteControl || releaseRemote;
-                data.putInt(20, focused || useRemote ? 1 : 0);
+                data.putInt(20, (current.window == null && focused) || useRemote ? 1 : 0);
                 data.putInt(24, remotePosition ? (int)((long)remoteX * Math.max(0, data.getInt(4)-1) / 65535) : mouseX);
                 data.putInt(28, remotePosition ? (int)((long)remoteY * Math.max(0, data.getInt(8)-1) / 65535) : mouseY);
                 data.putInt(32, useRemote ? (remotePressed ? 1 : 0) : buttons); data.putInt(36, wheel);
@@ -525,6 +526,10 @@ public final class GamePreview implements AutoCloseable {
                 if (current.simulatorWindow != null) {
                     current.simulatorWindow.input(data.getInt(24), data.getInt(28), data.getInt(32), wheel, keys, text);
                     wheel = 0;
+                }
+                if (current.window != null) {
+                    if (useRemote) current.window.input(data.getInt(24), data.getInt(28), remotePressed ? 1 : 0, 0, new byte[256], new ArrayDeque<>());
+                    return; // The native child window presents locally; only Remote reads the shared frame.
                 }
                 data.position(64); data.put(keys);
                 int count = Math.min(128, data.getInt(40));
@@ -603,7 +608,7 @@ public final class GamePreview implements AutoCloseable {
                 ByteBuffer data=current.data;
                 // Remote must drive readback independently of JavaFX presentation:
                 // collapsed/minimized Game panels must not stall the phone stream.
-                if (current.isSimulator()) {
+                if (current.isSimulator() || current.window != null) {
                     data.putInt(1060, 1);
                     data.putInt(1068, data.getInt(1068) + 1);
                 }
@@ -619,7 +624,7 @@ public final class GamePreview implements AutoCloseable {
                 // Windows glReadPixels stores bottom-up rows. The local ImageView
                 // flips them, but Remote encoders need top-left rows themselves.
                 // Keep X unchanged: reversing the full array would mirror text.
-                boolean bottomUp=current.simulatorWindow!=null;
+                boolean bottomUp=current.simulatorWindow!=null || current.window!=null;
                 if(outW!=width||outH!=height){
                     rgb=new int[outW*outH];
                     for(int y=0;y<outH;y++){
@@ -660,17 +665,8 @@ public final class GamePreview implements AutoCloseable {
             this.frameRate = frameRate;
             this.device = device;
             this.rotation = rotation;
-            slotSize = device == null ? 2048*2048*4 : device.width()*device.height()*4;
-            if (com.sun.jna.Platform.isWindows() && device == null) {
-                window = new WindowsGameWindow();
-                simulatorWindow = null;
-                path = null;
-                channel = null;
-                data = null;
-                arena = null;
-                return;
-            }
-            window = null;
+            slotSize = device == null ? (com.sun.jna.Platform.isWindows() ? 4096*2048*4 : 2048*2048*4) : device.width()*device.height()*4;
+            window = com.sun.jna.Platform.isWindows() && device == null ? new WindowsGameWindow() : null;
             simulatorWindow = device != null && com.sun.jna.Platform.isWindows() ? new WindowsGameWindow() : null;
             path = com.sun.jna.Platform.isWindows()
                 ? Files.createTempFile("defold-game-", ".shm")
@@ -679,7 +675,7 @@ public final class GamePreview implements AutoCloseable {
             channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
             arena = Arena.ofShared();
             data = channel.map(FileChannel.MapMode.READ_WRITE, 0, HEADER + 2L * slotSize, arena).asByteBuffer();
-            data.order(ByteOrder.nativeOrder()); data.putInt(0, device == null ? MAGIC : 0x44464733);
+            data.order(ByteOrder.nativeOrder()); data.putInt(0, window != null ? 0x44464734 : device == null ? MAGIC : 0x44464733);
             data.putInt(48, slotSize);
             data.putInt(1068, 1);
             refreshDevice(rotation);

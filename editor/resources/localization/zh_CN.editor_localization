@@ -2288,6 +2288,8 @@ gui-animation.exported = 动画与上次导出一致。
 
 dock.return = 返回原位置
 dock.game = 游戏
+dock.restore-game = 将 Game 恢复到原来的位置
+dock.game-drag-help = 拖动组合面板；双击收起到顶部菜单栏
 dock.gui-scene = GUI 画布
 dock.gui-animation = GUI 动画
 dock.editors = 编辑区域
@@ -2601,3 +2603,8 @@ game-preview.pick-unsupported = 当前游戏引擎不支持 GUI 资源定位，�
 game-preview.pick-empty = 此位置没有可见的 GUI 节点。
 game-preview.pick-timeout = 游戏未响应 GUI 资源定位请求。
 game-preview.pick-running = 请先运行游戏，再定位鼠标下方的 GUI。
+
+notification.play-build.preparing = 正在后台准备运行资源…
+notification.play-build.ready = 运行已就绪，内容未修改时可直接启动。
+notification.play-build.failed = 运行准备失败，请点击运行或编译查看错误并重试。
+notification.play-build.changed = 准备期间内容发生变化，请等待准备完成或再次运行；未启动旧版本。

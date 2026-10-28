@@ -125,7 +125,7 @@
         (is (= ["edited" "untouched"] (mapv :name @exported)))
         (is (= 25 (get-in @exported [0 :source "bones" 0 "x"])))
         (is (= {"marker" {"string" "keep"}} (get-in @exported [1 :source "events"])))
-        (is (= (.getCanonicalPath project) (get-in @exported [0 :source "skeleton" "images"])))
+        (is (= (.getCanonicalFile project) (.getCanonicalFile (io/file (get-in @exported [0 :source "skeleton" "images"])))))
         (is (= saved (data/read-json (data/write-json saved))))
         (is (thrown? clojure.lang.ExceptionInfo (skeletal-io/read-native-skeleton! file project skeletons "missing"))))
       (finally (fs/delete-directory! directory {:fail :silently})))))
