@@ -78,9 +78,20 @@ final class RemoteGateway implements AutoCloseable {
             for(var addresses=n.getInetAddresses();addresses.hasMoreElements();){InetAddress a=addresses.nextElement();if(a instanceof Inet4Address&&a.isSiteLocalAddress())result.add("https://"+a.getHostAddress()+":"+port());}}
         if(result.isEmpty())result.add("https://127.0.0.1:"+port());return result;
     }
+    String selectedAddress() throws SocketException {
+        List<String> available=addresses();
+        String selected=String.valueOf(manager.settings.getOrDefault("connectionAddress",""));
+        return available.contains(selected)?selected:available.size()==1?available.getFirst():"";
+    }
+    synchronized void selectAddress(String address) throws Exception {
+        if(!addresses().contains(address))throw new IllegalArgumentException("请选择当前电脑的有效连接地址");
+        pairSecret="";pairExpires=0;
+        synchronized(manager){manager.settings.put("connectionAddress",address);manager.save();}
+    }
     synchronized Map<String,Object> pairing() throws Exception {
+        String address=selectedAddress();
+        if(address.isEmpty())throw new IllegalArgumentException("请选择一个手机可访问的连接 IP");
         pairSecret=secret();pairExpires=System.currentTimeMillis()+120000;
-        String address=addresses().getFirst();
         String uri="defoldremote://connect?v=2&address="+URLEncoder.encode(address,StandardCharsets.UTF_8)+"&code="+pairSecret+"&fingerprint="+fingerprint;
         return Map.of("uri",uri,"address",address,"fingerprint",fingerprint,"expiresAt",pairExpires,"addresses",addresses());
     }

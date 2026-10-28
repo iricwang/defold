@@ -4,9 +4,18 @@ use serde_json::{json, Value};
 use tauri::{Manager, menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState}};
 
 struct Service { child: Child, input: ChildStdin, output: BufReader<ChildStdout> }
+fn runtime_directory() -> Result<PathBuf, std::io::Error> {
+    let directory = std::env::current_exe()?.parent().unwrap().to_path_buf();
+    #[cfg(target_os = "macos")]
+    {
+        let resources = directory.parent().unwrap().join("Resources");
+        if resources.join("remote-manager.json").is_file() { return Ok(resources); }
+    }
+    Ok(directory)
+}
 impl Service {
     fn start(data: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
-        let directory = std::env::current_exe()?.parent().unwrap().to_path_buf();
+        let directory = runtime_directory()?;
         let manifest = if let Ok(value) = std::env::var("DEFOLD_REMOTE_MANIFEST") { PathBuf::from(value) } else {
             let config: Value = serde_json::from_slice(&std::fs::read(directory.join("remote-manager.json"))?)?;
             directory.join(config["manifest"].as_str().ok_or("Missing runtime manifest")?)
@@ -63,7 +72,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app,_,_|show(app)))
         .invoke_handler(tauri::generate_handler![rpc,choose_project,qr_svg,hide,quit])
         .setup(|app| {
-            let config=std::env::current_exe()?.parent().unwrap().join("remote-manager.json");
+            let config=runtime_directory()?.join("remote-manager.json");
             let configured:Value=std::fs::read(config).ok().and_then(|bytes|serde_json::from_slice(&bytes).ok()).unwrap_or(Value::Null);
             let directory = std::env::var("DEFOLD_REMOTE_DATA").ok().or_else(||configured["dataDirectory"].as_str().map(str::to_owned))
                 .map(PathBuf::from).unwrap_or(app.path().app_local_data_dir()?);

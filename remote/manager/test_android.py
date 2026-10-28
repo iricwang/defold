@@ -137,6 +137,8 @@ def run(manifest, adb, serial):
         fixture = work/'fixture'
         shutil.copytree(ROOT/'scripts/automation/fixture', fixture)
         project = rpc('add', path=str(fixture))
+        state = rpc('status')
+        rpc('connection-address', address=state['addresses'][0])
         pair = rpc('pairing')
         address = urlparse(pair['address'])
         proxy = NetworkProxy(('127.0.0.1', address.port))

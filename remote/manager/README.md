@@ -26,9 +26,33 @@ macOS：
 python3 remote/manager/build.py --app /Applications/Defold.app --engine /path/to/local/dmengine --output /path/to/RemoteManager --shell
 ```
 
+macOS 的 `--shell` 同时生成 `Defold Remote Manager.app`，可直接双击启动。
+运行组件和配置放在 app 的 `Contents/Resources`，保留已有项目和配对配置。
+构建前请在所选 Python 环境独立安装 `PyYAML`，例如
+`env -u PYTHONPATH /path/to/venv/bin/python -m pip install PyYAML`。
+构建器会用隔离模式检查依赖，避免只在终端的 `PYTHONPATH` 中可用而从 Finder
+启动时报 `No module named 'yaml'`。构建时找到的 CMake/Ninja 路径也会写入配置。
+原生扩展仅请求运行组件对应的本机架构；Apple Silicon 不会隐式请求 Intel SDK。
+
 构建端需要 Java 25、Python/PyYAML、Rust 缓存和本机的引擎 CMake SDK。`build.py` 从现有 CMake 配置自动读取 SDK 路径，并把本机构建配置写入运行组件。当前开发交付包引用这台电脑的 Python、源码仓库和 SDK；不是可随意复制到无工具链电脑的完整 SDK 发行包。引擎 SDK 必须与 Bob 及后台桥接版本一致，缺少环境时返回明确错误，不上传源码、不伪造 SDK 版本。
 
-原生构建目前覆盖默认 debug app manifest、C/C++、DDF proto、symbols/defines/includes、Windows `.lib`，以及 macOS `.a`、Objective-C/Objective-C++、frameworks 和本机签名。额外 manifest 配置不会静默忽略；未支持的配置作为具体构建错误返回。macOS 路径已接入，仍需 Mac 实机验证。
+原生构建目前覆盖默认 debug app manifest、C/C++、DDF proto、symbols/defines/includes、Windows `.lib`，以及 macOS `.a`、Objective-C/Objective-C++、frameworks 和本机签名。额外 manifest 配置不会静默忽略；未支持的配置作为具体构建错误返回。2026-10-29 已在 Apple Silicon 实测标准 app 启动、双游戏自动构建、配对/接管、触控回调、H.264 视频及独立环境的 printer 原生扩展编译。该验证不等于 Android 真机或全部第三方扩展验证。
+
+串流坐标按平台处理：macOS 的引擎读回已经是左上角原点，不再纵向翻转；
+Windows 保留原有翻转。`test_manager.py` 用非对称位置的橙色控件检查实际截图方向。
+
+同次 macOS 验证还通过管理器窗口启动了 Path of Kings：在隔离副本中编译 Event
+原生扩展和游戏资源，进入“运行中”，实际游戏缩略图方向正常。原工程内容不变，
+既有项目列表保留。构建和回归日志位于 `tmp/remote-manager-macos-validation/`；
+双游戏协议回归报告位于 `tmp/remote-manager-tests/38f1baa664244a6d81ae8180541d7a8c/report.json`。
+
+Android 0.7.4 起，首页分为“扫码电脑”和“自动发现”两个分页。已配对电脑和 HTTPS
+共享项目从“扫码电脑”进入，独立局域网游戏在“自动发现”中显示。桌面端连接地址
+为单选并保存；多 IP 时先选择地址，再生成二维码。二维码只包含选中的地址，
+切换地址使旧二维码失效。同一电脑的旧版
+HTTP 游戏发现卡片不再进入单独游戏配对流程；电脑配对凭据用于共享项目的启动和
+控制权申请，切换项目或重连不需要再次输入游戏配对码。未配对的独立编辑器直连
+仍使用原有游戏配对。电脑凭据不会迁移到 UDP 发现的 HTTP 地址。
 
 ## 验证
 

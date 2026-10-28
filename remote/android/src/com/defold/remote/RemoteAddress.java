@@ -23,6 +23,21 @@ import java.util.Map;
 public final class RemoteAddress {
     public final String base, code;
     public String fingerprint = "";
+    /** Routes legacy discovery to a trusted computer catalog, never its HTTP endpoint. */
+    public static String pairedComputer(String game, String[] computers) {
+        try {
+            RemoteAddress address = new RemoteAddress(game, "");
+            URI target = new URI(address.base);
+            for (String computer : computers) {
+                RemoteAddress paired = new RemoteAddress(computer, "");
+                URI host = new URI(paired.base);
+                if (!"https".equals(host.getScheme()) || !host.getPath().isEmpty()) continue;
+                if (target.getHost().equals(host.getHost())
+                        && ("http".equals(target.getScheme()) || target.getPort() == host.getPort())) return paired.base;
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
     public RemoteAddress(String address, String pairingCode) throws Exception {
         if (address == null || address.length() > 512) throw new Exception("连接地址无效");
         URI uri = new URI(address.contains("://") ? address.trim() : "http://" + address.trim());

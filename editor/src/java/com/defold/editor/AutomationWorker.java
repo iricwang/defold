@@ -315,7 +315,8 @@ public final class AutomationWorker implements AutoCloseable {
             ByteBuffer source = data.duplicate().order(ByteOrder.LITTLE_ENDIAN);
             source.position(4096 + slot * CAPACITY);
             source.asIntBuffer().get(pixels);
-            for (int row = 0; row < h / 2; row++) {
+            // macOS engine readback is already top-left, just like capture().
+            for (int row = 0; !MAC && row < h / 2; row++) {
                 int top = row * w, bottom = (h - row - 1) * w;
                 for (int col = 0; col < w; col++) {
                     int value = pixels[top + col]; pixels[top + col] = pixels[bottom + col]; pixels[bottom + col] = value;

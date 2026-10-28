@@ -1,5 +1,7 @@
 """Automatic, local-only resource/native build used by Remote Manager."""
 import argparse
+import sys
+sys.dont_write_bytecode = True  # Keep signed macOS app resources read-only.
 import configparser
 import importlib.util
 import json
@@ -38,7 +40,8 @@ def prepare(manifest, project, cache):
     command = [str(path('java')), '--enable-native-access=ALL-UNNAMED', '-Dfile.encoding=UTF-8',
                '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8', '-Djava.awt.headless=true',
                '-cp', str(path('classes')) + os.pathsep + str(path('jar')), 'com.dynamo.bob.Bob',
-               '--root', str(project), '--platform', runtime['platform'], '--variant', 'debug']
+               '--root', str(project), '--platform', runtime['platform'],
+               '--architectures', runtime['platform'], '--variant', 'debug']
     quiet = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
 
     def run(args):
@@ -63,6 +66,7 @@ def prepare(manifest, project, cache):
             stage = '准备本地原生扩展工具链';kind = 'environment'
             write_state(status, stage=stage)
             profile = runtime.get('nativeBuild', {})
+            os.environ['PATH'] = os.pathsep.join([*profile.get('toolPaths', []), os.environ.get('PATH', '')])
             repository, sdk = Path(profile.get('repository', '')), Path(profile.get('sdk', ''))
             if not (sdk/'share/java/bob.jar').is_file() or not (repository/'engine/build'/runtime['platform']/'.defold_cmake_configure.json').is_file():
                 raise RuntimeError('本机缺少与运行版本匹配的原生扩展 SDK / CMake 工具链')
@@ -85,7 +89,7 @@ def prepare(manifest, project, cache):
                 raise RuntimeError('本地构建没有生成项目对应的原生引擎')
             if os.name!='nt':
                 engine.chmod(engine.stat().st_mode | 0o111)
-                subprocess.run(['lipo','-verify_arch',runtime['platform'].split('-')[0],str(engine)],check=True)
+                subprocess.run(['lipo',str(engine),'-verify_arch',runtime['platform'].split('-')[0]],check=True)
                 if b'Editor automation bridge protocol 1 (macOS HID)' not in engine.read_bytes():
                     raise RuntimeError('本地引擎 SDK 缺少 macOS 后台输入桥接，请更新运行组件')
         write_state(status, stage='本地构建完成', engine=str(engine.resolve()), native=native)

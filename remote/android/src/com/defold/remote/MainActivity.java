@@ -36,6 +36,7 @@ import org.json.*;
 
 public final class MainActivity extends Activity {
     private static volatile String internalGame = "";
+    private String homeTab="computers";
     static void openManagedGame(android.content.Context context,String base){internalGame=base;context.startActivity(new Intent(context,MainActivity.class).putExtra("manager_game",base));}
     private static final int BG=0xff181818, PANEL=0xff222222, INPUT=0xff333333, LINE=0xff303030,
         TEXT=0xffededed, MUTED=0xffaaa9a6, ACCENT=0xff4386e5, PRIMARY=0xff286bcc, WARM=0xff233650;
@@ -140,7 +141,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);RemoteHosts.init(this);setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);preferences=getPreferences(0);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        streamQuality=preferences.getString("streamQuality","720p");loadHistory(); showHome("");
+        streamQuality=preferences.getString("streamQuality","720p");homeTab=preferences.getString("homeTab","computers");loadHistory(); showHome("");
         if(state!=null){resumeStream=state.getBoolean("resumeStream");resumeAddress=state.getString("resumeAddress","");resumePaused=state.getBoolean("resumePaused");}
         if(state!=null || !handleIntent(getIntent())){
             if(state==null) {resumeAddress=preferences.getString("lastAddress","");resumeStream=!resumeAddress.isEmpty()&&!resumeAddress.startsWith("https:");}
@@ -202,30 +203,45 @@ public final class MainActivity extends Activity {
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(20),dp(10),dp(12),dp(10));
         ImageView brand=new ImageView(this);brand.setImageDrawable(getPackageManager().getApplicationIcon(getApplicationInfo()));header.addView(brand,new LinearLayout.LayoutParams(dp(32),dp(32)));
         TextView heading=title("Defold Remote",19);heading.setPadding(dp(12),0,0,0);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
-        header.addView(iconButton("refresh","重新发现游戏",this::refreshDiscovery),new LinearLayout.LayoutParams(dp(48),dp(48)));body.addView(header);divider(body);
+        header.addView(iconButton("refresh","刷新",()->{if(homeTab.equals("computers"))showHome("");else refreshDiscovery();}),new LinearLayout.LayoutParams(dp(48),dp(48)));body.addView(header);divider(body);
+        LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(20),dp(12),dp(20),dp(4));
+        for(String tab:new String[]{"computers","discovery"}){Button item=button(tab.equals("computers")?"扫码电脑":"自动发现",()->{homeTab=tab;preferences.edit().putString("homeTab",tab).apply();showHome("");refreshDiscovery();});item.setSelected(homeTab.equals(tab));item.setTextColor(homeTab.equals(tab)?TEXT:MUTED);item.setBackgroundTintList(ColorStateList.valueOf(homeTab.equals(tab)?PRIMARY:PANEL));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.rightMargin=dp(6);tabs.addView(item,lp);}body.addView(tabs);
+        if(homeTab.equals("computers")){showComputers(body,message);return;}
         scroll=new ScrollView(this);scroll.setClipToPadding(false);scroll.setPadding(dp(20),dp(22),dp(20),dp(24));scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content=column();scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout gamesHeading=new LinearLayout(this);gamesHeading.setGravity(Gravity.CENTER_VERTICAL);
-        gamesHeading.addView(title("你的游戏",28),new LinearLayout.LayoutParams(0,-2,1));
-        gamesHeading.addView(iconButton("scan","扫码连接",this::scan),new LinearLayout.LayoutParams(dp(48),dp(48)));
+        gamesHeading.addView(title("自动发现",28),new LinearLayout.LayoutParams(0,-2,1));
         gamesHeading.addView(iconButton("link","手动连接",()->manual(null)),new LinearLayout.LayoutParams(dp(48),dp(48)));
-        content.addView(gamesHeading);gap(content,12);content.addView(button("我的电脑  ›",()->{resumeStream=false;startActivity(new Intent(this,ManagerActivity.class));}));gap(content,20);
+        content.addView(gamesHeading);gap(content,12);content.addView(label("发现局域网中的独立编辑器游戏。已配对电脑的共享项目请在“扫码电脑”中打开。",13,MUTED));gap(content,20);
         homeStatus=label("",12,ACCENT);homeStatus.setPadding(0,0,0,dp(16));content.addView(homeStatus);
         homeMessage(message);
         cards=column();content.addView(cards);renderCards();
+    }
+    private void showComputers(LinearLayout body,String message){
+        cards=null;scroll=new ScrollView(this);scroll.setPadding(dp(20),dp(22),dp(20),dp(24));LinearLayout content=column();scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        content.addView(title("扫码电脑",28));gap(content,10);content.addView(label("扫描电脑管理器的二维码。配对一次，即可连接它共享的游戏。",14,MUTED));gap(content,20);
+        content.addView(primary("扫描电脑二维码",this::scan));gap(content,16);homeStatus=label("",12,ACCENT);content.addView(homeStatus);homeMessage(message);
+        JSONArray hosts=RemoteHosts.all();
+        if(hosts.length()==0){gap(content,24);content.addView(label("还没有配对的电脑",17,MUTED));}
+        for(int i=0;i<hosts.length();i++){JSONObject host=hosts.optJSONObject(i);if(host==null)continue;String address=host.optString("address");LinearLayout card=column();card.setPadding(dp(16),dp(16),dp(16),dp(16));card.setBackground(outlined(PANEL,12));card.addView(title(host.optString("computer","电脑"),18));gap(card,8);card.addView(label(address,12,MUTED));gap(card,14);card.addView(button("查看共享项目",()->openComputer(address)));content.addView(card);gap(content,12);}
+        if(hosts.length()>0)content.addView(button("管理已配对电脑",()->startActivity(new Intent(this,ManagerActivity.class))));
     }
     private void homeMessage(String message){
         boolean useful=message!=null&&!message.isEmpty()&&!message.startsWith("已")&&!message.startsWith("游戏已");
         homeStatus.setText(useful?message:"");homeStatus.setVisibility(useful?View.VISIBLE:View.GONE);
     }
     private void renderCards(){
-        if(!page.equals("home")||cards==null)return;
+        if(!page.equals("home")||!homeTab.equals("discovery")||cards==null)return;
         int scrollY=scroll.getScrollY();cards.removeAllViews();
         ArrayList<Game> online=new ArrayList<>(),offline=new ArrayList<>();String last=preferences.getString("lastId","");
         Comparator<Game> order=(a,b)->a.id.equals(b.id)?0:a.id.equals(last)?-1:b.id.equals(last)?1:(a.computer+a.name).compareTo(b.computer+b.name);
-        for(Game game:games.values())(System.currentTimeMillis()-game.seen<10000?online:offline).add(game);
+        for(Game game:games.values()){
+            if(game.address.startsWith("https:"))continue;
+            if(game.address.startsWith("http:")&&!RemoteHosts.pairedComputer(game.address).isEmpty())continue;
+            (System.currentTimeMillis()-game.seen<10000?online:offline).add(game);
+        }
         Collections.sort(online,order);Collections.sort(offline,order);
-        if(games.isEmpty()){
+        if(online.isEmpty()&&offline.isEmpty()){
             LinearLayout empty=column();empty.setGravity(Gravity.CENTER);empty.setPadding(dp(24),dp(38),dp(24),dp(34));empty.setBackground(outlined(PANEL,18));
             empty.addView(icon("monitor",MUTED),new LinearLayout.LayoutParams(dp(44),dp(44)));gap(empty,16);empty.addView(title("暂无游戏",17));cards.addView(empty);
         }else{
@@ -258,11 +274,18 @@ public final class MainActivity extends Activity {
         LinearLayout foot=new LinearLayout(this);foot.setGravity(Gravity.CENTER_VERTICAL);TextView enter=label(online?"进入游戏":"尝试连接",13,online?ACCENT:MUTED);foot.addView(enter);View arrow=icon("arrow",online?ACCENT:MUTED);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(dp(16),dp(16));ap.leftMargin=dp(6);foot.addView(arrow,ap);foot.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));foot.addView(iconButton("more",game.name+"的操作",()->gameMenu(game)),new LinearLayout.LayoutParams(dp(48),dp(48)));info.addView(foot);card.addView(info);
         card.setContentDescription(game.name+"，"+state+"，点击连接");return card;
     }
-    private void openGame(Game game){try{if(token(game.address).isEmpty())manual(game);else connect(new RemoteAddress(game.address,""));}catch(Exception e){homeMessage(e.getMessage());}}
+    private void openGame(Game game){try{
+        String computer=RemoteHosts.pairedComputer(game.address);
+        if(game.address.startsWith("http:")&&!computer.isEmpty()){openComputer(computer);return;}
+        if(game.address.startsWith("https:")){if(token(game.address).isEmpty())openComputer(RemoteTls.origin(game.address));else connect(new RemoteAddress(game.address,""));return;}
+        if(token(game.address).isEmpty())manual(game);else connect(new RemoteAddress(game.address,""));
+    }catch(Exception e){homeMessage(e.getMessage());}}
+    private void openComputer(String address){resumeStream=false;startActivity(new Intent(this,ManagerActivity.class).putExtra("host",address));}
     private String token(String address){return address.startsWith("https:")?RemoteHosts.token(address):preferences.getString("token:"+address,"");}
     private void gameMenu(Game game){
         LinearLayout options=column();Dialog[] holder=new Dialog[1];
-        String[] names={"连接游戏","停止电脑上的游戏","重新配对","移除连接记录"};String[] icons={"play","stop","scan","close"};
+        boolean managed=game.address.startsWith("https:")||!RemoteHosts.pairedComputer(game.address).isEmpty();
+        String[] names={"连接游戏","停止电脑上的游戏",managed?"查看所属电脑":"重新配对","移除连接记录"};String[] icons={"play","stop","scan","close"};
         for(int index=0;index<names.length;index++){final int choice=index;
             LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(12),dp(8),dp(12),dp(8));
             row.addView(icon(icons[index],index==1?ACCENT:MUTED),new LinearLayout.LayoutParams(dp(22),dp(22)));TextView text=label(names[index],15,TEXT);text.setPadding(dp(14),0,0,0);row.addView(text);clickable(row,PANEL,12,()->{holder[0].dismiss();
@@ -277,6 +300,7 @@ public final class MainActivity extends Activity {
         input.setInputType(numeric?InputType.TYPE_CLASS_NUMBER:InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);input.setBackground(outlined(INPUT,12));input.setHint(hint);return input;
     }
     private void manual(Game game){
+        if(game!=null){String host=RemoteHosts.pairedComputer(game.address);if(!host.isEmpty()){openComputer(host);return;}if(game.address.startsWith("https:")){openComputer(RemoteTls.origin(game.address));return;}}
         LinearLayout fields=column();
         fields.addView(label("电脑地址",13,TEXT));gap(fields,8);EditText address=field("192.168.1.10:8390",false);address.setText(game==null?preferences.getString("address",""):game.address);fields.addView(address,new LinearLayout.LayoutParams(-1,dp(52)));gap(fields,20);
         fields.addView(label("配对码",13,TEXT));gap(fields,8);EditText code=field("输入 8 位配对码",true);code.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(8)});fields.addView(code,new LinearLayout.LayoutParams(-1,dp(52)));gap(fields,10);
@@ -318,7 +342,7 @@ public final class MainActivity extends Activity {
                 if(attempt!=generation || !foreground)return;
                 String credential=token(base);
                 if(!target.code.isEmpty())credential=request(base,"","POST","/pair",new JSONObject().put("code",target.code).toString().getBytes(StandardCharsets.UTF_8)).json().getString("token");
-                if(credential.isEmpty())throw new Exception("需要重新配对，请扫描电脑 Game 面板的二维码");
+                if(credential.isEmpty())throw new Exception(managed?"电脑配对已失效，请重新扫描电脑管理器的二维码":"需要重新配对，请扫描电脑 Game 面板的二维码");
                 JSONObject status=startupRequest(base,credential,"GET","/status",null,attempt).json();
                 if(attempt!=generation || !foreground)return;
                 if(autoStart&&!status.optString("state").equals("running")){ui.post(()->{if(attempt==generation)overlay.setText("正在启动游戏…");});startupRequest(base,credential,"POST","/start",new byte[0],attempt);}
@@ -594,7 +618,7 @@ public final class MainActivity extends Activity {
     private final Runnable heartbeat=new Runnable(){public void run(){if(pressed)pointer(pointerX,pointerY,true);updateFps();if(foreground)ui.postDelayed(this,200);}};
 
     private void refreshDiscovery(){
-        if(discovering||!foreground||!page.equals("home"))return;discovering=true;
+        if(discovering||!foreground||!page.equals("home")||!homeTab.equals("discovery"))return;discovering=true;
         ArrayList<Game> known=new ArrayList<>(games.values());
         discovery.execute(()->{
             LinkedHashMap<String,Game> found=new LinkedHashMap<>();
@@ -612,10 +636,12 @@ public final class MainActivity extends Activity {
             }catch(Exception ignored){}
             HashSet<String> checked=new HashSet<>();
             for(Game old:known){if(found.containsKey(old.id)||old.address.startsWith("https:"))continue;String base=old.address.split("/games/")[0];if(!checked.add(base))continue;try{collect(found,base,request(base,"","GET","/games",null).json().getJSONArray("games"));}catch(Exception ignored){}}
+            // Computer catalogs belong to the separate paired-computer page.
+            found.values().removeIf(game->game.address.startsWith("http:")&&!RemoteHosts.pairedComputer(game.address).isEmpty());
             HashMap<String,Bitmap> pictures=new HashMap<>();
             for(Game game:found.values()){
                 String credential=token(game.address);
-                if(credential.isEmpty()){for(Game old:known)if(old.id.equals(game.id)){credential=token(old.address);if(!credential.isEmpty())preferences.edit().putString("token:"+game.address,credential).apply();}}
+                if(credential.isEmpty()&&game.address.startsWith("http:")){for(Game old:known)if(old.address.startsWith("http:")&&old.id.equals(game.id)){credential=token(old.address);if(!credential.isEmpty())preferences.edit().putString("token:"+game.address,credential).apply();}}
                 if(!credential.isEmpty())try{Reply response=request(game.address,credential,"GET","/thumbnail",null);if(response.status==200){Bitmap full=decode(response.data);if(full!=null){int w=Math.min(full.getWidth(),400),h=full.getHeight()*w/full.getWidth();pictures.put(game.id,Bitmap.createScaledBitmap(full,w,h,true));}}}catch(Exception ignored){}
             }
             ui.post(()->{discovering=false;if(isFinishing())return;games.putAll(found);for(Map.Entry<String,Bitmap> picture:pictures.entrySet())thumbnails.put(picture.getKey(),picture.getValue());while(thumbnails.size()>12)thumbnails.remove(thumbnails.keySet().iterator().next());saveHistory();if(page.equals("home")){renderCards();}});

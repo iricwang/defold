@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 105,
-  "version": "1.14.1-patch.105",
+  "revision": 106,
+  "version": "1.14.1-patch.106",
   "repository": "iricwang/defold",
-  "notes": "Prepare Play resources in the background after saving; reuse unchanged builds for faster Game, Simulator and Remote startup, with shared Windows and macOS cache invalidation and stale-build protection."
+  "notes": "Local macOS build of remote 58eacb4a3a with preserved MCP fixes; synchronize editor, engine and local extension SDK."
 }

@@ -239,7 +239,7 @@ public final class RemoteManager implements AutoCloseable {
     synchronized Map<String, Object> status() throws SocketException {
         Map<String,Object> state = new LinkedHashMap<>();
         state.put("hostId",hostId); state.put("computer",computer); state.put("port",gateway.port()); state.put("fingerprint",gateway.fingerprint);
-        state.put("addresses",gateway.addresses()); state.put("projects",all().stream().map(this::status).toList());
+        state.put("addresses",gateway.addresses()); state.put("connectionAddress",gateway.selectedAddress()); state.put("projects",all().stream().map(this::status).toList());
         state.put("devices",devices.values().stream().map(d->Map.of("id",str(d,"id"),"name",str(d,"name"),"pairedAt",str(d,"pairedAt"))).toList());
         state.put("settings",new LinkedHashMap<>(settings)); state.put("platform",runtime.get("platform")); state.put("runtime",runtime.get("revision")); return state;
     }
@@ -399,6 +399,7 @@ public final class RemoteManager implements AutoCloseable {
         String method=str(request,"method");Map<String,Object> params=(Map<String,Object>)request.getOrDefault("params",Map.of());
         if(method.equals("status"))return status();
         if(method.equals("pairing"))return gateway.pairing();
+        if(method.equals("connection-address")){gateway.selectAddress(str(params,"address"));return status();}
         if(method.equals("add")){
             Path root=Path.of(str(params,"path")).toRealPath();if(!Files.isRegularFile(root.resolve("game.project")))throw new IOException("请选择包含 game.project 的目录");
             if(directory.startsWith(root)||root.startsWith(directory)||root.startsWith(runtimeRoot))throw new IOException("项目目录不能包含管理器数据或运行组件");

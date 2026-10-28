@@ -117,8 +117,20 @@ public class RemoteLogicTest {
         certificate.initCause(new java.security.cert.CertificateException("pin mismatch"));
         check(!RemoteTls.transientFailure(certificate));
     }
+    // A paired host replaces legacy discovery, without authorizing arbitrary TLS origins.
+    static void pairedComputerRouting() {
+        String host="https://192.168.1.8:8390";String[] paired={host};
+        check(RemoteAddress.pairedComputer("http://192.168.1.8:9020/games/legacy",paired).equals(host));
+        check(RemoteAddress.pairedComputer(host+"/games/first",paired).equals(host));
+        check(RemoteAddress.pairedComputer(host+"/games/second",paired).equals(host));
+        check(RemoteAddress.pairedComputer("https://192.168.1.8:8391/games/other",paired).isEmpty());
+        check(RemoteAddress.pairedComputer("http://192.168.1.9:9020/games/other",paired).isEmpty());
+        check(RemoteAddress.pairedComputer("http://192.168.1.8:9020/games/legacy",new String[0]).isEmpty());
+        check(RemoteAddress.pairedComputer("http://192.168.1.8:9020/games/legacy",new String[]{"http://192.168.1.8:8390"}).isEmpty());
+        check(RemoteAddress.pairedComputer("https://192.168.1.8:8390/games/first",new String[]{"https://192.168.1.8:8390/games/second"}).isEmpty());
+    }
     public static void main(String[] args) throws Exception {
-        addresses();gestures();singleFinger();pointerBackpressure();frameRate();qr();
+        addresses();gestures();singleFinger();pointerBackpressure();frameRate();qr();pairedComputerRouting();
         if(args.length>0) {
             java.awt.image.BufferedImage image=javax.imageio.ImageIO.read(new java.io.File(args[0]));
             int width=image.getWidth(),height=image.getHeight();

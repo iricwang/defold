@@ -30,6 +30,7 @@ final class RemoteHosts {
     }
     static synchronized JSONArray all(){try{return new JSONArray(preferences.getString("hosts","[]"));}catch(Exception e){return new JSONArray();}}
     static synchronized String token(String base){String origin=RemoteTls.origin(base);JSONArray all=all();for(int i=0;i<all.length();i++){JSONObject h=all.optJSONObject(i);if(h!=null&&origin.equals(h.optString("address")))return h.optString("token");}return "";}
+    static synchronized String pairedComputer(String game){JSONArray known=all();String[] addresses=new String[known.length()];for(int i=0;i<known.length();i++)addresses[i]=known.optJSONObject(i).optString("address");return RemoteAddress.pairedComputer(game,addresses);}
     static synchronized void remove(String address){JSONArray next=new JSONArray(),all=all();for(int i=0;i<all.length();i++)if(!address.equals(all.optJSONObject(i).optString("address")))next.put(all.optJSONObject(i));preferences.edit().putString("hosts",next.toString()).apply();}
     static JSONObject pair(RemoteAddress target)throws Exception{
         if(target.fingerprint.isEmpty())throw new Exception("请扫描电脑管理器中的二维码");

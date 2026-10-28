@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import plistlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,6 +15,8 @@ HERE = Path(__file__).resolve().parent
 
 
 def build(app, output, engine=None, shell=False):
+    # Finder does not inherit the build terminal's PYTHONPATH.
+    subprocess.run([sys.executable, '-I', '-c', 'import yaml'], check=True)
     spec = importlib.util.spec_from_file_location('automation_build', ROOT / 'scripts/automation/build.py')
     automation = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(automation)
@@ -36,7 +39,8 @@ def build(app, output, engine=None, shell=False):
         for arg in json.loads(configure.read_text(encoding='utf-8'))['args']:
             if arg.startswith('-DDEFOLD_SDK_ROOT') and '=' in arg:
                 sdk = Path(arg.split('=', 1)[1])
-    profile = {'python': sys.executable, 'repository': str(ROOT), 'sdk': str(sdk.resolve())}
+    tool_paths = sorted({str(Path(tool).resolve().parent) for name in ('cmake', 'ninja') if (tool := shutil.which(name))})
+    profile = {'python': sys.executable, 'repository': str(ROOT), 'sdk': str(sdk.resolve()), 'toolPaths': tool_paths}
     inputs['nativeBuild'] = profile
     revision = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()[:16]
     output = Path(output).resolve()
@@ -63,11 +67,33 @@ def build(app, output, engine=None, shell=False):
     config['manifest']=str(package.relative_to(output)/'manifest.json')
     config_path.write_text(json.dumps(config), encoding='utf-8')
     if shell:
-        cargo = shutil.which('cargo') or str(Path.home()/'.cargo/bin/cargo.exe')
+        cargo = shutil.which('cargo') or str(Path.home()/'.cargo/bin'/('cargo.exe' if os.name=='nt' else 'cargo'))
         env = dict(os.environ, CARGO_TARGET_DIR=str(ROOT/'tmp/remote-manager-cargo'))
         subprocess.run([cargo, 'build', '--release', '--offline', '--manifest-path', str(HERE/'Cargo.toml')], env=env, check=True, **quiet)
         executable = 'defold-remote-manager.exe' if os.name=='nt' else 'defold-remote-manager'
         shutil.copy2(Path(env['CARGO_TARGET_DIR'])/'release'/executable, output/executable)
+        if sys.platform == 'darwin':
+            bundle = output/'Defold Remote Manager.app'
+            contents = bundle/'Contents'
+            macos = contents/'MacOS'
+            resources = contents/'Resources'
+            macos.mkdir(parents=True, exist_ok=True)
+            resources.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(output/executable, macos/executable)
+            # Runtime directories are content-addressed and contain read-only JRE files.
+            if not (resources/package.name).exists():
+                shutil.copytree(package, resources/package.name)
+            bundled_config = dict(config, manifest=str(Path(package.name)/'manifest.json'))
+            (macos/'remote-manager.json').unlink(missing_ok=True)
+            (resources/'remote-manager.json').write_text(json.dumps(bundled_config), encoding='utf-8')
+            version = json.loads((HERE/'tauri.conf.json').read_text())['version']
+            with (contents/'Info.plist').open('wb') as info:
+                plistlib.dump(dict(CFBundleExecutable=executable, CFBundleIdentifier='com.defold.remote.manager',
+                                  CFBundleName='Defold Remote Manager', CFBundleDisplayName='Defold Remote Manager',
+                                  CFBundlePackageType='APPL', CFBundleShortVersionString=version,
+                                  CFBundleVersion=version, LSMinimumSystemVersion='11.0',
+                                  NSHighResolutionCapable=True), info)
+            subprocess.run(['codesign', '--force', '--sign', '-', str(bundle)], check=True)
     return {'directory': str(output), 'manifest': str(package/'manifest.json'), 'revision': revision}
 
 

@@ -10,6 +10,8 @@ import struct
 import subprocess
 import time
 import uuid
+from io import BytesIO
+from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -46,10 +48,17 @@ def run(manifest, extension=None):
         return c,c.getresponse()
     try:
         state=rpc('status');port=state['port'];fingerprint=state['fingerprint']
+        selected=state['addresses'][-1]
+        rpc('connection-address',address=selected)
+        check('one selected connection address is persisted',rpc('status')['connectionAddress']==selected)
         c,r=request('/games');check('catalog rejects unpaired clients',r.status==403);r.read();c.close()
         pairing=rpc('pairing')
         from urllib.parse import urlparse,parse_qs
+        check('QR uses only the selected address',parse_qs(urlparse(pairing['uri']).query)['address']==[selected])
         code=parse_qs(urlparse(pairing['uri']).query)['code'][0]
+        rpc('connection-address',address=selected)
+        c,r=request('/pair',body={'code':code});check('address selection invalidates previous QR',r.status==403);r.read();c.close()
+        pairing=rpc('pairing');code=parse_qs(urlparse(pairing['uri']).query)['code'][0]
         c,r=request('/pair',body={'code':code,'name':'Integration Android'});auth=json.loads(r.read());c.close();token=auth['token']
         c,r=request('/pair',body={'code':code});check('pairing secret is single use',r.status==403);r.read();c.close()
         projects=[]
@@ -72,6 +81,12 @@ def run(manifest, extension=None):
         for pid in projects:
             c,r=request(f'/games/{pid}/claim',token,{});claim=json.loads(r.read());c.close();control=claim['token']
             c,r=request(f'/games/{pid}/thumbnail',token);image=r.read();c.close();check('real GPU thumbnail '+pid,r.status==200 and image[:2]==b'\xff\xd8');(work/(pid+'.jpg')).write_bytes(image)
+            # The asymmetric orange handle detects a double vertical flip on macOS.
+            with Image.open(BytesIO(image)) as thumbnail:
+                rgb=thumbnail.convert('RGB');w,h=rgb.size
+                lower=rgb.getpixel((w//4,round(h*185/240)))
+                upper=rgb.getpixel((w//4,round(h*55/240)))
+                check('stream uses top-left image coordinates '+pid,lower[0]>220 and lower[1]>90 and lower[2]<100 and upper[0]<80)
             c,r=request(f'/games/{pid}/input',control,struct.pack('<HHB',32768,32768,1),{'X-Defold-Device-Revision':str(claim['device_revision'])});check('pointer accepted '+pid,r.status==200);r.read();c.close()
             deadline=time.monotonic()+5
             while time.monotonic()<deadline:

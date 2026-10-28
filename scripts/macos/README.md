@@ -39,3 +39,43 @@ produce artifacts. Every new patch must have a revision higher than the latest
 published release. No signing or official Defold publishing credentials are used.
 
 See [patch delivery](../../patch/README.md) for installation and local verification.
+
+## Local native-extension build service
+
+Updating the editor does not update the SDK used by a separate local Extender
+service. After rebuilding the engine, package its complete SDK from the same
+build environment:
+
+```sh
+python scripts/build.py build_platform_sdk --platform=arm64-macos
+```
+
+The output is `tmp/dynamo_home/defoldsdk.zip` when using this fork's local build
+environment. Check the packaging log and archive before deployment: the build
+command can report a packaging error without returning a nonzero exit status.
+Stop the local service before replacing its `DYNAMO_HOME` directory, keep the
+previous directory for rollback, and extract the archive preserving executable
+permissions (for example, with `ditto -x -k`). Retain any service-specific SDK
+metadata separately, then restart the service and verify its health endpoint.
+Deploy headers, libraries and `extender/build.yml` together from this archive.
+
+Do not deploy only headers and libraries. Extensions containing `.proto` files
+also require `ext/bin/arm64-macos/protoc`, `bin/ddfc_cxx`, `bin/ddfc.py`,
+`lib/python`, `ext/lib/python/google`, and `share/proto`. The SDK build recipe
+sets `PYTHONPATH` for the DDF generator. A missing `protoc` produces an Extender
+`generateProtoCxxForEngine` failure even when extensions without Proto files
+previously built successfully.
+
+After deployment, verify an actual extension containing Proto definitions and
+run the resulting engine; `protoc --version` alone does not exercise DDF
+generation, extension compilation or linking. Use the configured loopback
+service when local-only builds are required.
+
+On 2026-10-28, the local service at `127.0.0.1:9011` was repaired using the SDK
+from engine `61ce841dbe`. Dragon Burst's actual editor Game bridge and Spine
+extension compiled and linked successfully (job `1874678848398488809`). The
+resulting engine registered Spine, initialized Metal, and reached both
+`AUTOMATION_READY` and `SAFE_AREA` in the local GUI runtime fixture without
+runtime errors. This verifies native compilation and engine startup, not a
+complete gameplay regression. Local evidence is retained in
+`tmp/local-extender-repair/build.log` and `tmp/local-extender-repair/runtime.log`.
