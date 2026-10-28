@@ -48,6 +48,8 @@ import java.util.prefs.Preferences;
 public final class RemoteGameServer {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
+    // Allow brief Wi-Fi stalls, but reconnect before the client's 3.5 second read timeout.
+    static final long WRITE_TIMEOUT_NANOS = 1_500_000_000L;
     private static RemoteGameServer instance;
     private final HttpServer http;
     private final ExecutorService network;
@@ -102,6 +104,7 @@ public final class RemoteGameServer {
         volatile long audioWriteStarted;
         volatile boolean videoStream;
         volatile long videoWriteStarted;
+        volatile long stalledStreams;
         volatile int lastSequence = -1;
         volatile Object lastSession;
         final ArrayDeque<Long> attempts = new ArrayDeque<>();
@@ -134,6 +137,8 @@ public final class RemoteGameServer {
             result.put("audio",com.sun.jna.Platform.isMac());
             result.put("video_codecs", RemoteVideoEncoder.available() ? List.of("h264", "jpeg") : List.of("jpeg"));
             result.put("resolutions",List.of("540p","720p","1080p","original"));result.put("stream_resolution",quality.id);
+            result.put("stream_codec", stream == null ? "none" : videoStream ? "h264" : "jpeg");
+            result.put("stream_stall_disconnects", stalledStreams);
             return result;
         }
         private boolean authorized(String authorization) {
@@ -151,8 +156,33 @@ public final class RemoteGameServer {
             token = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
             preferences.put("token", token); return token;
         }
-        private void closeStream() { HttpExchange previous = stream; stream = null; videoStream = false; videoWriteStarted = 0; if (previous != null) previous.close(); view.remoteRelease(); }
-        private void closeAudio(){HttpExchange old=audio;audio=null;audioWriteStarted=0;if(old!=null)old.close();}
+        private synchronized void closeStream() {
+            HttpExchange previous = stream;
+            stream = null; videoStream = false; videoWriteStarted = 0;
+            // HttpExchange.close can wait for a blocked writer. Never stall the capture/FX thread on it.
+            if (previous != null) Thread.ofVirtual().name("remote-stream-close").start(previous::close);
+            view.remoteRelease();
+            synchronized (signal) { signal.notifyAll(); }
+        }
+        private synchronized void closeAudio() {
+            HttpExchange old = audio; audio = null; audioWriteStarted = 0;
+            if (old != null) Thread.ofVirtual().name("remote-audio-close").start(old::close);
+        }
+        synchronized boolean beginVideoWrite(HttpExchange owner) {
+            if (stream != owner) return false;
+            videoWriteStarted = System.nanoTime();
+            return true;
+        }
+        synchronized void endVideoWrite(HttpExchange owner) {
+            if (stream == owner) videoWriteStarted = 0;
+        }
+        synchronized void expireStreams(long now) {
+            if (audioWriteStarted != 0 && now - audioWriteStarted > 250_000_000L) closeAudio();
+            if (videoWriteStarted != 0 && now - videoWriteStarted > WRITE_TIMEOUT_NANOS) {
+                stalledStreams++;
+                closeStream();
+            }
+        }
         private void closeConnections(){closeStream();closeAudio();}
         public void showPairing(javafx.stage.Window owner, Button button) {
             Dialog<Void> dialog = new Dialog<>(); dialog.setTitle("Remote · " + title);
@@ -245,9 +275,8 @@ public final class RemoteGameServer {
         for (Game game : games.values()) {
             if (!game.enabled) continue;
             long now = System.nanoTime();
-            if(game.audioWriteStarted!=0&&now-game.audioWriteStarted>250_000_000L)game.closeAudio();
-            // A stalled TCP receiver must reconnect at an IDR instead of accumulating old P frames.
-            if (game.videoWriteStarted != 0 && now - game.videoWriteStarted > 250_000_000L) { game.closeStream(); continue; }
+            // Inspect and detach the same stream under one lock; an old timeout cannot close a replacement.
+            game.expireStreams(now);
             if ((game.stream == null || game.videoStream) && now > game.demandUntil) continue;
             try {
                 RemoteStreamQuality quality=game.videoStream ? RemoteStreamQuality.SMOOTH : game.quality;
@@ -352,12 +381,15 @@ public final class RemoteGameServer {
                     frame=game.view.remoteRunning()?game.latest:null;
                     if(frame!=null&&frame.quality()!=game.quality)frame=null;
                 }
-                if(frame==null || frame==previous) { output.writeInt(0); output.writeInt(0); }
-                else { output.writeInt(frame.bytes().length); output.writeInt(frame.sequence()); output.write(frame.bytes()); previous=frame; }
-                output.flush();
+                if (!game.beginVideoWrite(exchange)) break;
+                try {
+                    if(frame==null || frame==previous) { output.writeInt(0); output.writeInt(0); }
+                    else { output.writeInt(frame.bytes().length); output.writeInt(frame.sequence()); output.write(frame.bytes()); previous=frame; }
+                    output.flush();
+                } finally { game.endVideoWrite(exchange); }
             }
         } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-        finally { if(game.stream==exchange) { game.stream=null; game.view.remoteRelease(); } exchange.close(); }
+        finally { synchronized (game) { if (game.stream == exchange) game.closeStream(); } exchange.close(); }
     }
     private void audio(HttpExchange exchange,Game game,String authorization)throws IOException{
         if(!com.sun.jna.Platform.isMac()){reply(exchange,503,Map.of("error","Audio unavailable"));return;}
@@ -415,9 +447,10 @@ public final class RemoteGameServer {
                     session = raw.session; sequence = raw.sequence;
                     byte[] bytes = encoder.frame(raw.rgb, raw.width, raw.height);
                     // Encoding and writing are serial: at most one compressed frame in our pipeline.
-                    if(game.stream==exchange)game.videoWriteStarted = System.nanoTime();
-                    output.writeInt(bytes.length); output.writeInt(sequence); output.write(bytes); output.flush();
-                    if(game.stream==exchange)game.videoWriteStarted = 0;
+                    if (!game.beginVideoWrite(exchange)) break;
+                    try {
+                        output.writeInt(bytes.length); output.writeInt(sequence); output.write(bytes); output.flush();
+                    } finally { game.endVideoWrite(exchange); }
                     raw = null;
                     nextFrame=Math.max(nextFrame+16_666_667L,System.nanoTime()-16_666_667L);
                 }

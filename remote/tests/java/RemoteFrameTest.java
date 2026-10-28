@@ -74,7 +74,7 @@ public final class RemoteFrameTest {
         Path output=Path.of(args[0]);Files.createDirectories(output);
         Path project=output.toAbsolutePath().resolve("project");Files.createDirectories(project.resolve(".internal"));
         Files.writeString(project.resolve(".internal/game-simulator.properties"),
-            "enabled=true\nname=Remote orientation test\nwidth=2048\nheight=2048\ntop=0\nright=0\nbottom=0\nleft=0\nradius=0\ncutoutWidth=0\ncutoutHeight=0\ncutoutTop=0\n");
+            "enabled="+!(args.length>1&&args[1].equals("embedded"))+"\nname=Remote orientation test\nwidth=2048\nheight=2048\ntop=0\nright=0\nbottom=0\nleft=0\nradius=0\ncutoutWidth=0\ncutoutHeight=0\ncutoutTop=0\n");
         Platform.startup(() -> {});
         GamePreview view=fx(() -> new GamePreview(project.toString(),()->{},()->{},(node,key)->{}));
         RemoteGameServer.Game game=RemoteGameServer.register(project.toString(),view,()->{});

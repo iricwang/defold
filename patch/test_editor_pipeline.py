@@ -63,12 +63,14 @@ class EditorPipelineTest(unittest.TestCase):
                 capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
                 creationflags=subprocess.CREATE_NO_WINDOW)
             self.assertEqual(0, compilation.returncode, compilation.stdout + compilation.stderr)
-            result = subprocess.run(
-                [str(java), '--enable-native-access=ALL-UNNAMED', '-Dglass.platform=headless', '-Dprism.order=sw',
-                 '-cp', str(classes) + os.pathsep + jar, 'com.defold.editor.RemoteFrameTest', directory],
-                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            for mode in ('simulator', 'embedded'):
+                with self.subTest(preview_mode=mode):
+                    result = subprocess.run(
+                        [str(java), '--enable-native-access=ALL-UNNAMED', '-Dglass.platform=headless', '-Dprism.order=sw',
+                         '-cp', str(classes) + os.pathsep + jar, 'com.defold.editor.RemoteFrameTest', str(Path(directory) / mode), mode],
+                        capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
+                    self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     # Native RectTransform fields must survive the actual shipped Bob protocol.
     def test_packaged_gui_rect_transform_protocol(self):

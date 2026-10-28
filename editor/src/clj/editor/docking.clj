@@ -421,11 +421,12 @@
                       :reserved reserved
                       :splits {"assets-split" (:assets bodies) "right-split" (:inspector bodies) "outline-dock-split" (:outline bodies)}
                       :snapshot! (fn [] (capture-trees!)
-                                    {:layout @layout :trees @trees
-                                        :positions (split-positions scene)
-                                        :hidden (into #{} (filter #(and (nil? (.lookup scene (str "#" (name %) "-pane")))
-                                                                       (not (floating-zone? scene %))))
-                                                      [:left :right :bottom :center])})
+                                   {:layout @layout :trees @trees
+                                    :positions (or (ui/user-data scene :editor.dock-windows/collapsed-home-positions)
+                                                   (split-positions scene))
+                                    :hidden (into #{} (filter #(and (nil? (.lookup scene (str "#" (name %) "-pane")))
+                                                                    (not (floating-zone? scene %))))
+                                                  [:left :right :bottom :center])})
                       :restore-visibility! (fn [snapshot]
                                              (doseq [zone (:hidden snapshot)
                                                      :when (contains? default-layout zone)]
@@ -454,4 +455,7 @@
       (render! nil)
       (.applyCss root)
       (.layout root)
+      (dock-windows/install-game-collapse! scene (get-in panels [:game :node])
+                                           #(split-positions scene)
+                                           #(apply-split-positions! scene %))
       {:panels (into {} (map (fn [[id value]] [id (:node value)])) panels)})))

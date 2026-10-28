@@ -44,7 +44,7 @@ public final class AutomationWorker implements AutoCloseable {
     private long logCursor;
     private volatile int servicePort;
 
-    private AutomationWorker(Path directory) throws IOException {
+    AutomationWorker(Path directory) throws IOException {
         this.directory = directory;
         Files.createDirectories(directory);
         if (MAC) Files.setPosixFilePermissions(directory, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
@@ -272,7 +272,7 @@ public final class AutomationWorker implements AutoCloseable {
         return metadata;
     }
 
-    private Object command(Map<?, ?> request) throws Exception {
+    synchronized Object command(Map<?, ?> request) throws Exception {
         return switch ((String)request.get("command")) {
             case "start" -> { start(request); yield status(); }
             case "status" -> status();
@@ -290,13 +290,59 @@ public final class AutomationWorker implements AutoCloseable {
         };
     }
 
-    private Map<String, Object> status() {
+    synchronized Map<String, Object> status() {
         return Map.of("alive", game != null && game.isAlive(), "pid", game == null ? 0 : game.pid(),
                 "port", servicePort, "width", width, "height", height, "device_revision", revision,
                 "render_sequence", get(270), "input_sequence", get(271), "protocol_version", get(269));
     }
 
-    @Override public void close() throws Exception {
+    /** Continuous Remote frames use the same coordinates as deterministic MCP captures. */
+    record LiveFrame(int width, int height, int sequence, int revision, int[] pixels) {}
+
+    synchronized LiveFrame liveFrame(int previous, int[] reuse) throws IOException {
+        if (game == null || !game.isAlive()) return null;
+        try (var lock = shared.getChannel().tryLock()) {
+            if (lock == null) return null;
+            put(265, 1);
+            put(267, get(267) + 1);
+            int frame = get(3), w = get(1), h = get(2), slot = get(11);
+            if (frame == previous || w != width || h != height || w < 32 || h < 32
+                    || slot < 0 || slot > 1 || (long)w * h * 4 > CAPACITY) return null;
+            int[] pixels = reuse != null && reuse.length == w * h ? reuse : new int[w * h];
+            ByteBuffer source = data.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+            source.position(4096 + slot * CAPACITY);
+            source.asIntBuffer().get(pixels);
+            for (int row = 0; row < h / 2; row++) {
+                int top = row * w, bottom = (h - row - 1) * w;
+                for (int col = 0; col < w; col++) {
+                    int value = pixels[top + col]; pixels[top + col] = pixels[bottom + col]; pixels[bottom + col] = value;
+                }
+            }
+            return new LiveFrame(w, h, frame, get(274), pixels);
+        }
+    }
+
+    /** A held Remote pointer must not wait two game frames or release after every move. */
+    synchronized void livePointer(int normalizedX, int normalizedY, boolean pressed) throws IOException {
+        if (game == null || !game.isAlive()) return;
+        if (normalizedX < 0 || normalizedX > 65535 || normalizedY < 0 || normalizedY > 65535)
+            throw new IllegalArgumentException("Pointer outside frame");
+        x = (int)((long)normalizedX * (width - 1) / 65535);
+        y = (int)((long)normalizedY * (height - 1) / 65535);
+        buttons = pressed ? 1 : 0;
+        if (MAC) {
+            try (var lock = shared.getChannel().lock()) {
+                put(6, x); put(7, y); put(8, buttons); put(9, 0); put(10, 0);
+                put(277, ++sequence);
+            }
+        } else {
+            put(6, x); put(7, y);
+            window.input(x, y, buttons, 0, keys, text);
+            window.automationMarker(++sequence);
+        }
+    }
+
+    @Override public synchronized void close() throws Exception {
         if (game != null && game.isAlive()) {
             try { release(); } catch (Exception ignored) { }
             game.destroyForcibly(); game.waitFor(10, TimeUnit.SECONDS); game.getInputStream().close();

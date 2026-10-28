@@ -110,7 +110,7 @@ public final class WindowsGameProcess extends Process {
         overrides.forEach((key, value) -> {
             if (value == null) environment.remove(key); else environment.put(key, value);
         });
-        if (overrides.get("DM_EDITOR_GAME_FILE") != null) {
+        if (overrides.get("DM_EDITOR_GAME_FILE") != null && !"1".equals(overrides.get("DM_EDITOR_GAME_CAPTURE_ONLY"))) {
             long address = hookLibrary.getFunction("SimulatorSafeAreaRva").invokeLong(new Object[]{new com.sun.jna.WString(command.getFirst())});
             if (address == 0) throw new IOException("Simulator requires the matching dmengine.pdb beside the game engine for native GUI safe-area adaptation.");
             environment.put("DM_EDITOR_GAME_SAFE_AREA_RVA", Long.toHexString(address));

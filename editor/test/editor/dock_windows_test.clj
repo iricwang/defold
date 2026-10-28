@@ -20,9 +20,97 @@
             [editor.prefs :as prefs]
             [editor.ui :as ui]
             [integration.test-util :as test-util])
-  (:import [javafx.scene Scene]
-           [javafx.scene.control SplitPane]
-           [javafx.scene.layout StackPane]))
+  (:import [javafx.event Event]
+           [javafx.scene Node Scene]
+           [javafx.scene.control Button Label MenuBar SplitPane TabPane]
+           [javafx.scene.input MouseButton MouseEvent PickResult]
+           [javafx.scene.layout BorderPane HBox Priority StackPane VBox]
+           [javafx.stage Stage]))
+
+(defn- click-header! [^Node node button clicks]
+  (let [point (.localToScene node 4.0 4.0)]
+    (Event/fireEvent node (MouseEvent. MouseEvent/MOUSE_CLICKED
+                                       (.getX point) (.getY point) 0.0 0.0 button clicks
+                                       false false false false false false false false false true
+                                       (PickResult. node (.getX point) (.getY point))))))
+
+;; Collapse frees dock space and ignores toolbar clicks. Restore retains content,
+;; divider ratios and floating geometry instead of recreating the Game view.
+(deftest collapse-game-to-menu-test
+  (ui/run-now
+    (let [preferences (test-util/make-test-prefs)
+          title (Label. "Game")
+          control (Button. "Play")
+          content (VBox. (into-array Node [(HBox. (into-array Node [title control])) (Label. "Preview")]))
+          slot (StackPane. (into-array Node [content]))
+          other (StackPane.)
+          split (doto (SplitPane.) (.setId "workbench"))
+          menu (doto (MenuBar.) (.setId "menu-bar"))
+          root (VBox. (into-array Node [menu split]))
+          scene (Scene. root 800.0 500.0)
+          owner (doto (Stage.) (.setScene scene) (.setX -10000.0) (.setY -10000.0))
+          previous-main-stage (ui/main-stage)
+          capture! #(vec (.getDividerPositions split))
+          restore! #(.setDividerPositions split (double-array %))]
+      (VBox/setVgrow split Priority/ALWAYS)
+      (.addAll (.getItems split) ^java.util.Collection [other slot])
+      (ui/user-data! scene :localization (localization/make-editor preferences #(throw %)))
+      (try
+        (.show owner)
+        (ui/set-main-stage owner)
+        (dock/register! slot "Game" {})
+        (dock/install-game-collapse! scene slot capture! restore!)
+        (.applyCss root)
+        (.layout root)
+        (.setDividerPositions split (double-array [0.4]))
+        (let [button ^Button (.lookup scene "#collapsed-game-button")
+              body (.getParent content)
+              before (capture!)]
+          (click-header! title MouseButton/PRIMARY 1)
+          (click-header! title MouseButton/SECONDARY 2)
+          (click-header! control MouseButton/PRIMARY 2)
+          (is (not (.isVisible button)))
+          (is (= [other slot] (vec (.getItems split))))
+          (click-header! title MouseButton/PRIMARY 2)
+          (is (.isVisible button))
+          (is (.isManaged button))
+          (is (= [menu button] (vec (.getChildren ^HBox (.getParent menu)))))
+          (is (= [other] (vec (.getItems split))))
+          (is (identical? body (.getParent content)))
+          (.fire button)
+          (is (not (.isManaged button)))
+          (is (= [other slot] (vec (.getItems split))))
+          (is (< (Math/abs (- (first before) (first (capture!)))) 0.001))
+          (click-header! title MouseButton/PRIMARY 2)
+          (dock/restore-all! scene)
+          (is (not (.isVisible button)))
+          (is (= [other slot] (vec (.getItems split))))
+          (dock/float-slot! slot -10000.0 -10000.0)
+          (let [windows (:windows (ui/user-data scene :editor.dock-windows/manager))
+                window (val (first @windows))
+                stage ^Stage (:stage window)
+                group ^TabPane (.getCenter ^BorderPane (:host window))
+                header (.getGraphic (.get (.getTabs group) 0))
+                bounds [(.getX stage) (.getY stage) (.getWidth stage) (.getHeight stage)]]
+            (click-header! header MouseButton/PRIMARY 2)
+            (is (not (.isShowing stage)))
+            (is (.isVisible button))
+            (is (= 1 (count @windows)))
+            (.fire button)
+            (is (.isShowing stage))
+            (is (= bounds [(.getX stage) (.getY stage) (.getWidth stage) (.getHeight stage)]))
+            (is (identical? body (.getParent content)))
+            (click-header! header MouseButton/PRIMARY 2)
+            (dock/restore-all! scene)
+            (is (zero? (count @windows)))
+            (is (not (.isVisible button)))
+            (is (= [other slot] (vec (.getItems split)))))
+          (dock/install-game-collapse! scene slot capture! restore!)
+          (is (= 2 (count (.getChildren ^HBox (.getParent menu))))))
+        (finally
+          (dock/restore-all! scene)
+          (.hide owner)
+          (ui/set-main-stage previous-main-stage))))))
 
 ;; Resource title changes follow the floating tab and native window without rebuilding or moving content.
 (deftest floating-resource-title-test

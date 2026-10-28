@@ -528,6 +528,19 @@ set(ENGINE_DMENGINE_EXPORTS "${CMAKE_CURRENT_BINARY_DIR}/__exported_symbols_dmen
 defold_create_exported_symbols_file("${ENGINE_DMENGINE_EXPORTS}" "${ENGINE_DMENGINE_SYMBOLS}")
 engine_add_binary(dmengine ${ENGINE_MAIN_SOURCES} "${ENGINE_DMENGINE_EXPORTS}")
 engine_configure_executable(dmengine debug engine engine_service graphics "${ENGINE_PROFILE_LIBS}" "${ENGINE_PROFILE_SYMBOLS}")
+
+# Optional local extension build. Keep the stock engine and installed SDK intact.
+# The Windows extension runner generates this file from validated manifests.
+set(DEFOLD_LOCAL_EXTENSION_CONFIG "" CACHE FILEPATH "Generated local extension target configuration")
+if(DEFOLD_LOCAL_EXTENSION_CONFIG)
+  include("${DEFOLD_LOCAL_EXTENSION_CONFIG}")
+  set(_local_exports "${CMAKE_CURRENT_BINARY_DIR}/__exported_symbols_dmengine_local.cpp")
+  defold_create_exported_symbols_file("${_local_exports}" "${ENGINE_DMENGINE_SYMBOLS};${DEFOLD_LOCAL_EXTENSION_SYMBOLS}")
+  engine_add_binary(dmengine_local ${ENGINE_MAIN_SOURCES} "${_local_exports}")
+  set_target_properties(dmengine_local PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  engine_configure_executable(dmengine_local debug engine engine_service graphics "${ENGINE_PROFILE_LIBS}" "${ENGINE_PROFILE_SYMBOLS}")
+  target_link_libraries(dmengine_local PRIVATE ${DEFOLD_LOCAL_EXTENSION_LIBRARIES})
+endif()
 if(COMMAND defold_bundle_target)
   defold_bundle_target(dmengine)
 endif()

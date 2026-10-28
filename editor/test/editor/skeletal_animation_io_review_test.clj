@@ -66,7 +66,7 @@
           (doseq [skeleton (native/graph-skeletons graph)]
             (let [fields (:data (native/graph-node graph (:reference skeleton)))
                   audio (:data (native/graph-node graph (get fields 34)))]
-              (is (= (.getCanonicalPath (io/file origin "audio")) audio))))
+              (is (= (.getCanonicalFile (io/file origin "audio")) (.getCanonicalFile (io/file audio))))))
           (let [peer-imported (:document (skeletal-io/read-independent-skeleton! source-file project decoded "peer"))
                 peer-target (io/file directory "second" "peer.spine")
                 _ (skeletal-io/write-independent-project! (data/update-bone peer-imported "root" {:x 88.0}) project peer-target)
@@ -140,10 +140,11 @@
                                (native/graph-skeletons graph))]
           (is (nil? (get-in restored [:native-project :codec])))
           (is (= ["hero" "peer"] (mapv :name (:skeletons reopened))))
-          (is (= [(.getCanonicalPath (io/file origin "hero-audio"))
-                  (.getCanonicalPath (io/file origin "peer" "audio"))] audio-roots))
+          (is (= [(.getCanonicalFile (io/file origin "hero-audio"))
+                  (.getCanonicalFile (io/file origin "peer" "audio"))]
+                 (mapv #(.getCanonicalFile (io/file %)) audio-roots)))
           (is (= 77.0 (get-in reopened [:skeletons 1 :source "bones" 0 "x"])))
-          (is (= (.getCanonicalPath (io/file origin "images"))
-                 (get-in reopened [:skeletons 1 :source "skeleton" "images"])))
+          (is (= (.getCanonicalFile (io/file origin "images"))
+                 (.getCanonicalFile (io/file (get-in reopened [:skeletons 1 :source "skeleton" "images"])))))
           (is (.isFile target))))
       (finally (fs/delete-directory! directory {:fail :silently})))))

@@ -22,13 +22,14 @@ import java.util.Map;
 /** Validated LAN-only connection parameters shared by manual input, QR and Intents. */
 public final class RemoteAddress {
     public final String base, code;
+    public String fingerprint = "";
     public RemoteAddress(String address, String pairingCode) throws Exception {
         if (address == null || address.length() > 512) throw new Exception("连接地址无效");
         URI uri = new URI(address.contains("://") ? address.trim() : "http://" + address.trim());
         String host = uri.getHost();
-        if (!"http".equals(uri.getScheme()) || host == null || !host.matches("[0-9.]+")
+        if (!("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) || host == null || !host.matches("[0-9.]+")
                 || uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null)
-            throw new Exception("仅支持局域网 HTTP 地址");
+            throw new Exception("仅支持局域网 HTTP / HTTPS 地址");
         String[] parts = host.split("\\.");
         if (parts.length != 4) throw new Exception("IP 地址无效");
         int[] octets = new int[4];
@@ -39,9 +40,9 @@ public final class RemoteAddress {
         int port=uri.getPort()==-1?8390:uri.getPort(); if(port<1||port>65535) throw new Exception("端口无效");
         String path=uri.getPath(); if(path==null||path.equals("/")) path="";
         if(!path.isEmpty()&&!path.matches("/games/[a-zA-Z0-9_-]{1,64}")) throw new Exception("游戏连接路径无效");
-        base="http://"+host+":"+port+path;
+        base=uri.getScheme()+"://"+host+":"+port+path;
         code=pairingCode==null?"":pairingCode.trim().replace(" ","");
-        if(!code.isEmpty()&&!code.matches("[0-9]{8}")) throw new Exception("配对码应为八位数字");
+        if(!code.isEmpty()&&!code.matches(base.startsWith("https:")?"[A-Za-z0-9_-]{43}":"[0-9]{8}")) throw new Exception("配对码格式无效");
     }
     public static RemoteAddress fromLink(String value) throws Exception {
         if(value==null||value.length()>2048) throw new Exception("二维码内容无效");
@@ -54,8 +55,13 @@ public final class RemoteAddress {
             String key=URLDecoder.decode(item[0],"UTF-8");
             if(fields.put(key,URLDecoder.decode(item[1],"UTF-8"))!=null) throw new Exception("重复的连接参数");
         }
-        if(!"1".equals(fields.get("v"))) throw new Exception("二维码版本不支持");
+        if(!"1".equals(fields.get("v"))&&!"2".equals(fields.get("v"))) throw new Exception("二维码版本不支持");
         RemoteAddress address=new RemoteAddress(fields.get("address"),fields.get("code"));
+        if("2".equals(fields.get("v"))) {
+            String pin=fields.get("fingerprint");
+            if(!address.base.startsWith("https:")||address.base.contains("/games/")||pin==null||!pin.matches("[a-f0-9]{64}")) throw new Exception("电脑二维码缺少有效证书指纹");
+            address.fingerprint=pin;
+        } else if(address.base.startsWith("https:")) throw new Exception("HTTPS 连接需要电脑二维码");
         if(address.code.isEmpty()) throw new Exception("二维码缺少配对码");
         return address;
     }

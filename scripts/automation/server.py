@@ -99,6 +99,8 @@ def tools():
          obj({'build_id': STRING, 'resource_path': STRING, 'support_objects': SUPPORT_OBJECTS,
               'instance_id': {'type': 'string', 'pattern': '^[A-Za-z0-9_-]{1,64}$'}, **operation}, ('build_id', 'resource_path', 'operation_id')), False),
         ('job_status', 'Read background build/start completion or failure.', obj({'job_id': STRING}, ('job_id',)), True),
+        ('job_wait', 'Wait up to 10 seconds for an owned job to finish. A nonterminal return is still running, not a failure; waiting never cancels or replays the operation.',
+         obj({'job_id': STRING, 'timeout_ms': {'type': 'integer', 'minimum': 0, 'maximum': 10000}}, ('job_id',)), True),
         ('job_cancel', 'Cancel an owned job. Completed work is not undone.', obj({'job_id': STRING}, ('job_id',)), False),
         ('operation_status', 'Read an accepted operation without replaying its side effects.', obj(operation, ('operation_id',)), True),
         ('session_start', 'Start an owned hidden GPU runtime from a completed build. Returns a job; no desktop input.',
@@ -257,6 +259,8 @@ def dispatch(service, name, arguments):
         return scenarios.inspect(service, **args)
     if name in ('job_status', 'job_cancel'):
         return service.job_status(args['job_id'], name == 'job_cancel')
+    if name == 'job_wait':
+        return service.job_wait(**args)
     if name == 'operation_status':
         result = service.operations.get(args['operation_id'])
         if not result:

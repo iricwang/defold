@@ -26,8 +26,8 @@
            [java.util.function BiConsumer Supplier]
            [javafx.geometry Point2D]
            [javafx.scene Node Scene]
-           [javafx.scene.control Label SplitPane Tab TabPane]
-           [javafx.scene.layout AnchorPane HBox Priority StackPane]
+           [javafx.scene.control Label MenuBar SplitPane Tab TabPane]
+           [javafx.scene.layout AnchorPane HBox Priority StackPane VBox]
            [javafx.scene.shape Rectangle]
            [javafx.stage Stage]))
 
@@ -149,8 +149,10 @@
                    (.setId "assets-split"))
           inspector (doto (SplitPane.) (.setId "right-split"))
           tools (doto (TabPane.) (.setId "tool-tabs"))
-          root (StackPane. (into-array Node [(doto (HBox. 4.0 (into-array Node (mapv hosts [:left :right :bottom :center])))
-                                             (.setId "workbench"))]))
+          root (StackPane. (into-array Node [(VBox. (into-array Node [(doto (MenuBar.) (.setId "menu-bar"))
+                                                                      (doto (HBox. 4.0 (into-array Node (mapv hosts [:left :right :bottom :center])))
+                                                                        (.setId "workbench")
+                                                                        (VBox/setVgrow Priority/ALWAYS))]))]))
           scene (Scene. root 1100.0 600.0)
           stage (doto (Stage.) (.setTitle "Dock gesture regression") (.setScene scene))]
       (StackPane/setAlignment assets-title javafx.geometry.Pos/TOP_LEFT)

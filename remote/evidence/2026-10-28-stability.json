@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-28",
+  "delivery": "Source changes and isolated tests only; installed editor and Android APK not replaced",
+  "findings": [
+    "Video writes were disconnected after 250 ms; short stalls caused unnecessary reconnects.",
+    "Android switched permanently to JPEG for the current stream after any first H.264 exception.",
+    "Closing HttpExchange synchronously could block the shared capture thread behind a stalled writer.",
+    "Write timeout ownership checks were not atomic with connection replacement.",
+    "Non-200 video HTTP responses were all presented as pairing failures."
+  ],
+  "changes": [
+    "Video/JPEG write timeout is 1.5 seconds and tied atomically to the current connection.",
+    "Socket close is detached from capture and JavaFX threads; obsolete writers cannot clear a new deadline.",
+    "Android uses bounded retries with backoff, retaining H.264 through transient failures.",
+    "Three consecutive failures without five seconds of decoded frames allow JPEG fallback; five failures end retries.",
+    "Explicit unsupported video responses allow immediate fallback; 401/403 alone request pairing again.",
+    "Status reports current stream codec and the host's stalled-video disconnect counter."
+  ],
+  "validation": {
+    "android_sources": "All Android Java sources compiled locally against android.jar with Java 8 target",
+    "recovery_policy": "23 assertions passed",
+    "client_logic": "11058 assertions passed",
+    "avc_config": "Regression tests passed",
+    "python_http_udp": "10 tests passed outside the network-isolated sandbox",
+    "stream_lifecycle": "Deterministic short-stall, blocked close, old-writer and new-owner checks passed in isolated JavaFX host",
+    "hidden_h264": {"frames": 900, "fps": 56.2240800893071, "p95_interval_ms": 32.0079},
+    "reconnect_run": {
+      "jpeg_frames": 480,
+      "jpeg_fps": 25.64892352137316,
+      "h264_frames": 480,
+      "h264_fps": 56.209005783437306,
+      "reconnects": 6,
+      "resolutions": ["540p", "720p"],
+      "each_reconnect_has_sps_pps_idr": true,
+      "input_callbacks": 12,
+      "disconnect_release_verified": true
+    }
+  },
+  "environment": {
+    "transport": "Loopback, real hidden Windows OpenGL engine, Media Foundation hardware H.264, headless JavaFX",
+    "live_editor_listener": "0.0.0.0:8390",
+    "live_editor_status": "running, advertises h264 and jpeg",
+    "android_adb_devices": 0
+  },
+  "artifacts": {
+    "hidden_run": "tmp/remote-stability/real/results.json",
+    "reconnect_run": "tmp/remote-stability/reconnect/results.json",
+    "host_tests": "tmp/remote-stability/host-tests.log"
+  },
+  "limitations": [
+    "No Android device or phone Wi-Fi reachability/display-FPS validation; actual initial connection failure is not conclusively diagnosed.",
+    "No firewall or security configuration was changed.",
+    "Numbers use the animated-color fixture, not a complex gameplay workload.",
+    "macOS actual hardware and audio streaming were not run."
+  ]
+}

@@ -44,11 +44,10 @@ async def main():
             async def finish(job, expected='complete'):
                 deadline = time.monotonic()+150
                 while time.monotonic()<deadline:
-                    result = await call('job_status',job_id=job['job_id'])
-                    if result['state'] in ('complete','failed','cancelled'):
+                    result = await call('job_wait',job_id=job['job_id'],timeout_ms=10000)
+                    if result['terminal']:
                         assert result['state']==expected,result
                         return result
-                    await asyncio.sleep(.1)
                 raise AssertionError('Job timed out')
             pid = (await call('project_discover'))['projects'][0]['project_id']
             build = (await finish(await call('build_run',project_id=pid,operation_id='build')))['result']
@@ -105,8 +104,10 @@ async def main():
                 await sampled(job)
                 busy = await finish(await call('capture_sequence',session_id=sid,operation_id='busy'),'failed')
                 assert busy['error_code']=='SEQUENCE_BUSY'
+                waiting = asyncio.create_task(finish(job,'cancelled'))
                 await call('job_cancel',job_id=job['job_id'])
-                cancelled = await finish(job,'cancelled')
+                cancelled = await waiting
+                assert cancelled['terminal'] and cancelled['cancel_requested'],cancelled
                 partial = cancelled['error_details']
                 assert 2<=partial['captured_frames']<30 and partial['state']=='cancelled'
                 assert Path(partial['preview']['path']).is_file()

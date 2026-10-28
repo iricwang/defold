@@ -57,11 +57,12 @@ public class RemoteWindowsIntegrationTest {
     public static void main(String[] args)throws Exception {
         Path project=Path.of(args[0]).toAbsolutePath(), output=Path.of(args[2]).toAbsolutePath();Files.createDirectories(output);
         boolean baseline=args.length>3&&args[3].equals("baseline");
-        boolean hidden=args.length>3&&args[3].equals("hidden");
+        boolean embedded=args.length>3&&args[3].equals("embedded");
+        boolean hidden=embedded||(args.length>3&&args[3].equals("hidden"));
         int frameCount=args.length>4?Integer.parseInt(args[4]):240;
         Files.createDirectories(project.resolve(".internal"));
         Files.writeString(project.resolve(".internal/game-simulator.properties"),
-            "enabled=true\nname=Remote Windows test\nwidth=1920\nheight=1080\ntop=0\nright=0\nbottom=0\nleft=0\nradius=0\ncutoutWidth=0\ncutoutHeight=0\ncutoutTop=0\n");
+            "enabled="+!embedded+"\nname=Remote Windows test\nwidth=1920\nheight=1080\ntop=0\nright=0\nbottom=0\nleft=0\nradius=0\ncutoutWidth=0\ncutoutHeight=0\ncutoutTop=0\n");
         Platform.startup(()->Platform.setImplicitExit(false));
         Stage[] stage=new Stage[1];
         GamePreview view=fx(()->{
@@ -70,16 +71,20 @@ public class RemoteWindowsIntegrationTest {
         });
         var field=GamePreview.class.getDeclaredField("remote");field.setAccessible(true);
         var remote=(RemoteGameServer.Game)field.get(view);
+        if (!baseline) RemoteStreamLifecycleTest.verify(remote);
         if(hidden)fx(()->{stage[0].getScene().setRoot(new javafx.scene.layout.Pane());return null;});
         var logs=new CopyOnWriteArrayList<String>();
         try(var session=fx(()->GamePreview.prepare(project.toString(),true))) {
+            if(session.isSimulator()==embedded)throw new AssertionError("Wrong preview mode");
+            if(session.getPath()==null)throw new AssertionError("Embedded Remote lacks capture mapping");
             var command=List.of(Path.of(args[1]).toAbsolutePath().toString(),"--config=display.vsync=0",
                 "--config=display.update_frequency=60","--config=display.focus_on_show=0","--config=display.high_dpi=0",
                 "--config=display.window_width=1920","--config=display.window_height=1080",
                 "--config=engine.run_while_iconified=1","--config=profiler.remotery_port=0","--graphics-adapter=opengl",
                 "build/default/game.projectc");
             Process process=WindowsGameProcess.start(command,project.toFile(),Map.of("DM_EDITOR_GAME_FILE",session.getPath(),
-                "DM_EDITOR_GAME_PARENT",Long.toString(ProcessHandle.current().pid()),"DM_EDITOR_AUTOMATION","1","DM_SERVICE_PORT","dynamic","DM_WINDOW_STATE",""));
+                "DM_EDITOR_GAME_PARENT",Long.toString(ProcessHandle.current().pid()),"DM_EDITOR_AUTOMATION","1","DM_SERVICE_PORT","dynamic","DM_WINDOW_STATE","",
+                "DM_EDITOR_GAME_CAPTURE_ONLY",embedded?"1":"0"));
             session.attach(process);
             Thread reader=Thread.ofPlatform().daemon().start(()->{
                 try(var r=new BufferedReader(new InputStreamReader(process.getInputStream()));var log=Files.newBufferedWriter(output.resolve("engine.log"))) {
@@ -92,7 +97,7 @@ public class RemoteWindowsIntegrationTest {
             String token=JSON.readTree(pair.body()).get("token").asText();
             List<Map<String,Object>> results=new ArrayList<>();
             int expectedCallbacks=hidden?4:8;
-            for(String mode:baseline?List.of("jpeg"):hidden?List.of("h264"):List.of("jpeg","h264")) {
+            for(String mode:baseline?List.of("jpeg"):hidden&&!embedded?List.of("h264"):List.of("jpeg","h264")) {
                 String route=mode.equals("jpeg")?"/stream?resolution=1080p":"/video?resolution=1080p";
                 HttpURLConnection response=(HttpURLConnection)URI.create(base+route).toURL().openConnection();
                 response.setConnectTimeout(10000);response.setReadTimeout(10000);
@@ -100,7 +105,7 @@ public class RemoteWindowsIntegrationTest {
                 if(response.getResponseCode()!=200)throw new AssertionError("Stream "+response.getResponseCode());
                 List<Long> times=new ArrayList<>();Set<Integer> sequences=new HashSet<>();long bytes=0;
                 try(var input=new DataInputStream(response.getInputStream());var video=Files.newOutputStream(output.resolve(mode+".stream"))) {
-                    if(mode.equals("h264")) {int w=input.readInt(),h=input.readInt();if(w!=1920||h!=1080)throw new AssertionError(w+"x"+h);}
+                    if(mode.equals("h264")) {int w=input.readInt(),h=input.readInt();if(w!=(embedded?640:1920)||h!=(embedded?360:1080))throw new AssertionError(w+"x"+h);}
                     while(times.size()<frameCount) {
                         int size=input.readInt(),sequence=input.readInt();if(size==0)continue;
                         if(size<0||size>24*1024*1024)throw new AssertionError("Packet size");
@@ -126,6 +131,7 @@ public class RemoteWindowsIntegrationTest {
             }
             long callbacks=logs.stream().filter(s->s.contains("GAME_INPUT")).count();
             System.out.println("Lua input callbacks: "+callbacks);
+            if(embedded)expectedCallbacks*=2;
             if(!baseline&&callbacks<expectedCallbacks)throw new AssertionError("Missing Lua press/release callbacks: "+callbacks);
             if(!baseline) {
                 var inputLines=logs.stream().filter(s->s.contains("GAME_INPUT")).toList();
@@ -140,7 +146,7 @@ public class RemoteWindowsIntegrationTest {
                 HttpURLConnection connection=(HttpURLConnection)URI.create(base+"/video?resolution=720p").toURL().openConnection();
                 connection.setReadTimeout(10000);connection.setRequestProperty("Authorization","Bearer "+token);
                 try(var input=new DataInputStream(connection.getInputStream())) {
-                    if(input.readInt()!=1280||input.readInt()!=720)throw new AssertionError("Resolution switch");
+                    if(input.readInt()!=(embedded?640:1280)||input.readInt()!=(embedded?360:720))throw new AssertionError("Resolution switch");
                     int size=input.readInt();input.readInt();input.readNBytes(size);
                     fx(()->{stage[0].getScene().setRoot(new javafx.scene.layout.Pane());return null;});
                     pointer(http,base,token,32768,32768,true);
@@ -149,9 +155,29 @@ public class RemoteWindowsIntegrationTest {
                     pointer(http,base,token,32768,32768,true);awaitCallbacks(logs,expectedCallbacks+3);
                 }finally{connection.disconnect();}
                 awaitCallbacks(logs,expectedCallbacks+4);
+                // Reconnect and switch resolutions repeatedly; each decoder must start from a fresh IDR.
+                for (int retry=0; retry<6; retry++) {
+                    String resolution=retry%2==0?"540p":"720p";
+                    HttpURLConnection reconnect=(HttpURLConnection)URI.create(base+"/video?resolution="+resolution).toURL().openConnection();
+                    reconnect.setConnectTimeout(5000); reconnect.setReadTimeout(5000);
+                    reconnect.setRequestProperty("Authorization","Bearer "+token);
+                    try(var input=new DataInputStream(reconnect.getInputStream())) {
+                        int width=input.readInt(),height=input.readInt();
+                        if(width!=(embedded?640:retry%2==0?960:1280)||height!=(embedded?360:retry%2==0?540:720))throw new AssertionError("Reconnect dimensions");
+                        int size=input.readInt();input.readInt();
+                        if(size<=0||size>8*1024*1024)throw new AssertionError("Reconnect packet size");
+                        byte[] frame=input.readNBytes(size);
+                        boolean idr=false,sps=false,pps=false;
+                        for(int i=0;i+4<frame.length;i++)if(frame[i]==0&&frame[i+1]==0&&frame[i+2]==0&&frame[i+3]==1){
+                            int type=frame[i+4]&31;idr|=type==5;sps|=type==7;pps|=type==8;
+                        }
+                        if(!idr||!sps||!pps)throw new AssertionError("Reconnect is not independently decodable");
+                        if(request(http,base,"/status",token,null).statusCode()!=200)throw new AssertionError("Control blocked by video");
+                    } finally { reconnect.disconnect(); }
+                }
             }
             JSON.writeValue(output.resolve("results.json").toFile(),Map.of("streams",results,"input_callbacks",logs.stream().filter(s->s.contains("GAME_INPUT")).count(),"baseline",baseline,
-                "disconnect_release_verified",!baseline,
+                "disconnect_release_verified",!baseline,"reconnects_verified",baseline?0:6,"preview_mode",embedded?"embedded":"simulator",
                 "transport","loopback, real hidden Windows engine and headless JavaFX; not phone/Wi-Fi displayed FPS"));
         }finally{fx(()->{view.close();stage[0].close();return null;});Platform.exit();}
     }

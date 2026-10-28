@@ -76,6 +76,7 @@
             [editor.pipeline :as pipeline]
             [editor.pipeline.bob :as bob]
             [editor.patch :as patch]
+            [editor.play-build :as play-build]
             [editor.prefs :as prefs]
             [editor.prefs-dialog :as prefs-dialog]
             [editor.process :as process]
@@ -967,6 +968,12 @@
 (defn- build-in-progress? []
   @build-in-progress-atom)
 
+(defn- play-build-state [project]
+  (or (g/user-data project ::play-build)
+      (let [state (atom {})]
+        (g/user-data! project ::play-build state)
+        state)))
+
 (def ^:private bob-task-in-progress-atom (atom false))
 
 (defn- bob-task-in-progress? []
@@ -1293,11 +1300,12 @@
     :task-cancelled?     optional fn that will be called periodically to check
                          if the user has cancelled the build process.
     :old-artifact-map    optional old artifact map with previous build results
-                         to speed up the build process"
+                         to speed up the build process
+    :prepare-play        internal flag to capture freshness for prepared Play"
   [project & {:keys [;; required
                      prefs
                      ;; optional
-                     debug build-engine run-build-hooks render-progress! task-cancelled? old-artifact-map lint]
+                     debug build-engine run-build-hooks render-progress! task-cancelled? old-artifact-map lint prepare-play]
               :or {debug false
                    build-engine true
                    run-build-hooks true
@@ -1306,6 +1314,7 @@
                    old-artifact-map {}}}]
   {:pre [(or (not build-engine) (some? prefs))]}
   (let [result-future (future/make)
+        play-snapshot (volatile! nil)
         lint (if (nil? lint)
                (prefs/get prefs [:build :lint-code])
                lint)
@@ -1375,7 +1384,11 @@
           (reset! build-in-progress-atom false)
           (render-progress! progress/done)
           (cancel-engine-build!)
-          (future/complete! result-future project-build-results)
+          (future/complete! result-future
+                            (cond-> project-build-results
+                              prepare-play
+                              (assoc ::play-build/snapshot @play-snapshot
+                                     ::play-build/engine-stamp (play-build/engine-stamp (:engine project-build-results)))))
           nil)
 
         phase-7-await-lint!
@@ -1487,6 +1500,9 @@
 
         phase-3-start-all-build-processes!
         (fn phase-3-start-all-build-processes! []
+          ;; Capture after pre-build hooks, before engine or resource work.
+          (when prepare-play
+            (vreset! play-snapshot (play-build/snapshot project prefs (not build-engine))))
           (start-engine-build!)
           (start-lint!)
           (phase-4-build-project!))
@@ -1531,6 +1547,8 @@
     ;; trigger subsequent phases which will again get off the ui thread as
     ;; soon as they can.
     (assert (not @build-in-progress-atom))
+    ;; Debug, hot reload and explicit builds write the same output directory.
+    (swap! (play-build-state project) dissoc :ready)
     (reset! build-in-progress-atom true)
     (phase-1-await-current-reload!)
     result-future))
@@ -1552,32 +1570,148 @@
 (defn- exception->target-error [error]
   (g/map->error {:severity :fatal :message (or (ex-message error) (.getName (class error)))}))
 
+(defn- show-play-build-status! [workspace status]
+  (notifications/show! (workspace/notifications workspace)
+                       {:id ::play-build
+                        :type (if (= :failed status) :warning :info)
+                        :message (localization/message (str "notification.play-build." (name status)))}))
+
+(defn- prepare-play-build! [project workspace prefs skip-engine]
+  (let [state (play-build-state project)]
+    (or (:preparing @state)
+        (let [result (future/make)
+              snapshot (play-build/snapshot project prefs skip-engine)
+              [render-progress! task-cancelled?] (begin-task-progress! :build)]
+          (swap! state assoc :preparing result :attempt snapshot)
+          (show-play-build-status! workspace :preparing)
+          (-> (try
+                (async-build! project
+                              :prepare-play true
+                              :debug true
+                              :build-engine (not skip-engine)
+                              :prefs prefs
+                              :render-progress! render-progress!
+                              :task-cancelled? (fn play-build-cancelled? []
+                                                 (or (:closed @state) (task-cancelled?)))
+                              :old-artifact-map (workspace/artifact-map workspace))
+                (catch Throwable error
+                  (future/failed error)))
+              (future/then
+                (fn prepared! [build-results]
+                  (when-not (:closed @state)
+                    (let [successful (handle-build-results! workspace (constantly nil) build-results)
+                          current (play-build/current? (::play-build/snapshot build-results)
+                                                       (play-build/snapshot project prefs skip-engine))
+                          ready (and successful current (or skip-engine (:engine build-results)))]
+                      (swap! state assoc
+                             :ready (when ready build-results)
+                             :attempt (or (::play-build/snapshot build-results) snapshot))
+                      (show-play-build-status! workspace (cond
+                                                           (not successful) :failed
+                                                           ready :ready
+                                                           :else :changed))))
+                  (swap! state dissoc :preparing)
+                  (future/complete! result build-results)))
+              (future/catch
+                (fn preparation-failed! [error]
+                  (swap! state dissoc :preparing :ready)
+                  (when-not (:closed @state)
+                    (show-play-build-status! workspace :failed))
+                  (future/fail! result error))))
+          result))))
+
+(defn- ensure-play-build! [project workspace prefs skip-engine]
+  (let [state (play-build-state project)
+        {:keys [preparing ready]} @state]
+    (cond
+      preparing preparing
+
+      (and ready (play-build/current? (::play-build/snapshot ready) (play-build/snapshot project prefs skip-engine)))
+      (do
+        ;; Reserve the writer while checking files, including against Debug,
+        ;; Clean Build and Hot Reload. Transition only on the UI thread.
+        (reset! build-in-progress-atom true)
+        (-> (future/io (play-build/files-valid? ready))
+            (future/then
+              (fn checked-play-files! [valid]
+                (ui/run-now
+                  (reset! build-in-progress-atom false)
+                  (cond
+                    (:closed @state) (future/failed (ex-info "Project closed while preparing Play" {}))
+                    (and valid (identical? ready (:ready @state))) ready
+                    :else (prepare-play-build! project workspace prefs skip-engine)))))
+            (future/catch
+              (fn play-files-failed! [error]
+                (ui/run-now (reset! build-in-progress-atom false))
+                (throw error)))))
+
+      :else (prepare-play-build! project workspace prefs skip-engine))))
+
+(defn- background-play-build! [project prefs now]
+  ;; The app timer owns this controller and stops on project close on every OS.
+  ;; Never rewrite resources beneath a running engine or overlap another writer.
+  (let [state (play-build-state project)]
+    (when (and (not (:closed @state))
+               (not (:launching @state))
+               (not (build-in-progress?))
+               (not (bob-task-in-progress?))
+               (disk-availability/available?)
+               (not (targets/launched-targets?)))
+      (let [skip-engine (target-cannot-swap-engine? (targets/selected-target prefs))
+            snapshot (play-build/snapshot project prefs skip-engine)]
+        (swap! state play-build/observe snapshot now)
+        (when (and (play-build/due? @state snapshot now)
+                   (coll/empty? (project/dirty-save-data project)))
+          (prepare-play-build! project (project/workspace project) prefs skip-engine))))))
+
 (defn- build-handler [project workspace prefs web-server build-errors-view main-stage tool-tab-pane launch focus]
-  (let [project-directory (workspace/project-directory workspace)
-        main-scene (.getScene ^Stage main-stage)
-        render-build-error! (make-render-build-error main-scene tool-tab-pane build-errors-view)
-        skip-engine (target-cannot-swap-engine? (targets/selected-target prefs))
-        [render-progress! task-cancelled?] (begin-task-progress! :build)]
-    (build-errors-view/clear-build-errors build-errors-view)
-    (future/then
-      (async-build! project
-                    :debug true
-                    :build-engine (not skip-engine)
-                    :prefs prefs
-                    :render-progress! render-progress!
-                    :task-cancelled? task-cancelled?
-                    :old-artifact-map (workspace/artifact-map workspace))
-      (fn [{:keys [engine] :as build-results}]
-        (if (and (handle-build-results! workspace render-build-error! build-results)
-                 launch
-                 (or engine skip-engine))
-          (do
-            (show-console! main-scene tool-tab-pane)
-            (let [{:keys [error target]} (launch-built-project! project engine project-directory prefs web-server false focus)]
-              (cond-> build-results
-                error (assoc :error (exception->target-error error))
-                target (assoc :target target))))
-          build-results)))))
+  (let [state (play-build-state project)]
+    (or (:launching @state)
+        (let [result (future/make)
+              project-directory (workspace/project-directory workspace)
+              main-scene (.getScene ^Stage main-stage)
+              render-build-error! (make-render-build-error main-scene tool-tab-pane build-errors-view)
+              skip-engine (target-cannot-swap-engine? (targets/selected-target prefs))]
+          (swap! state assoc :launching result)
+          (build-errors-view/clear-build-errors build-errors-view)
+          (-> (try
+                (if launch
+                  (ensure-play-build! project workspace prefs skip-engine)
+                  (prepare-play-build! project workspace prefs skip-engine))
+                (catch Throwable error
+                  (future/failed error)))
+              (future/then
+                (fn launch-prepared-project! [{:keys [engine] :as build-results}]
+                  (ui/run-now
+                    (let [current (and (not (:closed @state))
+                                       (disk-availability/available?)
+                                       (play-build/current? (::play-build/snapshot build-results)
+                                                            (play-build/snapshot project prefs (target-cannot-swap-engine? (targets/selected-target prefs)))))
+                          build-results (cond-> build-results
+                                          (and launch (not current) (nil? (:error build-results)))
+                                          (assoc :error (g/map->error {:severity :fatal
+                                                                       :message (localization/message "notification.play-build.changed")})))
+                          build-results (if (and launch current (nil? (:error build-results)) (or engine skip-engine))
+                                          (do
+                                            (show-console! main-scene tool-tab-pane)
+                                            (let [{:keys [error target]} (launch-built-project! project engine project-directory prefs web-server false focus)]
+                                              (cond-> build-results
+                                                error (assoc :error (exception->target-error error))
+                                                target (assoc :target target))))
+                                          build-results)]
+                      (when-not (:closed @state)
+                        (let [{:keys [error warning]} build-results]
+                          (when-let [error (if (and error warning)
+                                             (g/map->error {:causes [error warning]})
+                                             (or error warning))]
+                            (render-build-error! error))))
+                      (swap! state dissoc :launching)
+                      (future/complete! result (dissoc build-results ::play-build/snapshot ::play-build/engine-stamp))))))
+              (future/catch
+                (fn play-failed! [error]
+                  (swap! state dissoc :launching)
+                  (future/fail! result error))))
+          result))))
 
 (handler/defhandler :project.compile :global
   (enabled? [] (not (build-in-progress?)))
@@ -1585,7 +1719,7 @@
     (build-handler project workspace prefs web-server build-errors-view main-stage tool-tab-pane false true)))
 
 (handler/defhandler :project.build :global
-  (enabled? [] (not (build-in-progress?)))
+  (enabled? [project] (boolean (or (not (build-in-progress?)) (:preparing @(play-build-state project)))))
   (run [project workspace prefs web-server build-errors-view debug-view main-stage tool-tab-pane user-data]
     (debug-view/detach! debug-view)
     (build-handler project workspace prefs web-server build-errors-view main-stage tool-tab-pane true (get user-data :focus true))))
@@ -1687,6 +1821,7 @@
               (dialogs/make-confirmation-dialog localization clean-build-dialog-info))
       (debug-view/detach! debug-view)
       (workspace/clear-build-cache! workspace)
+      (swap! (play-build-state project) dissoc :ready)
       (build-handler project workspace prefs web-server build-errors-view main-stage tool-tab-pane true true))))
 
 (defn- start-new-log-pipe!
@@ -2450,6 +2585,7 @@
 
       (ui/register-menubar app-scene menu-bar ::menubar)
       (ui/on-closed! stage (fn [_]
+                             (swap! (play-build-state project) assoc :closed true :ready nil)
                              (g/let-ec [open-views (g/node-value app-view :open-views evaluation-context)
                                         scene-view-ids (g/node-value app-view :scene-view-ids evaluation-context)]
                                (doseq [view-id scene-view-ids]
@@ -2477,11 +2613,16 @@
                                       nil)}]})))
 
       (let [prev-localization-bundle (volatile! nil)
+            last-play-build-check (volatile! 0)
             reload-editor-scripts-notification-updater (make-reload-editor-scripts-notification-updater project)
             refresh-timer (ui/->timer
                             "refresh-app-view"
                             (fn [_animation-timer _elapsed dt]
                               (when-not (ui/ui-disabled?)
+                                (let [now (quot (System/nanoTime) 1000000)]
+                                  (when (and (.isShowing stage) (>= (- now @last-play-build-check) 500))
+                                    (vreset! last-play-build-check now)
+                                    (background-play-build! project prefs now)))
                                 (let [refresh-requested? (ui/user-data app-scene ::ui/refresh-requested?)]
                                   (when (or (NodeHelper/isTreeShowing right-split) (NodeHelper/isTreeShowing outline-split))
                                     (refresh-right-split! app-view))

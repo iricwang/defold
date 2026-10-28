@@ -49,7 +49,12 @@ final class VideoDecoder implements AutoCloseable {
                 format.setInteger(MediaFormat.KEY_OPERATING_RATE,60);
                 if(Build.VERSION.SDK_INT>=30&&caps.isFeatureSupported("low-latency"))format.setInteger("low-latency",1);
                 selected=MediaCodec.createByCodecName(info.getName());selected.configure(format,surface,null,0);selected.start();break;
-            } catch(Exception e) { if(selected!=null){try{selected.release();}catch(Exception ignored){}selected=null;} }
+            } catch(Exception e) {
+                if(selected!=null){
+                    android.util.Log.w("DefoldRemote","Cannot initialize AVC decoder "+info.getName()+" at "+width+"x"+height,e);
+                    try{selected.release();}catch(Exception ignored){}selected=null;
+                }
+            }
         }
         if(selected==null){surface.release();throw new IOException("Hardware H.264 decoder unavailable");}
         codec=selected;

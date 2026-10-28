@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-28",
+  "editor": {
+    "installed_revision": 103,
+    "app": "X:/Programs/Defold",
+    "patch": "editor/target/editor/Defold-x86_64-win32-patch-102-to-103.zip",
+    "sha256": "1c65cdd1d4949d33cddeb726a2164bc9a07616774256167199fb8f038557d8de",
+    "source": "Local ZIP through unified editor.py installer; no GitHub release",
+    "checks": "11 actual-package tests passed during build and install; exact installed target inventory verified",
+    "restart_pid": 29576,
+    "editor_revision": "10640af82b1d0c83e9c8bf800476f9c4b6fa8a6d",
+    "engine_revision": "6e0a03a165f0cd549abe062d812b0111717a8c94",
+    "engine_payload_unchanged": true,
+    "startup": "patch.103 resource cache and all nine native libraries loaded",
+    "build_log": "tmp/remote-stability/delivery/editor-build.log",
+    "install_log": "tmp/remote-stability/delivery/install.log"
+  },
+  "apk": {
+    "version": "0.6.3",
+    "version_code": 9,
+    "path": "X:/AI/UI/deliverables/DefoldRemote-0.6.3.apk",
+    "bytes": 1573577,
+    "sha256": "93347f84a16283f5bfc27cb2d1e590a518d0a4b9ac9d5842bc26fa451469256c",
+    "signature": "APK v2/v3 and zip alignment verified",
+    "certificate_sha256": "ee56f58d73ba8bd1e99150231c8542a71b2ef47b6beadb4f57c7e59a8247cc4d",
+    "stable_development_key_commit": "10640af82b1d0c83e9c8bf800476f9c4b6fa8a6d",
+    "key_location": "remote/android/signing/defold-remote-development.keystore",
+    "upgrade": "Old temporary-signature APK may require uninstall and re-pairing once; subsequent builds use the shared development key",
+    "build_log": "tmp/remote-stability/delivery/android-build.log"
+  },
+  "packaged_runtime_test": {
+    "jar": "Extracted from the final patch ZIP; no source-class override",
+    "frames": 300,
+    "h264_fps": 57.56771956549657,
+    "reconnects": 6,
+    "input_callbacks": 8,
+    "disconnect_release_verified": true,
+    "results": "tmp/remote-stability/delivery/runtime/results.json"
+  },
+  "mcp": {
+    "rebuilt_against_installed_editor": true,
+    "registered_stdio_probe_passed": true,
+    "tools": 50,
+    "projects": 3
+  },
+  "limitations": [
+    "FPS is Windows loopback with an isolated animated fixture, not Android Wi-Fi displayed FPS.",
+    "APK was compiled and signature-verified locally; no Android device was connected for installation or camera/touch UI testing.",
+    "Signing commit is on the local branch; it has not been pushed."
+  ]
+}

@@ -415,9 +415,11 @@
                       (str "--config=display.update_frequency=" (.getFrameRate game-session))
                       "--config=engine.run_while_iconified=1"])
 
+               (and game-session (or (.isWindows (Platform/getHostPlatform)) (.isSimulator game-session)))
+               (conj "--graphics-adapter=opengl")
+
                (and game-session (.isSimulator game-session))
-               (into ["--graphics-adapter=opengl"
-                      (str "--config=display.window_width=" (.getDeviceWidth game-session))
+               (into [(str "--config=display.window_width=" (.getDeviceWidth game-session))
                       (str "--config=display.window_height=" (.getDeviceHeight game-session))]))
         env {"DM_SERVICE_PORT" (or (validate-service-port (System/getenv "DM_SERVICE_PORT"))
                                    "dynamic")
@@ -433,10 +435,13 @@
              "_NT_ALT_SYMBOL_PATH" (.getAbsolutePath (.getParentFile engine))
              "MESA_GL_VERSION_OVERRIDE" nil
              "MESA_LOADER_DRIVER_OVERRIDE" nil}
-        env (cond-> env (and game-session (or system/mac? (.isSimulator game-session)))
+        env (cond-> env game-session
               (assoc "DM_EDITOR_GAME_FILE" (.getPath game-session)
                      "DM_EDITOR_GAME_PARENT" (str (.pid (ProcessHandle/current)))
-                     "DM_QUIT_ON_ESC" "0"))
+                     "DM_QUIT_ON_ESC" "0")
+
+              (and game-session (.isWindows (Platform/getHostPlatform)) (not (.isSimulator game-session)))
+              (assoc "DM_EDITOR_GAME_CAPTURE_ONLY" "1"))
         opts {:dir project-directory
               :err :stdout
               :env env

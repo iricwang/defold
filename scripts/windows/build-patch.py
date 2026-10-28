@@ -17,6 +17,7 @@ import json
 import argparse
 import io
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -127,15 +128,23 @@ def validate_engine_home(home):
     # The executable shipped inside Bob and its external debug symbols must be
     # from the same local build, or Simulator symbol lookup cannot be trusted.
     with zipfile.ZipFile(home / 'share/java/bob.jar') as bob:
-        if bob.read('libexec/x86_64-win32/dmengine.exe') != (home / 'bin/x86_64-win32/dmengine.exe').read_bytes():
+        engine = (home / 'bin/x86_64-win32/dmengine.exe').read_bytes()
+        if bob.read('libexec/x86_64-win32/dmengine.exe') != engine:
             raise ValueError('Local Bob engine differs from the engine build; rebuild Bob first')
+        versions = set(re.findall(rb'\x01\x00\x28([0-9a-f]{40})', bob.read('com/dynamo/bob/archive/EngineVersion.class')))
+        if len(versions) != 1:
+            raise ValueError('Cannot identify the local Bob SDK revision')
+        revision = versions.pop()
+        if revision + b'\0' not in engine:
+            raise ValueError('Local Bob and engine SDK revisions differ; rebuild Bob first')
+        return revision.decode('ascii')
 
 
 def main(*, baseline=None, full=False, engine_home=None):
     os.chdir(ROOT)
     home = Path(engine_home).resolve() if engine_home else ROOT / 'tmp/windows-patch-home'
     if engine_home:
-        validate_engine_home(home)
+        engine_revision = validate_engine_home(home)
     os.environ['DYNAMO_HOME'] = str(home)
     os.environ['LEIN_HOME'] = str(ROOT / 'editor/build/lein')
     os.environ['PYTHONUTF8'] = '1'
@@ -187,7 +196,8 @@ def main(*, baseline=None, full=False, engine_home=None):
                          ROOT / 'editor/resources/_unpack/x86_64-win32/lib/game_window_hook.dll')
     bundle.invoke_lein(['run', '-m', 'editor.ns-batch-builder', 'resources/sorted_clojure_ns_list.edn'], jdk_path=jdk)
     bundle.invoke_lein(['prerelease'], jdk_path=jdk)
-    options.engine_sha1 = options.editor_sha1 if engine_home else ENGINE
+    # Editor-only commits must not relabel an older, still-matching local native SDK.
+    options.engine_sha1 = engine_revision if engine_home else ENGINE
     if full:
         # create_bundle uses editor/tmp as its staging directory.
         staging = ROOT / 'editor/tmp'

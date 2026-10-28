@@ -73,8 +73,15 @@ the stream; a new connection negotiates the dimensions and creates a fresh codec
 Compression uses hardware H.264, no B frames, a keyframe every 60 frames, and
 6–40 Mbit/s according to output size. Frames are submitted serially and paced at
 60 FPS; no compressed packet is intentionally skipped. Socket writes stalled for
-250 ms cause disconnect. The client falls back to JPEG on unsupported hardware or
-codec failure. No extra ports or credentials are introduced.
+1.5 seconds cause disconnect; shorter stalls retain the connection. Closing a
+blocked socket does not block the shared capture thread, and each write deadline
+belongs to its connection. `/status` includes `stream_codec` (none/jpeg/h264) and
+`stream_stall_disconnects` (counter for this host game registration).
+The client retries H.264 after transient failures with bounded backoff. Three
+consecutive failures without five seconds of decoded frames fall back to JPEG;
+an unsupported video endpoint (404/503) falls back immediately. Five consecutive
+failures stop automatic reconnects. HTTP 401/403 requests new pairing, not a codec
+fallback. No extra ports or credentials are introduced.
 
 Touch requests use an independent connection/executor; the APK polls its bounded
 coalescing input buffer every 8 ms instead of 32 ms. The host consumes the latest

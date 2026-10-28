@@ -37,25 +37,23 @@ async def execute(args):
                 previous = None
                 try:
                     while True:
-                        status = await call('job_status', job_id=job['job_id'])
-                        if status['state'] in ('complete', 'failed', 'cancelled'):
-                            if 'result' not in status:
+                        status = await call('job_wait', job_id=job['job_id'], timeout_ms=1000)
+                        if status['terminal']:
+                            if status['state'] != 'complete' or 'result' not in status:
                                 raise RuntimeError(status)
                             return status['result']
                         progress = status.get('progress', {'state': status['state']})
                         if progress != previous:
                             print(json.dumps(progress, ensure_ascii=False), file=sys.stderr, flush=True)
                             previous = progress
-                        await asyncio.sleep(0.1)
                 except asyncio.CancelledError:
                     await call('job_cancel', job_id=job['job_id'])
                     deadline = time.monotonic() + 45
                     while time.monotonic() < deadline:
-                        status = await call('job_status', job_id=job['job_id'])
-                        if status['state'] in ('complete', 'failed', 'cancelled'):
+                        status = await call('job_wait', job_id=job['job_id'], timeout_ms=1000)
+                        if status['terminal']:
                             print(json.dumps(status, ensure_ascii=False), file=sys.stderr, flush=True)
                             break
-                        await asyncio.sleep(0.1)
                     raise
 
             project = (await call('project_discover'))['projects'][0]['project_id']

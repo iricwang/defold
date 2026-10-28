@@ -4,7 +4,7 @@
 
 ## 使用
 
-1. 覆盖安装 `android/build/DefoldRemote-debug.apk`，当前版本 0.6.2（Android 8.0 / API 26 以上）。保持原开发签名，可直接升级。
+1. 安装 `android/build/DefoldRemote-debug.apk`，当前版本 0.6.3（Android 8.0 / API 26 以上）。本版开始使用仓库中的固定开发签名；旧版签名不同时需卸载后安装并重新配对，此后相同签名版本可覆盖升级。签名说明见 [android/signing/README.md](android/signing/README.md)。
 2. 使用包含 Remote 的更新后编辑器打开项目。在 **Game 面板**中点击 `Remote · 八位配对码`，打开二维码；弹窗中的“启用局域网 Remote”需要勾选。
 3. 手机和电脑连接同一 Wi-Fi，在 Remote 首页点击“扫码”，允许相机权限，扫描编辑器二维码。手机会连接指定游戏；未运行时由编辑器执行构建和启动。
 4. 成功连接后，手机完整显示游戏画面，隐藏应用和系统顶底栏。再次打开 App 会恢复上次成功连接的游戏；外部 App 指定的目标优先。
@@ -55,9 +55,45 @@ defoldremote://connect?v=1&address=http%3A%2F%2F192.168.1.10%3A8390%2Fgames%2FGA
 python3 remote/android/build.py --sdk /路径/Android/sdk --java-home /路径/JDK
 ```
 
-产物：`remote/android/build/DefoldRemote-debug.apk`。开发密钥保留在同目录，重复构建可以覆盖安装；删除密钥后重建需要卸载旧 APK。正式分发应另行使用发布签名。
+产物：`remote/android/build/DefoldRemote-debug.apk`。使用仓库 `remote/android/signing/` 内固定开发密钥，后续版本可以覆盖安装；构建目录清理不会重新生成签名。正式分发应另行使用发布签名。
 
 ## 维护与验证
+
+### Windows 普通内嵌取帧（patch.104）
+
+普通 Game 内嵌模式以前只挂接 HWND，没有画面共享缓冲，Remote 虽然能连接却始终
+取不到首帧。现在普通内嵌与设备模拟器都支持 Remote：普通模式使用独立 capture-only
+协议，只在请求时读回 OpenGL 后缓冲，不覆盖游戏分辨率或安全区；Remote 的触控输入
+转发到同一游戏窗口，释放后恢复本机鼠标。关闭设备模拟器也能串流。
+
+`RemoteWindowsIntegrationTest ... embedded 240` 验证模拟器关闭时的 JPEG/H.264、
+隐藏面板、Lua 点击/拖动坐标、断开释放和六次重连；`hidden 240` 回归模拟器模式。
+`RemoteFrameTest OUTPUT embedded` 验证普通内嵌帧的上下方向与 JPEG/缩略图。
+
+### Android AVC 参数过滤（APK 0.6.4，兼容 Windows patch.103）
+
+Windows 编码器输出的首帧顺序为 AUD、SPS、PPS、IDR。旧客户端仅在首个 NAL 为
+SPS/PPS 时过滤解码配置，导致 AUD 开头的帧向已配置 `csd-0/csd-1` 的 MediaCodec
+重复提交参数。现扫描整个访问单元，保留 AUD/SEI/视频切片，过滤所有 SPS/PPS；
+同时支持 Annex B 的三字节和四字节起始码。失败提示与 Android `DefoldRemote`
+日志标明连接、接收/解码阶段以及错误原因。
+
+`AvcConfigTest` 覆盖 AUD 在前、混合起始码、无切片和不完整帧；可传入 Windows
+测试捕获的 `h264.stream`，逐帧验证实际编码结果。该检查不能代替 Android 实机解码验收。
+
+### 串流恢复修复（Windows patch.103 / APK 0.6.3）
+
+电脑端视频写入阻塞阈值由 250 毫秒调整为 1.5 秒；连接关闭从公共采帧线程移出，
+写入计时和关闭操作绑定当前连接，防止旧连接影响新串流。状态接口新增 `stream_codec`
+与 `stream_stall_disconnects`，便于区分 JPEG 降级和发送堵塞。
+
+Android 短暂断流先重连 H.264；连续三次失败才切 JPEG，明确不支持编码的响应立即回退。
+重试有退避和次数上限，只有连续五秒收到画面才重置失败次数。鉴权失败才提示重新配对，
+普通串流 HTTP 错误不再误报配对失效。此逻辑需电脑端和 APK 分别更新，现有 APK 不会随编辑器源码自动变化。
+
+新增回归入口：`remote/tests/java/RemoteRecoveryTest.java`、`RemoteStreamLifecycleTest.java`。
+后者随 `RemoteWindowsIntegrationTest` 验证，包含阻塞关闭、连接归属、短暂停顿和真实硬件串流重连。
+Windows 回环测试不能替代手机 Wi-Fi 的可达性、实际显示 FPS 和延迟验收。
 
 - `engine_remote.h`：私有协议、帧缓冲、尺寸限制、触摸队列和超时。
 - `engine_service.*`：调试 HTTP 服务注册与 release 空实现。
@@ -130,6 +166,8 @@ JDK_JAVA_OPTIONS="-Ddefold.patch.directory=$PWD/tmp/remote-patch" \
 ```sh
 javac -cp remote/vendor/zxing-core-3.5.3.jar -d tmp/remote-tests \
   remote/android/src/com/defold/remote/RemoteAddress.java \
+  remote/android/src/com/defold/remote/RemoteTls.java \
+  remote/android/src/com/defold/remote/QRDecoder.java \
   remote/android/src/com/defold/remote/FourFingerGesture.java \
   remote/android/src/com/defold/remote/PointerBuffer.java \
   remote/android/src/com/defold/remote/FrameRate.java \

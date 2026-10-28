@@ -1,0 +1,36 @@
+{
+  "manager_version": "0.1.1",
+  "android_version": "0.7.1",
+  "runtime_revision": "ced8bf0719c2c024",
+  "platform_verified": "x86_64-win32",
+  "build_policy": "Local native compilation only; no cloud source upload or cloud fallback",
+  "unit_tests_passed": 12,
+  "integration_report": "tmp/remote-manager-tests/c7fbf371e079424385d6e0609e4f7df0/report.json",
+  "integration_checks_passed": 33,
+  "integration_runtime_revision": "825b535e96cc8760",
+  "final_runtime_payload_identical_to_integration_runtime": true,
+  "final_runtime_file_hashes_verified": 231,
+  "real_project_report": "tmp/remote-manager-lifecycle/da3b5320e41645d4800e3b09c76c6972/report.json",
+  "real_project_screenshot": "tmp/remote-manager-lifecycle/da3b5320e41645d4800e3b09c76c6972/project.jpg",
+  "real_project": "Path of Kings: isolated source snapshot, automatically built and rendered; screenshot visually inspected",
+  "final_package_lifecycle_report": "tmp/remote-manager-lifecycle/cada957f3cf1478099571768812c89b1/report.json",
+  "android_apk_sha256": "3d57082866ae0f640f3c2260c68e3d465e6d9227754927a413a4f6fba9146d3e",
+  "verified_scenarios": [
+    "Phone protocol connection triggers automatic build and background launch",
+    "Event native extension compiles and loads in actual GPU engine",
+    "Lua-only modifications reuse native engine cache",
+    "Compiler error and failed stage synchronized to desktop and phone protocol",
+    "Fix and reconnect succeeds without manual import",
+    "Independent games continue running when another project fails",
+    "Cancellation cleans up owned build process tree",
+    "Unchanged reconnect reuses resource build",
+    "H264 frames and Lua pointer callback received"
+  ],
+  "limitations": [
+    "Android physical device and Wi-Fi performance not verified",
+    "macOS compatibility paths implemented but not verified on Mac hardware",
+    "Developer delivery references this machine's local Python, repository and CMake SDK",
+    "Unsupported extension manifest options fail explicitly; not all possible extensions are supported",
+    "Existing running manager was not forcibly stopped; exit old manager before opening new executable"
+  ]
+}

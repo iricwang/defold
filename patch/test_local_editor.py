@@ -72,13 +72,36 @@ class LocalEditorTest(unittest.TestCase):
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_bytes(b'local')
             (home / 'share/java').mkdir()
-            for engine, valid in ((b'archived', False), (b'local', True)):
+            revision = b'a' * 40
+            engine_file = home / 'bin/x86_64-win32/dmengine.exe'
+            engine_file.write_bytes(b'local' + revision + b'\0')
+            for engine, valid in ((b'archived', False), (engine_file.read_bytes(), True)):
                 with zipfile.ZipFile(home / 'share/java/bob.jar', 'w') as jar:
                     jar.writestr('libexec/x86_64-win32/dmengine.exe', engine)
+                    jar.writestr('com/dynamo/bob/archive/EngineVersion.class', b'\x01\x00\x28' + revision)
                 if valid:
-                    builder.validate_engine_home(home)
+                    self.assertEqual(revision.decode(), builder.validate_engine_home(home))
                 else:
                     with self.assertRaisesRegex(ValueError, 'rebuild Bob'):
                         builder.validate_engine_home(home)
             args = editor.parser().parse_args(['patch', '--app', 'Defold', '--engine-home', directory])
             self.assertEqual(home, args.engine_home)
+
+    # Reject mismatched version metadata even when the packaged executable bytes match.
+    def test_local_engine_rejects_wrong_sdk_revision(self):
+        builder = editor.builder()
+        with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as directory:
+            home = Path(directory)
+            for name in ('share/ref-doc.zip', 'bin/x86_64-win32/dmengine.exe',
+                         'bin/x86_64-win32/dmengine.pdb', 'bin/x86_64-win32/launcher.exe',
+                         'lib/x86_64-win32/particle_shared.dll', 'lib/x86_64-win32/mouse_capture_shared.dll'):
+                path = home / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'engine' + b'a' * 40 + b'\0')
+            (home / 'share/java').mkdir()
+            for version in (b'unknown', b'\x01\x00\x28' + b'b' * 40):
+                with zipfile.ZipFile(home / 'share/java/bob.jar', 'w') as jar:
+                    jar.writestr('libexec/x86_64-win32/dmengine.exe', (home / 'bin/x86_64-win32/dmengine.exe').read_bytes())
+                    jar.writestr('com/dynamo/bob/archive/EngineVersion.class', version)
+                with self.assertRaisesRegex(ValueError, 'revision'):
+                    builder.validate_engine_home(home)

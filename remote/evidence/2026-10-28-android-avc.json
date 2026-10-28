@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-28",
+  "issue": "Android connects but displays black or waits for the first frame",
+  "confirmed_defect": "AUD-prefixed Windows access units bypassed SPS/PPS filtering after MediaCodec csd-0/csd-1 initialization",
+  "reference": "https://developer.android.com/reference/android/media/MediaCodec",
+  "regression_before": "AssertionError: Windows AUD must not bypass CSD filtering",
+  "regression_after": {
+    "avc_configuration": "passed, including AUD prefix, mixed 3/4-byte start codes, malformed access units",
+    "recorded_windows_access_units": 300,
+    "recording": "tmp/remote-stability/delivery/runtime/h264.stream",
+    "recovery_checks": 23,
+    "apk_build": "passed",
+    "apk_v2_v3_signature": "passed",
+    "zip_alignment": "passed"
+  },
+  "delivery": {
+    "apk": "X:/AI/UI/deliverables/DefoldRemote-0.6.4.apk",
+    "version_name": "0.6.4",
+    "version_code": 10,
+    "sha256": "b1c88be5b21f6a5afcbf918f5e1c0e49a67f69411d3d6aedd6ed768b5f959f99",
+    "certificate_sha256": "ee56f58d73ba8bd1e99150231c8542a71b2ef47b6beadb4f57c7e59a8247cc4d",
+    "compatible_editor": "patch.103",
+    "editor_changed_this_fix": false
+  },
+  "limitations": [
+    "No Android device attached to adb; no real MediaCodec or phone screen validation performed",
+    "Confirmed parser defect is not yet proven to be the sole cause of the reported black screen",
+    "Failure-stage messages and DefoldRemote logcat diagnostics included for device verification"
+  ]
+}

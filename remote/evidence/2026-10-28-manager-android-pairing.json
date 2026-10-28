@@ -1,0 +1,45 @@
+{
+  "android_version": "0.7.2",
+  "android_version_code": 13,
+  "manager_version": "0.1.2",
+  "runtime_revision": "ced8bf0719c2c024",
+  "apk_sha256": "9a7fe5c6fe71ab8379b00f64dd87aec109ca997b61b7d19e0dc1f406d9ab3f08",
+  "confirmed_regressions": [
+    "Android startup status timeout aborted connection although desktop game started",
+    "Catalog kept error page after successful reconnect with unchanged catalog"
+  ],
+  "scan_changes": [
+    "1280x720 target preview instead of 640x480",
+    "Preserve camera preview aspect ratio",
+    "Continuous focus with video/auto fallback and tap-to-focus",
+    "Shared full-frame, center crop and inverted QR decoding",
+    "Persistent scanner progress and camera/decode error display",
+    "Desktop QR enlarged from 230 to 320 CSS pixels"
+  ],
+  "tests": {
+    "java_client_assertions": 11070,
+    "desktop_qr_generator": "Rust qrcode SVG render at old and new displayed sizes decoded by APK ZXing implementation",
+    "camera_frame_tests": [
+      "full 1280x720 frame",
+      "inverted luminance",
+      "90 degree rotation"
+    ],
+    "android_camera": "Emulator API 28 actual camera preview callbacks logged at 1280x720; scan page inspected",
+    "android_ui_report": "tmp/remote-android-tests/3ddc5317417d4b4e9607d738f2bb444f/report.json",
+    "apk_signature": "apksigner v2/v3 verification passed",
+    "source_diff": "git diff --check passed"
+  },
+  "screenshots": {
+    "before_timeout": "tmp/remote-android-repro/9d9e84f2a7b24822828929067bf67f01/screen.png",
+    "catalog": "tmp/remote-android-tests/3ddc5317417d4b4e9607d738f2bb444f/01-project-list.png",
+    "game_and_touch": "tmp/remote-android-tests/3ddc5317417d4b4e9607d738f2bb444f/05-touch-callback.png",
+    "scan_page": "tmp/remote-scan-page.png"
+  },
+  "limits": [
+    "Physical phone camera scan and actual phone Wi-Fi were not available for verification",
+    "Android UI pairing test invokes the decoded QR VIEW intent; optical capture is separately limited to emulator preview and synthetic frame decode tests",
+    "Specific physical camera cause is not confirmed",
+    "Existing user manager was not forcibly stopped; exit its tray instance before opening 0.1.2",
+    "No source upload or cloud compilation"
+  ]
+}

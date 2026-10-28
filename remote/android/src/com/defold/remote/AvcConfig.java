@@ -15,7 +15,6 @@
 package com.defold.remote;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 /** Extract in-band Annex B configuration before configuring an Android decoder. */
 final class AvcConfig {
@@ -23,35 +22,45 @@ final class AvcConfig {
         byte[] sps=null,pps=null;boolean idr=false;
         int start=prefix(packet,0);
         if(start!=0)throw new IOException("Invalid Annex B packet");
-        while(start>=0&&start+4<packet.length) {
-            int next=prefix(packet,start+4),end=next<0?packet.length:next;
-            int type=packet[start+4]&31;
+        while(start>=0) {
+            int payload=start+prefixSize(packet,start);
+            int next=prefix(packet,payload),end=next<0?packet.length:next;
+            if(end<=payload)throw new IOException("Empty AVC NAL unit");
+            int type=packet[payload]&31;
             if(type==7||type==8){
-                if(end-start<6||end-start>65536)throw new IOException("Invalid AVC configuration");
-                byte[] data=Arrays.copyOfRange(packet,start,end);
+                if(end-payload<2||end-payload>65532)throw new IOException("Invalid AVC configuration");
+                byte[] data=new byte[4+end-payload];data[3]=1;
+                System.arraycopy(packet,payload,data,4,end-payload);
                 if(type==7)sps=data;else pps=data;
             }
+            if(type==5&&end-payload<2)throw new IOException("Incomplete IDR slice");
             idr|=type==5;start=next;
         }
         if(sps==null||pps==null||!idr)throw new IOException("Stream must start with SPS/PPS and IDR");
         return new byte[][]{sps,pps};
     }
     static byte[] frame(byte[] packet)throws IOException {
-        if(packet.length<5)throw new IOException("Empty access unit");
-        int first=packet[4]&31;
-        if(first!=7&&first!=8)return packet;
+        if(prefix(packet,0)!=0)throw new IOException("Invalid Annex B packet");
         java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream(packet.length);
-        int start=0;
-        while(start>=0&&start+4<packet.length){
-            int next=prefix(packet,start+4),end=next<0?packet.length:next,type=packet[start+4]&31;
+        int start=0;boolean slice=false;
+        while(start>=0){
+            int payload=start+prefixSize(packet,start);
+            int next=prefix(packet,payload),end=next<0?packet.length:next;
+            if(end<=payload)throw new IOException("Empty AVC NAL unit");
+            int type=packet[payload]&31;
+            // MediaCodec submits csd-0/csd-1 at start. Windows places AUD before
+            // SPS/PPS, so inspecting only the first NAL repeats codec setup.
             if(type!=7&&type!=8)bytes.write(packet,start,end-start);
+            slice|=type==1||type==5;
             start=next;
         }
-        if(bytes.size()==0)throw new IOException("Missing video slice");
+        if(!slice)throw new IOException("Missing video slice");
         return bytes.toByteArray();
     }
     private static int prefix(byte[] packet,int from){
-        for(int i=from;i+3<packet.length;i++)if(packet[i]==0&&packet[i+1]==0&&packet[i+2]==0&&packet[i+3]==1)return i;
+        for(int i=from;i+2<packet.length;i++)if(packet[i]==0&&packet[i+1]==0&&
+                (packet[i+2]==1||(i+3<packet.length&&packet[i+2]==0&&packet[i+3]==1)))return i;
         return -1;
     }
+    private static int prefixSize(byte[] packet,int start){return packet[start+2]==1?3:4;}
 }

@@ -138,17 +138,35 @@ def parser():
     automation = sub.add_parser('automation-build', help='Compile the local Windows background MCP worker; no packaging/install')
     automation.add_argument('--app', type=Path, required=True)
     automation.add_argument('--output', type=Path)
+    manager = sub.add_parser('remote-manager-build', help='Build the independent Remote Manager runtime and optional desktop shell')
+    manager.add_argument('--app', type=Path, required=True)
+    manager.add_argument('--output', type=Path, default=ROOT / 'tmp/remote-manager-delivery')
+    manager.add_argument('--shell', action='store_true')
     video = sub.add_parser('remote-video-build', help='Compile Windows hardware H.264 JNI locally; no editor packaging/install')
     video.add_argument('--jdk', type=Path, required=True)
     video.add_argument('--output', type=Path, default=ROOT / 'editor/resources/lib/x86_64-win32/remote_video.dll')
+    extensions = sub.add_parser('extensions-serve', help='Serve Windows debug native-extension builds on loopback using the local engine SDK')
+    extensions.add_argument('--engine-home', type=Path, required=True)
+    extensions.add_argument('--work', type=Path, default=ROOT / 'tmp/local-extensions')
+    extensions.add_argument('--port', type=int, default=9011)
     return result
 
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    if args.command == 'remote-manager-build':
+        spec = importlib.util.spec_from_file_location('remote_manager_build', ROOT / 'remote/manager/build.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        print(json.dumps(module.build(args.app, args.output, shell=args.shell), indent=2))
+        return
     if args.command == 'remote-video-build':
         from remote_video import build
         build(args.jdk, args.output)
+        return
+    if args.command == 'extensions-serve':
+        from local_extensions import serve
+        serve(args.engine_home, args.work, args.port)
         return
     if args.command == 'automation-build':
         sys.path.insert(0, str(ROOT / 'scripts/automation'))

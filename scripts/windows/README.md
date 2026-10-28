@@ -92,6 +92,7 @@ scripts\windows\editor.cmd install editor\target\editor\Defold-x86_64-win32-patc
 必须包含 Bob、引擎 EXE/PDB、编辑器启动器、粒子/鼠标原生库和参考文档。
 脚本检查 Bob 内的 Windows 引擎与该目录的 EXE 完全一致，并统一复用 Bob 的协议类，
 防止 GUI 新字段只在编辑器生效或旧引擎在运行时忽略新功能。原生符号另由最终包测试验证。
+本地包的引擎版本取自该 Bob SDK，并与实际引擎校验；编辑器提交变化不会把未重编译的引擎误标为新提交。
 该参数不会回退下载旧引擎；未传时沿用原有官方归档构建流程。
 
 `install` 只接受增量包，要求先保存项目、关闭该安装的编辑器与游戏。
@@ -102,3 +103,38 @@ scripts\windows\editor.cmd install editor\target\editor\Defold-x86_64-win32-patc
 
 所有命令均不提交、推送或发布 GitHub。CI 继续使用 `build-patch.py` 的默认增量模式；
 本地完整打包不会改变远端仅发布 patch 的流程。校验失败时进程返回非零，不能把该产物当作已验证版本。
+
+## 本地引擎的 Windows 原生扩展
+
+Remote Manager 已接入自动本地构建。通过
+`scripts\windows\editor.cmd remote-manager-build --app X:\Programs\Defold --shell`
+构建管理器后，用户只需添加工程并从手机连接；无需执行下面的手动服务命令。
+管理器会自动使用本机 CMake SDK，回传构建错误，并复用未变化的原生引擎。
+详见 [Remote Manager](../../remote/manager/README.md)。下述手动入口保留给编辑器与命令行调试。
+
+`--engine-home` 打包的引擎使用本地提交号。官方扩展服务器没有该提交对应的 SDK，
+带 Spine 等原生扩展的项目不能直接使用官方服务器构建。不要把提交号替换成官方版本号，
+那会构建出缺少本地引擎修改的可执行文件。
+
+在已完成引擎 CMake 构建的同一仓库中启动本地入口（Python 需要 PyYAML）：
+
+```powershell
+scripts\windows\editor.cmd extensions-serve --engine-home tmp\dynamo_home --port 9011
+```
+
+将编辑器项目共享设置的 Extensions / Build Server 设为 `http://127.0.0.1:9011`。
+如果个人 Extensions 设置已经指定服务器，则个人设置优先，也需改为本机地址。
+本机所有项目都使用此定制 SDK 时，直接在个人设置的 Extensions / Build Server
+填写该地址；仅设置某一个项目，不会自动应用到后来打开的其他项目。
+命令行 Bob 构建显式传 `--build-server http://127.0.0.1:9011`。
+
+服务仅监听回环地址，使用本地 CMake、MSVC、SDK 编译和链接，保留编辑器原有的扩展缓存。
+SDK 提交号不匹配时拒绝构建，不回退云端。编译得到独立 `dmengine_local`，不覆盖原始 SDK 引擎。
+日志和结果位于 `tmp/local-extensions/<job-id>/`。不要同时执行完整引擎编译；更新 SDK 后重启服务。
+服务需要在缓存失效后重新构建时保持运行，重启电脑后可再次执行上述命令。
+SDK 版本从已安装的 Bob 读取，并校验实际引擎及核心链接库；单纯提交编辑器代码
+导致 CMake 版本头变化时不再误报。核心引擎库与 SDK 不一致时仍拒绝构建。
+
+当前支持 Windows x64 debug、C/C++、DDF proto、打包的 `.lib`，以及扩展 manifest 的
+`symbols`、`defines`、`includes`。已用 Spine 4.9.4 实测。暂不支持自定义 app manifest 的
+引擎裁剪、额外链接选项、插件编译或其他平台；遇到未支持选项会明确报错，不静默忽略。

@@ -23,9 +23,9 @@
            [java.util.function BiConsumer]
            [javafx.geometry Orientation Pos]
            [javafx.scene Node Scene]
-           [javafx.scene.control Label Menu MenuButton MenuItem SeparatorMenuItem SplitPane TextInputDialog Tab TabPane TabPane$TabClosingPolicy Tooltip]
+           [javafx.scene.control Button Label Menu MenuButton MenuItem SeparatorMenuItem SplitPane TextInputDialog Tab TabPane TabPane$TabClosingPolicy Tooltip]
            [javafx.scene.input KeyCode KeyEvent MouseEvent]
-           [javafx.scene.layout BorderPane StackPane]
+           [javafx.scene.layout BorderPane HBox Priority StackPane VBox]
            [javafx.scene.paint Color]
            [javafx.scene.shape Rectangle]
            [javafx.stage Screen Stage]))
@@ -450,15 +450,22 @@
               label (doto (Label. title)
                       (ui/add-style! "floating-dock-tab-label")
                       (.setTooltip (doto (Tooltip.)
-                                     (localization/localize! (ui/user-data scene :localization) (localization/message "dock.drag-help")))))
+                                     (localization/localize! (ui/user-data scene :localization)
+                                                             (localization/message (if (ui/user-data body ::collapse!)
+                                                                                     "dock.game-drag-help"
+                                                                                     "dock.drag-help"))))))
               tab (doto (Tab.) (.setGraphic label) (.setContent (or (get reserved-bodies id) body)))]
           (when title-property
             (.bind (.textProperty label) ^javafx.beans.value.ObservableValue title-property))
           (install-drag! manager label id)
           (.setOnMouseClicked label (ui/event-handler event
-                                     (when (and (= 2 (.getClickCount ^MouseEvent event))
-                                                (.isStillSincePress ^MouseEvent event))
-                                       (restore! manager id))))
+                                      (when (and (= javafx.scene.input.MouseButton/PRIMARY (.getButton ^MouseEvent event))
+                                                 (= 2 (.getClickCount ^MouseEvent event))
+                                                 (.isStillSincePress ^MouseEvent event))
+                                        (if-let [collapse! (ui/user-data body ::collapse!)]
+                                          (collapse!)
+                                          (restore! manager id))
+                                        (.consume event))))
           (ui/observe (.selectedProperty tab)
                       (fn [_ _ selected]
                         (when selected (ui/user-data! group ::panel id))))
@@ -662,6 +669,8 @@
      :visible? #(not (ui/inside-hidden-tab? body))}))
 
 (defn restore-all! [scene]
+  (when-let [restore! (ui/user-data scene ::restore-collapsed-game!)]
+    (restore!))
   (when-let [manager (ui/user-data scene ::manager)]
     (cancel-gesture! manager)
     (doseq [[id {:keys [floating]}] @(:panels manager)]
@@ -673,6 +682,87 @@
 (defn float-slot! [slot x y]
   (when-let [float! (ui/user-data slot ::float!)]
     (float! x y)))
+
+(defn install-game-collapse!
+  "Collapse Game to the menu bar, preserving its content and floating group."
+  [^Scene scene ^StackPane slot capture-home! restore-home!]
+  (when-let [dispose! (ui/user-data slot ::collapse-dispose!)]
+    (dispose!))
+  (let [manager (manager scene)
+        panel (coll/first-where #(identical? slot (:slot %)) (coll/vals @(:panels manager)))
+        ^Node body (:body panel)
+        localization (ui/user-data scene :localization)
+        ^Node menu-bar (.lookup scene "#menu-bar")
+        row (or (.lookup scene "#menu-bar-row")
+                (let [^VBox parent (.getParent menu-bar)
+                      index (.indexOf (.getChildren parent) menu-bar)
+                      row (doto (HBox.) (.setId "menu-bar-row") (.setAlignment Pos/CENTER_RIGHT))]
+                  (.remove (.getChildren parent) menu-bar)
+                  (.add (.getChildren row) menu-bar)
+                  (HBox/setHgrow menu-bar Priority/ALWAYS)
+                  (.add (.getChildren parent) index row)
+                  row))
+        button (doto (Button.)
+                 (.setId "collapsed-game-button")
+                 (.setFocusTraversable false)
+                 (.setVisible false)
+                 (.setManaged false)
+                 (ui/add-style! "button-small")
+                 (localization/localize! localization (localization/message "dock.game"))
+                 (.setTooltip (doto (Tooltip.)
+                                (localization/localize! localization (localization/message "dock.restore-game")))))
+        collapsed (volatile! nil)]
+    (letfn [(restore-game! []
+              (when-let [{:keys [^Stage stage positions]} @collapsed]
+                (vreset! collapsed nil)
+                (ui/user-data! scene ::collapsed-home-positions nil)
+                (if stage
+                  (do (.show stage) (.toFront stage))
+                  (do ((:home-visible! panel) true)
+                      (.applyCss (.getRoot scene))
+                      (.layout (.getRoot scene))
+                      (restore-home! positions)))
+                (.setVisible button false)
+                (.setManaged button false)))
+            (collapse-game! []
+              (when-not @collapsed
+                (cancel-gesture! manager)
+                (let [body-scene (.getScene body)]
+                  (if (identical? scene body-scene)
+                    (let [positions (capture-home!)]
+                      (vreset! collapsed {:positions positions})
+                      (ui/user-data! scene ::collapsed-home-positions positions)
+                      ((:home-visible! panel) false))
+                    (let [^Stage stage (.getWindow body-scene)]
+                      ;; Retain the floating group's tree and geometry.
+                      (vreset! collapsed {:stage stage})
+                      (.hide stage))))
+                (.setVisible button true)
+                (.setManaged button true)))]
+      (let [clicked (ui/event-handler event
+                      (when (and (= javafx.scene.input.MouseButton/PRIMARY (.getButton ^MouseEvent event))
+                                 (= 2 (.getClickCount ^MouseEvent event))
+                                 (.isStillSincePress ^MouseEvent event)
+                                 (< (.getY (.sceneToLocal body (.getSceneX ^MouseEvent event) (.getSceneY ^MouseEvent event))) 28.0)
+                                 (nil? (ui/closest-node-where
+                                         #(or (instance? javafx.scene.control.ButtonBase %)
+                                              (instance? javafx.scene.control.ComboBoxBase %)
+                                              (instance? javafx.scene.control.TextInputControl %))
+                                         (.getTarget event))))
+                        (collapse-game!)
+                        (.consume event)))]
+        (.add (.getChildren ^HBox row) button)
+        (.setOnAction button (ui/event-handler _ (restore-game!)))
+        (.addEventFilter body MouseEvent/MOUSE_CLICKED clicked)
+        (ui/user-data! body ::collapse! collapse-game!)
+        (ui/user-data! scene ::restore-collapsed-game! restore-game!)
+        (ui/user-data! slot ::collapse-dispose!
+                       (fn dispose-game-collapse! []
+                         (restore-game!)
+                         (.removeEventFilter body MouseEvent/MOUSE_CLICKED clicked)
+                         (.remove (.getChildren ^HBox row) button)
+                         (ui/user-data! body ::collapse! nil)
+                         (ui/user-data! scene ::restore-collapsed-game! nil)))))))
 
 (defn save-layout! [scene]
   (when-let [{:keys [panels windows persistence drag] :as manager} (ui/user-data scene ::manager)]

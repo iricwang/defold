@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-28",
+  "revision": 104,
+  "issue": "Android connects but remains on waiting for game frames with Windows Device Simulator disabled",
+  "root_cause": "Ordinary Windows embedding created only an HWND wrapper; Session.data/path were null. RemoteFrame therefore always returned null while remoteRunning reported the live process as running.",
+  "live_evidence": "The phone established H.264; the host thread was in RemoteGameServer.video waiting for the first raw frame. The actual game launch had no simulator arguments or shared frame file.",
+  "before": {
+    "package": "1.14.1-patch.103",
+    "test": "RemoteWindowsIntegrationTest embedded",
+    "failure": "AssertionError: Embedded Remote lacks capture mapping",
+    "log": "tmp/remote-embedded-check/before.log"
+  },
+  "after_source_tests": {
+    "ordinary_embedded": {
+      "jpeg_frames": 240,
+      "jpeg_fps": 53.497784777606014,
+      "h264_frames": 240,
+      "h264_fps": 54.152142733447455,
+      "lua_input_callbacks": 12,
+      "reconnects": 6,
+      "disconnect_release": true
+    },
+    "simulator": {
+      "h264_frames": 240,
+      "h264_fps": 55.659682634078884,
+      "lua_input_callbacks": 8,
+      "reconnects": 6,
+      "disconnect_release": true
+    },
+    "ordinary_embedded_orientation_assertions": 99,
+    "capture_only_native_window_probe": "HIDDEN_STARTUP_AND_ADOPTION_OK",
+    "cljfmt": "passed",
+    "clj_kondo": "0 errors, 7 pre-existing warnings outside changed lines"
+  },
+  "implementation": {
+    "capture_only_magic": "0x44464734",
+    "preserve_runtime_resolution_and_safe_area": true,
+    "capture_on_remote_demand_only": true,
+    "ordinary_input": "Forward Remote mouse events through the owned native window; use actual desktop cursor outside the Remote input lease",
+    "phone_apk": "0.6.4 remains compatible"
+  },
+  "user_confirmation": "User confirmed that enabling Device Simulator restores the phone picture; ordinary embedded capture was the missing path.",
+  "packaged_verification": {
+    "patch": "editor/target/editor/Defold-x86_64-win32-patch-103-to-104.zip",
+    "sha256": "d723e1f8145aef5237da6bb4e473d10c5e000548f390b0c1a65c9854a10b4a42",
+    "bytes": 236243802,
+    "pipeline_tests": 11,
+    "pipeline_seconds": 67.205,
+    "native_engine_sdk_unchanged": true,
+    "ordinary_embedded_jpeg_frames": 240,
+    "ordinary_embedded_jpeg_fps": 53.560357536676236,
+    "ordinary_embedded_h264_frames": 240,
+    "ordinary_embedded_h264_fps": 58.79918050179811,
+    "lua_input_callbacks": 12,
+    "reconnects": 6,
+    "disconnect_release": true,
+    "source_overrides_on_classpath": false
+  },
+  "local_installation": {
+    "app": "X:/Programs/Defold",
+    "version": "1.14.1-patch.104",
+    "inventory_matches_patch_target": true,
+    "installer_tests": 11,
+    "installer_test_seconds": 71.733,
+    "restart_native_libraries_loaded": 9,
+    "project_reopened": "X:/AI/Copy/pok_analysis/defold_game/game.project",
+    "project_http_port": 6766,
+    "project_loaded": true,
+    "mcp_runtime_rebuilt": true,
+    "mcp_stdio_probe_tools": 50,
+    "mcp_stdio_probe_projects": 3
+  },
+  "limitations": [
+    "FPS measured on local loopback with an isolated real Windows engine, not phone Wi-Fi display FPS",
+    "No physical Android device available for logcat/MediaCodec validation"
+  ]
+}
