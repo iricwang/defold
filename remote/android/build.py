@@ -24,6 +24,9 @@ def main():
         parser.error('Provide --sdk or both --build-tools and --android-jar')
     tools, android = tools.resolve(), android.resolve()
     zxing = root.parent / 'vendor/zxing-core-3.5.3.jar'
+    key = root / 'signing/defold-remote-development.keystore'
+    if not key.is_file():
+        parser.error('Missing shared development signing key; restore remote/android/signing from Git')
     if not zxing.is_file():
         parser.error('Missing remote/vendor/zxing-core-3.5.3.jar')
     exe = '.exe' if os.name == 'nt' else ''
@@ -41,6 +44,8 @@ def main():
             parser.error('Missing SDK file: %s' % item)
     for folder in ('classes', 'dex'):
         path = build / folder
+        if build.is_symlink() or path.is_symlink() or path.resolve().parent != (root / 'build').resolve():
+            raise ValueError('Android build cleanup must stay inside remote/android/build')
         if path.exists():
             shutil.rmtree(path)
         path.mkdir()
@@ -62,11 +67,6 @@ def main():
             archive.write(path, path.name)
     aligned = build / 'aligned.apk'
     run(tools / ('zipalign' + exe), '-f', '-p', '4', unsigned, aligned)
-    key = build / 'debug.keystore'
-    if not key.exists():
-        run(java_tool('keytool'), '-genkeypair', '-keystore', key, '-storepass', 'android', '-keypass', 'android',
-            '-alias', 'androiddebugkey', '-keyalg', 'RSA', '-keysize', '2048', '-validity', '10000',
-            '-dname', 'CN=Defold Remote Development', '-noprompt')
     apk = build / 'DefoldRemote-debug.apk'
     run(java_tool('java'), '-jar', tools / 'lib/apksigner.jar', 'sign', '--ks', key, '--ks-pass', 'pass:android',
         '--key-pass', 'pass:android', '--out', apk, aligned)
