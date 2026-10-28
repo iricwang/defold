@@ -205,6 +205,7 @@ class Builder:
         if not any(str(self.home).replace('\\', '/') in arg.replace('\\', '/') for arg in self.configure if 'DEFOLD_SDK_ROOT' in arg):
             raise ValueError('CMake build SDK does not match --engine-home')
         self.environment = dict(os.environ, DEFOLD_HOME=str(ROOT), DYNAMO_HOME=str(self.home),
+                                DEFOLD_LOCAL_ENGINE_SHA1=self.sdk,
                                 PYTHONUTF8='1', PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION='python')
         self.environment['PYTHONPATH'] = os.pathsep.join(str(p) for p in (
             self.home / 'lib/python', ROOT / 'build_tools', self.home / 'ext/lib/python'))

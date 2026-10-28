@@ -57,6 +57,15 @@ execute_process(
   OUTPUT_VARIABLE ENGINE_SHA1
   OUTPUT_STRIP_TRAILING_WHITESPACE
   ERROR_QUIET)
+# Local extension builds retain the installed SDK identity after editor-only commits.
+# The local builder separately verifies linked core libraries against that SDK.
+if(DEFOLD_LOCAL_EXTENSION_CONFIG AND DEFINED ENV{DEFOLD_LOCAL_ENGINE_SHA1})
+  set(ENGINE_SHA1 "$ENV{DEFOLD_LOCAL_ENGINE_SHA1}")
+  string(LENGTH "${ENGINE_SHA1}" LOCAL_ENGINE_SHA1_LENGTH)
+  if(NOT LOCAL_ENGINE_SHA1_LENGTH EQUAL 40 OR NOT ENGINE_SHA1 MATCHES "^[0-9a-f]+$")
+    message(FATAL_ERROR "Invalid installed SDK revision for local extension build")
+  endif()
+endif()
 if(NOT ENGINE_SHA1)
   set(ENGINE_SHA1 "unknown")
 endif()

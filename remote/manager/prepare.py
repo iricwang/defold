@@ -55,11 +55,16 @@ def prepare(manifest, project, cache):
     try:
         config = configparser.ConfigParser(interpolation=None, strict=False)
         config.read(project / 'game.project', encoding='utf-8')
-        if config.get('project', 'dependencies', fallback='').strip():
+        if config.has_section('project') and any(key == 'dependencies' or key.startswith('dependencies#')
+               for key, value in config.items('project') if value.strip()):
             stage = '同步项目依赖';kind = 'dependency'
             write_state(status, stage=stage)
             # Dependency downloads contain no project source upload; engine endpoint remains loopback.
             run(command + ['--build-server', 'http://127.0.0.1:1', 'resolve'])
+        stage = '迁移构建副本中的旧版 GUI 资源';kind = 'project'
+        write_state(status, stage=stage)
+        run(command[:command.index('com.dynamo.bob.Bob')] +
+            ['com.defold.editor.RemoteGuiMigration', str(project)])
         native = has_extensions(project)
         extra = ['--build-server', 'http://127.0.0.1:1']
         if native:
