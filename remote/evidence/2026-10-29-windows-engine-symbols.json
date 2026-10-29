@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-29T06:42:02.007277+00:00",
+  "managerVersion": "0.2.2",
+  "apkVersion": "0.8.1",
+  "runtimeRevision": "d37af2675ef21979",
+  "rootCause": "Local extension ZIP renames dmengine_local.exe/.pdb, but the PE CodeView record still references dmengine_local.pdb and its build directory. Implicit DbgHelp lookup fails after relocation or after that build directory changes.",
+  "fix": [
+    "Bind the adjacent canonical PDB to the PE by GUID and age before explicit PDB loading; preserve ABI checks.",
+    "Use the same resolver for safe-area and scene traversal.",
+    "Import and pin both engine and PDB; automatically rebuild invalid source caches.",
+    "Use UTF-8 for the background MCP worker protocol, including Chinese scene names."
+  ],
+  "sourceProjectReadOnly": true,
+  "cloudBuildUsed": false,
+  "tested": [
+    "Windows native symbol probes on owned relocated copies",
+    "Manager file I/O and controlled compilation/launch tests",
+    "Actual Path of Kings GPU launch with inaccessible original PDB path and supported scene snapshot",
+    "Actual imported engine GPU launch and Manager restart reuse",
+    "Two independent fixture games: GPU, pointer Lua callback and H.264",
+    "Installed Android emulator APK: compact pairing, one project click, local native build and nonblank video"
+  ],
+  "notTested": [
+    "Physical phone camera recognition",
+    "Physical phone Wi-Fi performance",
+    "macOS runtime"
+  ],
+  "evidence": {
+    "nativeExtensionSymbols": {
+      "report": "tmp/engine-symbols-tests/symbols-knbkiejo/report.json",
+      "checks": 31
+    },
+    "standardEngineSymbols": {
+      "report": "tmp/engine-symbols-tests/symbols-9et8691i/report.json",
+      "checks": 26
+    },
+    "artifactControlFlow": {
+      "report": "tmp/remote-engine-artifacts-tests/ee2cc1daecf540b4bf4872bec903c662/cases-complete/report.json",
+      "checks": 19
+    },
+    "snapshotControlFlow": {
+      "report": "tmp/remote-engine-artifacts-tests/ee2cc1daecf540b4bf4872bec903c662/snapshot-auto-repair/report.json",
+      "checks": 25
+    },
+    "actualRelocatedGame": {
+      "report": "tmp/pdb-real-game/b034192beade4ce5bc23d514bd41ffa7/report.json",
+      "checks": 0
+    },
+    "actualManagerImportRestart": {
+      "report": "tmp/remote-engine-relocation-tests/0a52d5df848141a7b687ce01bdbc887b/report.json",
+      "checks": 9
+    },
+    "gpuInputVideo": {
+      "report": "tmp/remote-manager-tests/fcb55880bf2a4743822e624e1f363b41/report.json",
+      "checks": 31
+    },
+    "localTls": {
+      "report": "tmp/remote-pairing-tests/02ce1ce12a4b4d79992dbb219cdac509/report.json",
+      "checks": 16
+    },
+    "actualApkProject": {
+      "report": "tmp/remote-android-project-tests/10a8fb5bdfd2483a80e3e15a4d8e7033/report.json",
+      "checks": 3
+    },
+    "package": {
+      "report": "tmp/pdb-manager-package.json",
+      "checks": 0
+    }
+  },
+  "package": {
+    "path": "X:\\AI\\UI\\deliverables\\DefoldRemoteManager-0.2.2-windows-x64.zip",
+    "sha256": "42a0b984078a4d4ce33e4582352fb295e94381e719131cb6b96da7f16a03854c",
+    "files": 242,
+    "runtimeRevision": "d37af2675ef21979",
+    "runtimeFileHashesVerified": 238,
+    "zipContentsVerified": true,
+    "preservesExistingDataDirectory": true
+  },
+  "screenshots": {
+    "relocated-native.png": "deliverables\\DefoldRemoteManager-0.2.2-verification\\relocated-native.png",
+    "manager-import.jpg": "deliverables\\DefoldRemoteManager-0.2.2-verification\\manager-import.jpg",
+    "manager-restart.jpg": "deliverables\\DefoldRemoteManager-0.2.2-verification\\manager-restart.jpg",
+    "android-apk.png": "deliverables\\DefoldRemoteManager-0.2.2-verification\\android-apk.png",
+    "manager-source.jpg": "deliverables\\DefoldRemoteManager-0.2.2-verification\\manager-source.jpg"
+  }
+}

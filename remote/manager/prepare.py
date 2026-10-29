@@ -29,6 +29,15 @@ def has_extensions(project):
     return False
 
 
+def validate_native_engine(engine, platform):
+    if not engine.is_file() or not engine.stat().st_size:
+        raise RuntimeError('本地构建没有生成项目对应的原生引擎')
+    if platform.endswith('win32'):
+        symbols = engine.with_suffix('.pdb')
+        if not symbols.is_file() or not symbols.stat().st_size:
+            raise RuntimeError('Windows 原生引擎缺少配套调试符号，请重新构建：' + str(symbols))
+
+
 def prepare(manifest, project, cache):
     root = manifest.parent
     runtime = json.loads(manifest.read_text(encoding='utf-8'))
@@ -90,8 +99,7 @@ def prepare(manifest, project, cache):
         engine = path('engine')
         if native:
             engine = project/'build'/runtime['platform'].replace('-macos','-osx')/('dmengine.exe' if os.name=='nt' else 'dmengine')
-            if not engine.is_file():
-                raise RuntimeError('本地构建没有生成项目对应的原生引擎')
+            validate_native_engine(engine, runtime['platform'])
             if os.name!='nt':
                 engine.chmod(engine.stat().st_mode | 0o111)
                 subprocess.run(['lipo',str(engine),'-verify_arch',runtime['platform'].split('-')[0]],check=True)

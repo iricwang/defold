@@ -112,7 +112,7 @@ public final class WindowsGameProcess extends Process {
         });
         if (overrides.get("DM_EDITOR_GAME_FILE") != null && !"1".equals(overrides.get("DM_EDITOR_GAME_CAPTURE_ONLY"))) {
             long address = hookLibrary.getFunction("SimulatorSafeAreaRva").invokeLong(new Object[]{new com.sun.jna.WString(command.getFirst())});
-            if (address == 0) throw new IOException("Simulator requires the matching dmengine.pdb beside the game engine for native GUI safe-area adaptation.");
+            if (address == 0) throw new IOException("Cannot resolve native GUI safe-area adaptation. The game engine requires a matching adjacent dmengine.pdb with a compatible WindowSafeArea ABI.");
             environment.put("DM_EDITOR_GAME_SAFE_AREA_RVA", Long.toHexString(address));
         }
         StringBuilder block = new StringBuilder();

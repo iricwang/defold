@@ -1,0 +1,43 @@
+{
+  "issue": "Physical Android phone remains at waiting for computer response / reconnecting after selecting a project",
+  "physicalEvidence": {
+    "platform": "Windows x64 Manager 0.2.2; HONOR PTP-AN70 peer",
+    "directory": "tmp/remote-physical-diagnostic",
+    "tcp": "retry-connections.jsonl shows established connections followed by close/retry during user-confirmed phone retry",
+    "threads": "retry-0.json through retry-7.json repeatedly show SSLStreams.<init> -> InetSocketAddress.getHostName -> InetAddress.getHostFromNameService -> Inet6AddressImpl.getHostByAddr",
+    "failureStage": "Reverse DNS before TLS handshake and before RemoteGateway route handler",
+    "androidStatusReadTimeoutMs": 3000
+  },
+  "fix": {
+    "managerVersion": "0.2.3",
+    "runtimeRevision": "fd611dc4f0f50326",
+    "implementation": "Standard InetAddressResolverProvider, enabled only in Manager process, returns numeric names for LAN peers; delegates forward and non-LAN reverse lookups",
+    "packaging": "SPI resource is packaged and included in runtime input hash and file inventory",
+    "apkChanged": false,
+    "certificatePinningChanged": false,
+    "machineDnsConfigurationChanged": false
+  },
+  "verification": {
+    "resolverReport": "tmp/remote-resolver-tests/26590f9ea6654d4ca45ff137c53b8379/report.json",
+    "resolverChecks": 21,
+    "samePhysicalPeerOriginalLookupMs": 6620.9449,
+    "samePhysicalPeerFixedLookupMs": 27.2749,
+    "blockedDnsTls": "Original HTTPS blocked; repaired HTTPS completed while reverse resolver remained blocked; certificate pin and unpaired access rejection checked",
+    "pairingReport": "tmp/remote-pairing-tests/36ef7d8dd63845b4914eec256099bbb9/report.json",
+    "pairingChecks": 16,
+    "apkEmulatorReport": "tmp/remote-android-tests/fbf3d0b585044538a21957fdf68eefb2/report.json",
+    "apkEmulatorChecks": 11,
+    "physicalPlaybackAfterFix": "User confirmed after installed Manager restart: retried and game picture appeared",
+    "installedLocation": "X:/Programs/DefoldRemote",
+    "installedRuntimeVerifiedFiles": 242,
+    "installedProjectAndPairing": "Path of Kings and HONOR PTP-AN70 retained",
+    "postUpdateEvidence": "tmp/remote-physical-diagnostic/fixed-phone-connections.jsonl and fixed-phone-*.json show the phone connecting and the real project preparation running without reverse DNS blocking",
+    "firewall": "No firewall settings changed. A proposed rule was rejected by automatic review; installation and live phone verification succeeded without it.",
+    "physicalTouchAndFps": "Not measured in this turn; physical confirmation covers game picture after project connection",
+    "macOS": "Portable Java implementation; not executed on macOS in this turn"
+  },
+  "delivery": {
+    "archive": "X:/AI/UI/deliverables/DefoldRemoteManager-0.2.3-windows-x64.zip",
+    "sha256": "26eec1b5c7816938d42558cac75fcfd248e0a72c0cbcbe1f435d7abe9b8b8f1f"
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "version": "0.2.6",
+  "runtime": "a1638636e4188d29",
+  "changes": [
+    "Global Defold installation setting shared by all projects; validated compiler, engine, native SDK and platform; preserved config and restart intents",
+    "Build compatibility separated from Manager transport/capture revision; migrate legacy receipts only from retained matching package manifests",
+    "Remote waits one completed frame per pointer edge; deterministic MCP keeps two; fixed-length input replies and TCP_NODELAY"
+  ],
+  "installation": {
+    "installedRuntime": "runtime-a1638636e4188d29\\manifest.json",
+    "engineDirectory": "X:\\Programs\\Defold",
+    "javaPids": [
+      172604
+    ],
+    "listenerPids": [
+      172604
+    ],
+    "sameHost": true,
+    "sameDeviceIds": true,
+    "sameProjectBuild": true,
+    "sameBuiltAt": true,
+    "compatibilityMigrated": true,
+    "build": "X:\\AI\\UI\\defold\\tmp\\remote-manager-ui-state\\builds\\11b2e819-520e-44f0-89d6-721bc8718413\\project"
+  },
+  "package": {
+    "archive": "X:\\AI\\UI\\deliverables\\DefoldRemoteManager-0.2.6-windows-x64.zip",
+    "sha256": "1f811b3bea625392546e3da3c79829c335bb9446cca74c83a6b30549be1899d2",
+    "runtime": "a1638636e4188d29",
+    "verifiedRuntimeFiles": 244,
+    "zipFiles": 247
+  },
+  "validation": {
+    "engineDirectory": {
+      "checks": 19,
+      "report": "tmp/remote-engine-directory-tests/final-RemoteEngineInstallationTest/report.json"
+    },
+    "buildCompatibility": {
+      "checks": 36,
+      "report": "tmp/remote-engine-directory-tests/final-RemoteEngineArtifactsTest/report.json"
+    },
+    "snapshots": {
+      "checks": 25,
+      "report": "tmp/remote-engine-directory-tests/final-RemoteSnapshotTest/report.json"
+    },
+    "actualNativeGame": {
+      "report": "tmp/remote-engine-relocation-tests/8f79c9a3baec4ae2981ca01f7946561b/report.json",
+      "cachedStartSeconds": 3.1665395999880275,
+      "newBuildDirectoriesOnUpgrade": 0
+    },
+    "input": {
+      "baselineRoundTripMs": {
+        "median": 50.41279998840764,
+        "p95": 59.169500003918074,
+        "maximum": 66.77309999940917
+      },
+      "fixedRoundTripMs": {
+        "median": 32.05520000483375,
+        "p95": 48.154399992199615,
+        "maximum": 59.61140000727028
+      },
+      "sentTaps": 300,
+      "clickCallbacks": 300,
+      "releaseCallbacks": 300,
+      "streamErrors": [],
+      "report": "tmp/remote-streaming-tests/96d7561193774c50a745cb5f04617aa0/report.json",
+      "scope": "Loopback TLS plus real Windows GPU/Lua, not physical touch-to-photon latency; baseline 1 tap/s, stress run 10 taps/s"
+    },
+    "apk": {
+      "version": "0.8.1",
+      "checks": 11,
+      "reportDirectory": "tmp/remote-android-tests/2b0d7e4200024878810c2eabbc4b1ee0",
+      "scope": "Emulator on 48aad1efb01dac18 transport build; final engine selector separately tested; physical phone pending"
+    },
+    "settingsUi": {
+      "passed": [
+        "Settings renders global engine path",
+        "Choose directory sends engine-directory RPC",
+        "Invalid directory leaves selected engine intact",
+        "Failed selection re-enables chooser",
+        "Engine row does not overflow"
+      ],
+      "scope": "Actual HTML/CSS/JS with mocked Tauri bridge; screenshot capture returned black and is not visual acceptance",
+      "result": {
+        "error": "Error: 引擎目录无效",
+        "retained": "X:/Programs/Defold",
+        "buttonEnabled": true,
+        "overflow": false
+      }
+    }
+  },
+  "limitations": [
+    "Physical phone input latency improvement awaits user retry",
+    "macOS app/JDK path and bridge checks exercised with fixtures; no Mac execution",
+    "Changed compiler/engine/build pipeline still rebuilds; first runs and source edits still require preparation",
+    "Selecting a version without a matching local native SDK fails before replacing active configuration"
+  ],
+  "apkChanged": false,
+  "firewallChanged": false
+}

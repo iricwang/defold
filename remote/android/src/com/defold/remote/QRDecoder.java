@@ -22,15 +22,30 @@ import java.util.*;
 public final class QRDecoder {
     private QRDecoder() {}
     public static String decode(byte[] data,int width,int height)throws NotFoundException {
-        if(width<=0||height<=0||(long)width*height>data.length)throw new IllegalArgumentException("Invalid camera frame");
+        return decode(data,width,height,0,0,width,height);
+    }
+    /** Analyze only the sensor area actually visible in an aspect-fill camera preview. */
+    public static String decode(byte[] data,int width,int height,int left,int top,int cropWidth,int cropHeight)throws NotFoundException {
+        if(data==null||width<=0||height<=0||(long)width*height>data.length||left<0||top<0||
+            cropWidth<=0||cropHeight<=0||(long)left+cropWidth>width||(long)top+cropHeight>height)
+            throw new IllegalArgumentException("Invalid camera frame");
+        return decodeSource(new PlanarYUVLuminanceSource(data,width,height,left,top,cropWidth,cropHeight,false));
+    }
+    /** Album pixels use exactly the same QR-only decoder, without requiring Android in tests. */
+    public static String decode(int[] argb,int width,int height)throws NotFoundException {
+        if(argb==null||width<=0||height<=0||(long)width*height>argb.length)
+            throw new IllegalArgumentException("Invalid image");
+        return decodeSource(new RGBLuminanceSource(width,height,argb));
+    }
+    private static String decodeSource(LuminanceSource full)throws NotFoundException {
         MultiFormatReader reader=new MultiFormatReader();
         Map<DecodeHintType,Object> hints=new EnumMap<>(DecodeHintType.class);
         hints.put(DecodeHintType.POSSIBLE_FORMATS,Collections.singletonList(BarcodeFormat.QR_CODE));
         hints.put(DecodeHintType.TRY_HARDER,Boolean.TRUE);reader.setHints(hints);
-        LuminanceSource full=new PlanarYUVLuminanceSource(data,width,height,0,0,width,height,false);
-        int side=Math.min(width,height);
+        int width=full.getWidth(),height=full.getHeight(),side=Math.min(width,height);
         LuminanceSource center=full.crop((width-side)/2,(height-side)/2,side,side);
-        for(LuminanceSource source:new LuminanceSource[]{full,center,center.invert()}){
+        // Full-image inversion is essential: a code can be near the edge of a landscape frame.
+        for(LuminanceSource source:new LuminanceSource[]{center,full,center.invert(),full.invert()}){
             try{return reader.decodeWithState(new BinaryBitmap(new HybridBinarizer(source))).getText();}
             catch(NotFoundException ignored){}finally{reader.reset();}
         }

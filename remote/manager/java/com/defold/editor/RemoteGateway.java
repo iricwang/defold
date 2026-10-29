@@ -35,11 +35,15 @@ final class RemoteGateway implements AutoCloseable {
     private final Semaphore requests = new Semaphore(96);
     private String pairSecret = "";
     private long pairExpires;
+    private boolean pairBusy;
+    private String pairState = "idle", pairedName = "";
     private final Map<String, long[]> attempts = new HashMap<>();
     private final Map<HttpExchange, Long> writing = new ConcurrentHashMap<>();
     private final Map<String, Long> seen = new ConcurrentHashMap<>();
 
     RemoteGateway(RemoteManager manager, int requestedPort) throws Exception {
+        // Small touch replies must not wait for TCP's delayed-ACK/Nagle timer.
+        System.setProperty("sun.net.httpserver.nodelay", "true");
         this.manager = manager;
         Path key = manager.directory.resolve("host.p12"), password = manager.directory.resolve("host-key-password");
         if (!Files.exists(password)) Files.writeString(password, secret(), StandardOpenOption.CREATE_NEW);
@@ -73,27 +77,37 @@ final class RemoteGateway implements AutoCloseable {
     static String secret(){byte[] bytes=new byte[32];new SecureRandom().nextBytes(bytes);return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);}
     int port(){return server.getAddress().getPort();}
     List<String> addresses() throws SocketException {
-        List<String> result=new ArrayList<>();
+        Map<String,Integer> ranked=new HashMap<>();
         for(var interfaces=NetworkInterface.getNetworkInterfaces();interfaces.hasMoreElements();){NetworkInterface n=interfaces.nextElement();if(!n.isUp()||n.isLoopback())continue;
-            for(var addresses=n.getInetAddresses();addresses.hasMoreElements();){InetAddress a=addresses.nextElement();if(a instanceof Inet4Address&&a.isSiteLocalAddress())result.add("https://"+a.getHostAddress()+":"+port());}}
+            String description=(n.getName()+" "+n.getDisplayName()).toLowerCase(Locale.ROOT);
+            int rank=n.isVirtual()||description.matches(".*(virtual|vethernet|docker|wsl|vpn|tailscale|zerotier|hamachi).*" )?10:0;
+            for(var addresses=n.getInetAddresses();addresses.hasMoreElements();){InetAddress a=addresses.nextElement();if(a instanceof Inet4Address&&a.isSiteLocalAddress())ranked.put("https://"+a.getHostAddress()+":"+port(),rank);}}
+        List<String> result=new ArrayList<>(ranked.keySet());result.sort(Comparator.comparingInt((String a)->ranked.get(a)).thenComparing(a->a));
         if(result.isEmpty())result.add("https://127.0.0.1:"+port());return result;
     }
     String selectedAddress() throws SocketException {
         List<String> available=addresses();
         String selected=String.valueOf(manager.settings.getOrDefault("connectionAddress",""));
-        return available.contains(selected)?selected:available.size()==1?available.getFirst():"";
+        return available.contains(selected)?selected:available.getFirst();
     }
     synchronized void selectAddress(String address) throws Exception {
         if(!addresses().contains(address))throw new IllegalArgumentException("请选择当前电脑的有效连接地址");
-        pairSecret="";pairExpires=0;
+        if(pairBusy)throw new IllegalStateException("手机正在配对，请完成后再切换地址");
+        pairSecret="";pairExpires=0;pairState="idle";pairedName="";
         synchronized(manager){manager.settings.put("connectionAddress",address);manager.save();}
     }
     synchronized Map<String,Object> pairing() throws Exception {
         String address=selectedAddress();
         if(address.isEmpty())throw new IllegalArgumentException("请选择一个手机可访问的连接 IP");
+        if(pairBusy)throw new IllegalStateException("手机正在配对，请稍候");
         pairSecret=secret();pairExpires=System.currentTimeMillis()+120000;
+        pairState="waiting";pairedName="";
         String uri="defoldremote://connect?v=2&address="+URLEncoder.encode(address,StandardCharsets.UTF_8)+"&code="+pairSecret+"&fingerprint="+fingerprint;
-        return Map.of("uri",uri,"address",address,"fingerprint",fingerprint,"expiresAt",pairExpires,"addresses",addresses());
+        return Map.of("uri",uri,"qrUri",RemotePairingLink.compact(address,pairSecret,fingerprint),"address",address,"fingerprint",fingerprint,"expiresAt",pairExpires,"addresses",addresses());
+    }
+    synchronized Map<String,Object> pairingStatus() {
+        String state=pairBusy?"pairing":pairState.equals("waiting")&&System.currentTimeMillis()>pairExpires?"expired":pairState;
+        return Map.of("state",state,"expiresAt",pairExpires,"deviceName",pairedName);
     }
     static String bearer(HttpExchange e){String a=e.getRequestHeaders().getFirst("Authorization");return a!=null&&a.startsWith("Bearer ")?a.substring(7):"";}
     String device(String token){String digest=RemoteManager.hash(token.getBytes(StandardCharsets.UTF_8));synchronized(manager){for(var d:manager.devices.values())if(MessageDigest.isEqual(digest.getBytes(StandardCharsets.UTF_8),RemoteManager.str(d,"tokenHash").getBytes(StandardCharsets.UTF_8)))return RemoteManager.str(d,"id");}return "";}
@@ -158,11 +172,15 @@ final class RemoteGateway implements AutoCloseable {
     private void pair(HttpExchange e)throws Exception{
         Map<String,Object> values=body(e);String candidate=RemoteManager.str(values,"code"),ip=e.getRemoteAddress().getAddress().getHostAddress();
         synchronized(this){long now=System.currentTimeMillis();long[] a=attempts.computeIfAbsent(ip,k->new long[]{now,0});if(now-a[0]>60000){a[0]=now;a[1]=0;}if(++a[1]>10){denied(e,429,"配对尝试过多，请稍后重试");return;}
-            if(now>pairExpires||candidate.isEmpty()||!MessageDigest.isEqual(candidate.getBytes(StandardCharsets.UTF_8),pairSecret.getBytes(StandardCharsets.UTF_8))){denied(e,403,"二维码已过期，请在电脑上刷新");return;}pairSecret="";pairExpires=0;}
+            if(now>pairExpires||candidate.isEmpty()||!MessageDigest.isEqual(candidate.getBytes(StandardCharsets.UTF_8),pairSecret.getBytes(StandardCharsets.UTF_8))){denied(e,403,"二维码已过期，请在电脑上刷新");return;}pairSecret="";pairExpires=0;pairBusy=true;pairState="pairing";}
+        try {
         String name=RemoteManager.str(values,"name");if(name.isBlank())name="Android Remote";if(name.length()>80)name=name.substring(0,80);
         String id=UUID.randomUUID().toString(),token=secret();
         synchronized(manager){if(manager.devices.size()>=32)throw new IOException("配对设备已达上限，请在电脑端移除旧设备");manager.devices.put(id,new LinkedHashMap<>(Map.of("id",id,"name",name,"tokenHash",RemoteManager.hash(token.getBytes(StandardCharsets.UTF_8)),"pairedAt",Instant.now().toString())));manager.save();}
         reply(e,200,Map.of("token",token,"device_id",id,"host_id",manager.hostId,"computer",manager.computer,"protocol",2));
+        synchronized(this){pairState="paired";pairedName=name;}
+        } catch(Exception failure) { synchronized(this){pairState="error";}throw failure; }
+        finally { synchronized(this){pairBusy=false;} }
     }
     private synchronized void claim(HttpExchange e,RemoteManager.Project p,String device)throws Exception{
         boolean force=Boolean.TRUE.equals(body(e).get("takeover"));
@@ -175,9 +193,23 @@ final class RemoteGateway implements AutoCloseable {
         synchronized(p){worker=p.worker;if(worker==null||!worker.process.isAlive()){denied(client,409,"游戏未运行");return;}}
         HttpURLConnection upstream=worker.connection(path,method);upstream.setRequestProperty("X-Remote-Lease",control);p.connections.add(upstream);p.clients.add(client);
         String revision=client.getRequestHeaders().getFirst("X-Defold-Device-Revision");if(revision!=null)upstream.setRequestProperty("X-Defold-Device-Revision",revision);
+        boolean reusable=false;
         try{
             if(body!=null){upstream.setDoOutput(true);upstream.setFixedLengthStreamingMode(body.length);try(var out=upstream.getOutputStream()){out.write(body);}}
             int code=upstream.getResponseCode();String type=upstream.getContentType();
+            if(!media){
+                byte[] response;
+                try(InputStream in=code>=400?upstream.getErrorStream():upstream.getInputStream()){
+                    response=in==null?new byte[0]:in.readNBytes(8*1024*1024+1);
+                    if(response.length>8*1024*1024)throw new IOException("Remote response too large");
+                }
+                reusable=true;
+                client.getResponseHeaders().set("Content-Type",type==null?"application/octet-stream":type);
+                client.getResponseHeaders().set("Cache-Control","no-store");
+                client.sendResponseHeaders(code,response.length==0?-1:response.length);
+                try(OutputStream out=client.getResponseBody()){out.write(response);}
+                return;
+            }
             client.getResponseHeaders().set("Content-Type",type==null?"application/octet-stream":type);client.getResponseHeaders().set("Cache-Control","no-store");client.sendResponseHeaders(code,0);
             try(InputStream in=code>=400?upstream.getErrorStream():upstream.getInputStream();OutputStream out=client.getResponseBody()){
                 if(in==null)return;byte[] bytes=new byte[65536];for(int n;(n=in.read(bytes))>=0;){
@@ -185,7 +217,7 @@ final class RemoteGateway implements AutoCloseable {
                     writing.put(client,System.nanoTime());try{out.write(bytes,0,n);out.flush();}finally{writing.remove(client);}
                 }
             }
-        }finally{writing.remove(client);p.connections.remove(upstream);p.clients.remove(client);upstream.disconnect();client.close();}
+        }finally{writing.remove(client);p.connections.remove(upstream);p.clients.remove(client);if(!reusable)upstream.disconnect();client.close();}
     }
     @Override public void close(){server.stop(0);watchdog.shutdownNow();executor.shutdownNow();}
 }

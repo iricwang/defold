@@ -1,0 +1,333 @@
+{
+  "date": "2026-10-29",
+  "versions": {
+    "apk": "0.8.1",
+    "manager": "0.2.1",
+    "runtime": "c2d03d4a1363a50a"
+  },
+  "cause": "A source change discarded the global copy, cleared run intent, and later preparation could stop at ready while APK only waited for running.",
+  "fixes": [
+    "Freeze each file with bounded stable copy and content validation; retain later edits as modified",
+    "Keep start intent across transient source saves; stop/cancel and real compiler errors remain explicit",
+    "APK retries an idle prepared start with bounded backoff and a shared operation deadline"
+  ],
+  "actualProject": {
+    "sourceProject": "X:\\AI\\Copy\\pok_analysis\\defold_game",
+    "manifest": "X:\\AI\\UI\\defold\\tmp\\remote-project-connect-final\\runtime-c2d03d4a1363a50a\\manifest.json",
+    "runtimeRevision": "c2d03d4a1363a50a",
+    "serial": "emulator-5554",
+    "scope": "Installed APK, independent Windows/macOS Manager, actual project read only. No physical camera recognition or real-phone Wi-Fi claim.",
+    "stages": [
+      {
+        "state": "preparing",
+        "stage": "准备已保存的资源",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 4.65
+      },
+      {
+        "state": "preparing",
+        "stage": "迁移构建副本中的旧版 GUI 资源",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 33.6
+      },
+      {
+        "state": "preparing",
+        "stage": "准备本地原生扩展工具链",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 34.11
+      },
+      {
+        "state": "preparing",
+        "stage": "编译原生扩展与游戏资源",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 34.62
+      },
+      {
+        "state": "preparing",
+        "stage": "本地构建完成",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 85.0
+      },
+      {
+        "state": "preparing",
+        "stage": "启动后台游戏",
+        "busy": true,
+        "modified": true,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 85.51
+      },
+      {
+        "state": "running",
+        "stage": "",
+        "busy": false,
+        "modified": true,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": true,
+        "elapsedSeconds": 91.11
+      }
+    ],
+    "passed": [
+      "Actual project is listed after compact QR/TLS pairing",
+      "One APK project click automatically builds the actual source and creates a game session",
+      "APK decodes a nonblank first frame and Manager independently captures the actual game image"
+    ],
+    "outcome": "passed",
+    "apkVersion": "0.8.1",
+    "projectId": "9dddcf15-8443-42c2-8b25-5415da9b2e01",
+    "projectName": "Path of Kings",
+    "runningStatus": {
+      "id": "9dddcf15-8443-42c2-8b25-5415da9b2e01",
+      "name": "Path of Kings",
+      "state": "running",
+      "busy": false,
+      "modified": true,
+      "session_id": "1bedd38f-8bcf-4b6f-9abc-ecc82fe1e8cb",
+      "width": 584,
+      "height": 1280,
+      "builtAt": "2026-10-29T04:58:02.812085700Z"
+    },
+    "phoneImageMetrics": {
+      "width": 1080,
+      "height": 1920,
+      "centerDistinctColors": 9134,
+      "centerStddev": 91.1756213381016
+    },
+    "engineImageMetrics": {
+      "width": 182,
+      "height": 400,
+      "centerDistinctColors": 10820,
+      "centerStddev": 90.5024256694754
+    },
+    "elapsedSeconds": 107.37,
+    "managerForcedCleanup": false
+  },
+  "preparedOnlyApkRecovery": {
+    "sourceProject": "X:\\AI\\UI\\defold\\scripts\\automation\\fixture",
+    "manifest": "X:\\AI\\UI\\defold\\tmp\\remote-project-connect-final\\runtime-c2d03d4a1363a50a\\manifest.json",
+    "runtimeRevision": "c2d03d4a1363a50a",
+    "serial": "emulator-5554",
+    "managerMainClass": "com.defold.editor.RemotePreparedOnlyTestHost",
+    "extraClasspath": [
+      "X:\\AI\\UI\\defold\\tmp\\remote-prepared-only-test-classes"
+    ],
+    "scope": "Installed APK, independent Windows/macOS Manager, actual project read only. No physical camera recognition or real-phone Wi-Fi claim.",
+    "stages": [
+      {
+        "state": "preparing",
+        "stage": "准备已保存的资源",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 10.44
+      },
+      {
+        "state": "preparing",
+        "stage": "迁移构建副本中的旧版 GUI 资源",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 10.95
+      },
+      {
+        "state": "preparing",
+        "stage": "构建游戏资源",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 11.46
+      },
+      {
+        "state": "ready",
+        "stage": "",
+        "busy": false,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 16.55
+      },
+      {
+        "state": "preparing",
+        "stage": "启动后台游戏",
+        "busy": true,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": false,
+        "elapsedSeconds": 17.06
+      },
+      {
+        "state": "running",
+        "stage": "",
+        "busy": false,
+        "modified": false,
+        "failed_stage": "",
+        "error_kind": "",
+        "hasSession": true,
+        "elapsedSeconds": 24.17
+      }
+    ],
+    "passed": [
+      "Actual project is listed after compact QR/TLS pairing",
+      "One APK project click automatically builds the actual source and creates a game session",
+      "APK decodes a nonblank first frame and Manager independently captures the actual game image",
+      "APK sends another Start from idle ready after the test host loses the first run intent; real compiler and game renderer succeed"
+    ],
+    "outcome": "passed",
+    "apkVersion": "0.8.1",
+    "projectId": "3a017331-38ef-4998-a95a-29eb5d1f89ce",
+    "projectName": "Background automation fixture",
+    "clickedActionBounds": [
+      1752,
+      460,
+      1885,
+      544
+    ],
+    "runningStatus": {
+      "id": "3a017331-38ef-4998-a95a-29eb5d1f89ce",
+      "name": "Background automation fixture",
+      "state": "running",
+      "busy": false,
+      "modified": false,
+      "session_id": "aff174fe-d14b-429a-8b7b-77cd44c8a964",
+      "width": 320,
+      "height": 240,
+      "builtAt": "2026-10-29T05:04:53.656585700Z"
+    },
+    "preparedOnlyRestart": {
+      "idleBeforeRetry": true,
+      "startRequests": 2,
+      "firstStartPreparedOnly": true
+    },
+    "phoneImageMetrics": {
+      "width": 1920,
+      "height": 1080,
+      "centerDistinctColors": 829,
+      "centerStddev": 48.87279880475419
+    },
+    "engineImageMetrics": {
+      "width": 320,
+      "height": 240,
+      "centerDistinctColors": 1927,
+      "centerStddev": 57.1646267211309
+    },
+    "elapsedSeconds": 28.11,
+    "managerForcedCleanup": false
+  },
+  "snapshotRegression": {
+    "scope": "Real file snapshot I/O, deterministic cancellation and prepare control flow; compiler/launch fakes, no user project or game process touched",
+    "monitorBoundary": "The passive monitor checks metadata rather than hashing all content. Later edits preserving size, time and absent file identity remain a pre-existing watcher limitation.",
+    "passed": [
+      "later edits to another file do not discard the frozen snapshot",
+      "new files after the initial resource list belong to the next snapshot",
+      "snapshot stamp identifies the captured version, not later source",
+      "content fingerprint is computed from frozen targets rather than later source",
+      "only a changing file is retried, with a three-copy upper bound",
+      "the stable final version is copied",
+      "content hash fallback detects same-size same-time replacement when file identity is unavailable",
+      "replacement content, not the removed inode content, is frozen",
+      "a continuously changing source is classified as retryable after exactly three attempts",
+      "a file removed after listing is a retryable source change",
+      "the next stable resource list completes after an atomic removal",
+      "a later edit does not lose the original launch request",
+      "a built frozen version reports subsequent source edits as modified",
+      "build receipt records the captured source stamp",
+      "a stopped frozen version becomes dirty when the later edit is observed",
+      "transient copy failure keeps the explicit start intent",
+      "transient copy failure waits without calling the compiler or launcher",
+      "a stable retry reaches launch with the original intent",
+      "stop during copying cancels the original generation and run intent",
+      "later observation never restores a cancelled launch request",
+      "automatic preparation after a later edit still does not restore cancelled run intent",
+      "real compiler failures are errors and clear the run intent",
+      "unchanged failed source is not automatically rebuilt or launched",
+      "editing failed source may prepare a fix but does not silently launch it",
+      "explicit retry can launch the repaired cached build"
+    ]
+  },
+  "startupWaitChecks": 43,
+  "gpuRegression": {
+    "passed": [
+      "one selected connection address is persisted",
+      "catalog rejects unpaired clients",
+      "QR uses only the selected address",
+      "address selection invalidates previous QR",
+      "pairing secret is single use",
+      "phone connection starts automatic build 2e69b992-5f7b-4c96-b82c-dc85321c43d9",
+      "phone connection starts automatic build d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1",
+      "two independent games running without editor",
+      "real GPU thumbnail 2e69b992-5f7b-4c96-b82c-dc85321c43d9",
+      "stream uses top-left image coordinates 2e69b992-5f7b-4c96-b82c-dc85321c43d9",
+      "pointer accepted 2e69b992-5f7b-4c96-b82c-dc85321c43d9",
+      "Lua button callback received 2e69b992-5f7b-4c96-b82c-dc85321c43d9",
+      "hardware video connects 2e69b992-5f7b-4c96-b82c-dc85321c43d9",
+      "video dimensions valid 2e69b992-5f7b-4c96-b82c-dc85321c43d9",
+      "60 H264 frames 2e69b992-5f7b-4c96-b82c-dc85321c43d9: 51.4 fps",
+      "real GPU thumbnail d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1",
+      "stream uses top-left image coordinates d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1",
+      "pointer accepted d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1",
+      "Lua button callback received d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1",
+      "hardware video connects d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1",
+      "video dimensions valid d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1",
+      "60 H264 frames d2e4ee7e-2e86-4a98-86ff-2c1879ec82e1: 42.7 fps",
+      "old project control revoked after switch",
+      "switching did not stop either game",
+      "another device requires explicit takeover",
+      "explicit takeover succeeds",
+      "takeover rejects old controller",
+      "stale device dimensions rejected",
+      "unshared project removed from catalog",
+      "revoked host credential rejected",
+      "both sessions stopped"
+    ]
+  },
+  "artifacts": {
+    "apk": {
+      "path": "X:\\AI\\UI\\deliverables\\DefoldRemote-0.8.1.apk",
+      "sha256": "cbf2ca0306f2bc3ac62f1cf426499230386f42cc0fbb90d245ada362351fe726"
+    },
+    "manager": {
+      "path": "X:\\AI\\UI\\deliverables\\DefoldRemoteManager-0.2.1-windows-x64.zip",
+      "sha256": "8a042cdd6ad37c579a17bdca04550a1ef89379784f567ac76754dd8ae0d61901",
+      "files": 241,
+      "runtimeRevision": "c2d03d4a1363a50a",
+      "runtimeFileHashesVerified": 237,
+      "zipContentsVerified": true,
+      "preservesExistingDataDirectory": true
+    }
+  },
+  "scope": "Actual APK on Android emulator; real Path of Kings source input plus isolated local native-extension build, Windows GPU game and phone video. The test did not edit original sources or operate the existing Manager.",
+  "limits": [
+    "No physical phone/Wi-Fi or macOS acceptance in this run"
+  ],
+  "review": "X:\\AI\\UI\\deliverables\\DefoldRemote-0.8.1-project-connect\\index.html"
+}

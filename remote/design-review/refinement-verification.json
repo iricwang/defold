@@ -1,0 +1,10 @@
+{
+  "checks": [
+    "computer menu retains selected Mac context",
+    "connection status retains selected computer",
+    "offline check retains laptop context",
+    "pair identity is not claimed before verification",
+    "build failure uses compiler diagnostic"
+  ],
+  "scope": "Prototype only"
+}

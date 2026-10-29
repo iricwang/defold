@@ -158,6 +158,10 @@ public final class AutomationWorker implements AutoCloseable {
     }
 
     private void send(int wheel) throws IOException {
+        send(wheel, 2);
+    }
+
+    private void send(int wheel, int frames) throws IOException {
         int next = ++sequence;
         if (MAC) {
             try (var lock = shared.getChannel().lock()) {
@@ -176,7 +180,7 @@ public final class AutomationWorker implements AutoCloseable {
         }
         await(() -> get(271) == next, 5000);
         int frame = get(270);
-        await(() -> Integer.toUnsignedLong(get(270) - frame) >= 2, 5000);
+        await(() -> Integer.toUnsignedLong(get(270) - frame) >= frames, 5000);
     }
 
     private void send() throws IOException {
@@ -238,6 +242,7 @@ public final class AutomationWorker implements AutoCloseable {
     private Map<String, Object> capture(String name) throws IOException {
         if (!name.matches("[a-zA-Z0-9_-]+\\.png")) throw new IllegalArgumentException("Invalid image name");
         int request = get(267) + 1;
+        put(266, 0); // Deterministic MCP capture requires the matching scene snapshot.
         put(267, request);
         await(() -> get(276) == request, 10000);
         BufferedImage image;
@@ -307,7 +312,14 @@ public final class AutomationWorker implements AutoCloseable {
         try (var lock = shared.getChannel().tryLock()) {
             if (lock == null) return null;
             put(265, 1);
-            put(267, get(267) + 1);
+            // Keep one request in flight until the render hook has published it.
+            // Replacing it on every poll invalidates the scene prepared before
+            // SwapBuffers and can starve capture indefinitely in complex scenes.
+            int request = get(267);
+            if (request == get(276)) {
+                put(266, 1); // Video needs pixels, not a full scene traversal and JSON file per frame.
+                put(267, request + 1);
+            }
             int frame = get(3), w = get(1), h = get(2), slot = get(11);
             if (frame == previous || w != width || h != height || w < 32 || h < 32
                     || slot < 0 || slot > 1 || (long)w * h * 4 > CAPACITY) return null;
@@ -326,14 +338,24 @@ public final class AutomationWorker implements AutoCloseable {
         }
     }
 
-    /** A held Remote pointer must not wait two game frames or release after every move. */
+    /** Consume button edges before accepting their inverse; held motion remains asynchronous. */
     synchronized void livePointer(int normalizedX, int normalizedY, boolean pressed) throws IOException {
         if (game == null || !game.isAlive()) return;
         if (normalizedX < 0 || normalizedX > 65535 || normalizedY < 0 || normalizedY > 65535)
             throw new IllegalArgumentException("Pointer outside frame");
         x = (int)((long)normalizedX * (width - 1) / 65535);
         y = (int)((long)normalizedY * (height - 1) / 65535);
-        buttons = pressed ? 1 : 0;
+        int nextButtons = pressed ? 1 : 0;
+        boolean edge = buttons != nextButtons;
+        buttons = nextButtons;
+        if (edge) {
+            // HTTP delivery or a window-dispatch marker alone does not mean HID
+            // has sampled the press. Hold through the next completed frame so
+            // HID and Lua input run before an inverse edge. Remote does not need
+            // MCP's extra settling frame for deterministic scene capture.
+            send(0, 1);
+            return;
+        }
         if (MAC) {
             try (var lock = shared.getChannel().lock()) {
                 put(6, x); put(7, y); put(8, buttons); put(9, 0); put(10, 0);
@@ -355,7 +377,7 @@ public final class AutomationWorker implements AutoCloseable {
     }
 
     public static void main(String[] args) throws Exception {
-        PrintStream protocol = System.out;
+        PrintStream protocol = new PrintStream(new FileOutputStream(FileDescriptor.out), true, java.nio.charset.StandardCharsets.UTF_8);
         System.setOut(System.err); // Resource unpacking and libraries must never corrupt the private protocol.
         ResourceUnpacker.unpackResources();
         System.setProperty("defold.unpack.path", args[1]);

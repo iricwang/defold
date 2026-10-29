@@ -29,7 +29,13 @@ def build(app, output, engine=None, shell=False):
         raise RuntimeError('Java 25 javac is required')
     quiet = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
     subprocess.run([compiler, '-encoding', 'UTF-8', '-cp', base['classes'] + os.pathsep + base['jar'], '-d', base['classes'], *map(str, sources)], check=True, **quiet)
+    resources = sorted(p for p in (HERE/'resources').rglob('*') if p.is_file())
+    for source in resources:
+        target = Path(base['classes']) / source.relative_to(HERE/'resources')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
     inputs = {str(p.relative_to(ROOT)): automation.digest(p) for p in sources}
+    inputs.update({str(p.relative_to(ROOT)): automation.digest(p) for p in resources})
     inputs.update(base['inputs'])
     for source in [HERE/'prepare.py', ROOT/'scripts/windows/local_extensions.py', Path(__file__)]:
         inputs[str(source.relative_to(ROOT))] = automation.digest(source)
@@ -60,6 +66,7 @@ def build(app, output, engine=None, shell=False):
         manifest = dict(version=1, revision=revision, platform=base['platform'], java='jre/bin/javaw.exe' if os.name=='nt' else 'jre/bin/java',
                         jar='editor.jar', classes='classes', native='native', engine=engine_name)
         manifest['nativeBuild'] = profile
+        manifest['engineDirectory'] = str(Path(app).resolve())
         manifest['files'] = {str(p.relative_to(package)): automation.digest(p) for p in package.rglob('*') if p.is_file()}
         (package/'manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     config_path=output/'remote-manager.json'

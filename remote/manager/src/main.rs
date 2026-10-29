@@ -58,9 +58,29 @@ async fn choose_project() -> Result<Option<String>,String> {
     Ok(rfd::AsyncFileDialog::new().set_title("选择包含 game.project 的工程目录").pick_folder().await.map(|p|p.path().to_string_lossy().into_owned()))
 }
 #[tauri::command]
+async fn choose_engine() -> Result<Option<String>,String> {
+    Ok(rfd::AsyncFileDialog::new().set_title("选择 Defold 安装目录（macOS 选择 Defold.app）").pick_folder().await.map(|p|p.path().to_string_lossy().into_owned()))
+}
+#[tauri::command]
 fn qr_svg(value: String) -> Result<String,String> {
     if value.len()>2048 {return Err("二维码过长".into())}
-    Ok(qrcode::QrCode::new(value).map_err(|e|e.to_string())?.render::<qrcode::render::svg::Color>().min_dimensions(320,320).build())
+    // One SVG unit per module. The WebView scales to whole physical pixels per module,
+    // including the complete four-module quiet zone on every side.
+    Ok(qrcode::QrCode::new(value).map_err(|e|e.to_string())?.render::<qrcode::render::svg::Color>().quiet_zone(true).module_dimensions(1,1).build())
+}
+#[cfg(test)]
+mod tests {
+    use super::qr_svg;
+    #[test]
+    fn qr_retains_quiet_zone_and_whole_module_coordinates() {
+        let value="defoldremote://connect?v=3&d=ChEAASDGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        let modules=qrcode::QrCode::new(value).unwrap().width()+8;
+        let svg=qr_svg(value.into()).unwrap();
+        assert!(svg.contains(&format!("width=\"{modules}\" height=\"{modules}\"")));
+        assert!(svg.contains("shape-rendering=\"crispEdges\""));
+        assert!(svg.contains("M4 4h"));
+        assert!(qr_svg("x".repeat(2049)).is_err());
+    }
 }
 #[tauri::command]
 fn hide(app: tauri::AppHandle) { if let Some(w)=app.get_webview_window("main"){let _=w.hide();} }
@@ -70,7 +90,7 @@ fn show(app:&tauri::AppHandle){if let Some(w)=app.get_webview_window("main"){let
 fn main() {
     let app=tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app,_,_|show(app)))
-        .invoke_handler(tauri::generate_handler![rpc,choose_project,qr_svg,hide,quit])
+        .invoke_handler(tauri::generate_handler![rpc,choose_project,choose_engine,qr_svg,hide,quit])
         .setup(|app| {
             let config=runtime_directory()?.join("remote-manager.json");
             let configured:Value=std::fs::read(config).ok().and_then(|bytes|serde_json::from_slice(&bytes).ok()).unwrap_or(Value::Null);

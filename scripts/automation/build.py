@@ -65,6 +65,7 @@ def prepare_windows(app, output=None):
               source / 'WindowsGameProcess.java', source / 'AutomationPreviewBuilder.java',
               ROOT / 'scripts/windows/game-window-hook.c', ROOT / 'scripts/windows/game-simulator.h',
               ROOT / 'scripts/windows/automation-scene.h',
+              ROOT / 'scripts/windows/engine-symbols.h',
               Path(__file__)]
     hashes = {str(path): digest(path) for path in inputs}
     manifest_path = output / 'manifest.json'

@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <dbghelp.h>
+#include "engine-symbols.h"
 #include "automation-scene.h"
 
 static HANDLE simulator_file = INVALID_HANDLE_VALUE;
@@ -89,21 +90,15 @@ static BOOL WINAPI SimulatorReleaseCapture(void)
  * instead of relying on an address or instruction pattern from a particular build. */
 __declspec(dllexport) uint64_t SimulatorSafeAreaRva(const WCHAR* executable)
 {
-    static SRWLOCK lock = SRWLOCK_INIT;
-    AcquireSRWLockExclusive(&lock);
+    AcquireSRWLockExclusive(&engine_symbols_lock);
     HANDLE symbols = CreateEventW(NULL, FALSE, FALSE, NULL);
-    if (!symbols) { ReleaseSRWLockExclusive(&lock); return 0; }
+    if (!symbols) { ReleaseSRWLockExclusive(&engine_symbols_lock); return 0; }
     uint64_t result = 0;
-    WCHAR directory[32768];
-    wcsncpy(directory, executable, 32767); directory[32767] = 0;
-    WCHAR* separator = wcsrchr(directory, L'\\');
-    if (!separator) separator = wcsrchr(directory, L'/');
-    if (separator) *separator = 0;
     DWORD options = SymGetOptions();
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_EXACT_SYMBOLS | SYMOPT_NO_PROMPTS | SYMOPT_IGNORE_NT_SYMPATH);
-    if (SymInitializeW(symbols, directory, FALSE))
+    if (SymInitializeW(symbols, NULL, FALSE))
     {
-        DWORD64 base = SymLoadModuleExW(symbols, NULL, executable, NULL, 0x10000000, 0, NULL, 0);
+        DWORD64 base = LoadEngineSymbols(symbols, executable, 0x10000000);
         if (base)
         {
             char storage[sizeof(SYMBOL_INFO) + MAX_SYM_NAME] = {0};
@@ -118,7 +113,7 @@ __declspec(dllexport) uint64_t SimulatorSafeAreaRva(const WCHAR* executable)
     }
     SymSetOptions(options);
     CloseHandle(symbols);
-    ReleaseSRWLockExclusive(&lock);
+    ReleaseSRWLockExclusive(&engine_symbols_lock);
     return result;
 }
 

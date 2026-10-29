@@ -18,6 +18,7 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Base64;
 
 /** Validated LAN-only connection parameters shared by manual input, QR and Intents. */
 public final class RemoteAddress {
@@ -62,7 +63,9 @@ public final class RemoteAddress {
     public static RemoteAddress fromLink(String value) throws Exception {
         if(value==null||value.length()>2048) throw new Exception("二维码内容无效");
         URI uri=new URI(value);
-        if(!"defoldremote".equals(uri.getScheme())||!"connect".equals(uri.getHost())) throw new Exception("这不是 Defold Remote 二维码");
+        if(!"defoldremote".equals(uri.getScheme())||!"connect".equals(uri.getHost())
+                || uri.getUserInfo()!=null || uri.getPort()!=-1 || uri.getFragment()!=null
+                || uri.getRawPath()!=null&&!uri.getRawPath().isEmpty()) throw new Exception("这不是 Defold Remote 二维码");
         Map<String,String> fields=new HashMap<>();
         if(uri.getRawQuery()!=null) for(String pair:uri.getRawQuery().split("&")) {
             String[] item=pair.split("=",2);
@@ -70,6 +73,7 @@ public final class RemoteAddress {
             String key=URLDecoder.decode(item[0],"UTF-8");
             if(fields.put(key,URLDecoder.decode(item[1],"UTF-8"))!=null) throw new Exception("重复的连接参数");
         }
+        if("3".equals(fields.get("v"))) return compact(fields);
         if(!"1".equals(fields.get("v"))&&!"2".equals(fields.get("v"))) throw new Exception("二维码版本不支持");
         RemoteAddress address=new RemoteAddress(fields.get("address"),fields.get("code"));
         if("2".equals(fields.get("v"))) {
@@ -78,6 +82,23 @@ public final class RemoteAddress {
             address.fingerprint=pin;
         } else if(address.base.startsWith("https:")) throw new Exception("HTTPS 连接需要电脑二维码");
         if(address.code.isEmpty()) throw new Exception("二维码缺少配对码");
+        return address;
+    }
+    private static RemoteAddress compact(Map<String,String> fields) throws Exception {
+        String encoded=fields.get("d");
+        if(fields.size()!=2||encoded==null||!encoded.matches("[A-Za-z0-9_-]{94}")) throw new Exception("电脑二维码内容不完整");
+        byte[] data;
+        try { data=Base64.getUrlDecoder().decode(encoded); }
+        catch(IllegalArgumentException e) { throw new Exception("电脑二维码内容无效"); }
+        if(data.length!=70||!Base64.getUrlEncoder().withoutPadding().encodeToString(data).equals(encoded))
+            throw new Exception("电脑二维码内容无效");
+        int port=((data[4]&255)<<8)|(data[5]&255);
+        String host=(data[0]&255)+"."+(data[1]&255)+"."+(data[2]&255)+"."+(data[3]&255);
+        String credential=Base64.getUrlEncoder().withoutPadding().encodeToString(java.util.Arrays.copyOfRange(data,6,38));
+        RemoteAddress address=new RemoteAddress("https://"+host+":"+port,credential);
+        StringBuilder pin=new StringBuilder(64);
+        for(int i=38;i<70;i++)pin.append(Character.forDigit((data[i]&255)>>>4,16)).append(Character.forDigit(data[i]&15,16));
+        address.fingerprint=pin.toString();
         return address;
     }
 }

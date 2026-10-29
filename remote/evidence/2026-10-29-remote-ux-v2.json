@@ -1,0 +1,133 @@
+{
+  "date": "2026-10-29",
+  "versions": {
+    "android": "0.8.0",
+    "manager": "0.2.0",
+    "runtime": "ca1d6e38c9964da3"
+  },
+  "artifacts": {
+    "apk": {
+      "path": "X:\\AI\\UI\\deliverables\\DefoldRemote-0.8.0.apk",
+      "sha256": "e178f43e4a96d6504cd0b50b0cf70561b65bab7450aa9e4c8936ab6e8be4b028"
+    },
+    "manager": {
+      "path": "X:\\AI\\UI\\deliverables\\DefoldRemoteManager-0.2.0-windows-x64.zip",
+      "sha256": "ed0cc81dff265b3b33b2f7638d17177501ee0db44b6f74ea1bc848b9f397971c",
+      "files": 237,
+      "runtimeRevision": "ca1d6e38c9964da3",
+      "runtimeFileHashesVerified": 233,
+      "zipContentsVerified": true,
+      "preservesExistingDataDirectory": true
+    }
+  },
+  "android": {
+    "report": "X:\\AI\\UI\\defold\\tmp\\remote-android-tests\\b07774c3a8384a939299201167712f2b\\report.json",
+    "passed": [
+      "Compact v3 QR payload verifies TLS identity and enters the project list with four fixed tabs",
+      "Four tabs retain the game search and paired computer filter",
+      "APK QR payload pairs and displays catalog despite an interrupted initial TLS handshake",
+      "Unchanged catalog reappears automatically after network recovery",
+      "Interrupted connection resumes automatic build and presents streamed game",
+      "Android touch reaches the background game Lua callback",
+      "Visible player controls return to the list and release control without stopping the game",
+      "Switching starts an independent second game; explicit stop only stops that selected game",
+      "Real Lua compiler failure retains project context across background/resume; explicit retry rebuilds repaired source",
+      "Scanner exposes focus/torch/zoom, album and full-link alternatives with a path back to Computers",
+      "Actual APK remains navigable in portrait and landscape; emulator display overrides are restored"
+    ],
+    "scope": "Real APK on selected Android emulator plus isolated Windows GPU manager. QR payload intents do not verify physical camera recognition or Wi-Fi."
+  },
+  "managerGpu": {
+    "report": "tmp/remote-manager-tests/32857d477f374309a203c8565652d18c/report.json",
+    "passed": [
+      "one selected connection address is persisted",
+      "catalog rejects unpaired clients",
+      "QR uses only the selected address",
+      "address selection invalidates previous QR",
+      "pairing secret is single use",
+      "phone connection starts automatic build e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a",
+      "phone connection starts automatic build 36ca9d59-ca81-4e91-8bcc-175af2c4b926",
+      "two independent games running without editor",
+      "real GPU thumbnail e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a",
+      "stream uses top-left image coordinates e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a",
+      "pointer accepted e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a",
+      "Lua button callback received e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a",
+      "hardware video connects e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a",
+      "video dimensions valid e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a",
+      "60 H264 frames e6b51b18-5ed5-45f6-bec4-adcc4d4a6a7a: 30.1 fps",
+      "real GPU thumbnail 36ca9d59-ca81-4e91-8bcc-175af2c4b926",
+      "stream uses top-left image coordinates 36ca9d59-ca81-4e91-8bcc-175af2c4b926",
+      "pointer accepted 36ca9d59-ca81-4e91-8bcc-175af2c4b926",
+      "Lua button callback received 36ca9d59-ca81-4e91-8bcc-175af2c4b926",
+      "hardware video connects 36ca9d59-ca81-4e91-8bcc-175af2c4b926",
+      "video dimensions valid 36ca9d59-ca81-4e91-8bcc-175af2c4b926",
+      "60 H264 frames 36ca9d59-ca81-4e91-8bcc-175af2c4b926: 32.1 fps",
+      "old project control revoked after switch",
+      "switching did not stop either game",
+      "another device requires explicit takeover",
+      "explicit takeover succeeds",
+      "takeover rejects old controller",
+      "stale device dimensions rejected",
+      "unshared project removed from catalog",
+      "revoked host credential rejected",
+      "both sessions stopped"
+    ]
+  },
+  "managerTls": {
+    "report": "tmp/remote-pairing-tests/ea97252c4384432596f6d9069a574b7b/report.json",
+    "passed": [
+      "a recommended current LAN address is selected",
+      "compact QR keeps full certificate identity",
+      "compact QR keeps full one-use secret",
+      "compact QR keeps selected origin and port",
+      "compact QR is shorter without shortening credentials",
+      "waiting feedback is non-secret",
+      "actual TLS certificate matches full QR pin",
+      "manual refresh invalidates original code",
+      "actual TLS certificate matches full QR pin",
+      "actual TLS pair succeeds and returns computer identity",
+      "paired feedback names the accepted phone",
+      "actual TLS certificate matches full QR pin",
+      "accepted credential is single-use",
+      "adding another phone returns to waiting",
+      "actual TLS certificate matches full QR pin",
+      "address reselection invalidates prior QR"
+    ],
+    "scope": "Real local TLS and hidden manager; no phone camera or Wi-Fi tested"
+  },
+  "managerUi": {
+    "report": "tmp/remote-manager-ui-20261029/report-final.json",
+    "checks": [
+      "QR integer physical module scale at 1",
+      "QR integer physical module scale at 1.25",
+      "QR integer physical module scale at 1.5",
+      "QR integer physical module scale at 2",
+      "copies full v2 only on explicit action",
+      "compatibility mode sends v2 payload",
+      "accepted pair locks refresh and origin controls",
+      "does not rotate active handshake on expiry",
+      "paired state masks consumed QR and offers add phone",
+      "add another phone creates independent new pairing",
+      "address switch invalidates and redraws QR",
+      "expired waiting code refreshes automatically",
+      "minimum desktop window has no horizontal modal overflow"
+    ],
+    "scope": "Production frontend, isolated mock IPC; browser print rendering inspected"
+  },
+  "offlineJava": {
+    "RemoteLogicTest": 11077,
+    "RemoteCompactQrTest": 1229,
+    "RemoteScanTest": 84
+  },
+  "otherChecks": [
+    "RemotePairingStateTest passed on production runtime",
+    "Rust release QR test passed",
+    "APK fixed signing key verified; Android overwrite installation passed",
+    "Manager runtime file inventory and ZIP hashes verified"
+  ],
+  "limits": [
+    "Physical Android camera recognition rate and real Wi-Fi not verified",
+    "macOS actual build/run not verified in this Windows session"
+  ],
+  "review": "X:\\AI\\UI\\deliverables\\DefoldRemote-0.8.0-review\\index.html"
+}

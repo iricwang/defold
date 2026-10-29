@@ -147,12 +147,13 @@ static void InitAutomationScene(uint32_t* transport, uint32_t* sequence)
     if (!GetEnvironmentVariableW(L"DM_EDITOR_AUTOMATION_SCENE", auto_scene_path, 32768)) return;
     WCHAR executable[32768];
     GetModuleFileNameW(NULL, executable, 32768);
+    AcquireSRWLockExclusive(&engine_symbols_lock);
     HANDLE symbols = CreateEventW(NULL, FALSE, FALSE, NULL);
     DWORD previous = SymGetOptions();
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_EXACT_SYMBOLS | SYMOPT_NO_PROMPTS | SYMOPT_IGNORE_NT_SYMPATH);
     if (symbols && SymInitializeW(symbols, NULL, FALSE))
     {
-        DWORD64 base = SymLoadModuleExW(symbols, NULL, executable, NULL, (DWORD64)GetModuleHandleW(NULL), 0, NULL, 0);
+        DWORD64 base = LoadEngineSymbols(symbols, executable, (DWORD64)GetModuleHandleW(NULL));
         if (base)
         {
             auto_scene_checks = (AutoSize(symbols, base, "dmGameObject::SceneNode", sizeof(AutoNode)) ? 1 : 0)
@@ -194,6 +195,7 @@ static void InitAutomationScene(uint32_t* transport, uint32_t* sequence)
     }
     if (symbols) CloseHandle(symbols);
     SymSetOptions(previous);
+    ReleaseSRWLockExclusive(&engine_symbols_lock);
 }
 
 static void AutoNodeJson(AutoNode* node, int parent, int depth)
@@ -274,7 +276,7 @@ static int AutomationRenderUpdate(void* instance, float dt)
 {
     if (!AutoPatch(FALSE)) { auto_scene_supported=FALSE; return -1; }
     int result=auto_render_update(instance,dt);
-    if (auto_transport[267] != auto_transport[276])
+    if (!auto_transport[266] && auto_transport[267] != auto_transport[276])
     {
         auto_prepared_request=auto_transport[267]; auto_prepared_sequence=*auto_sequence+1;
         PrepareAutomationScene(auto_prepared_sequence);
@@ -285,12 +287,12 @@ static int AutomationRenderUpdate(void* instance, float dt)
 
 static BOOL AutomationSceneReady(uint32_t request, uint32_t sequence)
 {
-    return !auto_scene_supported || (auto_prepared_request==request && auto_prepared_sequence==sequence);
+    return !auto_scene_supported || auto_transport[266] || (auto_prepared_request==request && auto_prepared_sequence==sequence);
 }
 
 static void CaptureAutomationScene(uint32_t sequence)
 {
-    if (!auto_scene_path[0]) return;
+    if (!auto_scene_path[0] || auto_transport[266]) return;
     if (!auto_scene_supported) PrepareAutomationScene(sequence);
     HANDLE output = CreateFileW(auto_scene_path, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                 NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);

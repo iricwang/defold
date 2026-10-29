@@ -19,7 +19,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.view.View;
 
-/** Quiet corner guides leave the camera image unobstructed. */
+/** Aim guides; the scanner also analyzes the rest of the visible camera field. */
 final class ScanGuide extends View {
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     ScanGuide(Context context){super(context);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
@@ -30,7 +30,7 @@ final class ScanGuide extends View {
         paint.setColor(0x88000000);paint.setStyle(Paint.Style.FILL);
         canvas.drawRect(0,0,getWidth(),top,paint);canvas.drawRect(0,bottom,getWidth(),getHeight(),paint);
         canvas.drawRect(0,top,left,bottom,paint);canvas.drawRect(right,top,getWidth(),bottom,paint);
-        paint.setColor(0xffe2763e);paint.setStrokeWidth(3*density);paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(0xfff5f7fa);paint.setStrokeWidth(3*density);paint.setStrokeCap(Paint.Cap.ROUND);
         float edge=Math.min(24*density,size/4);
         for(float x:new float[]{left,right})for(float y:new float[]{top,bottom}){
             canvas.drawLine(x,y,x+(x==left?edge:-edge),y,paint);canvas.drawLine(x,y,x,y+(y==top?edge:-edge),paint);

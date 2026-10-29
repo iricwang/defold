@@ -44,6 +44,7 @@ public final class RemoteRuntime implements AutoCloseable {
     private String lease = "";
 
     private RemoteRuntime(Path directory) throws IOException {
+        System.setProperty("sun.net.httpserver.nodelay", "true");
         worker = new AutomationWorker(directory);
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 16);
         server.createContext("/", this::request);

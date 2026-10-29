@@ -78,6 +78,14 @@ public final class MainActivity extends Activity {
     private String resumeAddress="", lastName="";
     private RemoteAddress pendingExternal;
     private Dialog activeSheet;
+    private RemoteDashboard dashboard;
+    private boolean legacyPage;
+    private View controlHandle;
+    private TextView scanStatus;
+    private LinearLayout connectionContent;
+    private RemoteAddress connectionTarget;
+    private boolean scanTorch;
+    private volatile boolean albumDecoding;
 
     private static final class Game {
         String id,address,name,computer,state; long seen;
@@ -140,22 +148,24 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);RemoteHosts.init(this);setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);preferences=getPreferences(0);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        streamQuality=preferences.getString("streamQuality","720p");homeTab=preferences.getString("homeTab","computers");loadHistory(); showHome("");
+        if(getSharedPreferences("remote-dashboard",0).getBoolean("keepAwake",true))getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        streamQuality=preferences.getString("streamQuality","720p");homeTab="discovery";loadHistory(); showHome("");
         if(state!=null){resumeStream=state.getBoolean("resumeStream");resumeAddress=state.getString("resumeAddress","");resumePaused=state.getBoolean("resumePaused");}
         if(state!=null || !handleIntent(getIntent())){
-            if(state==null) {resumeAddress=preferences.getString("lastAddress","");resumeStream=!resumeAddress.isEmpty()&&!resumeAddress.startsWith("https:");}
+            if(state==null) {resumeAddress=preferences.getString("lastAddress","");resumeStream=false;}
         }
         inputs.scheduleWithFixedDelay(this::sendPointer,0,8,TimeUnit.MILLISECONDS);
         monitor.scheduleWithFixedDelay(()->{
             if(!foreground)return;
-            if(page.equals("home"))refreshDiscovery();
+            if(page.equals("home")&&legacyPage)refreshDiscovery();
             else if(page.equals("stream"))pollState();
         },0,2,TimeUnit.SECONDS);
     }
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleIntent(intent);}
     private boolean handleIntent(Intent intent){
         if(intent==null)return false;
+        String managerHost=intent.getStringExtra("manager_host");
+        if(managerHost!=null){intent.removeExtra("manager_host");resumeStream=false;showHome("");if(managerHost.isEmpty())dashboard.showTab("computers");else dashboard.showComputer(managerHost);return true;}
         if(intent.getBooleanExtra("manager_scan",false)){intent.removeExtra("manager_scan");resumeStream=false;ui.post(this::scan);return true;}
         String managed=intent.getStringExtra("manager_game");
         if(managed!=null&&managed.equals(internalGame)){internalGame="";intent.removeExtra("manager_game");try{RemoteAddress target=new RemoteAddress(managed,"");resumeStream=false;if(foreground)connect(target);else pendingExternal=target;}catch(Exception e){showHome(e.getMessage());}return true;}
@@ -167,46 +177,53 @@ public final class MainActivity extends Activity {
         }catch(Exception e){showHome(e.getMessage());resumeStream=false;}
         return true;
     }
-    @Override public void onResume(){super.onResume();foreground=true;ui.post(heartbeat);
+    @Override public void onResume(){super.onResume();foreground=true;ui.post(heartbeat);if(dashboard!=null&&page.equals("home")&&!legacyPage)dashboard.resume();
         if(pendingExternal!=null){RemoteAddress target=pendingExternal;pendingExternal=null;connect(target);}
         else if(resumeStream&&!resumeAddress.isEmpty()){resumeStream=false;try{connect(new RemoteAddress(resumeAddress,""),!resumePaused);}catch(Exception e){showHome(e.getMessage());}}
-        else if(page.equals("home"))refreshDiscovery();
-        else if(page.equals("scan")&&checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)scan();
+        else if(page.equals("home")&&legacyPage)refreshDiscovery();
+        else if(page.equals("scan")&&!albumDecoding&&checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)scan();
         applySystemBars();
     }
     @Override public void onStop(){
         resumeStream=page.equals("stream")||page.equals("connecting");resumePaused=paused;
         if(session!=null)resumeAddress=session.base;
-        foreground=false;if(activeSheet!=null)activeSheet.dismiss();ui.removeCallbacks(heartbeat);endInput();releaseManaged();++generation;session=null;closeStream();closeCamera();super.onStop();
+        foreground=false;if(dashboard!=null)dashboard.pause();if(activeSheet!=null)activeSheet.dismiss();ui.removeCallbacks(heartbeat);endInput();releaseManaged();++generation;session=null;closeStream();closeCamera();super.onStop();
     }
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putBoolean("resumeStream",resumeStream||page.equals("stream")||page.equals("connecting"));out.putString("resumeAddress",resumeAddress);out.putBoolean("resumePaused",paused);}
-    @Override public void onDestroy(){closeCamera();closeStream();commands.shutdownNow();frames.shutdownNow();discovery.shutdownNow();monitor.shutdownNow();inputs.shutdown();super.onDestroy();}
+    @Override public void onDestroy(){if(dashboard!=null)dashboard.close();closeCamera();closeStream();commands.shutdownNow();frames.shutdownNow();discovery.shutdownNow();monitor.shutdownNow();inputs.shutdown();super.onDestroy();}
     @Override public void onConfigurationChanged(android.content.res.Configuration config){super.onConfigurationChanged(config);if(page.equals("home"))renderCards();else if(page.equals("scan"))scan();else if(controlPanel!=null)positionControls();}
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)applySystemBars();}
-    @Override public void onBackPressed(){if(page.equals("stream"))showControls("");else if(!page.equals("home"))goHome("");else super.onBackPressed();}
+    @Override public void onBackPressed(){if(page.equals("stream"))showControls("");else if(page.equals("scan")||page.equals("pairing")){goHome("");dashboard.showTab("computers");}else if(page.equals("failure")){boolean computer=connectionTarget!=null&&connectionTarget.base.startsWith("https:")&&!connectionTarget.base.contains("/games/");goHome("");dashboard.showTab(computer?"computers":"games");}else if(!page.equals("home")||legacyPage)goHome("");else if(dashboard!=null&&!dashboard.currentTab().equals("games"))dashboard.showTab("games");else super.onBackPressed();}
     private void applySystemBars(){
-        boolean immersive=page.equals("stream")||page.equals("connecting");
+        boolean immersive=page.equals("stream");
         if(Build.VERSION.SDK_INT>=30){
             getWindow().setDecorFitsSystemWindows(false);
             WindowInsetsController c=getWindow().getInsetsController();
             if(c!=null){c.setSystemBarsAppearance(0,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);if(immersive){c.hide(WindowInsets.Type.systemBars());c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);}else c.show(WindowInsets.Type.systemBars());}
         }else getWindow().getDecorView().setSystemUiVisibility(immersive?View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_STABLE:View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }
-    private void newRoot(){if(activeSheet!=null)activeSheet.dismiss();controlPanel=null;fpsLabel=null;root=new FrameLayout(this);root.setBackgroundColor(BG);
-        root.setOnApplyWindowInsetsListener((v,insets)->{boolean full=page.equals("stream")||page.equals("connecting");v.setPadding(full?0:insets.getSystemWindowInsetLeft(),full?0:insets.getSystemWindowInsetTop(),full?0:insets.getSystemWindowInsetRight(),full?0:insets.getSystemWindowInsetBottom());return insets;});
+    private void newRoot(){if(activeSheet!=null)activeSheet.dismiss();controlPanel=null;controlHandle=null;fpsLabel=null;root=new FrameLayout(this);root.setBackgroundColor(BG);
+        root.setOnApplyWindowInsetsListener((v,insets)->{boolean full=page.equals("stream");v.setPadding(full?0:insets.getSystemWindowInsetLeft(),full?0:insets.getSystemWindowInsetTop(),full?0:insets.getSystemWindowInsetRight(),full?0:insets.getSystemWindowInsetBottom());return insets;});
         setContentView(root);applySystemBars();}
     private void goHome(String message){endInput();releaseManaged();++generation;session=null;resumeStream=false;paused=false;controlBusy=false;frameRate.reset();closeStream();closeCamera();if(screen!=null)screen.clear();showHome(message);refreshDiscovery();}
-    private void releaseManaged(){Session current=session;if(current!=null&&current.base.startsWith("https:"))try{inputs.execute(()->{try{request(current.base,current.token,"POST","/release",new byte[0]);}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}}
+    private void releaseManaged(){releaseManaged(session);}
+    private void releaseManaged(Session current){if(current!=null&&current.base.startsWith("https:"))try{inputs.execute(()->{try{request(current.base,current.token,"POST","/release",new byte[0]);}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}}
     private void showHome(String message){
+        page="home";legacyPage=false;setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);newRoot();
+        if(dashboard==null)dashboard=new RemoteDashboard(this,new RemoteDashboard.Actions(){
+            public void scan(){MainActivity.this.scan();}public void album(){MainActivity.this.album();}public void paste(){MainActivity.this.pasteLink();}
+            public void connect(String base){try{MainActivity.this.connect(new RemoteAddress(base,""));}catch(Exception e){dashboard.setMessage(e.getMessage());}}
+            public void discover(){dashboard.pause();legacyPage=true;homeTab="discovery";showLegacyHome("");refreshDiscovery();}
+            public void quality(){chooseQuality();}
+            public Dialog sheet(String title,LinearLayout content){return MainActivity.this.sheet(title,content);}
+            public void stop(String base,Runnable complete){commands.execute(()->{try{request(base,token(base),"POST","/stop",new byte[0]);ui.post(complete);}catch(Exception e){ui.post(()->dashboard.setMessage(RemoteTls.explain(e,base)));}});}
+        });
+        if(dashboard.getParent()!=null)((ViewGroup)dashboard.getParent()).removeView(dashboard);root.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));dashboard.setMessage(message);if(foreground)dashboard.resume();
+    }
+    private void showLegacyHome(String message){
         page="home";setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);newRoot();
         LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(20),dp(10),dp(12),dp(10));
-        ImageView brand=new ImageView(this);brand.setImageDrawable(getPackageManager().getApplicationIcon(getApplicationInfo()));header.addView(brand,new LinearLayout.LayoutParams(dp(32),dp(32)));
-        TextView heading=title("Defold Remote",19);heading.setPadding(dp(12),0,0,0);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
-        header.addView(iconButton("refresh","刷新",()->{if(homeTab.equals("computers"))showHome("");else refreshDiscovery();}),new LinearLayout.LayoutParams(dp(48),dp(48)));body.addView(header);divider(body);
-        LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(20),dp(12),dp(20),dp(4));
-        for(String tab:new String[]{"computers","discovery"}){Button item=button(tab.equals("computers")?"扫码电脑":"自动发现",()->{homeTab=tab;preferences.edit().putString("homeTab",tab).apply();showHome("");refreshDiscovery();});item.setSelected(homeTab.equals(tab));item.setTextColor(homeTab.equals(tab)?TEXT:MUTED);item.setBackgroundTintList(ColorStateList.valueOf(homeTab.equals(tab)?PRIMARY:PANEL));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.rightMargin=dp(6);tabs.addView(item,lp);}body.addView(tabs);
-        if(homeTab.equals("computers")){showComputers(body,message);return;}
+        homeTab="discovery";body.addView(pageHeader("发现编辑器游戏",()->goHome("")));divider(body);
         scroll=new ScrollView(this);scroll.setClipToPadding(false);scroll.setPadding(dp(20),dp(22),dp(20),dp(24));scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content=column();scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout gamesHeading=new LinearLayout(this);gamesHeading.setGravity(Gravity.CENTER_VERTICAL);
@@ -227,11 +244,12 @@ public final class MainActivity extends Activity {
         if(hosts.length()>0)content.addView(button("管理已配对电脑",()->startActivity(new Intent(this,ManagerActivity.class))));
     }
     private void homeMessage(String message){
+        if(!legacyPage&&dashboard!=null){dashboard.setMessage(message);return;}
         boolean useful=message!=null&&!message.isEmpty()&&!message.startsWith("已")&&!message.startsWith("游戏已");
         homeStatus.setText(useful?message:"");homeStatus.setVisibility(useful?View.VISIBLE:View.GONE);
     }
     private void renderCards(){
-        if(!page.equals("home")||!homeTab.equals("discovery")||cards==null)return;
+        if(!page.equals("home")||!legacyPage||!homeTab.equals("discovery")||cards==null)return;
         int scrollY=scroll.getScrollY();cards.removeAllViews();
         ArrayList<Game> online=new ArrayList<>(),offline=new ArrayList<>();String last=preferences.getString("lastId","");
         Comparator<Game> order=(a,b)->a.id.equals(b.id)?0:a.id.equals(last)?-1:b.id.equals(last)?1:(a.computer+a.name).compareTo(b.computer+b.name);
@@ -280,7 +298,7 @@ public final class MainActivity extends Activity {
         if(game.address.startsWith("https:")){if(token(game.address).isEmpty())openComputer(RemoteTls.origin(game.address));else connect(new RemoteAddress(game.address,""));return;}
         if(token(game.address).isEmpty())manual(game);else connect(new RemoteAddress(game.address,""));
     }catch(Exception e){homeMessage(e.getMessage());}}
-    private void openComputer(String address){resumeStream=false;startActivity(new Intent(this,ManagerActivity.class).putExtra("host",address));}
+    private void openComputer(String address){resumeStream=false;goHome("");dashboard.showComputer(address);}
     private String token(String address){return address.startsWith("https:")?RemoteHosts.token(address):preferences.getString("token:"+address,"");}
     private void gameMenu(Game game){
         LinearLayout options=column();Dialog[] holder=new Dialog[1];
@@ -311,25 +329,28 @@ public final class MainActivity extends Activity {
     private void showStream(String message){
         page="connecting";newRoot();videoSurface=new VideoSurface(this);root.addView(videoSurface,new FrameLayout.LayoutParams(-1,-1));screen=new StreamView();root.addView(screen,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout connection=column();connection.setPadding(dp(28),dp(24),dp(28),dp(24));connection.setGravity(Gravity.CENTER);connection.setBackgroundColor(BG);
-        connection.addView(icon("monitor",ACCENT),new LinearLayout.LayoutParams(dp(44),dp(44)));gap(connection,22);
+        connection.addView(icon("monitor",ACCENT),new LinearLayout.LayoutParams(dp(44),dp(44)));gap(connection,18);
+        TextView project=title(projectName(connectionTarget==null?"":connectionTarget.base),23);project.setMaxLines(2);project.setEllipsize(TextUtils.TruncateAt.END);project.setGravity(Gravity.CENTER);connection.addView(project);gap(connection,14);
         overlay=title(message,20);overlay.setGravity(Gravity.CENTER);connection.addView(overlay);gap(connection,12);
-        TextView caption=label("连接成功后自动进入全屏",14,MUTED);caption.setGravity(Gravity.CENTER);connection.addView(caption);gap(connection,24);
+        TextView caption=label("电脑自动同步资源、本机构建并启动。可以返回列表，准备过程会继续。",14,MUTED);caption.setGravity(Gravity.CENTER);connection.addView(caption);gap(connection,24);
         ProgressBar progress=new ProgressBar(this);progress.setIndeterminateTintList(ColorStateList.valueOf(ACCENT));connection.addView(progress,new LinearLayout.LayoutParams(dp(26),dp(26)));gap(connection,28);
-        connection.addView(button("返回首页",()->goHome("已取消连接")),new LinearLayout.LayoutParams(dp(180),dp(48)));ScrollView cover=new ScrollView(this);cover.setFillViewport(true);cover.setBackgroundColor(BG);cover.addView(connection);root.addView(cover,new FrameLayout.LayoutParams(-1,-1));overlay.setTag(cover);
+        connection.addView(button("返回游戏列表",()->goHome("准备过程在电脑后台继续")),new LinearLayout.LayoutParams(dp(180),dp(48)));ScrollView cover=new ScrollView(this);cover.setFillViewport(true);cover.setBackgroundColor(BG);cover.addView(connection);root.addView(cover,new FrameLayout.LayoutParams(-1,-1));overlay.setTag(cover);
     }
     private void connect(RemoteAddress target){connect(target,true);}
     private void connect(RemoteAddress target,boolean autoStart){
         connect(target,autoStart,false);
     }
     private void connect(RemoteAddress target,boolean autoStart,boolean takeover){
-        endInput();releaseManaged();closeCamera();closeStream();session=null;paused=false;controlBusy=false;frameRate.reset();final int attempt=++generation;resumeAddress=target.base;showStream("正在连接电脑…");
-        commands.execute(()->{
+        endInput();releaseManaged();closeCamera();closeStream();session=null;paused=false;controlBusy=false;frameRate.reset();final int attempt=++generation;resumeAddress=target.base;connectionTarget=target;if(dashboard!=null)dashboard.pause();if(target.base.startsWith("https:")&&!target.base.contains("/games/"))showPairing(target);else showStream("正在连接电脑…");
+        final String projectLabel=projectName(target.base);commands.execute(()->{
             try{
                 boolean managed=target.base.startsWith("https:");
                 if(managed&&!target.base.contains("/games/")){
                     if(!target.code.isEmpty())RemoteHosts.pair(target);
+                    ui.post(()->{if(attempt==generation&&overlay!=null)overlay.setText("保存配对信息 · 正在读取共享项目…");});
                     if(token(target.base).isEmpty())throw new Exception("请扫描电脑管理器中的二维码");
-                    ui.post(()->{if(attempt!=generation||!foreground)return;goHome("");startActivity(new Intent(this,ManagerActivity.class).putExtra("host",target.base));});return;
+                    JSONObject catalog=RemoteHosts.request(target.base,token(target.base),"/games",null);
+                    ui.post(()->{if(attempt!=generation||!foreground)return;dashboard.seedCatalog(target.base,catalog);goHome("电脑已配对");dashboard.showComputer(target.base);});return;
                 }
                 String base=target.code.isEmpty()&&!managed?rediscover(target.base):target.base;
                 if(!base.equals(target.base)&&!token(target.base).isEmpty())preferences.edit().putString("token:"+base,token(target.base)).apply();
@@ -343,43 +364,90 @@ public final class MainActivity extends Activity {
                 String credential=token(base);
                 if(!target.code.isEmpty())credential=request(base,"","POST","/pair",new JSONObject().put("code",target.code).toString().getBytes(StandardCharsets.UTF_8)).json().getString("token");
                 if(credential.isEmpty())throw new Exception(managed?"电脑配对已失效，请重新扫描电脑管理器的二维码":"需要重新配对，请扫描电脑 Game 面板的二维码");
-                JSONObject status=startupRequest(base,credential,"GET","/status",null,attempt).json();
+                long began=SystemClock.elapsedRealtime();
+                StartupWait startup=managed?new StartupWait(began):null;
+                long deadline=managed?startup.deadline():began+30000;
+                JSONObject status=startupRequest(base,credential,"GET","/status",null,attempt,deadline).json();
                 if(attempt!=generation || !foreground)return;
-                if(autoStart&&!status.optString("state").equals("running")){ui.post(()->{if(attempt==generation)overlay.setText("正在启动游戏…");});startupRequest(base,credential,"POST","/start",new byte[0],attempt);}
-                long deadline=System.currentTimeMillis()+(managed?1260000:30000);
+                if(autoStart&&!status.optString("state").equals("running")){
+                    ui.post(()->{if(attempt==generation)overlay.setText("正在启动游戏…");});
+                    if(startup!=null)startup.startRequested(SystemClock.elapsedRealtime());
+                    Reply started=startupRequest(base,credential,"POST","/start",new byte[0],attempt,deadline);
+                    if(managed)status=started.json();
+                }
                 while(autoStart&&!status.optString("state").equals("running")){
                     if(attempt!=generation || !foreground)return;
-                    if(System.currentTimeMillis()>deadline)throw new Exception("游戏启动超时，请查看电脑端的构建结果");
-                    Thread.sleep(300);status=startupRequest(base,credential,"GET","/status",null,attempt).json();
-                    if(managed){String stage=status.optString("stage","正在启动游戏…");ui.post(()->{if(attempt==generation&&!TextUtils.equals(overlay.getText(),stage))overlay.setText(stage);});}
                     if(status.optString("state").equals("error"))throw new Exception(status.optString("failed_stage","")+"\n"+status.optString("error","游戏启动失败"));
+                    if(managed){
+                        long now=SystemClock.elapsedRealtime();
+                        StartupWait.Decision decision=startup.update(status.optString("state"),status.optBoolean("busy"),status.optString("stage"),now);
+                        if(decision==StartupWait.Decision.START){
+                            startup.startRequested(now);
+                            android.util.Log.i("DefoldRemote","Ensuring prepared game starts (request "+startup.startRequests()+")");
+                            String message=startup.message(now);ui.post(()->{if(attempt==generation&&!TextUtils.equals(overlay.getText(),message))overlay.setText(message);});
+                            status=startupRequest(base,credential,"POST","/start",new byte[0],attempt,deadline).json();continue;
+                        }
+                        String message=startup.message(now);ui.post(()->{if(attempt==generation&&!TextUtils.equals(overlay.getText(),message))overlay.setText(message);});
+                    }else if(SystemClock.elapsedRealtime()>=deadline)throw new Exception("游戏启动超时，请查看电脑端的构建结果");
+                    Thread.sleep(300);status=startupRequest(base,credential,"GET","/status",null,attempt,deadline).json();
                 }
-                String id=status.optString("id",base),name=status.optString("name","Defold 游戏");
+                String id=status.optString("id",base),name=status.optString("name","Defold 游戏");if(name.trim().isEmpty())name=projectLabel;
                 if(managed&&status.optString("state").equals("running")){
-                    try{status=startupRequest(base,credential,"POST","/claim",new JSONObject().put("takeover",takeover).toString().getBytes(StandardCharsets.UTF_8),attempt).json();credential=status.getString("token");}
+                    try{status=startupRequest(base,credential,"POST","/claim",new JSONObject().put("takeover",takeover).toString().getBytes(StandardCharsets.UTF_8),attempt,deadline).json();credential=status.getString("token");}
                     catch(RequestError e){if(e.status!=409)throw e;ui.post(()->{if(attempt!=generation||!foreground)return;new AlertDialog.Builder(this).setTitle("接管游戏？").setMessage(e.getMessage()+"。接管后另一台设备会断开控制。").setNegativeButton("取消",(d,w)->goHome("")).setPositiveButton("接管",(d,w)->connect(target,autoStart,true)).show();});return;}
                 }
                 Session connected=new Session(base,credential,id,name,status.has("resolutions"),status.optJSONArray("video_codecs")!=null&&status.getJSONArray("video_codecs").toString().contains("h264"),status.optBoolean("audio",false));
                 connected.deviceRevision=status.optInt("device_revision",0);
-                ui.post(()->{if(attempt!=generation||!foreground)return;session=connected;lastName=connected.name;page="stream";applySystemBars();overlay.setText("正在接收游戏画面…");if(autoStart)frames.execute(()->readStream(connected,attempt));else pauseRemote("游戏已停止，点击运行继续");});
-            }catch(Exception e){android.util.Log.e("DefoldRemote","Connection failed: "+RemoteTls.origin(target.base),e);ui.post(()->{if(attempt==generation){if(target.base.startsWith("https:")&&target.base.contains("/games/"))showBuildFailure(target,RemoteTls.explain(e,target.base));else goHome(RemoteTls.explain(e,target.base));}});}
+                ui.post(()->{if(attempt!=generation||!foreground){releaseManaged(connected);return;}session=connected;lastName=connected.name;page="stream";applySystemBars();overlay.setText("正在接收游戏画面…");if(autoStart)frames.execute(()->readStream(connected,attempt));else pauseRemote("游戏已停止，点击运行继续");});
+            }catch(Exception e){android.util.Log.e("DefoldRemote","Connection failed: "+RemoteTls.origin(target.base),e);ui.post(()->{if(attempt==generation){showBuildFailure(target,RemoteTls.explain(e,target.base));}});}
         });
     }
-    private void showBuildFailure(RemoteAddress target,String error){
-        goHome("连接未完成，请查看错误详情");
-        LinearLayout content=column();TextView details=label(error==null?"启动失败":error,12,TEXT);details.setTextIsSelectable(true);
-        ScrollView area=new ScrollView(this);area.addView(details);content.addView(area,new LinearLayout.LayoutParams(-1,dp(260)));gap(content,16);
-        content.addView(primary("重新连接",()->connect(target)));gap(content,8);
-        content.addView(button("返回电脑项目列表",()->{if(activeSheet!=null)activeSheet.dismiss();startActivity(new Intent(this,ManagerActivity.class).putExtra("host",RemoteTls.origin(target.base)));}));
-        sheet("无法连接项目",content);
+    private void showPairing(RemoteAddress target){
+        page="pairing";newRoot();LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));body.addView(pageHeader("连接电脑",()->{goHome("");dashboard.showTab("computers");}));
+        connectionContent=column();connectionContent.setPadding(dp(24),dp(32),dp(24),dp(24));body.addView(connectionContent,new LinearLayout.LayoutParams(-1,0,1));
+        connectionContent.addView(title("正在验证电脑身份",25));gap(connectionContent,14);connectionContent.addView(label(target.base,13,MUTED));gap(connectionContent,28);
+        overlay=title("验证电脑身份…",19);connectionContent.addView(overlay);gap(connectionContent,20);connectionContent.addView(label("验证身份 → 保存配对 → 读取共享项目",13,MUTED));gap(connectionContent,18);connectionContent.addView(label("配对完成后显示项目列表。选择游戏后才开始准备与运行。",14,MUTED));
+        body.addView(button("取消连接",()->{goHome("");dashboard.showTab("computers");}),new LinearLayout.LayoutParams(-1,dp(52)));
     }
+    private void showBuildFailure(RemoteAddress target,String error){
+        boolean computer=target.base.startsWith("https:")&&!target.base.contains("/games/");page="failure";newRoot();
+        LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));body.addView(pageHeader(computer?"连接电脑未完成":"项目准备未完成",()->{goHome("");if(computer)dashboard.showTab("computers");}));
+        ScrollView area=new ScrollView(this);LinearLayout content=column();content.setPadding(dp(24),dp(20),dp(24),dp(16));area.addView(content);body.addView(area,new LinearLayout.LayoutParams(-1,0,1));
+        TextView project=title(computer?"保留已识别的电脑":projectName(target.base),23);project.setMaxLines(2);project.setEllipsize(TextUtils.TruncateAt.END);content.addView(project);gap(content,10);content.addView(label(target.base,12,MUTED));gap(content,16);
+        TextView details=label(errorSummary(error),13,0xffed8585);details.setMaxLines(5);details.setEllipsize(TextUtils.TruncateAt.END);details.setContentDescription("错误摘要");content.addView(details);gap(content,14);
+        content.addView(label(computer?"请检查二维码有效期、电脑管理器、局域网和系统时间。":"修复后点重试，电脑会自动重新构建。其他游戏继续运行。",14,MUTED));
+        LinearLayout actions=column();actions.setPadding(dp(20),dp(10),dp(20),dp(16));actions.setBackgroundColor(BG);body.addView(actions,new LinearLayout.LayoutParams(-1,-2));
+        actions.addView(primary("重试",()->connect(target)),new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);
+        actions.addView(button("查看并复制完整日志",()->showFullConnectionError(target,error)),new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);
+        actions.addView(button(computer?"重新扫描":"返回游戏列表",()->{if(computer)scan();else{goHome("");dashboard.showComputer(RemoteTls.origin(target.base));}}),new LinearLayout.LayoutParams(-1,dp(48)));
+    }
+    private static String errorSummary(String error){
+        if(error==null||error.trim().isEmpty())return "启动失败，请查看完整日志。";
+        String[] lines=error.split("\\r?\\n");StringBuilder summary=new StringBuilder();int count=0;
+        for(String line:lines){String value=line.trim();if(value.isEmpty())continue;
+            if(value.matches("(?i).*(?:\\bline\\s+\\d+|:\\d+[:)]|error:|错误|失败|\\.(?:gui_script|script|lua|cpp|h|c)(?::\\d+)?)\\s*.*")){
+                if(summary.length()>0)summary.append('\n');summary.append(value.length()>300?value.substring(0,300)+"…":value);if(++count==4)break;
+            }
+        }
+        if(summary.length()>0)return summary.toString();String first=lines[0].trim();return first.length()>400?first.substring(0,400)+"…":first;
+    }
+    private void showFullConnectionError(RemoteAddress target,String error){
+        LinearLayout content=column();ScrollView log=new ScrollView(this);TextView details=label(error==null?"启动失败":error,12,TEXT);details.setTypeface(Typeface.MONOSPACE);details.setTextIsSelectable(true);details.setHorizontallyScrolling(false);log.addView(details);content.addView(log,new LinearLayout.LayoutParams(-1,Math.min(dp(260),getResources().getDisplayMetrics().heightPixels/3)));gap(content,14);
+        content.addView(button("复制完整错误",()->{((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Defold Remote",error==null?"启动失败":error));Toast.makeText(this,"已复制完整错误",Toast.LENGTH_SHORT).show();}),new LinearLayout.LayoutParams(-1,dp(48)));
+        sheet((target.base.contains("/games/")?projectName(target.base):"连接电脑")+" · 完整日志",content);
+    }
+    private String projectName(String base){for(Game game:games.values())if(base.equals(game.address)&&game.name!=null&&!game.name.trim().isEmpty())return game.name;return dashboard==null?"Defold 游戏":dashboard.projectName(base);}
     // A slow status/claim response is not a build failure. These operations are idempotent
     // for this host/device, so retry bounded transport failures while the UI stays cancellable.
     private Reply startupRequest(String base,String token,String method,String path,byte[] body,int attempt)throws Exception{
-        long deadline=SystemClock.elapsedRealtime()+45000;
+        return startupRequest(base,token,method,path,body,attempt,Long.MAX_VALUE);
+    }
+    private Reply startupRequest(String base,String token,String method,String path,byte[] body,int attempt,long operationDeadline)throws Exception{
+        long deadline=Math.min(SystemClock.elapsedRealtime()+45000,operationDeadline);
         boolean waitingShown=false;
         for(;;){
             if(attempt!=generation||!foreground)throw new InterruptedException("连接已取消");
+            if(SystemClock.elapsedRealtime()>=operationDeadline)throw new IOException("等待电脑响应已超过本次连接时限，请查看电脑端项目阶段后重试。");
             try{return request(base,token,method,path,body);}
             catch(Exception error){
                 if(!base.startsWith("https:")||!RemoteTls.transientFailure(error)||SystemClock.elapsedRealtime()>=deadline)throw error;
@@ -398,7 +466,8 @@ public final class MainActivity extends Activity {
         preferences.edit().putString("lastAddress",current.base).putString("lastId",current.id).apply();
         if(!current.base.startsWith("https:"))preferences.edit().putString("token:"+current.base,current.token).apply();
         Game old=games.get(current.id);games.put(current.id,new Game(current.id,current.base,current.name,old==null?"电脑":old.computer,"running",System.currentTimeMillis()));saveHistory();
-        if(!preferences.getBoolean("controlGestureHint",false)){Toast.makeText(this,"四指下滑打开运行、停止和 FPS 控制栏",Toast.LENGTH_LONG).show();preferences.edit().putBoolean("controlGestureHint",true).apply();}
+        ensureControlHandle();
+        if(!preferences.getBoolean("controlGestureHint",false)){Toast.makeText(this,"点击屏幕边缘菜单打开游戏控制，返回列表会保留后台游戏",Toast.LENGTH_LONG).show();preferences.edit().putBoolean("controlGestureHint",true).apply();}
     }
     private void readStream(Session current,int attempt){
         StreamRecovery recovery=new StreamRecovery(current.h264);
@@ -514,34 +583,39 @@ public final class MainActivity extends Activity {
             controlPanel=column();controlPanel.setPadding(dp(12),dp(10),dp(12),dp(10));controlPanel.setElevation(dp(8));controlPanel.setBackground(outlined(PANEL,16));
             LinearLayout info=new LinearLayout(this);info.setGravity(Gravity.CENTER_VERTICAL);controlStatus=label("",12,MUTED);controlStatus.setSingleLine();controlStatus.setEllipsize(TextUtils.TruncateAt.END);info.addView(controlStatus,new LinearLayout.LayoutParams(0,-2,1));
             fpsLabel=label("0 FPS",13,ACCENT);fpsLabel.setTypeface(Typeface.MONOSPACE);fpsLabel.setPadding(dp(10),0,0,0);fpsLabel.setContentDescription("手机实际显示帧率");info.addView(fpsLabel);controlPanel.addView(info);gap(controlPanel,8);
-            LinearLayout actions=new LinearLayout(this);runButton=primary("运行",this::runRemote);stopButton=button("停止",this::stopRemote);
-            actions.addView(runButton,new LinearLayout.LayoutParams(0,dp(48),1));LinearLayout.LayoutParams middle=new LinearLayout.LayoutParams(0,dp(48),1);middle.setMargins(dp(8),0,dp(8),0);actions.addView(stopButton,middle);
-            actions.addView(button("返回",()->goHome(paused?"已回首页，电脑游戏保持停止":"已回首页，电脑游戏继续运行")),new LinearLayout.LayoutParams(0,dp(48),1));actions.addView(iconButton("close","收起控制栏",this::hideControls),new LinearLayout.LayoutParams(dp(48),dp(48)));controlPanel.addView(actions);gap(controlPanel,8);qualityButton=button("",this::chooseQuality);controlPanel.addView(qualityButton,new LinearLayout.LayoutParams(-1,dp(48)));
-            FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);position.setMargins(dp(12),dp(12),dp(12),0);root.addView(controlPanel,position);
+            info.addView(iconButton("close","收起控制栏",this::hideControls),new LinearLayout.LayoutParams(dp(48),dp(48)));
+            LinearLayout actions=column();runButton=primary("继续游戏",this::runRemote);stopButton=button("停止这款游戏",()->new AlertDialog.Builder(this).setTitle("停止这款游戏？").setMessage("只停止当前游戏，其他项目继续运行。").setPositiveButton("停止游戏",(d,w)->stopRemote()).setNegativeButton("继续运行",null).show());
+            actions.addView(runButton,new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);actions.addView(button("返回游戏列表",()->goHome(paused?"电脑游戏保持停止":"电脑游戏继续后台运行")),new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);
+            qualityButton=button("",this::chooseQuality);actions.addView(qualityButton,new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);actions.addView(stopButton,new LinearLayout.LayoutParams(-1,dp(48)));controlPanel.addView(actions);
+            FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(Math.min(getResources().getDisplayMetrics().widthPixels-dp(24),dp(420)),-2,Gravity.BOTTOM|Gravity.RIGHT);position.setMargins(dp(12),dp(12),dp(12),dp(12));root.addView(controlPanel,position);
         }
-        controlStatus.setText(message.isEmpty()?(paused?"游戏已停止":lastName):message);runButton.setEnabled(!controlBusy);stopButton.setEnabled(!controlBusy);runButton.setAlpha(controlBusy?.45f:1);stopButton.setAlpha(controlBusy?.45f:1);
-        qualityButton.setText("清晰度 · "+qualityName(streamQuality)+" · "+videoMode+(frameWidth>0?"   "+frameWidth+" × "+frameHeight:""));qualityButton.setEnabled(!controlBusy);
+        controlStatus.setText(message.isEmpty()?(paused?"游戏已停止":lastName):message);runButton.setText(paused?"运行游戏":"继续游戏");runButton.setEnabled(!controlBusy);stopButton.setEnabled(!controlBusy);runButton.setAlpha(controlBusy?.45f:1);stopButton.setAlpha(controlBusy?.45f:1);
+        qualityButton.setText("画质 · "+qualityName(streamQuality)+" · "+videoMode+(frameWidth>0?"   "+frameWidth+" × "+frameHeight:""));qualityButton.setEnabled(!controlBusy);
         positionControls();controlPanel.setVisibility(View.VISIBLE);controlPanel.bringToFront();updateFps();
     }
+    private void ensureControlHandle(){
+        if(controlHandle==null){controlHandle=iconButton("more","打开游戏控制",()->showControls(""));controlHandle.setBackground(outlined(0xd9222222,12));FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT);lp.setMargins(dp(12),dp(12),0,0);root.addView(controlHandle,lp);}controlHandle.setVisibility(View.VISIBLE);positionControls();
+    }
     private void positionControls(){
-        if(controlPanel==null)return;int left=0,top=0,right=0;
+        int left=0,top=0,right=0;
         if(Build.VERSION.SDK_INT>=28&&root.getRootWindowInsets()!=null){DisplayCutout cutout=root.getRootWindowInsets().getDisplayCutout();if(cutout!=null){left=cutout.getSafeInsetLeft();top=cutout.getSafeInsetTop();right=cutout.getSafeInsetRight();}}
-        FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)controlPanel.getLayoutParams();position.setMargins(dp(12)+left,dp(12)+top,dp(12)+right,0);controlPanel.setLayoutParams(position);
+        if(controlHandle!=null){FrameLayout.LayoutParams hp=(FrameLayout.LayoutParams)controlHandle.getLayoutParams();hp.setMargins(dp(12)+left,dp(12)+top,0,0);controlHandle.setLayoutParams(hp);}
+        if(controlPanel==null)return;FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)controlPanel.getLayoutParams();position.width=Math.min(getResources().getDisplayMetrics().widthPixels-dp(24)-left-right,dp(420));position.setMargins(dp(12)+left,dp(12)+top,dp(12)+right,dp(12));controlPanel.setLayoutParams(position);
     }
     private String qualityName(String quality){return quality.equals("original")?"原始尺寸":quality;}
     private void chooseQuality(){
-        Session current=session;if(current==null)return;
-        if(!current.qualitySupported){Toast.makeText(this,"请先将电脑 Defold 更新至 patch.93，以启用高清串流",Toast.LENGTH_LONG).show();return;}
+        Session current=session;
+        if(current!=null&&!current.qualitySupported){Toast.makeText(this,"请先将电脑 Defold 更新至 patch.93，以启用高清串流",Toast.LENGTH_LONG).show();return;}
         LinearLayout options=column();TextView help=label("更高分辨率更清晰，也需要更好的 Wi-Fi。\n保持游戏比例，不放大原始画面。",13,MUTED);help.setLineSpacing(dp(4),1);options.addView(help);gap(options,16);
         String[] ids={"540p","720p","1080p","original"};String[] names={"流畅 · 540p","均衡 · 720p","高清 · 1080p","原始尺寸"};Dialog[] holder=new Dialog[1];
-        for(int i=0;i<ids.length;i++){final String choice=ids[i];Button option=button((choice.equals(streamQuality)?"✓  ":"")+names[i],()->{holder[0].dismiss();if(session!=current||choice.equals(streamQuality))return;streamQuality=choice;preferences.edit().putString("streamQuality",choice).apply();if(paused){showControls("已选择 "+qualityName(choice)+"，运行后生效");return;}endInput();controlBusy=true;int attempt=++generation;closeStream();frameRate.reset();showControls("正在切换清晰度…");frames.execute(()->readStream(current,attempt));});if(choice.equals(streamQuality))option.setTextColor(ACCENT);options.addView(option,new LinearLayout.LayoutParams(-1,dp(52)));gap(options,6);}
+        for(int i=0;i<ids.length;i++){final String choice=ids[i];Button option=button((choice.equals(streamQuality)?"✓  ":"")+names[i],()->{holder[0].dismiss();if(session!=current||choice.equals(streamQuality))return;streamQuality=choice;preferences.edit().putString("streamQuality",choice).apply();if(current==null){Toast.makeText(this,"默认画质已更新",Toast.LENGTH_SHORT).show();return;}if(paused){showControls("已选择 "+qualityName(choice)+"，运行后生效");return;}endInput();controlBusy=true;int attempt=++generation;closeStream();frameRate.reset();showControls("正在切换清晰度…");frames.execute(()->readStream(current,attempt));});if(choice.equals(streamQuality))option.setTextColor(ACCENT);options.addView(option,new LinearLayout.LayoutParams(-1,dp(52)));gap(options,6);}
         holder[0]=sheet("串流分辨率",options);
     }
-    private void hideControls(){if(controlPanel!=null)controlPanel.setVisibility(View.GONE);}
+    private void hideControls(){if(controlPanel!=null)controlPanel.setVisibility(View.GONE);if(page.equals("stream"))ensureControlHandle();}
     private void updateFps(){
         Session current=session;
         if(foreground&&!paused&&hasWindowFocus()&&current!=null&&audioPlayer!=null&&audioPlayer.needsFocusRetry())audioPlayer=new RemoteAudioPlayer(this,current.base,current.token);
-        if(fpsLabel!=null)fpsLabel.setText(Math.round(paused?0:frameRate.fps(SystemClock.elapsedRealtime()))+" FPS"+(audioPlayer==null?"":" · "+audioPlayer.status()));
+        if(fpsLabel!=null){fpsLabel.setVisibility(getSharedPreferences("remote-dashboard",0).getBoolean("showFps",false)?View.VISIBLE:View.GONE);fpsLabel.setText(Math.round(paused?0:frameRate.fps(SystemClock.elapsedRealtime()))+" FPS"+(audioPlayer==null?"":" · "+audioPlayer.status()));}
     }
     private void pauseRemote(String message){
         endInput();paused=true;controlBusy=false;++generation;closeStream();frameRate.reset();if(screen!=null)screen.discardPending();
@@ -550,7 +624,7 @@ public final class MainActivity extends Activity {
     private void stopRemote(){
         Session current=session;if(current==null||controlBusy)return;
         if(current.base.startsWith("https:")){
-            pauseRemote("正在停止游戏…");controlBusy=true;commands.execute(()->{try{request(current.base,current.token,"POST","/stop",new byte[0]);ui.post(()->{if(session==current){String host=RemoteTls.origin(current.base);goHome("游戏已停止");startActivity(new Intent(this,ManagerActivity.class).putExtra("host",host));}});}catch(Exception e){ui.post(()->{if(session==current){controlBusy=false;showControls(e.getMessage());}});}});return;
+            pauseRemote("正在停止游戏…");controlBusy=true;commands.execute(()->{try{request(current.base,current.token,"POST","/stop",new byte[0]);ui.post(()->{if(session==current){String host=RemoteTls.origin(current.base);goHome("游戏已停止");dashboard.showTab("running");dashboard.refresh();}});}catch(Exception e){ui.post(()->{if(session==current){controlBusy=false;showControls(e.getMessage());}});}});return;
         }
         pauseRemote("正在停止游戏…");controlBusy=true;showControls("正在停止游戏…");int attempt=generation;
         commands.execute(()->{try{
@@ -618,7 +692,7 @@ public final class MainActivity extends Activity {
     private final Runnable heartbeat=new Runnable(){public void run(){if(pressed)pointer(pointerX,pointerY,true);updateFps();if(foreground)ui.postDelayed(this,200);}};
 
     private void refreshDiscovery(){
-        if(discovering||!foreground||!page.equals("home")||!homeTab.equals("discovery"))return;discovering=true;
+        if(discovering||!foreground||!legacyPage||!page.equals("home")||!homeTab.equals("discovery"))return;discovering=true;
         ArrayList<Game> known=new ArrayList<>(games.values());
         discovery.execute(()->{
             LinkedHashMap<String,Game> found=new LinkedHashMap<>();
@@ -673,23 +747,34 @@ public final class MainActivity extends Activity {
     }
     private void saveHistory(){JSONArray array=new JSONArray();try{for(Game g:games.values()){if(array.length()>=24)break;array.put(new JSONObject().put("id",g.id).put("address",g.address).put("name",g.name).put("computer",g.computer));}preferences.edit().putString("games",array.toString()).apply();}catch(JSONException ignored){}}
     private void loadHistory(){try{JSONArray list=new JSONArray(preferences.getString("games","[]"));for(int i=0;i<list.length();i++){JSONObject g=list.getJSONObject(i);games.put(g.getString("id"),new Game(g.getString("id"),new RemoteAddress(g.getString("address"),"").base,g.getString("name"),g.optString("computer","电脑"),"offline",0));}}catch(Exception ignored){}}
-    private void scan(){endInput();++generation;session=null;closeStream();closeCamera();page="scan";newRoot();
-        LinearLayout layout=column();root.addView(layout,new FrameLayout.LayoutParams(-1,-1));layout.addView(pageHeader("扫码连接",()->goHome("")));divider(layout);
-        boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-        LinearLayout content=new LinearLayout(this);content.setOrientation(wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);content.setPadding(dp(20),dp(20),dp(20),dp(20));layout.addView(content,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout copy=column();copy.addView(title("扫码连接电脑",23));gap(copy,8);TextView hint=label("在电脑 Remote Manager 点击“扫码连接电脑”。\n配对成功后显示该电脑的游戏项目列表。\n也支持扫描编辑器 Game 面板的游戏二维码。",14,MUTED);hint.setLineSpacing(dp(4),1);copy.addView(hint);
-        FrameLayout cameraArea=new FrameLayout(this);cameraArea.setBackground(background(PANEL,20));cameraArea.setClipToOutline(true);
-        TextView tip=label("识别后自动配对并显示项目列表",12,MUTED);
-        Button manual=button("手动输入连接信息",()->{goHome("");manual(null);});
-        if(wide){
-            ScrollView instructions=new ScrollView(this);copy.setPadding(0,0,dp(20),0);instructions.addView(copy);content.addView(instructions,new LinearLayout.LayoutParams(0,-1,1));gap(copy,20);copy.addView(tip);gap(copy,16);copy.addView(manual,new LinearLayout.LayoutParams(-1,dp(50)));content.addView(cameraArea,new LinearLayout.LayoutParams(0,-1,1));
-        }else{
-            content.addView(copy);gap(content,20);content.addView(cameraArea,new LinearLayout.LayoutParams(-1,0,1));gap(content,16);tip.setGravity(Gravity.CENTER);content.addView(tip);gap(content,16);content.addView(manual,new LinearLayout.LayoutParams(-1,dp(50)));
-        }
-        if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.CAMERA},40);return;}
-        scanner=new QRScanner(this,new QRScanner.Listener(){public void result(String text){try{RemoteAddress address=RemoteAddress.fromLink(text);closeCamera();connect(address);}catch(Exception e){tip.setText(e.getMessage());}}public void status(String message){tip.setText(message);}public void error(String message){tip.setText(message);}});cameraArea.addView(scanner,new FrameLayout.LayoutParams(-1,-1));cameraArea.addView(new ScanGuide(this),new FrameLayout.LayoutParams(-1,-1));
+    private void pasteLink(){
+        final QRScanner pausedScanner=scanner;final int scanAttempt=generation;if(pausedScanner!=null)pausedScanner.pauseScanning();
+        LinearLayout content=column();content.addView(label("在电脑管理器点击“复制完整配对链接”，然后粘贴到这里。",14,MUTED));gap(content,12);EditText link=field("defoldremote://connect?…",false);link.setSingleLine(false);link.setMinLines(3);link.setContentDescription("完整配对链接");content.addView(link);gap(content,12);TextView error=label("",13,0xffed8585);content.addView(error);Dialog[] holder=new Dialog[1];content.addView(primary("连接电脑",()->{try{RemoteAddress target=RemoteAddress.fromLink(link.getText().toString().trim());holder[0].dismiss();connect(target);}catch(Exception e){error.setText(e.getMessage());}}));holder[0]=sheet("使用配对链接",content);holder[0].setOnDismissListener(d->{if(activeSheet==d)activeSheet=null;if(scanAttempt==generation&&page.equals("scan")&&scanner==pausedScanner&&scanner!=null&&!albumDecoding)scanner.resumeScanning();});
     }
-    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==40&&page.equals("scan")){if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)scan();else{goHome("相机权限未开启，可手动输入连接信息");manual(null);}}}
+    private void album(){
+        if(dashboard!=null)dashboard.pause();closeCamera();page="scan";Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("image/*");try{startActivityForResult(intent,41);}catch(ActivityNotFoundException e){scan();scanStatus.setText("没有可用的相册，可粘贴完整配对链接");}
+    }
+    @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=41)return;
+        scan();if(result!=RESULT_OK||data==null||data.getData()==null)return;android.net.Uri uri=data.getData();final int attempt=generation;albumDecoding=true;scanStatus.setText("正在识别相册二维码…");if(scanner!=null)scanner.pauseScanning();
+        commands.execute(()->{Bitmap image=null;String detected=null;try{
+            BitmapFactory.Options o=new BitmapFactory.Options();o.inJustDecodeBounds=true;try(InputStream in=getContentResolver().openInputStream(uri)){BitmapFactory.decodeStream(in,null,o);}if(o.outWidth<1||o.outHeight<1||o.outWidth>60000||o.outHeight>60000)throw new IOException("图片尺寸无效");o.inJustDecodeBounds=false;o.inSampleSize=1;while(Math.max(o.outWidth,o.outHeight)/o.inSampleSize>2048)o.inSampleSize*=2;try(InputStream in=getContentResolver().openInputStream(uri)){image=BitmapFactory.decodeStream(in,null,o);}if(image==null)throw new IOException("无法读取图片");int w=image.getWidth(),h=image.getHeight();int[] pixels=new int[w*h];image.getPixels(pixels,0,w,0,0,w,h);detected=QRDecoder.decode(pixels,w,h);RemoteAddress target=RemoteAddress.fromLink(detected);ui.post(()->{albumDecoding=false;if(attempt!=generation||!page.equals("scan"))return;closeCamera();if(foreground)connect(target);else pendingExternal=target;});
+        }catch(Exception e){final boolean recognized=detected!=null;ui.post(()->{albumDecoding=false;if(attempt!=generation||!page.equals("scan"))return;scanStatus.setText(recognized?"二维码已识别，但配对信息无效："+e.getMessage():"未找到二维码，请使用原始截图或粘贴完整链接");if(scanner!=null)scanner.resumeScanning();});}finally{if(image!=null)image.recycle();}});
+    }
+    private void scan(){endInput();releaseManaged();++generation;session=null;closeStream();closeCamera();if(dashboard!=null)dashboard.pause();page="scan";scanTorch=false;newRoot();
+        boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        FrameLayout cameraArea=new FrameLayout(this);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-1);if(wide)cp.rightMargin=dp(236);root.addView(cameraArea,cp);
+        LinearLayout header=pageHeader("扫描电脑二维码",()->{goHome("");dashboard.showTab("computers");});header.setBackgroundColor(0x99181818);FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-1,dp(64),Gravity.TOP);root.addView(header,hp);
+        LinearLayout controls=column();controls.setPadding(dp(16),dp(12),dp(16),dp(16));controls.setBackgroundColor(0xde181818);
+        scanStatus=label("将电脑上的二维码放入框内\n识别后自动对焦，不需要按快门",14,TEXT);scanStatus.setGravity(Gravity.CENTER);scanStatus.setPadding(dp(10),dp(10),dp(10),dp(10));controls.addView(scanStatus);gap(controls,10);
+        LinearLayout tools=new LinearLayout(this);Button torch=button("补光",()->{if(scanner==null){scanStatus.setText("相机未就绪，仍可使用相册或链接");return;}scanTorch=!scanTorch;if(!scanner.setTorch(scanTorch)){scanTorch=false;scanStatus.setText("当前相机不支持补光");}});torch.setContentDescription("补光");tools.addView(torch,new LinearLayout.LayoutParams(0,dp(48),1));
+        for(float ratio:new float[]{1,2}){Button zoom=button(ratio==1?"1×":"2×",()->{if(scanner!=null)scanner.setZoom(ratio);});zoom.setContentDescription(ratio==1?"1倍缩放":"2倍缩放");LinearLayout.LayoutParams z=new LinearLayout.LayoutParams(0,dp(48),1);z.leftMargin=dp(8);tools.addView(zoom,z);}controls.addView(tools);gap(controls,12);
+        LinearLayout alternatives=new LinearLayout(this);alternatives.setOrientation(wide?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);alternatives.addView(button("从相册识别",this::album),new LinearLayout.LayoutParams(wide?-1:0,dp(48),wide?0:1));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(wide?-1:0,dp(48),wide?0:1);if(wide)lp.topMargin=dp(8);else lp.leftMargin=dp(8);alternatives.addView(button("粘贴完整配对链接",this::pasteLink),lp);controls.addView(alternatives);
+        FrameLayout.LayoutParams bottom=new FrameLayout.LayoutParams(wide?dp(236):-1,wide?-1:-2,wide?Gravity.RIGHT:Gravity.BOTTOM);if(wide)bottom.topMargin=dp(64);root.addView(controls,bottom);
+        if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){scanStatus.setText("需要相机权限。也可以从相册识别或粘贴完整链接。");requestPermissions(new String[]{Manifest.permission.CAMERA},40);return;}
+        scanner=new QRScanner(this,new QRScanner.Listener(){public void result(String value){try{RemoteAddress address=RemoteAddress.fromLink(value);root.performHapticFeedback(HapticFeedbackConstants.CONFIRM);closeCamera();connect(address);}catch(Exception e){scanStatus.setText("这不是有效的 Defold Remote 配对码\n"+e.getMessage());if(scanner!=null)scanner.resumeScanning();}}public void status(String value){if(scanStatus!=null)scanStatus.setText(value);}public void error(String value){if(scanStatus!=null)scanStatus.setText(value+"\n可使用相册或完整配对链接");}});
+        cameraArea.addView(scanner,new FrameLayout.LayoutParams(-1,-1));cameraArea.addView(new ScanGuide(this),new FrameLayout.LayoutParams(-1,-1));
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==40&&page.equals("scan")){if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)scan();else if(scanStatus!=null){scanStatus.setText("相机权限未开启。可从相册识别、粘贴链接，或在系统设置中允许相机。");scanStatus.setOnClickListener(v->startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName()))));}}}
     private void closeCamera(){if(scanner!=null){scanner.close();scanner=null;}}
 
     private final class StreamView extends View {
@@ -702,7 +787,7 @@ public final class MainActivity extends Activity {
         private boolean posted,multi,hardware;
         private int videoWidth,videoHeight;
         void video(boolean enabled,int width,int height){hardware=enabled;videoWidth=width;videoHeight=height;if(enabled)bitmap=null;setBackgroundColor(enabled?Color.TRANSPARENT:Color.BLACK);invalidate();}
-        StreamView(){super(MainActivity.this);setBackgroundColor(Color.BLACK);setContentDescription("远程游戏。四指下滑打开控制栏，返回键打开控制栏");}
+        StreamView(){super(MainActivity.this);setBackgroundColor(Color.BLACK);setContentDescription("远程游戏。点击边缘菜单或返回键打开控制栏");}
         synchronized void offer(Session current,int attempt,Bitmap next){if(pending!=null)pending.recycle();pending=next;pendingSession=current;pendingGeneration=attempt;if(!posted){posted=true;postOnAnimation(()->{synchronized(StreamView.this){if(pending!=null){if(pendingSession==session&&pendingGeneration==generation&&foreground)bitmap=pending;else pending.recycle();}pending=null;posted=false;}invalidate();});}}
         synchronized void discardPending(){if(pending!=null){pending.recycle();pending=null;}}
         synchronized void clear(){bitmap=null;if(pending!=null){pending.recycle();pending=null;}destination.setEmpty();invalidate();}

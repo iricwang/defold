@@ -24,6 +24,7 @@ import android.view.View;
 final class RemoteIcon extends View {
     private final String kind;
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+    void setColor(int color){if(paint.getColor()!=color){paint.setColor(color);invalidate();}}
     RemoteIcon(Context context,String kind,int color){
         super(context);this.kind=kind;paint.setColor(color);paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(1.7f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
@@ -34,6 +35,10 @@ final class RemoteIcon extends View {
         super.onDraw(canvas);canvas.save();float scale=Math.min(getWidth(),getHeight())/24f;
         canvas.translate((getWidth()-24*scale)/2,(getHeight()-24*scale)/2);canvas.scale(scale,scale);
         switch(kind){
+        case "plus":line(canvas,12,5,12,19);line(canvas,5,12,19,12);break;
+        case "game":Path game=new Path();game.moveTo(6,7);game.lineTo(18,7);game.lineTo(22,18);game.lineTo(18,20);game.lineTo(14,16);game.lineTo(10,16);game.lineTo(6,20);game.lineTo(2,18);game.close();canvas.drawPath(game,paint);line(canvas,7,10,7,15);line(canvas,4.5f,12.5f,9.5f,12.5f);canvas.drawCircle(16,11,0.7f,paint);canvas.drawCircle(18,14,0.7f,paint);break;
+        case "layers":Path layers=new Path();layers.moveTo(12,3);layers.lineTo(2,8);layers.lineTo(12,13);layers.lineTo(22,8);layers.close();canvas.drawPath(layers,paint);line(canvas,2,12,12,17);line(canvas,12,17,22,12);line(canvas,2,16,12,21);line(canvas,12,21,22,16);break;
+        case "settings":for(int y:new int[]{6,12,18})line(canvas,4,y,20,y);line(canvas,8,3,8,9);line(canvas,16,9,16,15);line(canvas,10,15,10,21);break;
         case "monitor":canvas.drawRoundRect(3,4,21,17,2,2,paint);line(canvas,12,17,12,21);line(canvas,8,21,16,21);break;
         case "back":line(canvas,14,5,7,12);line(canvas,7,12,14,19);break;
         case "arrow":line(canvas,4,12,20,12);line(canvas,14,6,20,12);line(canvas,20,12,14,18);break;

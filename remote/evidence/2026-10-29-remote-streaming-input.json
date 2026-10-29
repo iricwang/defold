@@ -1,0 +1,105 @@
+{
+  "issue": "Physical phone gets video data timeouts and reconnects; quick taps do not operate the game reliably",
+  "liveEvidence": {
+    "directory": "tmp/remote-stream-diagnostic",
+    "renderSequenceSamples": [
+      8924,
+      8963,
+      8992
+    ],
+    "publishedFrameSamples": [
+      50,
+      50,
+      50
+    ],
+    "requestSequenceSamples": [
+      178360,
+      179167,
+      179894
+    ],
+    "threadEvidence": "RemoteRuntime.video repeatedly waits for liveFrame while engine render acknowledgements advance",
+    "userReportedMessage": "等待数据超时／正在重连"
+  },
+  "fix": {
+    "managerVersion": "0.2.4",
+    "runtimeRevision": "1be01e0f7f5520a5",
+    "capture": "Keep exactly one capture request outstanding until its frame and scene snapshot have been published",
+    "input": "Reuse acknowledged input and render advancement for button transitions; retain asynchronous held-pointer motion",
+    "apkChanged": false,
+    "firewallChanged": false,
+    "macOS": "Reviewed matching capture/input acknowledgement fields in editor_game_bridge.h; not executed on macOS"
+  },
+  "verification": {
+    "oldRealProject": {
+      "report": "tmp/remote-streaming-tests/485540a6ffe64743b630cd34f2cf5df8/report.json",
+      "frames": 2,
+      "result": "Read timed out after 3.52 seconds"
+    },
+    "captureOnlyFix": {
+      "report": "tmp/remote-streaming-tests/2b6e647250a94140a4697637137d1411/report.json",
+      "frames": 1300,
+      "durationSeconds": 25,
+      "sentTaps": 25,
+      "clickCallbacks": 14,
+      "result": "Streaming recovered; independently reproduced rapid-tap loss"
+    },
+    "fixedComplexGui": {
+      "report": "tmp/remote-streaming-tests/2e56dee8e51b4af5aec83485e6bf7cf8/report.json",
+      "additionalGuiNodes": 800,
+      "durationSeconds": 60.014,
+      "frames": 2560,
+      "maxGapSeconds": 0.107,
+      "sentTaps": 60,
+      "clickCallbacks": 60,
+      "releaseCallbacks": 60,
+      "streamErrors": []
+    },
+    "fixedRealProject": {
+      "report": "tmp/remote-streaming-tests/e0b8237fbc464c109785a6c2746778e2/report.json",
+      "name": "Path of Kings",
+      "durationSeconds": 60.006,
+      "frames": 2007,
+      "maxGapSeconds": 0.349,
+      "streamErrors": [],
+      "businessInput": "Not sent to the real game; input callbacks verified in isolated complex GUI fixture"
+    },
+    "concurrentStartupAttempts": "Two simultaneous regression launches hit pre-render CONDITION_TIMEOUT; subsequent serial runs passed. Reports 83f198bb43fc46b3bc02b8d72154276d and cae0f05df614422db51603415b3bcfa0 are retained; not a multi-session startup certification.",
+    "physicalPhoneAfterUpdate": "0.2.4 user reported overall lag; installed session produced 3269 frames over 102.197 seconds (31.99 FPS). Performance follow-up 0.2.5 installed; physical feedback pending.",
+    "installation": {
+      "path": "X:/Programs/DefoldRemote",
+      "runtimeRevision": "1be01e0f7f5520a5",
+      "verifiedRuntimeFiles": 242,
+      "backup": "tmp/remote-stream-diagnostic/installed-backup-0.2.3",
+      "archive": "X:/AI/UI/deliverables/DefoldRemoteManager-0.2.4-windows-x64.zip",
+      "sha256": "fb30beca3f28f9d606b4b9bc778c3ad741c1d0c884d016ec0bd5ad23745c1644",
+      "apkOrFirewallChanges": false
+    }
+  },
+  "performanceFollowUp": {
+    "managerVersion": "0.2.5",
+    "runtimeRevision": "d2d984cc990d4dbd",
+    "change": "Header word 266 selects pixels-only live capture; deterministic MCP capture retains matching full scene; ordinary preview short-circuit guarded",
+    "realProjectReport": "tmp/remote-streaming-tests/5fd9e41562e5486b8948bb1c57db3039/report.json",
+    "durationSeconds": 60.005,
+    "frames": 3412,
+    "averageFps": 56.862,
+    "maxGapSeconds": 0.326,
+    "streamErrors": [],
+    "rapidInputReport": "tmp/remote-streaming-tests/9951f08ef1e745c2988f4360638e9041/report.json",
+    "quickTaps": 20,
+    "clickCallbacks": 20,
+    "releaseCallbacks": 20,
+    "captureModesTest": "Ordinary preview captures without automation transport; 180 live frames avoid scene JSON writes; an intervening MCP capture returns matching full native scene",
+    "captureModesEvidence": "tmp/remote-stream-diagnostic/capture-mode-final",
+    "installed": "X:/Programs/DefoldRemote",
+    "package": {
+      "archive": "X:\\AI\\UI\\deliverables\\DefoldRemoteManager-0.2.5-windows-x64.zip",
+      "sha256": "233288e03e80a5169085877a5403f0ceb586432366aa234627c82eac8866fb4d",
+      "runtime": "runtime-d2d984cc990d4dbd",
+      "files": 246
+    },
+    "physicalPhone": "User reported improved video but remaining input delay on 0.2.5; 0.2.6 follow-up installed, physical acceptance pending.",
+    "macOS": "Source/protocol reviewed, not run on Mac",
+    "followUpEvidence": "remote/evidence/2026-10-29-remote-engine-selection-fast-start.json"
+  }
+}

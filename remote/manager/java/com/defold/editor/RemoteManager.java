@@ -27,10 +27,14 @@ import java.util.concurrent.*;
 import java.util.zip.ZipFile;
 
 /** Independent local build/session service shared by the desktop shell and LAN gateway. */
-public final class RemoteManager implements AutoCloseable {
+public class RemoteManager implements AutoCloseable {
     static final ObjectMapper JSON = new ObjectMapper();
     final Path directory, runtimeRoot;
-    final Map<String, Object> runtime;
+    final Map<String, Object> packagedRuntime;
+    final Path packagedManifest;
+    volatile Map<String, Object> runtime;
+    volatile Path gameManifest;
+    volatile String engineDirectory = "", engineError = "";
     final Map<String, Project> projects = new LinkedHashMap<>();
     final Map<String, Map<String, Object>> devices = new ConcurrentHashMap<>();
     final Map<String, Object> settings = new ConcurrentHashMap<>(Map.of("prepare", true, "maxSessions", 2));
@@ -46,7 +50,7 @@ public final class RemoteManager implements AutoCloseable {
         final Path root;
         String name, mode = "source", state = "new", error = "", errorKind = "", failedStage = "", stamp = "", builtStamp = "", stage = "", builtAt = "";
         boolean shared = true, busy, startAfterBuild, modified;
-        long generation;
+        volatile long generation;
         Process compiler;
         Path build, engine, buildLog;
         Worker worker;
@@ -115,9 +119,12 @@ public final class RemoteManager implements AutoCloseable {
     }
 
     RemoteManager(Path manifest, Path directory, int port) throws Exception {
+        RemoteAddressResolver.enableForManager();
         this.runtimeRoot = manifest.toAbsolutePath().getParent();
         this.directory = directory.toAbsolutePath().normalize();
         runtime = JSON.readValue(manifest.toFile(), Map.class);
+        packagedRuntime = new LinkedHashMap<>(runtime);
+        packagedManifest = manifest.toAbsolutePath(); gameManifest = packagedManifest;
         String expected = String.valueOf(runtime.get("platform"));
         String system = System.getProperty("os.name"), arch = System.getProperty("os.arch");
         if (!system.startsWith("Windows") && !system.startsWith("Mac")) throw new IOException("仅支持 Windows 和 macOS");
@@ -132,6 +139,11 @@ public final class RemoteManager implements AutoCloseable {
         try { host = InetAddress.getLocalHost().getHostName(); } catch (Exception e) { host = "Defold Computer"; }
         computer = host;
         if (saved.get("settings") instanceof Map<?, ?> values) settings.putAll((Map<String, Object>)values);
+        engineDirectory = Objects.toString(settings.getOrDefault("engineDirectory",runtime.getOrDefault("engineDirectory","")),"");
+        if (!engineDirectory.isBlank()) {
+            try { useEngine(RemoteEngineInstallation.resolve(Path.of(engineDirectory),this.directory.resolve("engines"),packagedManifest,packagedRuntime)); }
+            catch (Exception unavailable) { engineError = "引擎目录不可用：" + unavailable.getMessage(); }
+        }
         if (saved.get("devices") instanceof List<?> entries) for (Object item : entries) {
             Map<String, Object> device = (Map<String, Object>)item; devices.put(String.valueOf(device.get("id")), device);
         }
@@ -144,8 +156,10 @@ public final class RemoteManager implements AutoCloseable {
                 Path build = Path.of(str(entry,"build")).toAbsolutePath().normalize();
                 if (build.startsWith(this.directory.resolve("builds")) && Files.isRegularFile(build.resolve("build/default/game.projectc"))) {
                     Path receipt = build.getParent().resolve("receipt.json");
-                    if (Files.isRegularFile(receipt) && Objects.equals(JSON.readValue(receipt.toFile(), Map.class).get("runtimeRevision"), runtime.get("revision"))) {
-                        p.build = build; p.engine = Path.of(str(entry,"engine")); p.state = Files.isRegularFile(p.engine) ? "ready" : "error";
+                    if (Files.isRegularFile(receipt) && (p.mode.equals("import") || compatibleBuild(JSON.readValue(receipt.toFile(), Map.class)))) {
+                        p.build = build; p.engine = Path.of(str(entry,"engine"));
+                        try { verifyBuild(p); p.state = "ready"; }
+                        catch (EngineArtifactException damaged) { p.builtStamp = ""; p.state = "error"; p.error = damaged.getMessage(); p.errorKind = "environment"; p.failedStage = "校验本地构建产物"; }
                     }
                 }
             }
@@ -156,6 +170,28 @@ public final class RemoteManager implements AutoCloseable {
     }
 
     Path path(String key) { Path value = Path.of(String.valueOf(runtime.get(key))); return value.isAbsolute() ? value : runtimeRoot.resolve(value).normalize(); }
+    private void useEngine(RemoteEngineInstallation.Selection selection) {
+        runtime = selection.runtime(); gameManifest = selection.manifest();
+        engineDirectory = selection.directory().toString(); engineError = "";
+        settings.put("engineDirectory",engineDirectory);
+    }
+    synchronized void selectEngine(Path app) throws Exception {
+        // Validation/copy finishes before any existing game is interrupted.
+        var selection = RemoteEngineInstallation.resolve(app,directory.resolve("engines"),packagedManifest,packagedRuntime);
+        boolean changed = !buildCompatibility(runtime).equals(buildCompatibility(selection.runtime())) || !engineError.isEmpty();
+        List<Project> restart = new ArrayList<>();
+        if (changed) for (Project p : all()) {
+            synchronized(p) { if (p.worker != null || p.startAfterBuild) restart.add(p); }
+            stop(p);
+        }
+        useEngine(selection);
+        if (changed) for (Project p : all()) synchronized(p) {
+            // Keep pinned imports so incompatibility is reported, never substituted.
+            if (p.mode.equals("source")) { p.build=null; p.engine=null; p.builtStamp=""; p.state="new"; }
+        }
+        save();
+        for (Project p : restart) prepare(p,true,false);
+    }
     List<String> javaCommand(String main) {
         return new ArrayList<>(List.of(path("java").toString(), "--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true",
                 "-Ddefold.editor.sha1=remote-manager-v1", "-Ddefold.unpack.path=" + directory.resolve("unpack"),
@@ -164,6 +200,70 @@ public final class RemoteManager implements AutoCloseable {
     static String str(Map<?, ?> value, String key) { return Objects.toString(value.get(key), ""); }
     static String hash(byte[] bytes) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); } catch (Exception e) { throw new IllegalStateException(e); } }
     static String hash(Path file) throws Exception { MessageDigest digest = MessageDigest.getInstance("SHA-256"); try (InputStream in = Files.newInputStream(file)) { byte[] b = new byte[65536]; for (int n; (n = in.read(b)) >= 0;) digest.update(b,0,n); } return HexFormat.of().formatHex(digest.digest()); }
+    /** Build inputs only: transport/UI/capture updates do not change compiled game data. */
+    static Map<String,Object> buildCompatibility(Map<?,?> manifest) {
+        if (!(manifest.get("files") instanceof Map<?,?> files)) return Map.of();
+        Map<String,String> selected = new TreeMap<>();
+        for (var entry : files.entrySet()) {
+            String name = entry.getKey().toString().replace('\\','/');
+            if (Set.of("editor.jar","dmengine","dmengine.exe","dmengine.pdb","prepare.py","local_extensions.py").contains(name)
+                    || name.matches("classes/com/defold/editor/RemoteGuiMigration(?:\\$.*)?\\.class"))
+                selected.put(name, entry.getValue().toString());
+        }
+        if (!selected.containsKey("editor.jar") || !selected.containsKey("prepare.py")
+                || !(selected.containsKey("dmengine") || selected.containsKey("dmengine.exe"))
+                || !selected.containsKey("classes/com/defold/editor/RemoteGuiMigration.class")) return Map.of();
+        return Map.of("version",1,"platform",str(manifest,"platform"),"files",selected,
+                "nativeBuild",manifest.get("nativeBuild") instanceof Map<?,?> profile ? profile : Map.of());
+    }
+    boolean compatibleBuild(Map<?,?> receipt) {
+        Map<String,Object> current = buildCompatibility(runtime);
+        if (receipt.get("buildCompatibility") instanceof Map<?,?> previous)
+            return !current.isEmpty() && current.equals(previous);
+        if (Objects.equals(receipt.get("runtimeRevision"),runtime.get("revision"))) return true;
+        // Upgrade receipts made before build compatibility was separated from the app
+        // revision. Only a retained, matching packaged manifest can prove equivalence.
+        String previousRevision = str(receipt,"runtimeRevision");
+        if (current.isEmpty() || !previousRevision.matches("[a-f0-9]{16}")) return false;
+        Path previousManifest = runtimeRoot.getParent().resolve("runtime-"+previousRevision).resolve("manifest.json");
+        try {
+            Map<?,?> previous = JSON.readValue(previousManifest.toFile(),Map.class);
+            return previousRevision.equals(str(previous,"revision")) && current.equals(buildCompatibility(previous));
+        } catch (IOException unavailable) { return false; }
+    }
+    static final class EngineArtifactException extends IOException {
+        EngineArtifactException(String message) { super(message); }
+    }
+    static Path symbols(Path engine) { String name = engine.getFileName().toString(); int dot = name.lastIndexOf('.'); return engine.resolveSibling((dot < 0 ? name : name.substring(0,dot)) + ".pdb"); }
+    static Map<String,Object> engineArtifacts(Path engine, Map<?,?> receipt, boolean windows) throws Exception {
+        if (!Files.isRegularFile(engine) || Files.size(engine) == 0) throw new EngineArtifactException("本地构建缺少游戏引擎，请重新构建：" + engine);
+        String engineHash = hash(engine);
+        if (!str(receipt,"engineSha256").isEmpty() && !engineHash.equals(str(receipt,"engineSha256"))) throw new EngineArtifactException("本地构建引擎已损坏或被替换，请重新构建：" + engine);
+        Map<String,Object> hashes = new LinkedHashMap<>(); hashes.put("engineSha256",engineHash);
+        if (windows) {
+            Path pdb = symbols(engine);
+            if (!Files.isRegularFile(pdb) || Files.size(pdb) == 0) throw new EngineArtifactException("Windows 游戏引擎缺少配套调试符号，请重新构建或重新导入：" + pdb);
+            String symbolsHash = hash(pdb);
+            if (!str(receipt,"symbolsSha256").isEmpty() && !symbolsHash.equals(str(receipt,"symbolsSha256"))) throw new EngineArtifactException("Windows 游戏引擎调试符号已损坏或被替换，请重新构建或重新导入：" + pdb);
+            hashes.put("symbolsSha256",symbolsHash);
+        }
+        return hashes;
+    }
+    void verifyBuild(Project p) throws Exception {
+        Path file = p.build.getParent().resolve("receipt.json");
+        Map<String,Object> receipt = JSON.readValue(file.toFile(),Map.class);
+        if (!compatibleBuild(receipt)) throw new EngineArtifactException("本地构建与当前编译器或引擎不兼容，请重新构建或重新导入");
+        Map<String,Object> hashes = engineArtifacts(p.engine,receipt,str(runtime,"platform").endsWith("win32"));
+        // Old receipts already identify the engine. Preserve their build and pin the existing
+        // sidecar; the native launch resolver still checks that its symbols match the PE.
+        Map<String,Object> compatibility = buildCompatibility(runtime);
+        if (!receipt.entrySet().containsAll(hashes.entrySet()) || (!compatibility.isEmpty() && !compatibility.equals(receipt.get("buildCompatibility")))) {
+            receipt.putAll(hashes);
+            if (!compatibility.isEmpty()) receipt.put("buildCompatibility",compatibility);
+            Path temporary = file.resolveSibling("receipt.json.part"); JSON.writeValue(temporary.toFile(),receipt);
+            Files.move(temporary,file,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+        }
+    }
     synchronized List<Project> all() { return new ArrayList<>(projects.values()); }
     synchronized Project project(String id) { Project p = projects.get(id); if (p == null) throw new IllegalArgumentException("项目不存在"); return p; }
     synchronized void save() throws IOException {
@@ -180,7 +280,10 @@ public final class RemoteManager implements AutoCloseable {
         return relative.getName(0).toString().equals(".internal") && relative.getNameCount() > 1 && !relative.getName(1).toString().equals("lib");
     }
     static List<Path> resources(Path root) throws IOException {
-        if (!Files.isRegularFile(root.resolve("game.project"))) throw new IOException("工程目录中没有 game.project");
+        if (!Files.isRegularFile(root.resolve("game.project"))) {
+            if (!Files.exists(root.resolve("game.project"))) throw new NoSuchFileException(root.resolve("game.project").toString());
+            throw new IOException("工程目录中没有 game.project");
+        }
         List<Path> result = new ArrayList<>();
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
@@ -199,25 +302,95 @@ public final class RemoteManager implements AutoCloseable {
     static String stamp(Path root, List<Path> files) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         for (Path file : files) {
-            var attrs = Files.readAttributes(file, BasicFileAttributes.class);
-            digest.update((root.relativize(file) + "\0" + attrs.size() + "\0" + attrs.lastModifiedTime() + "\n").getBytes(StandardCharsets.UTF_8));
+            stampEntry(digest, root.relativize(file), sourceAttributes(file));
         }
         return HexFormat.of().formatHex(digest.digest());
     }
+    private static void stampEntry(MessageDigest digest, Path relative, BasicFileAttributes attrs) {
+        digest.update((relative + "\0" + attrs.size() + "\0" + attrs.lastModifiedTime() + "\0" + attrs.fileKey() + "\n").getBytes(StandardCharsets.UTF_8));
+    }
+    private static BasicFileAttributes sourceAttributes(Path file) throws IOException {
+        BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        if (!attrs.isRegularFile() || attrs.isSymbolicLink()) throw new IOException("暂不支持链接资源：" + file);
+        return attrs;
+    }
+    static final class SourceChangedException extends IOException {
+        SourceChangedException(Path source) { super("资源正在保存，等待稳定版本：" + source); }
+    }
+    interface SnapshotObserver {
+        void check() throws Exception;
+        default void copied(Path source, Path target, int attempt) throws Exception { }
+    }
+    record SourceSnapshot(String sourceStamp, String fingerprint, boolean nativeExtension) { }
+    private record CopiedSource(BasicFileAttributes attributes, String hash) { }
+    private static boolean sameSourceVersion(BasicFileAttributes before, BasicFileAttributes after) {
+        return before.size() == after.size() && before.lastModifiedTime().equals(after.lastModifiedTime())
+                && Objects.equals(before.fileKey(), after.fileKey());
+    }
+    private static CopiedSource copyStable(Path source, Path target, SnapshotObserver observer) throws Exception {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            observer.check();
+            try {
+                BasicFileAttributes before = sourceAttributes(source);
+                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                observer.copied(source, target, attempt);
+                observer.check();
+                String hash = hash(target);
+                BasicFileAttributes after = sourceAttributes(source);
+                if (sameSourceVersion(before, after) && before.size() == Files.size(target)) {
+                    // Windows providers may expose no file key. In that case an atomic save
+                    // can preserve both size and mtime; validate bytes once while freezing,
+                    // without turning the passive source monitor into a full content scan.
+                    if (before.fileKey() != null || hash.equals(hash(source)) && sameSourceVersion(before, sourceAttributes(source)))
+                        return new CopiedSource(before, hash);
+                }
+            } catch (NoSuchFileException changed) {
+                // Editors can replace or briefly remove the source during an atomic save.
+                // Retry this file, without discarding other files already frozen in this snapshot.
+            }
+        }
+        throw new SourceChangedException(source);
+    }
+    static SourceSnapshot copySnapshot(Path root, List<Path> files, Path destination, SnapshotObserver observer) throws Exception {
+        MessageDigest sources = MessageDigest.getInstance("SHA-256"), content = MessageDigest.getInstance("SHA-256");
+        boolean nativeExtension = false;
+        for (Path source : files) {
+            observer.check();
+            Path relative = root.relativize(source), target = destination.resolve(relative).normalize();
+            if (!target.startsWith(destination.normalize())) throw new IOException("资源路径超出构建副本：" + source);
+            Files.createDirectories(target.getParent());
+            CopiedSource copied = copyStable(source, target, observer);
+            stampEntry(sources, relative, copied.attributes());
+            content.update(relative.toString().getBytes(StandardCharsets.UTF_8));
+            content.update(copied.hash().getBytes(StandardCharsets.UTF_8));
+            nativeExtension |= source.getFileName().toString().equals("ext.manifest");
+            if (source.toString().endsWith(".zip") && relative.startsWith(".internal")) {
+                try (ZipFile archive = new ZipFile(target.toFile())) {
+                    nativeExtension |= archive.stream().anyMatch(e -> e.getName().endsWith("/ext.manifest") || e.getName().equals("ext.manifest"));
+                }
+            }
+        }
+        return new SourceSnapshot(HexFormat.of().formatHex(sources.digest()), HexFormat.of().formatHex(content.digest()), nativeExtension);
+    }
+    SnapshotObserver snapshotObserver(Project p, long generation) { return () -> check(p, generation); }
     private void observe() {
         if (closed) return;
         for (Project p : all()) try {
             String next = stamp(p.root, resources(p.root));
-            boolean prepare;
+            boolean prepare, pendingStart;
             synchronized (p) {
                 boolean changed = !p.stamp.isEmpty() && !next.equals(p.stamp);
                 p.stamp = next;
                 p.modified = !p.builtStamp.isEmpty() && !next.equals(p.builtStamp);
                 if (p.worker != null && !p.worker.process.isAlive()) { release(p); p.worker.close(); p.worker = null; p.state = "error"; p.error = "游戏已退出，请查看运行日志"; }
                 if (p.worker == null && !p.busy && p.modified && p.error.isEmpty()) p.state = "dirty";
-                prepare = changed && !p.busy && p.mode.equals("source") && Boolean.TRUE.equals(settings.get("prepare"));
+                pendingStart = p.startAfterBuild && p.errorKind.equals("source_changed");
+                prepare = !p.busy && p.mode.equals("source") && (pendingStart || changed && Boolean.TRUE.equals(settings.get("prepare")));
             }
-            if (prepare) prepare(p, false, false);
+            if (prepare) prepare(p, pendingStart, false);
+        } catch (NoSuchFileException sourceBeingSaved) {
+            // An editor's atomic save can temporarily remove a file while this passive scan runs.
+            // Keep the current build/start state; the next scan observes the finished save.
         } catch (Exception e) { synchronized (p) { p.error = e.getMessage(); if (p.worker == null && !p.busy) p.state = "error"; } }
     }
 
@@ -241,11 +414,13 @@ public final class RemoteManager implements AutoCloseable {
         state.put("hostId",hostId); state.put("computer",computer); state.put("port",gateway.port()); state.put("fingerprint",gateway.fingerprint);
         state.put("addresses",gateway.addresses()); state.put("connectionAddress",gateway.selectedAddress()); state.put("projects",all().stream().map(this::status).toList());
         state.put("devices",devices.values().stream().map(d->Map.of("id",str(d,"id"),"name",str(d,"name"),"pairedAt",str(d,"pairedAt"))).toList());
-        state.put("settings",new LinkedHashMap<>(settings)); state.put("platform",runtime.get("platform")); state.put("runtime",runtime.get("revision")); return state;
+        state.put("settings",new LinkedHashMap<>(settings)); state.put("platform",runtime.get("platform")); state.put("runtime",runtime.get("revision"));
+        state.put("engine",Map.of("directory",engineDirectory,"error",engineError,"nativeCompatible",!Boolean.FALSE.equals(runtime.get("nativeEngineCompatible")))); return state;
     }
 
     synchronized void prepare(Project p, boolean start, boolean importing) {
         if (closed) throw new IllegalArgumentException("管理器正在退出");
+        if (!engineError.isEmpty()) throw new IllegalArgumentException(engineError);
         int limit = ((Number)settings.get("maxSessions")).intValue();
         long active = projects.values().stream().filter(x->x.worker != null || x.startAfterBuild).count();
         synchronized (p) {
@@ -266,9 +441,20 @@ public final class RemoteManager implements AutoCloseable {
                         p.state = p.worker == null ? "ready" : "running"; p.stage = "";
                     }
                 } catch (Exception e) {
-                    synchronized (p) { if (p.generation == generation) { p.error = Objects.toString(e.getMessage(),e.toString()); p.failedStage=p.stage; if(p.errorKind.isEmpty())p.errorKind="project"; p.state = p.worker == null ? "error" : "running"; p.stage = ""; } }
+                    synchronized (p) { if (p.generation == generation) {
+                        p.error = Objects.toString(e.getMessage(),e.toString()); p.failedStage=p.stage;
+                        if (e instanceof SourceChangedException) {
+                            p.errorKind = "source_changed";
+                            p.state = p.worker == null ? "preparing" : "running";
+                            p.stage = "等待资源保存完成";
+                        } else {
+                            if (e instanceof EngineArtifactException) p.builtStamp = ""; // The next explicit retry rebuilds unusable artifacts.
+                            if(p.errorKind.isEmpty())p.errorKind=e instanceof EngineArtifactException ? "environment" : "project";
+                            p.state = p.worker == null ? "error" : "running"; p.stage = "";
+                        }
+                    } }
                 } finally {
-                    synchronized (p) { if (p.generation == generation) { p.busy = false; p.startAfterBuild = false; p.compiler = null; } }
+                    synchronized (p) { if (p.generation == generation) { p.busy = false; if(!p.errorKind.equals("source_changed"))p.startAfterBuild = false; p.compiler = null; } }
                     try { save(); } catch (IOException e) { System.err.println(e); }
                 }
             });
@@ -277,25 +463,27 @@ public final class RemoteManager implements AutoCloseable {
     void check(Project p, long generation) throws IOException { if (closed || generation != p.generation || Thread.currentThread().isInterrupted()) throw new IOException("操作已取消"); }
 
     private void prepareBuild(Project p, boolean importing, long generation) throws Exception {
-        List<Path> files = resources(p.root); String stamp = stamp(p.root, files);
+        List<Path> files; String stamp;
+        try { files = resources(p.root); stamp = stamp(p.root, files); }
+        catch (NoSuchFileException sourceBeingSaved) { throw new SourceChangedException(p.root); }
         synchronized (p) {
-            if (!importing && p.build != null && stamp.equals(p.builtStamp) && Files.isRegularFile(p.build.resolve("build/default/game.projectc"))) return;
+            if (!importing && p.build != null && Files.isRegularFile(p.build.resolve("build/default/game.projectc")) && (p.mode.equals("import") || stamp.equals(p.builtStamp))) {
+                p.stage = "校验本地构建产物";
+                try { verifyBuild(p); return; }
+                catch (EngineArtifactException damaged) {
+                    p.builtStamp = "";
+                    if (p.mode.equals("import")) throw damaged;
+                    // Source builds are reproducible. Repair their invalid cache within this
+                    // connection request; an explicitly imported engine must be re-imported.
+                }
+            }
             p.stage = importing ? "导入本地构建产物" : "准备已保存的资源";
         }
         Path destination = directory.resolve("builds").resolve(UUID.randomUUID().toString()).resolve("project");
         Files.createDirectories(destination);
-        MessageDigest digest = MessageDigest.getInstance("SHA-256"); boolean nativeExtension = false;
-        for (Path file : files) {
-            check(p,generation); Path relative = p.root.relativize(file), target = destination.resolve(relative);
-            Files.createDirectories(target.getParent()); Files.copy(file,target);
-            digest.update(relative.toString().getBytes(StandardCharsets.UTF_8)); digest.update(hash(target).getBytes(StandardCharsets.UTF_8));
-            nativeExtension |= file.getFileName().toString().equals("ext.manifest");
-            if (file.toString().endsWith(".zip") && relative.startsWith(".internal")) {
-                try (ZipFile archive = new ZipFile(file.toFile())) { nativeExtension |= archive.stream().anyMatch(e->e.getName().endsWith("/ext.manifest") || e.getName().equals("ext.manifest")); }
-            }
-        }
-        if (!stamp.equals(stamp(p.root, resources(p.root)))) throw new IOException("资源在准备期间发生变化，请重试");
-        String fingerprint = HexFormat.of().formatHex(digest.digest());
+        SourceSnapshot snapshot = copySnapshot(p.root, files, destination, snapshotObserver(p,generation));
+        stamp = snapshot.sourceStamp(); String fingerprint = snapshot.fingerprint(); boolean nativeExtension = snapshot.nativeExtension();
+        synchronized(p) { check(p,generation); p.stamp=stamp; }
         Path engine = path("engine");
         if (importing) {
             Path compiled = p.root.resolve("build/default");
@@ -305,25 +493,40 @@ public final class RemoteManager implements AutoCloseable {
             Path custom = p.root.resolve("build").resolve(str(runtime,"platform")).resolve(exe);
             if (nativeExtension && !Files.isRegularFile(custom)) throw new IOException("原生扩展工程缺少本机平台的定制引擎：" + custom);
             if (Files.isRegularFile(custom)) {
+                boolean windows = exe.endsWith(".exe");
+                Map<String,Object> sourceHashes = engineArtifacts(custom,Map.of(),windows);
                 engine = destination.getParent().resolve(exe); Files.copy(custom,engine);
+                if (windows) Files.copy(symbols(custom),symbols(engine));
+                engineArtifacts(engine,sourceHashes,windows);
                 if (!exe.endsWith(".exe")) engine.toFile().setExecutable(true);
             }
         } else {
+            if (nativeExtension && Boolean.FALSE.equals(runtime.get("nativeEngineCompatible"))) {
+                synchronized(p) { p.errorKind="environment"; }
+                throw new IOException("所选 Defold 引擎与本地原生扩展 SDK 不匹配，请安装对应版本的本地 SDK 后重新选择引擎目录");
+            }
             engine = automaticBuild(p, destination, generation);
         }
         if (!Files.isRegularFile(destination.resolve("build/default/game.projectc"))) throw new IOException("构建没有产生 game.projectc");
-        Map<String,Object> receipt = Map.of("fingerprint",fingerprint,"sourceStamp",stamp,"runtimeRevision",runtime.get("revision"),"engineSha256",hash(engine),"mode",importing?"import":"source");
+        synchronized(p) { p.stage = "校验本地构建产物"; }
+        Map<String,Object> receipt = new LinkedHashMap<>(Map.of("fingerprint",fingerprint,"sourceStamp",stamp,"runtimeRevision",runtime.get("revision"),"mode",importing?"import":"source"));
+        Map<String,Object> compatibility = buildCompatibility(runtime);
+        if (!compatibility.isEmpty()) receipt.put("buildCompatibility",compatibility);
+        receipt.putAll(engineArtifacts(engine,Map.of(),str(runtime,"platform").endsWith("win32")));
         JSON.writeValue(destination.getParent().resolve("receipt.json").toFile(),receipt);
-        synchronized (p) { check(p,generation); p.build=destination;p.engine=engine;p.builtStamp=stamp;p.stamp=stamp;p.modified=false;p.builtAt=Instant.now().toString();p.mode=importing?"import":"source"; }
+        boolean modified;
+        try { modified = !stamp.equals(stamp(p.root, resources(p.root))); }
+        catch (IOException sourceStillSaving) { modified = true; }
+        synchronized (p) { check(p,generation); p.build=destination;p.engine=engine;p.builtStamp=stamp;p.stamp=stamp;p.modified=modified;p.builtAt=Instant.now().toString();p.mode=importing?"import":"source"; }
     }
 
-    private Path automaticBuild(Project p, Path destination, long generation) throws Exception {
+    Path automaticBuild(Project p, Path destination, long generation) throws Exception {
         Map<?,?> profile = runtime.get("nativeBuild") instanceof Map<?,?> value ? value : Map.of();
         Path python = Path.of(str(profile,"python"));
         if (!Files.isRegularFile(python)) { synchronized(p){p.errorKind="environment";} throw new IOException("运行组件缺少本机构建工具，请更新 Remote Manager 运行包"); }
         Path log = destination.getParent().resolve("build.log"), progress = destination.getParent().resolve("progress.json");
         List<String> command = List.of(python.toString(), "-X", "utf8", runtimeRoot.resolve("prepare.py").toString(),
-                runtimeRoot.resolve("manifest.json").toString(), destination.toString(), directory.resolve("native-cache").toString());
+                gameManifest.toString(), destination.toString(), directory.resolve("native-cache").toString());
         Process compiler;
         synchronized(p) {
             check(p,generation); p.buildLog=log;
@@ -372,7 +575,7 @@ public final class RemoteManager implements AutoCloseable {
         });
     }
     static String tail(Path path) throws IOException { if(!Files.isRegularFile(path))return "";try(var file=new RandomAccessFile(path.toFile(),"r")){file.seek(Math.max(0,file.length()-12000));byte[] b=new byte[(int)(file.length()-file.getFilePointer())];file.readFully(b);return new String(b,StandardCharsets.UTF_8);} }
-    private void launch(Project p, long generation) throws Exception {
+    void launch(Project p, long generation) throws Exception {
         synchronized (p) { check(p,generation); p.stage="启动后台游戏"; }
         Map<String,String> config = new LinkedHashMap<>();String section="";
         for(String line:Files.readAllLines(p.build.resolve("build/default/game.projectc"))){line=line.trim();if(line.startsWith("["))section=line.substring(1,line.indexOf(']'));else if(line.contains("=")){String[] a=line.split("=",2);config.put(section+"."+a[0].trim(),a[1].trim());}}
@@ -398,7 +601,9 @@ public final class RemoteManager implements AutoCloseable {
     Object command(Map<String,Object> request) throws Exception {
         String method=str(request,"method");Map<String,Object> params=(Map<String,Object>)request.getOrDefault("params",Map.of());
         if(method.equals("status"))return status();
+        if(method.equals("engine-directory")){selectEngine(Path.of(str(params,"path")));return status();}
         if(method.equals("pairing"))return gateway.pairing();
+        if(method.equals("pairing-status"))return gateway.pairingStatus();
         if(method.equals("connection-address")){gateway.selectAddress(str(params,"address"));return status();}
         if(method.equals("add")){
             Path root=Path.of(str(params,"path")).toRealPath();if(!Files.isRegularFile(root.resolve("game.project")))throw new IOException("请选择包含 game.project 的目录");

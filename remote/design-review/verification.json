@@ -1,0 +1,59 @@
+{
+  "checks": [
+    "add computer opens one sheet",
+    "scanner zoom and torch feedback",
+    "pairing leads to projects, not game fullscreen",
+    "tab switch preserves search and filter",
+    "build failure retains project context",
+    "visible game controls without four-finger gesture",
+    "quality replaces control sheet",
+    "return keeps game running and preserves search",
+    "three independent game sessions retained",
+    "explicit stop affects selected game only",
+    "dismiss add route returns to computers",
+    "scanner error: 二维码已过期",
+    "scanner error: 这不是 Defold Remote 配对码",
+    "scanner error: 需要使用相机",
+    "scanner error: 相机暂时不可用",
+    "desktop QR placeholder is explicitly non-scannable",
+    "four stable tabs with 48px touch targets",
+    "no page or phone horizontal overflow"
+  ],
+  "layout": {
+    "viewport": {
+      "width": 2560,
+      "height": 1281
+    },
+    "phone": {
+      "x": 1029,
+      "y": 137.546875,
+      "width": 430,
+      "height": 932,
+      "top": 137.546875,
+      "right": 1459,
+      "bottom": 1069.546875,
+      "left": 1029
+    },
+    "tabs": [
+      {
+        "text": "游戏",
+        "height": 55
+      },
+      {
+        "text": "2运行中",
+        "height": 55
+      },
+      {
+        "text": "电脑",
+        "height": 55
+      },
+      {
+        "text": "设置",
+        "height": 55
+      }
+    ],
+    "pageOverflow": false,
+    "phoneOverflow": false
+  },
+  "scope": "Interactive design only; no APK, camera or real networking tested"
+}
