@@ -23,8 +23,8 @@
            [java.net URI URL URLDecoder]
            [java.nio.channels OverlappingFileLockException]
            [java.nio.charset StandardCharsets]
-           [java.nio.file AccessDeniedException CopyOption FileAlreadyExistsException FileSystems FileVisitResult Files LinkOption NotDirectoryException OpenOption Path SimpleFileVisitor StandardCopyOption StandardOpenOption]
-           [java.nio.file.attribute BasicFileAttributes FileAttribute]
+           [java.nio.file AccessDeniedException CopyOption FileAlreadyExistsException FileSystems FileSystemException FileVisitResult Files LinkOption NotDirectoryException OpenOption Path SimpleFileVisitor StandardCopyOption StandardOpenOption]
+           [java.nio.file.attribute BasicFileAttributeView BasicFileAttributes FileAttribute]
            [java.util Map UUID]))
 
 (set! *warn-on-reflection* true)
@@ -443,6 +443,30 @@
 
 (def ^:private copy-defaults {:target :replace})
 
+(defn- copy-file-content! [^Path source ^Path target ^CopyOption/1 options]
+  (let [^LinkOption/1 link-options (make-array LinkOption 0)
+        attributes (Files/readAttributes source BasicFileAttributes link-options)
+        permissions (Files/getPosixFilePermissions source link-options)
+        ^CopyOption/1 fallback-options (into-array CopyOption (filterv #(not= StandardCopyOption/COPY_ATTRIBUTES %) options))]
+    (Files/copy source target fallback-options)
+    (.setTimes ^BasicFileAttributeView (Files/getFileAttributeView target BasicFileAttributeView link-options)
+               (.lastModifiedTime attributes) (.lastAccessTime attributes) nil)
+    (Files/setPosixFilePermissions target permissions)))
+
+(defn- copy-file-path! [^Path source ^Path target ^CopyOption/1 options]
+  (try
+    (Files/copy source target options)
+    (catch FileSystemException error
+      ;; JDK 25's macOS clone path can reject provenance-bearing files even
+      ;; when ordinary copying is allowed. Do not retry other permission errors.
+      (if-not (and (= "Operation not permitted" (.getReason error))
+                   (coll/any? (fn [^StackTraceElement frame]
+                                (and (= "sun.nio.fs.BsdFileSystem" (.getClassName frame))
+                                     (= "clone" (.getMethodName frame))))
+                              (.getStackTrace error)))
+        (throw error)
+        (copy-file-content! source target options)))))
+
 (defn- do-copy-file! [^File src ^File tgt {:keys [target]}]
   (let [src-path (.toPath src)
         tgt-path (.toPath tgt)
@@ -452,7 +476,7 @@
       (do (when-not (= target :keep)
             (delete! tgt))
           (create-parent-directories! tgt)
-          (Files/copy src-path tgt-path copy-options)
+          (copy-file-path! src-path tgt-path copy-options)
           [[src tgt]]))))
 
 (defn copy-file!
@@ -480,7 +504,7 @@
         FileVisitResult/CONTINUE))
     (visitFile [^Path source-file ^BasicFileAttributes _attrs]
       (let [target-file (.resolve target (.relativize source source-file))]
-        (Files/copy source-file target-file replace-copy-options)) ; always replace
+        (copy-file-path! source-file target-file replace-copy-options)) ; always replace
       FileVisitResult/CONTINUE)
     (postVisitDirectory [^Path source-dir ^IOException exc]
       (when-not exc

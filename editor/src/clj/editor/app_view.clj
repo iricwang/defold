@@ -2353,6 +2353,8 @@
    {:label (localization/message "command.file.show-in-desktop")
     :icon "icons/32/Icons_S_14_linkarrow.png"
     :command :file.show-in-desktop}
+   {:label "进入 AI 模式"
+    :command :ai.open}
    {:label (localization/message "command.photocraft.open-local")
     :icon "icons/32/Icons_S_14_linkarrow.png"
     :command :photocraft.open-local}
@@ -3758,6 +3760,24 @@
   (doto (Clipboard/getSystemClipboard)
     (.setContent (doto (ClipboardContent.)
                    (.putString s)))))
+
+(handler/defhandler :ai.open :global
+  (active? [app-view selection selection-context evaluation-context]
+    (when-let [r (context-resource app-view selection selection-context evaluation-context)]
+      (= "gui" (resource/type-ext r))))
+  (run [app-view selection selection-context prefs localization project]
+    (when-let [r (context-resource app-view selection selection-context)]
+      (let [root (.getCanonicalPath (workspace/project-directory (project/workspace project)))
+            path (resource/proj-path r)
+            snapshot ((requiring-resolve 'editor.craft-project/snapshot) {:root root :project project} path)
+            nodes ((requiring-resolve 'editor.craft-project/gui-nodes) project
+                                                                       ((requiring-resolve 'editor.craft-project/ensure-gui-loaded!) project path))
+            selected (set selection)
+            context (assoc snapshot :selectedNodeIds (coll/into-> nodes [] (filter #(contains? selected (:ref %))) (map :id)))]
+        (require 'editor.ai-workbench)
+        (let [tab (open-editor-tab! app-view localization :editor.ai-workbench/chat
+                                    {:root root :context context :project project :prefs prefs :localization localization})]
+          ((requiring-resolve 'editor.ai-workbench/update-context!) tab context))))))
 
 (handler/defhandler :photocraft.open-local :global
   (active? [app-view selection selection-context evaluation-context]

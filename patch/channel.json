@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 106,
-  "version": "1.14.1-patch.106",
+  "revision": 108,
+  "version": "1.14.1-patch.108",
   "repository": "iricwang/defold",
-  "notes": "Local macOS build of remote 58eacb4a3a with preserved MCP fixes; synchronize editor, engine and local extension SDK."
+  "notes": "AI Canvas native-theme UI, shared Codex game project conversation, and macOS asset paste repair."
 }
