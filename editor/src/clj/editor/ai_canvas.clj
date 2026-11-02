@@ -124,12 +124,14 @@
 
 (defn add-flow [canvas]
   (let [n (next-flow-number canvas)
-        a (str "action-" n) r (str "result-" n) s (str "assets-" n)
+        a (if (= :document (:workflow canvas)) (str "card_" (java.util.UUID/randomUUID)) (str "action-" n))
+        r (if (= :document (:workflow canvas)) (str "card_" (java.util.UUID/randomUUID)) (str "result-" n))
+        s (if (= :document (:workflow canvas)) (str "card_" (java.util.UUID/randomUUID)) (str "assets-" n))
         y (+ 500.0 (reduce max 0.0 (mapv :y (:nodes canvas))))]
     (-> canvas
         (update :nodes into [{:id a :kind :action :title (str "设计目标 " n) :x 0.0 :y y}
-                             {:id r :kind :result :title "效果图候选" :x 310.0 :y y :candidates []}
-                             {:id s :kind :assets :title "组件资源" :x 620.0 :y y :assets []}])
+                             {:id r :kind :result :title (if (= :document (:workflow canvas)) "方案候选" "效果图候选") :x 310.0 :y y :candidates []}
+                             {:id s :kind :assets :title (if (= :document (:workflow canvas)) "方案文档" "组件资源") :x 620.0 :y y :assets []}])
         (update :edges into [{:from a :to r} {:from r :to s}])
         (assoc :next-flow-id (inc n) :selected a :viewport {:x 36.0 :y (- 44.0 (* y 0.85)) :zoom 0.85}))))
 
@@ -153,14 +155,14 @@
   (let [result (node-by-id canvas result-id)
         chosen (coll/first-where #(= (:chosen result) (:id %)) (:candidates result))
         target (:to (coll/first-where #(= result-id (:from %)) (:edges canvas)))]
-    (when-not (and (:image-path chosen) (= :assets (:kind (node-by-id canvas target))))
-      (throw (ex-info "先选择效果图候选，并连接 Assets 卡片" {})))
+    (when-not (and (if (= :document (:workflow canvas)) (not (string/blank? (:text chosen))) (:image-path chosen)) (= :assets (:kind (node-by-id canvas target))))
+      (throw (ex-info "先选择候选，并连接 Assets 卡片" {})))
     (-> canvas
-        (update-node target #(assoc (dissoc % :production :production-plan :production-source-key) :assets (if (coll/not-empty (:files chosen))
-                                                                                                             (mapv (fn [file] (cond-> file
-                                                                                                                                (and (:preview chosen) (= (:path file) (:image-path chosen)))
-                                                                                                                                (assoc :preview (:preview chosen)))) (:files chosen))
-                                                                                                             [{:name "设计方案" :text (:text chosen)}])
+        (update-node target #(assoc (dissoc % :production :production-plan :production-source-key :document-output) :assets (if (and (not= :document (:workflow canvas)) (coll/not-empty (:files chosen)))
+                                                                                                                              (mapv (fn [file] (cond-> file
+                                                                                                                                                 (and (:preview chosen) (= (:path file) (:image-path chosen)))
+                                                                                                                                                 (assoc :preview (:preview chosen)))) (:files chosen))
+                                                                                                                              [{:name "设计方案" :text (:text chosen)}])
                                     :source-result result-id :source-candidate (:id chosen)))
         (assoc :selected target))))
 
@@ -288,7 +290,7 @@
                          :action
                          (do
                            (text! (section! "设计目标") (or (:prompt card) "尚未填写目标，可在下方与 AI 对话。"))
-                           (let [binding (section! "GUI 上下文")]
+                           (let [binding (section! (if (= :document (get-in s [:canvas :workflow])) "Canvas 文档" "GUI 上下文"))]
                              (text! binding (get-in s [:context :path]))
                              (when (coll/not-empty (get-in s [:context :selectedNodeIds]))
                                (text! binding (str "选中节点：" (coll/join-to-string "、" (get-in s [:context :selectedNodeIds]))))))
@@ -315,7 +317,7 @@
                                (.add (.getChildren section)
                                      (button (if selected "✓ 当前候选" "选择此候选") (str "ai-detail-choose-" index)
                                              (fn choose-detail [] (choose! (:id card) (:id candidate)))))))
-                           (text! (section! "效果图候选") "等待 AI 生成效果图。"))
+                           (text! (section! (:title card)) "等待 AI 返回候选。"))
                          :assets
                          (do
                            (let [source (section! "采用的资源")]
@@ -326,6 +328,8 @@
                                  (when-let [text (:text asset)] (text! source text))
                                  (when-let [path (or (:source asset) (:path asset))] (text! source path)))
                                (text! source "先从 Result 卡片采用候选。")))
+                           (when-let [path (:document-output card)]
+                             (text! (section! "归档文档") path))
                            (when-let [plan (:production-plan card)]
                              (let [regions (section! (str "拆分计划 · " (count (:regions plan)) " 个组件"))]
                                (doseq [region (:regions plan)]
@@ -520,7 +524,7 @@
                             (case kind
                               :action
                               (let [files (or (coll/not-empty (get-in @state [:sessions id :attachments])) (:references model))
-                                    prompt (label (or (:prompt model) "描述你想生成的界面"))
+                                    prompt (label (or (:prompt model) (if (= :document (:workflow canvas)) "描述游戏定位、核心循环与设计目标" "描述你想生成的界面")))
                                     refs (TilePane. 8.0 8.0)]
                                 (.add (.getStyleClass prompt) "ai-card-prompt")
                                 (.add (.getChildren content) prompt)
@@ -541,7 +545,7 @@
                                 (.add (.getChildren content) refs)
                                 (Tooltip/install card (Tooltip. (str "绑定 " (get-in @state [:context :path]))))
                                 (.add (.getChildren card)
-                                      (primary-button "生成候选" (str "canvas-compose-" id)
+                                      (primary-button (if (= :document (:workflow canvas)) "生成方案" "生成候选") (str "canvas-compose-" id)
                                                       (fn generate-candidates [] (select! id) (focus!) (generate!)))))
                               :result
                               (do
@@ -572,23 +576,27 @@
                                                               (try (change! #(adopt-candidate % id)) (select! (get-in @state [:canvas :selected]))
                                                                    (catch Exception e (report! (.getMessage e))))))]
                                   (.setDisable compare (< (count candidates) 2))
-                                  (.setDisable adopt (nil? (:image-path (coll/first-where #(= chosen (:id %)) candidates))))
+                                  (.setDisable adopt (nil? ((if (= :document (:workflow canvas)) :text :image-path) (coll/first-where #(= chosen (:id %)) candidates))))
                                   (HBox/setHgrow adopt Priority/ALWAYS)
                                   (.addAll (.getChildren actions) ^java.util.Collection (identity [compare adopt]))
                                   (.add (.getChildren card) actions)))
                               :assets
                               (do
                                 (if-not (coll/not-empty assets)
-                                  (.add (.getChildren content) (empty-card "◇" "采用候选后生成组件"))
+                                  (.add (.getChildren content) (empty-card "◇" (if (= :document (:workflow canvas)) "采用方案后归档文档" "采用候选后生成组件")))
                                   (doseq [asset assets]
                                     (when-let [preview (:preview asset)]
                                       (.add (.getChildren content) (image-preview (str preview) 226.0 210.0)))
-                                    (.add (.getChildren content) (label (str "◇ " (:name asset))))))
+                                    (.add (.getChildren content) (label (str "◇ " (:name asset))))
+                                    (when-let [text (:text asset)]
+                                      (.add (.getChildren content) (label (subs text 0 (min 360 (count text))))))))
+                                (when-let [path (:document-output model)]
+                                  (.add (.getChildren content) (label (str "已归档 · " (last (string/split path #"/"))))))
                                 (when-let [output (:production model)]
                                   (.add (.getChildren content) (label (str (:count output) " 个组件 · 已归档")))
                                   (.add (.getChildren content) (button "打开 GUI" (str "canvas-open-gui-" id) #(open-output! output :gui)))
                                   (.add (.getChildren content) (button "打开 Atlas" (str "canvas-open-atlas-" id) #(open-output! output :atlas))))
-                                (.add (.getChildren card) (primary-button "拆分 / 生成 GUI" (str "canvas-produce-" id)
+                                (.add (.getChildren card) (primary-button (if (= :document (:workflow canvas)) (if (:document-output model) "另存文档版本" "归档方案文档") "拆分 / 生成 GUI") (str "canvas-produce-" id)
                                                                           (fn produce-assets [] (select! id) (produce! id))))))
                             (.addAll (.getChildren card) ^java.util.Collection (identity [port-in port-out]))
                             (.add (.getChildren cards) card))))))
@@ -605,7 +613,7 @@
                             (.pseudoClassStateChanged (.getParent choose) (PseudoClass/getPseudoClass "selected") (= chosen (:id candidate)))))
                         (when-let [^Button adopt (.lookup card (str "#canvas-adopt-" id))]
                           (.setText adopt (if chosen (str "采用 " (candidate-label (.indexOf ^java.util.List (mapv :id (:candidates model)) chosen))) "采用候选"))
-                          (.setDisable adopt (nil? (:image-path (coll/first-where #(= chosen (:id %)) (:candidates model)))))))))
+                          (.setDisable adopt (nil? ((if (= :document (get-in @state [:canvas :workflow])) :text :image-path) (coll/first-where #(= chosen (:id %)) (:candidates model)))))))))
                   (.setDisable undo (not (coll/not-empty (:canvas-undo @state))))
                   (.setDisable redo (not (coll/not-empty (:canvas-redo @state))))
                   (draw-links!) (apply-viewport!))

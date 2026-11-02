@@ -59,3 +59,6 @@ specific language governing permissions and limitations under the License.
 .ai-details, .ai-details > .viewport { -fx-background-color: -df-background-light; -fx-background: -df-background-light; }
 .ai-detail-section { -fx-padding: 10; -fx-spacing: 8; -fx-background-color: -df-background; -fx-background-radius: 6; -fx-border-color: -df-component-dark; -fx-border-radius: 6; }
 .ai-detail-section .label { -fx-wrap-text: true; }
+
+.ai-project-browser { -fx-padding: 10 8; -fx-background-color: -df-background-light; }
+.ai-project-browser .tree-view { -fx-background-color: -df-background; -fx-border-color: -df-component-darker; }

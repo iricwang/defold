@@ -22,11 +22,15 @@
             [editor.ai-archive :as archive]
             [editor.ai-canvas :as canvas]
             [editor.ai-composer :as composer]
+            [editor.ai-document :as document]
+            [editor.app-view :as app-view]
             [editor.ai-production :as production]
             [editor.ai-production-view :as production-view]
+            [editor.ai-project-browser :as project-browser]
             [editor.craft-project :as craft-project]
             [editor.defold-project :as project]
             [editor.editor-tab :as editor-tab]
+            [editor.resource :as resource]
             [editor.ui :as ui]
             [editor.view :as view]
             [editor.workspace :as workspace]
@@ -60,14 +64,16 @@
     (string/replace address #"/$" "")))
 
 (defn message-text [text context]
-  (str (case (get-in context [:canvasCard :type])
-         "action" "[效果图] 使用生图工具生成候选图片，不修改游戏文件。\n\n"
-         "result" "[候选评审] 讨论或调整候选图片，不修改游戏文件。\n\n"
-         "assets" "[资源规划] 返回拆分方案，不直接写游戏文件。\n\n"
-         "") text))
+  (str (if (= :document (:workflow context))
+         "[方案创作] 返回文字方案供选择，不生成图片或修改游戏文件。\n\n"
+         (case (get-in context [:canvasCard :type])
+           "action" "[效果图] 使用生图工具生成候选图片，不修改游戏文件。\n\n"
+           "result" "[候选评审] 讨论或调整候选图片，不修改游戏文件。\n\n"
+           "assets" "[资源规划] 返回拆分方案，不直接写游戏文件。\n\n"
+           "")) text))
 
 (defn canvas-metadata [context]
-  {:guiPath (:path context) :cardId (get-in context [:canvasCard :id])
+  {:guiPath (or (:routing-path context) (:path context)) :cardId (get-in context [:canvasCard :id])
    :stage (get-in context [:canvasCard :type]) :selectedNodeIds (vec (:selectedNodeIds context))})
 
 (defn flow-action-id [model id]
@@ -79,7 +85,7 @@
         id))))
 
 (defn- display-message-text [text]
-  (let [text (string/replace (or text "") #"^\[(效果图|候选评审|资源规划)\][^\n]*\n\n" "")]
+  (let [text (string/replace (or text "") #"^\[(效果图|候选评审|资源规划|方案创作)\][^\n]*\n\n" "")]
     (cond
       (string/starts-with? (or text "") "请分析附件中的已选定 GUI 候选图")
       "分析所选候选图，生成组件拆分与命名建议。"
@@ -136,7 +142,12 @@
       (when-not (<= 200 (.statusCode response) 299)
         (when (instance? InputStream (.body response)) (.close ^InputStream (.body response)))
         (throw (ex-info (if (= 409 (.statusCode response))
-                          "游戏主对话暂时忙碌或关联有冲突，请稍后重试或在 Codex 中检查"
+                          (or (when (string? (.body response))
+                                (try
+                                  (let [message (:error (json/read-str (.body response) :key-fn keyword))]
+                                    (when (and (string? message) (<= (count message) 500)) message))
+                                  (catch Exception _ nil)))
+                              "游戏主对话暂时忙碌或关联有冲突，请稍后重试或在 Codex 中检查")
                           (str "Companion 请求失败（" (.statusCode response) "），请检查本机连接")) {})))
       (.body response))))
 
@@ -228,11 +239,26 @@
       (throw (ex-info "候选图片不属于当前流程" {})))
     source))
 
+(defn connection-description [state title]
+  (str "项目已连接 · " title
+       (case (:sidebar-status state)
+         "confirmed" " · Codex 侧栏已归组"
+         "pending" " · Codex 侧栏待同步"
+         "mismatch" " · Codex 侧栏归组不一致"
+         "unavailable" " · Codex 侧栏状态暂不可读"
+         " · Codex 侧栏状态未确认")
+       " · 点击重新检查"))
+
 (defn make-view [^AnchorPane parent {:keys [root context tab project app-view prefs localization]}]
   (let [node (first (g/tx-nodes-added (g/transact {:undoable false} (g/make-node AIWorkbenchView))))
         _ (archive/migrate-legacy! root)
-        saved (archive/load-canvas root (:path context))
-        state (atom (archive/archive-state-files! root {:project-id (:project-id saved) :canvas (or (:canvas saved) (canvas/initial-canvas))
+        doc (when (document/document-path? (:path context)) (document/read-document root (:path context)))
+        _ (when (and doc (not= 1 (:schemaVersion doc))) (throw (ex-info "此 Canvas 版本暂不支持编辑，请使用文本查看器查看" {})))
+        document-state (atom doc)
+        context (cond-> context doc (assoc :workflow :document :routing-path (str "/canvas/" (:id doc))))
+        storage-key (or (:routing-path context) (:path context))
+        saved (archive/load-canvas root storage-key)
+        state (atom (archive/archive-state-files! root {:project-id (:project-id saved) :canvas (if doc (document/model doc (:canvas saved)) (or (:canvas saved) (canvas/initial-canvas)))
                                                         :sessions (or (:sessions saved) {"action-1" (select-keys saved [:thread-id :create-id :pending])})
                                                         :upload-paths (set (:upload-paths saved)) :address (:address saved) :closed false :connected false :context context :busy #{}}))
         client (-> (HttpClient/newBuilder) (.connectTimeout (Duration/ofSeconds 10)) .build)
@@ -246,11 +272,15 @@
         attach (Button. "＋ 图片 / 文档") clear (Button. "清空") send (Button. "发送")
         composer-ui (atom nil)
         right (VBox. 8.0) right-dock (VBox.) split (SplitPane.) pane (VBox.)
-        canvas-ui (atom nil) details-ui (atom nil) displayed (atom nil)
+        browser-ui (atom nil) canvas-ui (atom nil) details-ui (atom nil) displayed (atom nil)
         persist! (fn persist-session []
                    (locking save-lock
                      (when-not (:closed @state)
-                       (archive/save-canvas! root (:path context) @state))))
+                       (when doc
+                         (try (reset! document-state (document/save-document! root (:path context) @document-state (:canvas @state)))
+                              (catch Exception e
+                                (Platform/runLater (fn report-document-conflict [] (.setText status (.getMessage e)))))))
+                       (archive/save-canvas! root storage-key @state))))
         show! (fn show-status [text]
                 (Platform/runLater (fn update-status [] (when-not (:closed @state) (.setText status text)))))
         sync-archive! (fn sync-project-archive []
@@ -269,6 +299,9 @@
                                                        response (.send client req (HttpResponse$BodyHandlers/ofString))]
                                                    (when-not (= 200 (.statusCode response)) (throw (ex-info "CodexCamp 资料上传失败，已保留本地副本" {})))))
                                                (fn download-object [path] (request client base secret path nil (HttpResponse$BodyHandlers/ofByteArray))))]
+                                  (Platform/runLater (fn refresh-project-directory []
+                                                       (when-not (:closed @state)
+                                                         (when-let [refresh! (:refresh! @browser-ui)] (refresh!)))))
                                   (show! (if (= "conflict" (:status result)) "资料存在冲突，两边版本已保留" (str "资料已同步 · 版本 " (:revision result)))))
                                 (catch Exception e (show! (str "资料待同步：" (.getMessage e)))))))))
         save-draft! (fn save-draft []
@@ -322,9 +355,9 @@
                                                                 (fn fetch-artifact [] (request client base secret (str "/api/file?threadId=" (query-value thread-id) "&path=" (query-value (:path reference))) nil (HttpResponse$BodyHandlers/ofInputStream))))
                                      (catch Exception e (show! (str "资料归档失败：" (.getMessage e)))))))
                              snapshot (if (get-in @state [:sessions id :shared-thread])
-                                        (card-snapshot snapshot (:path context) id) snapshot)
+                                        (card-snapshot snapshot storage-key id) snapshot)
                              candidates (cond->> (canvas/snapshot-candidates snapshot thread-id)
-                                          (contains? #{:action :result} (:kind (canvas/node-by-id (:canvas @state) id)))
+                                          (and (not doc) (contains? #{:action :result} (:kind (canvas/node-by-id (:canvas @state) id))))
                                           (filterv :image-path))
                              candidates
                              (mapv (fn cache-preview [candidate]
@@ -387,10 +420,12 @@
                                 result (api client base secret "/api/project/ensure"
                                             (cond-> {:cwd root :name (or (get (g/node-value project :settings) ["project" "title"])
                                                                          (.getName (io/file root)))
-                                                     :taskKey (digest/string->sha256-hex (str (:path context) "/" owner))}
+                                                     :taskKey (digest/string->sha256-hex (str storage-key "/" owner))}
                                               preferred (assoc :threadId preferred)))
                                 thread-id (get-in result [:thread :id])]
-                            (swap! state assoc :project-id (get-in result [:project :id]))
+                            (swap! state assoc :project-id (get-in result [:project :id])
+                                   :sidebar-status (or (:sidebarStatus result)
+                                                       (when (:sidebarConfirmed result) "confirmed")))
                             (archive/ensure-project! root (get-in result [:project :id]))
                             (swap! state update :sessions
                                    (fn bind-flow-task [sessions]
@@ -518,7 +553,16 @@
     (.add (.getStylesheets parent) (str (io/resource "ai-canvas.css")))
     (reset! composer-ui (composer/make-composer input attach clear send attachment-label status
                                                 (fn remember-collapse [collapsed] (swap! state assoc :composer-collapsed collapsed))))
-    (reset! canvas-ui (canvas/make-canvas state change! select! #((:expand! @composer-ui)) show! produce! open-output! #(.fire attach) #(.fire send)))
+    (reset! canvas-ui (canvas/make-canvas state change! select! #((:expand! @composer-ui)) show! (fn produce-card [id]
+                                                                                                   (if-not doc (produce! id)
+                                                                                                           (try
+                                                                                                             (let [path (document/export-document! root (:path context) (canvas/node-by-id (:canvas @state) id))]
+                                                                                                               (swap! state update :canvas canvas/update-node id (fn mark-export [node] (assoc node :document-output path)))
+                                                                                                               (persist!)
+                                                                                                               ((:render! @canvas-ui))
+                                                                                                               ((:refresh! @browser-ui))
+                                                                                                               (show! (str "文档已归档：" path)))
+                                                                                                             (catch Exception e (show! (.getMessage e)))))) open-output! #(.fire attach) #(.fire send)))
     (.setTop ^BorderPane (:root @canvas-ui) nil)
     (.setId sync-button "ai-sync-archive")
     (.setOnAction sync-button (reify EventHandler (handle [_ _] (save-draft!) (persist!) (run-task! state sync-archive!))))
@@ -548,8 +592,29 @@
     (.setStyle right "-fx-padding: 8; -fx-background-color: -df-background-light;")
     (.setMinWidth right 290.0) (.setPrefWidth right 340.0)
     (VBox/setVgrow (:root @details-ui) Priority/ALWAYS)
-    (.addAll (.getItems split) ^java.util.Collection (identity [(:root @canvas-ui) right]))
-    (.setDividerPositions split (double-array [0.73]))
+    (reset! browser-ui
+            (project-browser/make-browser
+              root
+              (fn open-project-document [path]
+                (if (document/document-path? path)
+                  (app-view/open-editor-tab! app-view localization ::chat
+                                             {:root root :context {:path path} :project project :prefs prefs :localization localization})
+                  (let [workspace (project/workspace project)
+                        file (craft-project/resource-file root path)]
+                    (when-not (workspace/find-resource workspace path)
+                      (craft-project/safe-refresh! project (coll/into-> (archive/manifest root) #{"/ai-workspace/sync.json"}
+                                                             (map #(str "/" (:path %))))))
+                    (if-let [asset (workspace/find-resource workspace path)]
+                      (if (resource/editor-openable-resource? asset)
+                        (craft-project/open-resource! {:root root :project project :app-view app-view :prefs prefs :localization localization} path)
+                        (ui/open-file file show!))
+                      (ui/open-file file show!)))))
+              (fn project-library-changed [] (run-task! state sync-archive!))
+              show!))
+    (.addAll (.getItems split) ^java.util.Collection (identity [(:root @browser-ui) (:root @canvas-ui) right]))
+    (SplitPane/setResizableWithParent (:root @browser-ui) false)
+    (SplitPane/setResizableWithParent right false)
+    (.setDividerPositions split (double-array [0.18 0.76]))
     (.addAll (.getChildren pane) ^java.util.Collection (identity [(:toolbar @canvas-ui) split]))
     (VBox/setVgrow split Priority/ALWAYS)
     (doseq [setter [#(AnchorPane/setTopAnchor pane %) #(AnchorPane/setRightAnchor pane %) #(AnchorPane/setBottomAnchor pane %) #(AnchorPane/setLeftAnchor pane %)]] (setter 0.0))
@@ -581,17 +646,17 @@
                             visible (and (not (string/blank? text))
                                          (coll/not-any? #(string/starts-with? text %) ["Codex 已连接" "正在重新连接" "正在连接" "已在 Defold"]))]
                         (.setVisible status visible) (.setManaged status visible)
-                        (.setText connection-tip (if (:connected @state) (str "项目已连接 · " (or (get (g/node-value project :settings) ["project" "title"]) (.getName (io/file root))) " · 点击重新连接") text))))))
+                        (.setText connection-tip (if (:connected @state) (connection-description @state (or (get (g/node-value project :settings) ["project" "title"]) (.getName (io/file root)))) text))))))
     (.setVisible status false) (.setManaged status false)
     (add-watch state ::connection-ui
                (fn connection-state-changed [_ _ before after]
-                 (when (not= (select-keys before [:connected :connection-id]) (select-keys after [:connected :connection-id]))
+                 (when (not= (select-keys before [:connected :connection-id :sidebar-status]) (select-keys after [:connected :connection-id :sidebar-status]))
                    (Platform/runLater
                      (fn display-connection-state []
                        (when-not (:closed @state)
                          (.pseudoClassStateChanged connect (PseudoClass/getPseudoClass "connected") (boolean (:connected @state)))
                          (.pseudoClassStateChanged connect (PseudoClass/getPseudoClass "connecting") (boolean (and (:connection-id @state) (not (:connected @state)))))
-                         (.setText connection-tip (if (:connected @state) (str "项目已连接 · " (or (get (g/node-value project :settings) ["project" "title"]) (.getName (io/file root))) " · 点击重新连接") "连接本机 Codex · 点击重试"))))))))
+                         (.setText connection-tip (if (:connected @state) (connection-description @state (or (get (g/node-value project :settings) ["project" "title"]) (.getName (io/file root)))) "连接本机 Codex · 点击重试"))))))))
     (.setOnAction connect
                   (reify EventHandler
                     (handle [_ _]
@@ -689,25 +754,47 @@
                      (remove-watch state ::card-details)
                      (locking save-lock
                        (swap! state assoc :closed true)
-                       (archive/save-canvas! root (:path context) @state))
+                       (when doc
+                         (try (reset! document-state (document/save-document! root (:path context) @document-state (:canvas @state)))
+                              (catch Exception e
+                                (Platform/runLater (fn report-document-conflict [] (.setText status (.getMessage e)))))))
+                       (archive/save-canvas! root storage-key @state))
                      (doseq [task (:tasks @state)] (future-cancel task))
                      (doseq [window (:production-windows @state)] (.close ^javafx.stage.Stage window))
                      (when-let [stream (:stream @state)] (.close ^InputStream stream))))
     (persist!)
     (doseq [card (get-in @state [:canvas :nodes]) :when (:production card)]
       (archive/save-delivery! root (:production card)))
+    (when doc
+      (.setText ^Label (.lookup ^Node (:root @composer-ui) "#ai-composer-heading") "✦  方案与玩法创作"))
     (display!)
     ((:set-expanded! @composer-ui) (not (:composer-collapsed saved)))
     (Platform/runLater (fn connect-local-on-open [] (when-not (:closed @state) (.fire connect))))
     node))
 
+(defn- make-readonly-view [^AnchorPane parent {:keys [root context]}]
+  (let [node (first (g/tx-nodes-added (g/transact {:undoable false} (g/make-node AIWorkbenchView))))
+        content (doto (TextArea. (slurp (craft-project/resource-file root (:path context))))
+                  (.setEditable false) (.setWrapText true))
+        pane (VBox. 8.0)]
+    (.addAll (.getChildren pane) ^java.util.Collection
+             (identity [(Label. "此 Canvas 使用较新格式，当前只读；原文件保持不变。") content]))
+    (VBox/setVgrow content Priority/ALWAYS)
+    (doseq [setter [#(AnchorPane/setTopAnchor pane %) #(AnchorPane/setRightAnchor pane %) #(AnchorPane/setBottomAnchor pane %) #(AnchorPane/setLeftAnchor pane %)]] (setter 0.0))
+    (.add (.getChildren parent) pane)
+    (ui/user-data! parent ::close (fn close-readonly []))
+    node))
+
 (editor-tab/register-type! ::chat
   {:make-tab-spec-fn (fn tab-spec [{:keys [root context]}]
-                       {:instance-key [::chat root (:path context)]
-                        :title (str "AI Canvas · " (:path context))
+                       {:instance-key [::chat root (if (document/document-path? (:path context)) (:id (document/read-document root (:path context))) (:path context))]
+                        :title (str "AI Canvas · " (if (document/document-path? (:path context)) (:title (document/read-document root (:path context))) (:path context)))
                         :tooltip "Action → Result → Assets · Companion / Codex"
                         :make-view-fn (fn create-view [parent opts]
-                                        (let [node (make-view parent opts)]
+                                        (let [path (get-in opts [:context :path])
+                                              readonly (and (document/document-path? path)
+                                                            (not= 1 (:schemaVersion (document/read-document (:root opts) path))))
+                                              node (if readonly (make-readonly-view parent opts) (make-view parent opts))]
                                           (ui/on-closed! (:tab opts) (fn dispose-client [_] ((ui/user-data parent ::close))))
                                           node))})})
 

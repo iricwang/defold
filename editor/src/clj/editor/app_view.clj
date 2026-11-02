@@ -3762,22 +3762,29 @@
                    (.putString s)))))
 
 (handler/defhandler :ai.open :global
-  (active? [app-view selection selection-context evaluation-context]
-    (when-let [r (context-resource app-view selection selection-context evaluation-context)]
-      (= "gui" (resource/type-ext r))))
+  (active? [project] (boolean project))
   (run [app-view selection selection-context prefs localization project]
-    (when-let [r (context-resource app-view selection selection-context)]
-      (let [root (.getCanonicalPath (workspace/project-directory (project/workspace project)))
-            path (resource/proj-path r)
-            snapshot ((requiring-resolve 'editor.craft-project/snapshot) {:root root :project project} path)
-            nodes ((requiring-resolve 'editor.craft-project/gui-nodes) project
-                                                                       ((requiring-resolve 'editor.craft-project/ensure-gui-loaded!) project path))
-            selected (set selection)
-            context (assoc snapshot :selectedNodeIds (coll/into-> nodes [] (filter #(contains? selected (:ref %))) (map :id)))]
-        (require 'editor.ai-workbench)
-        (let [tab (open-editor-tab! app-view localization :editor.ai-workbench/chat
-                                    {:root root :context context :project project :prefs prefs :localization localization})]
-          ((requiring-resolve 'editor.ai-workbench/update-context!) tab context))))))
+    (require 'editor.ai-workbench)
+    (let [r (context-resource app-view selection selection-context)
+          root (.getCanonicalPath (workspace/project-directory (project/workspace project)))
+          context (if (= "gui" (some-> r resource/type-ext))
+                    (let [path (resource/proj-path r)
+                          snapshot ((requiring-resolve 'editor.craft-project/snapshot) {:root root :project project} path)
+                          nodes ((requiring-resolve 'editor.craft-project/gui-nodes) project
+                                                                                     ((requiring-resolve 'editor.craft-project/ensure-gui-loaded!) project path))
+                          selected (set selection)]
+                      (assoc snapshot :selectedNodeIds (coll/into-> nodes [] (filter #(contains? selected (:ref %))) (map :id))))
+                    (let [path (if (= "aicanvas" (some-> r resource/type-ext))
+                                 (resource/proj-path r)
+                                 "/ai-workspace/library/01-concept/项目规划.aicanvas")]
+                      ((requiring-resolve 'editor.ai-project-browser/ensure-library!) root)
+                      (when-not (.isFile (io/file root (subs path 1)))
+                        ((requiring-resolve 'editor.ai-document/create-document!) root "ai-workspace/library/01-concept" "项目规划"))
+                      {:path path}))
+          tab (open-editor-tab! app-view localization :editor.ai-workbench/chat
+                                {:root root :context context :project project :prefs prefs :localization localization})]
+      (when (= "gui" (some-> r resource/type-ext))
+        ((requiring-resolve 'editor.ai-workbench/update-context!) tab context)))))
 
 (handler/defhandler :photocraft.open-local :global
   (active? [app-view selection selection-context evaluation-context]

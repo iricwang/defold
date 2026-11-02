@@ -160,3 +160,10 @@
         (spit archived "corrupt bytes")
         (is (thrown? Exception (ai/production-source root context model "assets-1" asset))))
       (finally (fs/delete-directory! root)))))
+
+;; A working task connection must not claim an unconfirmed desktop grouping.
+(deftest sidebar-status-description-test
+  (is (.contains (editor.ai-workbench/connection-description {:sidebar-status "pending"} "Game") "侧栏待同步"))
+  (is (.contains (editor.ai-workbench/connection-description {:sidebar-status "confirmed"} "Game") "侧栏已归组"))
+  (is (.contains (editor.ai-workbench/connection-description {:sidebar-status "mismatch"} "Game") "归组不一致"))
+  (is (.contains (editor.ai-workbench/connection-description {} "Game") "状态未确认")))

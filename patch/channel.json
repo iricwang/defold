@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 108,
-  "version": "1.14.1-patch.108",
+  "revision": 109,
+  "version": "1.14.1-patch.109",
   "repository": "iricwang/defold",
-  "notes": "AI Canvas native-theme UI, shared Codex game project conversation, and macOS asset paste repair."
+  "notes": "AI Canvas card focus and details, middle-button pan, deletion and undo/redo; validate archived candidate sources and GUI production."
 }
