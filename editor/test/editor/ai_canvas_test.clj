@@ -16,8 +16,49 @@
 (ns editor.ai-canvas-test
   (:require [clojure.test :refer [deftest is]]
             [editor.ai-canvas :as canvas]
+            [editor.ai-graph :as graph]
+            [editor.ai-results :as results]
+            [editor.ai-roles :as roles]
             [editor.ai-workbench :as workbench]
             [editor.ui :as ui]))
+
+;; Migration preserves explicit GUI bindings and creates one terminal card.
+(deftest gui-delivery-card-test
+  (let [base (assoc (canvas/initial-canvas) :workflow :document :template "gui")
+        output {:gui "/ui/generated.gui" :atlas "/ui/generated.atlas"}
+        delivered (canvas/deliver-gui base "assets-1" output)
+        id "gui_assets-1"
+        bound (canvas/update-node delivered id #(assoc % :gui-resource "/game/final.gui"))]
+    (is (= [:gui] (get graph/successors :assets)))
+    (is (= [] (get graph/successors :gui)))
+    (is (= 4 (count (:nodes delivered))))
+    (is (= (:gui output) (:gui-resource (canvas/node-by-id delivered id))))
+    (is (= bound (canvas/migrate-gui-cards bound)))
+    (is (= "/game/final.gui" (:gui-resource (canvas/node-by-id (canvas/migrate-gui-cards bound) id))))
+    (is (thrown? Exception (canvas/connect-nodes delivered "result-1" id)))
+    (is (thrown? Exception (canvas/connect-nodes delivered id "assets-1")))
+    (is (= 3 (count (:nodes (canvas/migrate-gui-cards (assoc base :template "concept"))))))))
+
+;; Component sheets stay on Assets, including replay and legacy adoption.
+(deftest gui-candidate-purpose-test
+  (let [sheet {:id "sheet" :image-path "sheet.png" :preview "file:/sheet.png"
+               :files [{:name "loot_components_v2.png" :path "sheet.png"}]}
+        screen {:id "screen" :image-path "screen.png" :files [{:name "loot_screen.png" :path "screen.png"}]}
+        base (assoc (canvas/initial-canvas) :workflow :document :template "gui")
+        model (-> base (canvas/merge-candidates "action-1" [sheet screen])
+                  (canvas/update-node "result-1" #(assoc % :chosen "screen"))
+                  (canvas/adopt-candidate "result-1")
+                  (canvas/deliver-gui "assets-1" {:gui "/screen.gui"}))
+        result (canvas/node-by-id model "result-1")
+        chosen (canvas/adopt-components model "assets-1" sheet)]
+    (is (= [screen] (:candidates result)))
+    (is (= [sheet] (:asset-candidates result)))
+    (is (= model (canvas/merge-candidates model "action-1" [sheet screen])))
+    (is (= "sheet" (:source-candidate (canvas/node-by-id chosen "assets-1"))))
+    (is (= "screen" (:chosen (canvas/node-by-id chosen "result-1"))))
+    (is (:gui-stale (canvas/node-by-id chosen "gui_assets-1")))
+    (is (:gui-stale (canvas/node-by-id (canvas/adopt-candidate model "result-1") "gui_assets-1")))
+    (is (= [sheet] (:asset-candidates (canvas/node-by-id (canvas/merge-candidates base "assets-1" [sheet]) "result-1"))))))
 
 ;; Connections must remain directional and unambiguous for reply attribution.
 (deftest linear-connections-test
@@ -45,7 +86,8 @@
                   (canvas/update-node "result-1" #(assoc % :chosen "a"))
                   (canvas/adopt-candidate "result-1"))
         replay (canvas/merge-candidates model "action-1" [a b])]
-    (is (= 2 (count (:candidates (canvas/node-by-id replay "result-1")))))
+    (is (= 2 (count (results/cards replay "action-1"))))
+    (is (= 1 (count (:candidates (canvas/node-by-id replay "result-1")))))
     (is (= "a" (:chosen (canvas/node-by-id replay "result-1"))))
     (is (= (:files a) (:assets (canvas/node-by-id replay "assets-1"))))
     (is (= "a" (:source-candidate (canvas/node-by-id replay "assets-1"))))
@@ -124,15 +166,18 @@
   (ui/run-now
     (let [file (java.io.File/createTempFile "canvas-preview" ".png")
           _ (javax.imageio.ImageIO/write (java.awt.image.BufferedImage. 2 2 java.awt.image.BufferedImage/TYPE_INT_ARGB) "png" file)
-          state (atom {:canvas (canvas/update-node (canvas/initial-canvas) "result-1"
-                                                   #(assoc % :candidates [{:id "a" :text "Candidate" :image-path "a.png" :preview (str (.toURI file))}]))})
+          staff [(roles/new-role "planning" #{})]
+          model (canvas/add-person (canvas/update-node (canvas/initial-canvas) "action-1" #(assoc % :prompt "输出方案")))
+          model (canvas/update-node model (:selected model) #(roles/assign-staff % (first staff)))
+          state (atom {:staff staff :canvas (canvas/update-node model "result-1"
+                                                                #(assoc % :candidates [{:id "a" :text "Candidate" :image-path "a.png" :preview (str (.toURI file))}] :chosen "a"))})
           view-ref (atom nil)
           change! (fn change-test-canvas [f] (swap! state canvas/change-state f))
           select! (fn select-test-card [id]
                     (change! #(assoc % :selected id))
                     ((:render! @view-ref)))
           view (canvas/make-canvas state change! select! (fn focus-test []) (fn report-test [_])
-                                   (fn produce-test [_]) (fn open-test [_ _]) (fn attach-test []) (fn generate-test []))
+                                   (fn produce-test [_]) (fn open-test [_ _]) (fn gui-test [_ _ _]) (fn attach-test []) (constantly staff) (fn assign-test [_ _]) (fn work-test [_ _ _]))
           root ^javafx.scene.layout.BorderPane (:root view)]
       (try
         (reset! view-ref view)
@@ -140,11 +185,9 @@
         (.resize root 1000.0 800.0)
         (.applyCss root) (.layout root)
         (let [card (.lookup root "#canvas-card-result-1")
-              image (.lookup card "ImageView")
-              choose ^javafx.scene.control.Button (.lookup card "#canvas-candidate-result-1-0")]
+              image (.lookup card "ImageView")]
           (is (some? image))
           (select! "result-1")
-          (.fire choose)
           (is (identical? card (.lookup root "#canvas-card-result-1")))
           (is (identical? image (.lookup card "ImageView")))
           (javafx.event.Event/fireEvent image
@@ -180,7 +223,7 @@
           change! (fn change-controls [f] (swap! state canvas/change-state f))
           select! (fn select-controls [id] (change! #(assoc % :selected id)) ((:render! @view-ref)))
           view (canvas/make-canvas state change! select! (fn focus-controls []) (fn report-controls [_])
-                                   (fn produce-controls [_]) (fn open-controls [_ _]) (fn attach-controls []) (fn generate-controls []))
+                                   (fn produce-controls [_]) (fn open-controls [_ _]) (fn gui-test [_ _ _]) (fn attach-controls []) (constantly []) (fn assign-controls [_ _]) (fn work-controls [_ _ _]))
           root ^javafx.scene.layout.BorderPane (:root view)
           stage (javafx.stage.Stage.)
           mouse! (fn fire-mouse [target kind button x y]
@@ -219,7 +262,7 @@
           (javafx.event.Event/fireEvent (.lookup root "#canvas-card-action-1")
                                         (javafx.scene.input.ContextMenuEvent. javafx.scene.input.ContextMenuEvent/CONTEXT_MENU_REQUESTED 20.0 20.0 100.0 100.0 false nil))
           (let [menu ^javafx.scene.control.ContextMenu (first (filterv #(instance? javafx.scene.control.ContextMenu %) (vec (javafx.stage.Window/getWindows))))
-                delete ^javafx.scene.control.MenuItem (.get (.getItems menu) 1)]
+                delete ^javafx.scene.control.MenuItem (first (filterv #(= "canvas-delete-action-1" (.getId ^javafx.scene.control.MenuItem %)) (.getItems menu)))]
             (is (.isShowing menu))
             (swap! state assoc :busy #{"action-1"})
             (.fire delete)
@@ -228,13 +271,130 @@
             (.fire delete)
             (.hide menu)
             (is (nil? (.lookup root "#canvas-card-action-1")))
-            (is (= "result-1" (get-in @state [:canvas :selected])))
+            (is (= "assets-1" (get-in @state [:canvas :selected])))
             (is (= "keep" (get-in @state [:sessions "action-1" :draft])))))
         (change! #(reduce canvas/remove-node % (mapv :id (:nodes %))))
         ((:render! view))
         ((:fit! view))
         (is (= [] (get-in @state [:canvas :nodes])))
         (finally (.close stage))))))
+
+;; Right-click creates one Person; invalid setup blocks pins and task buttons.
+(deftest person-card-controls-test
+  (ui/run-now
+    (let [staff [(roles/new-role "planning" #{})]
+          state (atom {:canvas (canvas/initial-canvas) :sessions {} :staff staff})
+          view-ref (atom nil)
+          work (atom nil)
+          change! (fn change-person [f] (swap! state canvas/change-state f))
+          select! (fn select-person [id] (change! #(assoc % :selected id)) ((:render! @view-ref)))
+          view (canvas/make-canvas state change! select! (fn focus-person []) (fn report-person [_])
+                                   (fn produce-person [_]) (fn open-person [_ _]) (fn gui-test [_ _ _]) (fn attach-person [])
+                                   (constantly staff) (fn assign-person [_ _]) (fn work-person [op id fields] (reset! work [op id fields])))
+          root ^javafx.scene.layout.BorderPane (:root view)
+          stage (javafx.stage.Stage.)]
+      (reset! view-ref view)
+      (try
+        (.setScene stage (javafx.scene.Scene. root 1000.0 800.0))
+        (.show stage)
+        (javafx.event.Event/fireEvent (.lookup root "#ai-canvas-viewport")
+                                      (javafx.scene.input.ContextMenuEvent. javafx.scene.input.ContextMenuEvent/CONTEXT_MENU_REQUESTED 80.0 650.0 100.0 650.0 false nil))
+        (let [menu ^javafx.scene.control.ContextMenu (first (filterv #(instance? javafx.scene.control.ContextMenu %) (vec (javafx.stage.Window/getWindows))))]
+          (is (.isShowing menu))
+          (javafx.event.Event/fireEvent root
+                                        (javafx.scene.input.MouseEvent. javafx.scene.input.MouseEvent/MOUSE_PRESSED
+                                                                        10.0 10.0 10.0 10.0 javafx.scene.input.MouseButton/PRIMARY 1
+                                                                        false false false false true false false false false true nil))
+          (is (not (.isShowing menu)))
+          (is (= 3 (count (get-in @state [:canvas :nodes])))))
+        (javafx.event.Event/fireEvent (.lookup root "#ai-canvas-viewport")
+                                      (javafx.scene.input.ContextMenuEvent. javafx.scene.input.ContextMenuEvent/CONTEXT_MENU_REQUESTED 80.0 650.0 100.0 650.0 false nil))
+        (let [menu ^javafx.scene.control.ContextMenu (first (filterv #(instance? javafx.scene.control.ContextMenu %) (vec (javafx.stage.Window/getWindows))))]
+          (.fire ^javafx.scene.control.MenuItem (first (filterv #(= "canvas-create-person" (.getId ^javafx.scene.control.MenuItem %)) (vec (.getItems menu)))))
+          (.hide menu))
+        (.applyCss root) (.layout root)
+        (let [person (get-in @state [:canvas :selected])
+              viewport (get-in @state [:canvas :viewport])
+              model (canvas/node-by-id (:canvas @state) person)]
+          (is (< 0.0 (+ (:x viewport) (* (:x model) (:zoom viewport))) 1000.0))
+          (is (some? (.lookup root (str "#canvas-staff-" person))))
+          (is (.isDisabled ^javafx.scene.control.Button (.lookup root (str "#canvas-out-" person))))
+          (is (.isDisabled ^javafx.scene.control.Button (.lookup root (str "#canvas-run-person-" person))))
+          (is (= 4 (count (get-in @state [:canvas :nodes]))))
+          (is (= [] (filterv #(= person (:from %)) (get-in @state [:canvas :edges]))))
+          (change! #(-> % (canvas/update-node person (fn assign [card] (roles/assign-staff card (first staff))))
+                        (canvas/update-node "action-1" (fn describe [card] (assoc card :prompt "设计任务")))
+                        (graph/connect staff person "action-1")))
+          ((:render! view)) (.applyCss root) (.layout root)
+          (.fire ^javafx.scene.control.Button (.lookup root (str "#canvas-run-person-" person)))
+          (is (= [:run person nil] @work))
+          (change! canvas/add-flow)
+          ((:render! view))
+          (let [action (get-in @state [:canvas :selected])]
+            (change! #(canvas/connect-nodes % person action))
+            ((:render! view))
+            (.applyCss root) (.layout root)
+            (is (some? (.lookup root (str "#person-task-" action)))))
+          (swap! state assoc-in [:sessions "action-1" :execution] {:status "running" :turn-id "t"})
+          ((:render! view))
+          (.applyCss root) (.layout root)
+          (is (= "执行中" (.getText ^javafx.scene.control.Label (.lookup root "#canvas-status-action-1"))))
+          (is (nil? (.lookup root "#canvas-compose-action-1")))
+          (is (some? (.lookup (.lookup root "#canvas-card-action-1") "ProgressBar"))))
+        (finally (.close stage))))))
+
+;; Orphan Actions cannot assign staff or run, and disable downstream controls.
+;; A valid Person connection restores them; removing it blocks them again.
+(deftest person-required-controls-test
+  (ui/run-now
+    (let [staff [(roles/new-role "planning" #{})]
+          model (-> (canvas/initial-canvas)
+                    (assoc :workflow :document :template "gui")
+                    (canvas/update-node "action-1" #(-> % (assoc :prompt "输出界面") (roles/assign-staff (first staff))))
+                    (canvas/update-node "result-1" #(assoc % :candidates [{:id "candidate" :text "方案" :image-path "screen.png"}] :chosen "candidate"))
+                    (canvas/deliver-gui "assets-1" {:gui "/screen.gui"})
+                    (assoc :selected "action-1"))
+          state (atom {:canvas model :staff staff})
+          change! (fn change-gated-canvas [f] (swap! state canvas/change-state f))
+          view (canvas/make-canvas state change! (fn select-gated-card [id] (change! #(assoc % :selected id)))
+                                   (fn focus-gated-card []) (fn report-gated-card [_])
+                                   (fn produce-gated-card [_]) (fn open-gated-card [_ _]) (fn gui-gated-card [_ _ _])
+                                   (fn attach-gated-card []) (constantly staff) (fn assign-gated-card [_ _]) (fn work-gated-card [_ _ _]))
+          details (canvas/make-details state (fn choose-gated-card [_ _]) (fn open-gated-details [_ _])
+                                       (fn gui-gated-details [_ _ _]) (fn save-gated-role [_ _]) (constantly staff)
+                                       (fn assign-gated-details [_ _]) (fn report-gated-details [_]) (fn work-gated-details [_ _ _]))
+          root ^javafx.scene.layout.BorderPane (:root view)
+          detail-root ^javafx.scene.layout.BorderPane (:root details)]
+      (javafx.scene.Scene. root 1000.0 800.0)
+      (javafx.scene.Scene. detail-root 360.0 800.0)
+      (.applyCss root) (.layout root)
+      ((:refresh! details))
+      (.applyCss detail-root) (.layout detail-root)
+      (is (nil? (.lookup root "#canvas-staff-action-1")))
+      (is (nil? (.lookup root "#canvas-compose-action-1")))
+      (is (nil? (.lookup detail-root "#ai-detail-staff-action-1")))
+      (is (nil? (.lookup detail-root "#action-task-run")))
+      (is (not (.isDisabled (.lookup detail-root "#action-task-save"))))
+      (doseq [id ["canvas-out-action-1" "canvas-confirm-result-result-1"
+                  "canvas-produce-assets-1" "canvas-gui-open-gui_assets-1" "canvas-gui-refresh-gui_assets-1"]]
+        (is (.isDisabled (.lookup root (str "#" id)))))
+      (doseq [id ["action-1" "result-1" "assets-1" "gui_assets-1"]]
+        (is (= 0.55 (.getOpacity (.lookup root (str "#canvas-card-" id))))))
+      (change! #(let [next (canvas/add-person (assoc % :selected "action-1"))
+                      person (:selected next)]
+                  (-> next (canvas/update-node person (fn configure-person [card] (roles/assign-staff card (first staff))))
+                      (graph/connect staff person "action-1"))))
+      ((:render! view))
+      (.applyCss root) (.layout root)
+      (is (.isDisabled (.lookup root "#canvas-out-action-1")))
+      (is (not (.isDisabled (.lookup root "#canvas-confirm-result-result-1"))))
+      (is (not (.isDisabled (.lookup root "#canvas-gui-open-gui_assets-1"))))
+      (let [person (get-in @state [:canvas :selected])]
+        (is (not (.isDisabled (.lookup root (str "#canvas-run-person-" person)))))
+        (change! #(canvas/remove-node % person)))
+      ((:render! view))
+      (is (.isDisabled (.lookup root "#canvas-out-action-1")))
+      (is (.isDisabled (.lookup root "#canvas-produce-assets-1"))))))
 
 ;; Undo preserves asynchronous outputs and archived sessions.
 (deftest canvas-undo-redo-test
@@ -255,3 +415,30 @@
     (is (= (:sessions start) (:sessions restored)))
     (is (= [] (:canvas-redo (canvas/change-state restored canvas/add-flow))))
     (is (= (:canvas-undo moved) (:canvas-undo (canvas/change-state moved #(assoc % :selected "result-1")))))))
+
+;; Only produced Results unlock viewing and determine the Action menu mode.
+(deftest action-result-menu-test
+  (ui/run-now
+    (let [events (atom []) state (atom {:canvas (canvas/initial-canvas)})
+          view (canvas/make-canvas state #(swap! state update :canvas %) (fn select-card [_])
+                                   (fn focus-card []) (fn report-card [_]) (fn produce-card [_])
+                                   (fn open-card [_ _]) (fn gui-card [_ _ _]) (fn attach-card [])
+                                   (constantly []) (fn assign-card [_ _])
+                                   (fn work-card [op id fields] (swap! events conj [op id fields])))
+          root (:root view) stage (javafx.stage.Stage.)]
+      (try
+        (.setScene stage (javafx.scene.Scene. root 1000.0 800.0)) (.show stage)
+        (doseq [n [0 1 2]]
+          (swap! state assoc :canvas (canvas/merge-candidates (canvas/initial-canvas) "action-1"
+                                                              (mapv #(hash-map :id (str %) :text (str "方案" %)) (range n))))
+          ((:render! view)) (.applyCss root) (.layout root)
+          (javafx.event.Event/fireEvent (.lookup root "#canvas-card-action-1")
+                                        (javafx.scene.input.ContextMenuEvent. javafx.scene.input.ContextMenuEvent/CONTEXT_MENU_REQUESTED 20.0 20.0 100.0 100.0 false nil))
+          (let [menu ^javafx.scene.control.ContextMenu (first (filterv #(and (instance? javafx.scene.control.ContextMenu %) (.isShowing %)) (vec (javafx.stage.Window/getWindows))))
+                item ^javafx.scene.control.MenuItem (first (filterv #(= "canvas-action-results-action-1" (.getId ^javafx.scene.control.MenuItem %)) (.getItems menu)))]
+            (is (= (if (= 2 n) "对比方案" "查看方案") (.getText item)))
+            (is (= (zero? n) (.isDisable item)))
+            (.hide menu)
+            (when (pos? n) (.fire item))))
+        (is (= [[:view-action-results "action-1" nil] [:view-action-results "action-1" nil]] @events))
+        (finally ((:dispose! view)) (.close stage))))))

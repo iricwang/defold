@@ -49,6 +49,7 @@
             [editor.engine.build-errors :as engine-build-errors]
             [editor.engine.native-extensions :as native-extensions]
             [editor.error-reporting :as error-reporting]
+            [editor.file-reveal :as file-reveal]
             [editor.fs :as fs]
             [editor.future :as future]
             [editor.fxui :as fxui]
@@ -2276,7 +2277,10 @@
                (menu-items/separator-with-id ::edit-end)]}
    {:label (localization/message "menu.view")
     :id ::view
-    :children [{:label (localization/message "command.window.toggle-left-pane")
+    :children [{:label "AI 模式"
+                :command :ai.open}
+               menu-items/separator
+               {:label (localization/message "command.window.toggle-left-pane")
                 :command :window.toggle-left-pane}
                {:label (localization/message "command.window.toggle-changed-files-pane")
                 :command :window.toggle-changed-files-pane}
@@ -2942,7 +2946,8 @@
   the Tab. Must be called on the JavaFX application thread.
 
   `opts` is handed to the tab type and on to its view. See
-  editor-tab/register-type!."
+  editor-tab/register-type!. The optional :on-open-fn receives [tab opts] after
+  selection, including when an existing tab is reused."
   [app-view localization type-id opts]
   (let [make-tab-spec-fn (:make-tab-spec-fn (editor-tab/resolve-type type-id))
         tab-spec (make-tab-spec-fn opts)
@@ -2956,6 +2961,8 @@
                 (let [^TabPane tab-pane (g/node-value app-view :active-tab-pane)]
                   (make-editor-tab! app-view localization (.getTabs tab-pane) tab-spec opts)))]
     (select-editor-tab! tab opts)
+    (when-let [on-open-fn (:on-open-fn tab-spec)]
+      (on-open-fn tab opts))
     tab))
 
 (defn make-open-resource-plan
@@ -3602,7 +3609,7 @@
   (run [app-view selection selection-context]
     (when-let [r (context-resource app-view selection selection-context)]
       (let [f (File. (resource/abs-path r))]
-        (ui/open-file (fs/to-folder f))))))
+        (file-reveal/reveal! f)))))
 
 (handler/defhandler :file.show-references :global
   (active? [app-view selection selection-context evaluation-context]
@@ -3791,7 +3798,7 @@
                                  "/ai-workspace/library/01-concept/项目规划.aicanvas")]
                       ((requiring-resolve 'editor.ai-project-browser/ensure-library!) root)
                       (when-not (.isFile (io/file root (subs path 1)))
-                        ((requiring-resolve 'editor.ai-document/create-document!) root "ai-workspace/library/01-concept" "项目规划"))
+                        ((requiring-resolve 'editor.ai-document/create-document!) root "ai-workspace/library/01-concept" "项目规划" "concept"))
                       {:path path}))
           tab (open-editor-tab! app-view localization :editor.ai-workbench/chat
                                 {:root root :context context :project project :prefs prefs :localization localization})]

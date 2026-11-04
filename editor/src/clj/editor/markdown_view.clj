@@ -99,7 +99,7 @@
 (defmethod url->command :default [^URI uri]
   {:command (keyword (.getHost uri))})
 
-(defn- open-link! [^URI base-url base-resource project ^String url ^MouseEvent event]
+(defn- open-link! [^URI base-url base-resource project on-open-resource ^String url ^MouseEvent event]
   (condp = (.getButton event)
     MouseButton/PRIMARY
     (when-let [^URI resolved-url (try
@@ -118,7 +118,9 @@
                                       workspace (g/node-value project :workspace evaluation-context)]
                                   (when-let [proj-path (workspace/as-proj-path basis workspace resolved-url)]
                                     (workspace/find-resource basis workspace proj-path)))))]
-            (ui/execute-command (ui/contexts (ui/main-scene) true) :file.open resource)
+            (if on-open-resource
+              (on-open-resource resource)
+              (ui/execute-command (ui/contexts (ui/main-scene) true) :file.open resource))
             (ui/open-url resolved-url))
 
           (if (or scheme (.getAuthority resolved-url))
@@ -127,7 +129,9 @@
               (when base-resource
                 (let [resource (workspace/resolve-resource base-resource path)]
                   (when (resource/exists? resource)
-                    (ui/execute-command (ui/contexts (ui/main-scene) true) :file.open resource))))
+                    (if on-open-resource
+                      (on-open-resource resource)
+                      (ui/execute-command (ui/contexts (ui/main-scene) true) :file.open resource)))))
               (when-let [fragment (coll/not-empty (.getFragment resolved-url))]
                 (let [^ScrollPane scroll-pane (ui/closest-node-of-type ScrollPane (.getTarget event))
                       content (.getContent scroll-pane)]
@@ -160,7 +164,7 @@
 (defn- text-view
   ([ctx]
    (-> ctx
-       (dissoc :paragraph :base-url :project :base-resource)
+       (dissoc :paragraph :base-url :project :base-resource :on-open-resource)
        (assoc :fx/type fx.text/lifecycle)))
   ([text ctx]
    (text-view (assoc ctx :text text))))
@@ -516,7 +520,7 @@
               (-> ctx
                   (style tag)
                   (cond-> (pos? (count href))
-                    (assoc :on-mouse-clicked (fn/partial #'open-link! (:base-url ctx) (:base-resource ctx) (:project ctx) href))))))
+                    (assoc :on-mouse-clicked (fn/partial #'open-link! (:base-url ctx) (:base-resource ctx) (:project ctx) (:on-open-resource ctx) href))))))
       "kbd" (add-view acc (kbd-view node ctx))
       "img" (with-separators acc 3 1 add-view (image-view node ctx))
       "span" (let [class (attr node "class")]
@@ -646,19 +650,20 @@
                       when absent, file urls open externally
     :base-url         optional, URI used for resolving relative urls in links
     :base-resource    optional, Resource used for resolving relative urls
+    :on-open-resource optional, function receiving a clicked local Resource
     :root-props
     ...the rest of ScrollPane lifecycle props"
-  [{:keys [html base-url base-resource project max-width pref-viewport-height] :as props}]
+  [{:keys [html base-url base-resource project on-open-resource max-width pref-viewport-height] :as props}]
   (let [html-ast (Jsoup/parseBodyFragment html)
         view (or (when-let [view (children-section-view
                                    html-ast
-                                   {:paragraph true :base-url base-url :project project :base-resource base-resource})]
+                                   {:paragraph true :base-url base-url :project project :base-resource base-resource :on-open-resource on-open-resource})]
                    (-> (:root-props props {})
                        (into view)
                        (fxui/add-style-classes "md-root")))
                  {:fx/type fx.region/lifecycle})]
     (-> props
-        (dissoc :html :base-url :base-resource :project :root-props)
+        (dissoc :html :base-url :base-resource :project :on-open-resource :root-props)
         (util/provide-defaults :fit-to-width true :hbar-policy :never)
         (fxui/add-style-classes "md-scroll-pane")
         (assoc :fx/type fx.scroll-pane/lifecycle :content view)
@@ -702,6 +707,7 @@
                       when absent, file urls open externally
     :base-url         optional, URI used for resolving relative urls in links
     :base-resource    optional, Resource used for resolving relative urls
+    :on-open-resource optional, function receiving a clicked local Resource
     ...the rest of ScrollPane lifecycle props"
   [{:keys [content] :as props}]
   (-> props (dissoc :content) (assoc :fx/type html-view :html (markdown->html content))))

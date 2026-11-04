@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 109,
-  "version": "1.14.1-patch.109",
+  "revision": 110,
+  "version": "1.14.1-patch.110",
   "repository": "iricwang/defold",
-  "notes": "AI Canvas card focus and details, middle-button pan, deletion and undo/redo; validate archived candidate sources and GUI production."
+  "notes": "Windows local build of latest dev 4c9b2971: AI Canvas, standalone text proposals, project library and complete custom docking."
 }

@@ -24,7 +24,7 @@
 
 (set! *warn-on-reflection* true)
 
-(defn make-composer [input attach clear send attachment-label status collapsed-change!]
+(defn make-composer [input attach clear send attachment-label collapsed-change!]
   (let [input ^TextArea input
         attach ^Button attach
         clear ^Button clear
@@ -71,11 +71,10 @@
     (.setText clear "清除附件")
     (doseq [button [attach clear]] (.add (.getStyleClass ^Button button) "button-small"))
     (.add (.getStyleClass ^Label attachment-label) "ai-muted")
-    (.add (.getStyleClass ^Label status) "ai-error")
     (.addAll (.getChildren footer) ^java.util.Collection (identity [attach clear]))
     (.addAll (.getChildren row) ^java.util.Collection (identity [input send]))
     (.addAll (.getChildren form) ^java.util.Collection (identity [heading row attachment-label footer]))
-    (.addAll (.getChildren root) ^java.util.Collection (identity [status toggle form]))
+    (.addAll (.getChildren root) ^java.util.Collection (identity [toggle form]))
     (.setOnAction toggle (reify EventHandler (handle [_ _] (apply! false))))
     (.setTooltip toggle (Tooltip. "收起输入框"))
     (.setOnMouseClicked input (reify EventHandler (handle [_ _] (when-not @expanded (expand!)))))

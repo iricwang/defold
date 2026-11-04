@@ -76,12 +76,22 @@
                                    (turn "b" "/b.gui" "action-1" "B 的结果")
                                    (turn "c" "/a.gui" "assets-1" "拆分建议")
                                    {:id "external" :items [{:type "userMessage" :content [{:text "普通项目消息"}]}]}]}}
-        scoped (ai/card-snapshot snapshot "/a.gui" "action-1")]
+        scoped (ai/card-snapshot snapshot "/a.gui" "action-1" nil)]
     (is (= ["a"] (mapv :id (get-in scoped [:thread :turns]))))
     (is (= "你\n目标\n\nCodex\nA 的结果" (ai/transcript scoped)))
     (is (= 4 (count (get-in snapshot [:thread :turns]))))
-    (is (= ["c"] (mapv :id (get-in (ai/card-snapshot snapshot "/a.gui" "assets-1") [:thread :turns]))))
-    (is (= [] (get-in (ai/card-snapshot snapshot "/missing.gui" "action-1") [:thread :turns])))))
+    (is (= ["c"] (mapv :id (get-in (ai/card-snapshot snapshot "/a.gui" "assets-1" nil) [:thread :turns]))))
+    (is (= [] (get-in (ai/card-snapshot snapshot "/missing.gui" "action-1" nil) [:thread :turns])))))
+
+;; A new local service may lack card metadata; saved execution IDs recover
+;; only that card's turn, never an explicitly different card's history.
+(deftest local-service-card-history-recovery-test
+  (let [snapshot {:thread {:turns [{:id "saved-turn"}
+                                   {:id "other-turn"}
+                                   {:id "annotated-turn" :canvasContext {:guiPath "/b.gui" :cardId "action-2"}}]}}]
+    (is (= ["saved-turn"] (mapv :id (get-in (ai/card-snapshot snapshot "/a.gui" "action-1" "saved-turn") [:thread :turns]))))
+    (is (= [] (get-in (ai/card-snapshot snapshot "/a.gui" "action-1" nil) [:thread :turns])))
+    (is (= [] (get-in (ai/card-snapshot snapshot "/a.gui" "action-1" "annotated-turn") [:thread :turns])))))
 
 ;; An empty GUI tab should find the game's existing AI conversation.
 (deftest cross-gui-session-migration-test
@@ -112,8 +122,8 @@
                   (json/write-str {:path "/test.gui" :canvasCard {:id "action-1" :type "action"}})
                   "\n\n附件（已上传到当前工作目录）：\n- [reference.png](<codex-attachments/ref.png>)")
         snapshot {:thread {:turns [{:id "attached" :items [{:type "userMessage" :content [{:text text}]}]}]}}]
-    (is (= ["attached"] (mapv :id (get-in (ai/card-snapshot snapshot "/test.gui" "action-1") [:thread :turns]))))
-    (is (= [] (get-in (ai/card-snapshot snapshot "/other.gui" "action-1") [:thread :turns])))))
+    (is (= ["attached"] (mapv :id (get-in (ai/card-snapshot snapshot "/test.gui" "action-1" nil) [:thread :turns]))))
+    (is (= [] (get-in (ai/card-snapshot snapshot "/other.gui" "action-1" nil) [:thread :turns])))))
 
 ;; Output directories are created locally and reused without model mkdir steps.
 (deftest candidate-directory-test
@@ -167,3 +177,37 @@
   (is (.contains (editor.ai-workbench/connection-description {:sidebar-status "confirmed"} "Game") "侧栏已归组"))
   (is (.contains (editor.ai-workbench/connection-description {:sidebar-status "mismatch"} "Game") "归组不一致"))
   (is (.contains (editor.ai-workbench/connection-description {} "Game") "状态未确认")))
+
+;; A staff member keeps one project conversation across actions and canvases.
+(deftest person-task-binding-test
+  (let [model {:nodes [{:id "p" :kind :person :staff-id "staff-1"}
+                       {:id "a" :kind :action} {:id "b" :kind :action} {:id "r" :kind :result}
+                       {:id "other" :kind :person :staff-id "staff-2"}]
+               :edges [{:from "p" :to "a"} {:from "p" :to "b"} {:from "a" :to "r"}]}
+        state (ai/bind-task {:canvas model :context {:path "/first.aicanvas"}} "person/staff-1" "thread")]
+    (doseq [id ["p" "a" "b" "r"]]
+      (is (= "person/staff-1" (ai/task-owner model id "/second.aicanvas")))
+      (is (= "thread" (get-in state [:sessions id :thread-id]))))
+    (is (nil? (get-in state [:sessions "other" :thread-id])))
+    (is (= "person/staff-2" (ai/task-owner (canvas/update-node model "p" #(assoc % :staff-id "staff-2")) "a" "/first.aicanvas")))))
+
+;; Failed renames must never dispatch work. Retries retain the original title
+;; and request identity.
+(deftest rename-before-dispatch-test
+  (let [pending {:task-name "林知远(核心玩法)" :body {:threadId "thread" :requestId "request" :text "work"}}
+        calls (atom [])
+        call! (fn capture-call [path body] (swap! calls conj [path body]) {:turnId "turn"})]
+    (is (= {:turnId "turn"} (ai/dispatch-pending! call! pending)))
+    (is (= [["/api/thread/name" {:threadId "thread" :name "林知远(核心玩法)" :requestId "name-request"}]
+            ["/api/message" (:body pending)]] @calls))
+    (ai/dispatch-pending! call! pending)
+    (is (= (subvec @calls 0 2) (subvec @calls 2 4)))
+    (reset! calls [])
+    (is (thrown? Exception (ai/dispatch-pending! (fn fail-name [path _] (swap! calls conj path) (throw (ex-info "offline" {}))) pending)))
+    (is (= ["/api/thread/name"] @calls))))
+
+;; Task names follow staff(task) and fit the Companion title boundary.
+(deftest staff-task-name-test
+  (is (= "林知远(核心玩法设计)" (ai/task-name {:title "林知远"} {:title "核心玩法设计"})))
+  (is (= "林知远(任务 整理)" (ai/task-name {:title " 林知远 "} {:title "任务\n整理"})))
+  (is (= 120 (count (ai/task-name {:title "林知远"} {:title (.repeat "长" 150)})))))

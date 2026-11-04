@@ -76,6 +76,15 @@ def reload_sources(root, args):
         if not after.is_file():
             raise ValueError('After-reload file not found: ' + str(after))
         forms.append('(load-file ' + json.dumps(after.as_posix(), ensure_ascii=False) + ')')
+    # Classloader parent-first lookup can still return packaged CSS after source
+    # namespaces are loaded. Update existing AI views and their future tabs with
+    # the matching source stylesheet, without rebuilding views or installed files.
+    stylesheet = root / 'editor/resources/ai-canvas.css'
+    if stylesheet.is_file():
+        url = stylesheet.resolve().as_uri()
+        forms.append('(when-let [ns (find-ns (quote editor.ai-workspace))] '
+                     '(when-let [reload-styles (ns-resolve ns (quote reload-styles!))] '
+                     '(reload-styles ' + json.dumps(url) + ')))')
     started = time.monotonic()
     try:
         exchange(args.port, '\n'.join(forms), args.timeout)

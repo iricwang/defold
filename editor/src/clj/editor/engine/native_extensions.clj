@@ -19,6 +19,7 @@
             [editor.connection-properties :as connection-properties]
             [editor.defold-project :as project]
             [editor.engine.build-errors :as engine-build-errors]
+            [editor.engine.local-extensions :as local-extensions]
             [editor.fs :as fs]
             [editor.prefs :as prefs]
             [editor.resource :as resource]
@@ -28,7 +29,8 @@
             [editor.workspace :as workspace]
             [editor.yaml :as yaml]
             [util.coll :as coll])
-  (:import [com.defold.extender.client ExtenderClient ExtenderClientCache ExtenderResource]
+  (:import [com.defold.editor Editor]
+           [com.defold.extender.client ExtenderClient ExtenderClientCache ExtenderResource]
            [com.dynamo.bob IProgress IProgress$Message$BuildingEngine Platform]
            [com.dynamo.bob.bundle BundleHelper]
            [java.io File]
@@ -336,6 +338,8 @@
               destination-file (fs/create-temp-file! (str "build_" sdk-version) ".zip")
               log-file (fs/create-temp-file! (str "build_" sdk-version) ".txt")]
           (try
+            (local-extensions/ensure-server! url sdk-version platform
+                                             (io/file (str (Editor/getSupportPath)) "native-extension-builders"))
             (when-let [^String auth (or
                                       (and (not (string/blank? username))
                                            (not (coll/empty? password))
@@ -354,4 +358,7 @@
               (throw (engine-build-errors/build-error
                        (or (:cause (Throwable->map e))
                            (.getSimpleName (class e)))
-                       (slurp log-file))))))))))
+                       (let [output (slurp log-file)]
+                         (if (string/blank? output)
+                           (str "Native extension build failed at " url ": " (ex-message e))
+                           output)))))))))))

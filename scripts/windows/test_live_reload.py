@@ -63,6 +63,8 @@ class LiveReloadTest(unittest.TestCase):
             self.assertLess(code.index('ProcessHandle/current'), code.index('.addURL'))
             self.assertLess(code.index('.addURL'), code.index('(load-file'))
             self.assertIn('/editor/resources/', code)
+            self.assertIn('/editor/resources/ai-canvas.css', code)
+            self.assertLess(code.index('(load-file'), code.index('(reload-styles '))
             exchange.reset_mock()
             args.namespace = ['../../outside']
             with self.assertRaises(ValueError):

@@ -30,6 +30,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -420,12 +421,38 @@ def create_server(builder, port=0, token=None):
     return server
 
 
+def register_editor_builder(builder, port):
+    """Remember a validated local SDK independently of Remote Manager."""
+    if not windows():
+        return
+    support = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'Defold/native-extension-builders'
+    support.mkdir(parents=True, exist_ok=True)
+    python = Path(sys.executable).resolve()
+    pythonw = python.with_name('pythonw.exe')
+    profile = {
+        'version': 1, 'url': f'http://127.0.0.1:{port}',
+        'sdk': builder.sdk, 'platform': PLATFORM,
+        'directory': str(ROOT),
+        'command': [str(pythonw if pythonw.is_file() else python), '-X', 'utf8',
+                    str(ROOT / 'scripts/windows/editor.py'), 'extensions-serve',
+                    '--engine-home', str(builder.home), '--work', str(builder.work), '--port', str(port)],
+    }
+    target = support / f'{port}.json'
+    temporary = target.with_name(f'{port}.{uuid.uuid4().hex}.tmp')
+    try:
+        temporary.write_text(json.dumps(profile, ensure_ascii=False), encoding='utf-8')
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def serve(engine_home, work, port):
     builder = Builder(engine_home, work)
     server = create_server(builder, port)
-    print(json.dumps({'url': 'http://127.0.0.1:' + str(server.server_port), 'sdk': builder.sdk,
-                      'pid': os.getpid()}), flush=True)
     try:
+        register_editor_builder(builder, server.server_port)
+        print(json.dumps({'url': 'http://127.0.0.1:' + str(server.server_port), 'sdk': builder.sdk,
+                          'pid': os.getpid()}), flush=True)
         server.serve_forever()
     finally:
         server.server_close()

@@ -131,7 +131,13 @@ scripts\windows\editor.cmd extensions-serve --engine-home tmp\dynamo_home --port
 服务仅监听回环地址，使用本地 CMake、MSVC、SDK 编译和链接，保留编辑器原有的扩展缓存。
 SDK 提交号不匹配时拒绝构建，不回退云端。编译得到独立 `dmengine_local`，不覆盖原始 SDK 引擎。
 日志和结果位于 `tmp/local-extensions/<job-id>/`。不要同时执行完整引擎编译；更新 SDK 后重启服务。
-服务需要在缓存失效后重新构建时保持运行，重启电脑后可再次执行上述命令。
+`extensions-serve` 验证 SDK 后，会在当前用户 Defold 支持目录登记启动方式。
+编辑器在原生引擎缓存失效、需要编译时，检查已登记的本机服务；服务未运行则
+独立启动并等待 SDK/平台健康检查通过，不依赖 Remote Manager 开启。
+已运行的服务直接复用，缓存命中不启动服务。远程地址和未登记的地址保持原流程。
+启动日志在 `%LOCALAPPDATA%/Defold/native-extension-builders/startup.log`。
+SDK 更新或路径迁移后，重新运行上述命令登记匹配的工具链。
+该自动启动入口目前用于 Windows 本地 SDK；不代表 macOS 已完成同样的接入或验证。
 SDK 版本从已安装的 Bob 读取，并校验实际引擎及核心链接库；单纯提交编辑器代码
 导致 CMake 版本头变化时不再误报。核心引擎库与 SDK 不一致时仍拒绝构建。
 

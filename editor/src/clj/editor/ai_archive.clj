@@ -25,13 +25,13 @@
             [util.digest :as digest])
   (:import [java.io File InputStream]
            [java.net URI]
-           [java.nio.file Files StandardCopyOption]
+           [java.nio.file AccessDeniedException Files StandardCopyOption]
            [java.util UUID]))
 
 (set! *warn-on-reflection* true)
 
-(def ^:private archive-lock (Object.))
-(def ^:private sync-lock (Object.))
+(defonce ^:private archive-lock (Object.))
+(defonce ^:private sync-lock (Object.))
 
 (defn- file-at
   ^File [root relative]
@@ -42,7 +42,17 @@
   (let [temp (.toFile (Files/createTempFile (.toPath (.getParentFile file)) "archive-" ".tmp" (make-array java.nio.file.attribute.FileAttribute 0)))]
     (try
       (with-open [out (io/output-stream temp)] (.write out ^bytes bytes))
-      (Files/move (.toPath temp) (.toPath file) (into-array StandardCopyOption [StandardCopyOption/REPLACE_EXISTING StandardCopyOption/ATOMIC_MOVE]))
+      ;; Windows readers can briefly deny replacement. Keep the old file intact
+      ;; and retry only this failure, for at most 375 ms in total.
+      (loop [attempt 0]
+        (let [denied (try
+                       (Files/move (.toPath temp) (.toPath file) (into-array StandardCopyOption [StandardCopyOption/REPLACE_EXISTING StandardCopyOption/ATOMIC_MOVE]))
+                       nil
+                       (catch AccessDeniedException e
+                         (if (= 4 attempt) (throw e) e)))]
+          (when denied
+            (Thread/sleep (long (* 25 (bit-shift-left 1 attempt))))
+            (recur (inc attempt)))))
       (finally (.delete temp)))))
 
 (defn- write-json! [file data]
@@ -235,16 +245,17 @@
       (save-delivery! root {:gui (:gui record) :atlas (:atlas record) :paths (set (mapv :path (:files record)))}))))
 
 (defn manifest [root]
-  (let [directory (file-at root "project.json") directory (.getParentFile directory)]
-    (with-open [paths (Files/walk (.toPath directory) (make-array java.nio.file.FileVisitOption 0))]
-      (reduce (fn describe-file [result ^java.nio.file.Path path]
-                (let [file (.toFile path)
-                      relative (string/replace (str (.relativize (.toPath (.getCanonicalFile (io/file root))) path)) "\\" "/")]
-                  (if (or (not (.isFile file)) (= relative "ai-workspace/sync.json") (string/ends-with? relative ".tmp"))
-                    result
-                    (let [file (craft-project/resource-file root (str "/" relative))]
-                      (conj result {:path relative :sha256 (with-open [input (io/input-stream file)] (digest/stream->sha256-hex input)) :size (.length file)})))))
-              [] (vec (.toArray paths))))))
+  (locking archive-lock
+    (let [directory (file-at root "project.json") directory (.getParentFile directory)]
+      (with-open [paths (Files/walk (.toPath directory) (make-array java.nio.file.FileVisitOption 0))]
+        (reduce (fn describe-file [result ^java.nio.file.Path path]
+                  (let [file (.toFile path)
+                        relative (string/replace (str (.relativize (.toPath (.getCanonicalFile (io/file root))) path)) "\\" "/")]
+                    (if (or (not (.isFile file)) (= relative "ai-workspace/sync.json") (string/ends-with? relative ".tmp"))
+                      result
+                      (let [file (craft-project/resource-file root (str "/" relative))]
+                        (conj result {:path relative :sha256 (with-open [input (io/input-stream file)] (digest/stream->sha256-hex input)) :size (.length file)})))))
+                [] (vec (.toArray paths)))))))
 
 (defn write-index! [root]
   (locking archive-lock

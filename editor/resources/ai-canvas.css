@@ -15,22 +15,178 @@ specific language governing permissions and limitations under the License.
 */
 
 .ai-workbench { -fx-background-color: -df-background; }
+
+/* Native JavaFX adaptation of the reading proportions and dark-dimmed palette
+   documented by https://github.com/sindresorhus/github-markdown-css.
+   Also reviewed https://github.com/kinoute/typora-github-night-theme.
+   Scoped to document tabs rather than editor chrome. */
+.ai-markdown-reader {
+    -reading-paper: #212830;
+    -reading-panel: #262c36;
+    -reading-ink: #d9e1eb;
+    -reading-heading: #f0f6fc;
+    -reading-muted: #9198a1;
+    -reading-accent: #80b7f0;
+    -fx-background-color: -reading-paper;
+}
+.ai-markdown-toolbar {
+    -fx-alignment: center;
+    -fx-padding: 0;
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-max-height: 24;
+    -fx-border-width: 0;
+    -fx-background-color: -reading-paper;
+    -fx-background-radius: 5;
+}
+.ai-markdown-toolbar .button {
+    -fx-min-width: 24;
+    -fx-pref-width: 24;
+    -fx-max-width: 24;
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-max-height: 24;
+    -fx-padding: 4;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 5;
+}
+.ai-markdown-toolbar .button:hover, .ai-markdown-toolbar .button:focused, .ai-markdown-toolbar .button:selected {
+    -fx-background-color: derive(-reading-panel, 22%);
+}
+.ai-markdown-icon { -fx-fill: transparent; -fx-stroke: -reading-muted; -fx-stroke-width: 1.4; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.ai-markdown-toolbar .button:hover .ai-markdown-icon,
+.ai-markdown-toolbar .button:focused .ai-markdown-icon { -fx-stroke: -reading-heading; }
+.ai-markdown-toolbar .button:selected .ai-markdown-icon { -fx-stroke: -reading-accent; }
+.ai-markdown-status {
+    -fx-padding: 6 14;
+    -fx-text-fill: -reading-accent;
+    -fx-background-color: -reading-panel;
+}
+.ai-markdown-reader .ai-markdown-scroll,
+.ai-markdown-reader .ai-markdown-scroll > .viewport {
+    -fx-background-color: -reading-paper;
+    -fx-background: -reading-paper;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+.ai-markdown-sheet { -fx-padding: 38 28 72 28; }
+.ai-markdown-reader .md-root.ai-markdown-page {
+    -fx-padding: 0;
+    -fx-font-size: 16;
+    -md-text-fill: -reading-ink;
+}
+.ai-markdown-reader .md-paragraph {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-line-spacing: 5;
+}
+.ai-markdown-reader .md-paragraph > .md-h1 {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-font-size: 32;
+    -fx-font-weight: bold;
+    -fx-fill: -reading-heading;
+}
+.ai-markdown-reader .md-paragraph > .md-h2 {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+    -fx-fill: -reading-heading;
+}
+.ai-markdown-reader .md-paragraph > .md-h3,
+.ai-markdown-reader .md-paragraph > .md-h4 {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-font-size: 20;
+    -fx-font-weight: bold;
+    -fx-fill: -reading-heading;
+}
+.ai-markdown-reader .md-paragraph > .md-strong { -fx-font-family: "Microsoft YaHei"; -fx-font-weight: bold; -fx-fill: -reading-heading; }
+.ai-markdown-reader .md-paragraph > .md-a { -fx-fill: -reading-accent; -fx-underline: false; }
+.ai-markdown-reader .md-paragraph > .md-a:hover { -fx-fill: -reading-heading; -fx-underline: true; }
+.ai-markdown-reader .md-paragraph > .md-code { -fx-font-family: "DejaVu Sans Mono"; -fx-font-size: 13; -fx-fill: -reading-accent; }
+.ai-markdown-reader .md-code-block { -fx-padding: 16 18; -fx-background-color: -reading-panel; -fx-background-radius: 7; }
+.ai-markdown-reader .md-code-block .md-paragraph { -fx-line-spacing: 3; }
+.ai-markdown-reader .md-code-block .md-paragraph > Text { -fx-font-family: "DejaVu Sans Mono"; -fx-font-size: 13; }
+.ai-markdown-reader .md-blockquote { -fx-min-width: 3; -fx-background-color: -reading-accent; }
+.ai-markdown-reader .md-hr { -fx-background-color: derive(-reading-paper, 25%); -fx-background-insets: 0; }
+.ai-markdown-reader .md-separator-3 { -fx-min-height: 12; }
+.ai-markdown-reader .md-separator-4 { -fx-min-height: 18; }
+.ai-markdown-reader .md-separator-5 { -fx-min-height: 24; }
+.ai-markdown-reader .md-separator-6 { -fx-min-height: 30; }
+.ai-markdown-reader .md-table-cell { -fx-padding: 10 14; -fx-border-color: transparent transparent derive(-reading-paper, 18%) transparent; }
+.ai-markdown-reader .md-table-cell.md-table-header-cell { -fx-background-color: -reading-panel; -fx-border-width: 0 0 1 0; }
+.ai-markdown-reader .md-table-row-even { -fx-background-color: derive(-reading-paper, 5%); }
+.ai-markdown-reader .md-table-row-odd { -fx-background-color: transparent; }
+.ai-markdown-reader .ai-markdown-source {
+    -fx-font-family: "DejaVu Sans Mono";
+    -fx-font-size: 13;
+    -fx-text-fill: -reading-ink;
+    -fx-background-color: -reading-paper;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+.ai-markdown-reader .ai-markdown-source .content { -fx-background-color: -reading-paper; -fx-padding: 38 28 24 28; }
+.ai-markdown-reader .scroll-bar { -fx-background-color: -reading-paper; }
+.ai-markdown-reader .scroll-bar .thumb { -fx-background-color: derive(-reading-paper, 30%); -fx-background-radius: 4; }
 .ai-toolbar { -fx-padding: 8 12; -fx-alignment: center-left; -fx-background-color: -df-background-light; -fx-border-color: -df-component-darker; -fx-border-width: 0 0 1 0; }
 .ai-icon-button { -fx-min-width: 28; -fx-pref-width: 28; -fx-padding: 3; -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -df-text; }
 .ai-icon-button:hover { -fx-background-color: -df-component-dark; }
+.ai-resource-icon { -fx-fill: transparent; -fx-stroke: -df-text; -fx-stroke-width: 1.4; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.ai-card-markdown-source { -fx-font-family: "Microsoft YaHei"; -fx-font-size: 14; -fx-text-fill: #d9e1eb; -fx-background-color: #212830; -fx-border-color: transparent; }
+.ai-card-markdown-source .content { -fx-background-color: #212830; -fx-padding: 24 28; }
 .ai-connection { -fx-min-width: 32; -fx-pref-width: 32; -fx-padding: 5; -fx-background-radius: 16; }
 .ai-connection .connection-glyph { -fx-fill: -df-text-dark; }
 .ai-connection:connected .connection-glyph { -fx-fill: #48c78e; }
 .ai-connection:connecting .connection-glyph { -fx-fill: -df-defold-yellow; }
-.ai-card { -fx-background-color: linear-gradient(to bottom, -df-background-light, -df-background-lightish); -fx-background-radius: 10; -fx-border-radius: 10; -fx-padding: 14; -fx-border-color: -ai-accent; -fx-border-width: 2; }
-.ai-card:selected { -fx-effect: dropshadow(gaussian, -ai-accent, 12, 0.18, 0, 0); }
+.ai-card { -ai-ink: #f3f5f8; -ai-body: #d8dee8; -ai-muted: #b2bdcc; -ai-success: #77dfb0; -fx-font-family: "Microsoft YaHei"; -fx-background-color: linear-gradient(to bottom right, derive(-ai-accent, -75%) 0%, -df-background-light 34%, -df-background 100%); -fx-background-radius: 18; -fx-border-radius: 18; -fx-padding: 14; -fx-border-color: derive(-ai-accent, -12%); -fx-border-width: 1.5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.28), 10, 0, 0, 3); }
+.ai-card:selected { -fx-border-color: -ai-accent; -fx-effect: dropshadow(gaussian, -ai-accent, 14, 0.2, 0, 0); }
+.ai-card:running { -fx-effect: dropshadow(gaussian, -ai-accent, 16, 0.28, 0, 0); }
+.ai-card:running .ai-primary:disabled { -fx-opacity: 0.85; }
+.ai-person-profile { -fx-padding: 4 0 8 0; }
+.ai-card-type-badge { -fx-font-size: 11; -fx-padding: 3 8 3 4; -fx-background-color: derive(-ai-accent, -65%); -fx-background-radius: 12; -fx-graphic-text-gap: 2; }
+.ai-card-type-badge .ai-role-icon { -fx-stroke: -ai-accent; -fx-stroke-width: 1.6; }
+.ai-role-chip { -fx-background-color: derive(-ai-accent, -68%); -fx-text-fill: -df-text-light; -fx-background-radius: 12; -fx-padding: 4 9; -fx-font-size: 12; }
+.ai-card-summary { -fx-font-size: 13; -fx-text-fill: -df-text; -fx-line-spacing: 2; -fx-padding: 4 0 6 0; }
+.ai-card-metadata { -fx-font-size: 12; -fx-text-fill: -df-text; }
+.ai-status-badge { -fx-font-size: 12; -fx-text-fill: -df-text-light; -fx-padding: 3 0; }
+.ai-card .ai-status-badge:completed, .ai-card .ai-task-row:completed .ai-task-status { -fx-text-fill: -ai-success; }
+.ai-section-caption, .ai-progress-caption { -fx-font-size: 11; -fx-text-fill: -df-text-dark; -fx-padding: 6 0 2 0; }
+.ai-proposal-point { -fx-font-size: 13; -fx-text-fill: -df-text-light; -fx-padding: 3 0; }
+.ai-resource-row { -fx-background-color: -df-background-lighter; -fx-background-radius: 7; -fx-border-color: transparent; -fx-border-radius: 7; -fx-padding: 7 8; -fx-min-height: 36; -fx-alignment: center-left; }
+.ai-resource-row:hover { -fx-background-color: -df-component-dark; }
+.ai-resource-row .label { -fx-font-size: 12; -fx-text-fill: -df-text; }
+.ai-resource-row .ai-muted { -fx-font-size: 10; -fx-text-fill: -df-text-dark; }
+.ai-resource-row .ai-role-icon { -fx-stroke: -df-text-dark; -fx-stroke-width: 1.4; }
+.ai-task-row { -fx-background-color: -df-background-lighter; -fx-border-color: transparent; -fx-background-radius: 7; -fx-padding: 8; -fx-alignment: center-left; -fx-font-size: 12; }
+.ai-card-link { -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -ai-accent; -fx-alignment: center-left; -fx-padding: 6 2; -fx-font-size: 11; }
+.ai-card-link:hover { -fx-text-fill: -df-text-light; }
+.ai-person-progress { -fx-pref-height: 7; -fx-max-height: 7; -fx-padding: 0; }
+.ai-person-progress .bar { -fx-background-color: -ai-success; -fx-background-insets: 0; -fx-background-radius: 4; -fx-min-height: 0; -fx-padding: 0; }
+.ai-person-progress .track { -fx-background-color: -df-component-dark; -fx-background-radius: 4; -fx-border-width: 0; -fx-background-insets: 0; }
+.ai-card-confirm { -fx-background-color: transparent; -fx-border-color: -ai-accent; -fx-text-fill: -ai-accent; -fx-border-radius: 10; -fx-padding: 9 10; -fx-font-size: 12; }
+.ai-card-confirm:hover { -fx-background-color: derive(-ai-accent, -65%); }
+.ai-toast { -fx-padding: 10 12; -fx-background-color: -df-background-light; -fx-border-color: -df-component-lighter; -fx-border-width: 1 1 1 3; -fx-border-radius: 5; -fx-background-radius: 5; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 8, 0, 0, 2); }
+.ai-toast .ai-toast-message { -fx-text-fill: -df-text; }
+.ai-toast-info { -fx-border-color: -df-component-lighter -df-component-lighter -df-component-lighter -df-error-severity-info; }
+.ai-toast-warning { -fx-border-color: -df-component-lighter -df-component-lighter -df-component-lighter -df-error-severity-warning; }
+.ai-toast-error { -fx-border-color: -df-component-lighter -df-component-lighter -df-component-lighter -df-error-severity-fatal; }
+.ai-toast-info .ai-toast-icon { -fx-text-fill: -df-error-severity-info; }
+.ai-toast-warning .ai-toast-icon, .ai-toast-warning .ai-toast-message { -fx-text-fill: -df-error-severity-warning; }
+.ai-toast-error .ai-toast-icon, .ai-toast-error .ai-toast-message { -fx-text-fill: -df-error-severity-fatal; }
+.ai-toast-icon { -fx-font-weight: bold; -fx-font-size: 16; -fx-min-width: 16; -fx-alignment: center; }
+.ai-toast-close { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0; -fx-min-width: 22; -fx-pref-width: 22; -fx-min-height: 22; -fx-pref-height: 22; -fx-font-size: 18; -fx-text-fill: -df-text; }
+.ai-toast-close:hover { -fx-background-color: -df-background-lighter; }
 .ai-card-kind { -fx-text-fill: -ai-accent; -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; }
-.ai-card-title { -fx-text-fill: -df-text-light; -fx-font-size: 20; -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; -fx-padding: 4 0 6 0; }
+.ai-card-title { -fx-text-fill: -df-text-light; -fx-font-size: 19; -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; -fx-padding: 4 0 8 0; }
 .ai-card-prompt { -fx-text-fill: -df-text-light; -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; }
 .ai-muted { -fx-text-fill: -df-text-dark; }
 .ai-card .scroll-pane, .ai-card .scroll-pane > .viewport { -fx-background-color: transparent; }
 .ai-card .scroll-pane { -fx-background: transparent; }
-.ai-primary { -fx-background-color: -ai-accent; -fx-text-fill: -df-text-selected; -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; -fx-border-color: transparent; -fx-background-radius: 6; -fx-border-radius: 6; -fx-padding: 10 12; -fx-max-width: Infinity; -fx-min-width: 0; }
+.ai-card-scroll .scroll-bar:vertical { -fx-min-width: 5; -fx-pref-width: 5; -fx-max-width: 5; -fx-opacity: 0; }
+.ai-card-scroll .scroll-bar:horizontal { -fx-min-height: 5; -fx-pref-height: 5; -fx-max-height: 5; -fx-opacity: 0; }
+.ai-card-scroll .scroll-bar .increment-button, .ai-card-scroll .scroll-bar .decrement-button { -fx-padding: 0; -fx-min-width: 0; -fx-pref-width: 0; -fx-min-height: 0; -fx-pref-height: 0; }
+.ai-card-scroll .scroll-bar .thumb { -fx-background-insets: 0; }
+.ai-card-scroll:scrolling .scroll-bar, .ai-card-scroll .scroll-bar:hover, .ai-card-scroll .scroll-bar:pressed { -fx-opacity: 1; }
+.ai-primary { -fx-background-color: linear-gradient(to bottom, derive(-ai-accent, 8%), derive(-ai-accent, -8%)); -fx-text-fill: -df-text-selected; -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; -fx-border-color: transparent; -fx-background-radius: 11; -fx-border-radius: 11; -fx-padding: 10 12; -fx-max-width: Infinity; -fx-min-width: 0; }
 .ai-primary:hover { -fx-background-color: derive(-ai-accent, 15%); -fx-text-fill: -df-text-selected; }
 .ai-primary:armed { -fx-background-color: derive(-ai-accent, -12%); }
 .ai-primary:disabled { -fx-opacity: 0.4; }
@@ -54,11 +210,75 @@ specific language governing permissions and limitations under the License.
 .ai-composer-heading { -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; }
 .ai-error { -fx-text-fill: -df-error-severity-warning; -fx-wrap-text: true; }
 
-.ai-assets .ai-primary { -fx-text-fill: #111111; }
+/* Keep readable text independent of accent hues and editor muted-text tokens. */
+.ai-card .label, .ai-card .ai-task-row { -fx-text-fill: -ai-body; }
+.ai-card .ai-card-title { -fx-text-fill: -ai-ink; -fx-font-family: "Microsoft YaHei"; -fx-font-weight: bold; }
+.ai-card .ai-role-chip, .ai-card .ai-proposal-point { -fx-text-fill: -ai-ink; }
+.ai-card .ai-card-kind { -fx-text-fill: -ai-accent; -fx-font-family: "Microsoft YaHei"; }
+.ai-card .ai-section-caption, .ai-card .ai-progress-caption, .ai-card .ai-muted, .ai-card .ai-task-status { -fx-text-fill: -ai-muted; }
+.ai-card .ai-resource-row .label { -fx-text-fill: -ai-body; }
+.ai-card .ai-resource-row .ai-muted { -fx-text-fill: -ai-muted; }
+.ai-card .ai-resource-row .ai-role-icon { -fx-stroke: -ai-muted; }
+.ai-card .ai-primary, .ai-card .ai-primary:hover, .ai-card .ai-primary:armed { -fx-text-fill: #151b24; -fx-font-family: "Microsoft YaHei"; }
+.ai-card .ai-card-link { -fx-text-fill: -ai-accent; }
+.ai-card .ai-task-row { -fx-font-family: "Microsoft YaHei"; }
+
 
 .ai-details, .ai-details > .viewport { -fx-background-color: -df-background-light; -fx-background: -df-background-light; }
 .ai-detail-section { -fx-padding: 10; -fx-spacing: 8; -fx-background-color: -df-background; -fx-background-radius: 6; -fx-border-color: -df-component-dark; -fx-border-radius: 6; }
 .ai-detail-section .label { -fx-wrap-text: true; }
 
-.ai-project-browser { -fx-padding: 10 8; -fx-background-color: -df-background-light; }
-.ai-project-browser .tree-view { -fx-background-color: -df-background; -fx-border-color: -df-component-darker; }
+.ai-project-browser { -fx-padding: 0; -fx-spacing: 0; -fx-background-color: -df-background-light; }
+.ai-project-browser .tree-view { -fx-padding: 0; -fx-border-width: 0; -fx-background-color: -df-background-light; }
+.ai-project-header { -fx-padding: 4 6 4 12; -fx-alignment: center-left; -fx-min-height: 30; -fx-background-color: -df-background-light; }
+.ai-project-header .label { -fx-text-fill: -df-text; -fx-font-size: 14; }
+
+/* Staff configuration follows the active editor palette. */
+.ai-card.ai-role { -fx-background-color: -df-background-light; -fx-padding: 14 12; -fx-spacing: 0; -fx-border-width: 1; }
+.ai-card.ai-role:selected { -fx-border-width: 2; -fx-padding: 13 11; }
+.ai-role .scroll-pane { -fx-padding: 0; -fx-border-width: 0; }
+.ai-role-icon { -fx-fill: transparent; -fx-stroke: -df-text; -fx-stroke-width: 1.5; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.ai-role-row-title { -fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: -ai-accent; -fx-graphic-text-gap: 10; }
+.ai-role-row-title .ai-role-icon { -fx-stroke: -ai-accent; }
+.ai-role-count { -fx-padding: 2 10; -fx-background-color: -df-background-light; -fx-border-color: -df-component-dark; -fx-border-radius: 12; -fx-background-radius: 12; }
+.ai-role-add { -fx-background-color: -df-background-light; -fx-border-color: -df-component-lighter; -fx-border-style: segments(3, 3); -fx-border-radius: 7; -fx-background-radius: 7; -fx-text-fill: -df-text; }
+.ai-role-add:hover { -fx-border-color: -ai-accent; -fx-background-color: -df-background-lighter; }
+.ai-role-card-title { -fx-text-fill: -df-text-light; -fx-font-size: 17; -fx-font-weight: bold; }
+.ai-role-badge { -fx-text-fill: -df-text; -fx-background-color: -df-component-dark; -fx-background-radius: 12; -fx-padding: 3 8; -fx-font-size: 11; }
+.ai-role-badge:enabled { -fx-text-fill: -df-defold-green-lighter; }
+.ai-role-description { -fx-text-fill: -df-text-dark; -fx-font-size: 12; -fx-graphic-text-gap: 6; }
+.ai-role-description .ai-role-icon { -fx-stroke: -df-text-dark; }
+.ai-role-metadata .label { -fx-font-size: 12; -fx-graphic-text-gap: 6; }
+.ai-role-editor { -fx-background-color: -df-background-light; }
+.ai-role-form-scroll, .ai-role-form-scroll > .viewport { -fx-background-color: -df-background-light; -fx-background: -df-background-light; -fx-padding: 0; -fx-border-width: 0; }
+.ai-role-form { -fx-padding: 12 8; }
+.ai-role-form-heading { -fx-padding: 14 10; -fx-border-color: -df-component-dark; -fx-border-width: 0 0 1 0; }
+.ai-role-form-heading > .label { -fx-font-size: 16; -fx-font-weight: bold; -fx-graphic-text-gap: 10; }
+.ai-role-form-heading > .ai-role-badge { -fx-font-size: 11; -fx-font-weight: normal; }
+.ai-role-section { -fx-background-color: -df-background; -fx-border-color: -df-component-dark; -fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 12; }
+.ai-role-section-title { -fx-text-fill: -df-text-light; -fx-font-weight: bold; -fx-graphic-text-gap: 8; -fx-padding: 0 0 4 0; }
+.ai-role-section-title .ai-role-icon, .ai-role-form-heading .ai-role-icon { -fx-stroke: -df-ui-accent; }
+.ai-role-section .text-area { -fx-min-height: 80; }
+.ai-role-form-footer { -fx-padding: 8 10 12 10; -fx-border-color: -df-component-dark; -fx-border-width: 1 0 0 0; }
+.ai-role-form-footer .button { -fx-padding: 10 20; -fx-background-radius: 5; -fx-border-radius: 5; }
+.ai-role-save { -fx-background-color: -df-ui-accent; -fx-text-fill: -df-text-selected; -fx-font-weight: bold; -fx-border-color: transparent; }
+.ai-role-save:hover { -fx-background-color: derive(-df-ui-accent, 12%); }
+
+/* Compare results using the editor palette and reading theme. */
+#ai-result-compare { -fx-background-color: -df-background; }
+.ai-compare-bar { -fx-padding: 12 16; -fx-border-color: transparent transparent -df-component-dark transparent; -fx-border-width: 0 0 1 0; }
+.ai-compare-bar .button { -fx-padding: 6 12; }
+.ai-compare-title { -fx-font-family: "Microsoft YaHei"; -fx-font-size: 16; -fx-font-weight: bold; -fx-text-fill: -df-text-light; }
+.ai-compare-muted, .ai-compare-notice { -fx-text-fill: -df-text; -fx-font-size: 12; }
+.ai-compare-notice { -fx-padding: 0 16 4 16; }
+#ai-compare-status { -fx-text-fill: -df-text-light; -fx-min-width: 0; -fx-wrap-text: true; }
+.ai-compare-empty { -fx-text-fill: -df-text; -fx-padding: 32; -fx-font-size: 14; }
+#ai-result-compare .ai-markdown-sheet { -fx-padding: 24 28 48 28; }
+#ai-result-compare .md-paragraph > .md-h1 { -fx-font-size: 26; }
+.ai-compare-diff { -fx-background-color: -df-background; -fx-border-width: 0; -fx-padding: 0; }
+.ai-compare-diff .list-cell { -fx-padding: 0; -fx-background-color: -df-background; }
+.ai-compare-diff-side { -fx-padding: 4 10; -fx-border-color: transparent -df-component-dark transparent transparent; -fx-border-width: 0 1 0 0; }
+.ai-compare-diff-side .label { -fx-font-family: "Microsoft YaHei"; -fx-font-size: 13; -fx-text-fill: -df-text-light; }
+.ai-compare-diff-side .ai-compare-line-number { -fx-text-fill: -df-text; -fx-font-size: 11; }
+.ai-compare-left:changed { -fx-background-color: derive(-df-error-severity-fatal, -78%); -fx-border-color: transparent -df-component-dark transparent -df-error-severity-fatal; -fx-border-width: 0 1 0 3; }
+.ai-compare-right:changed { -fx-background-color: derive(-df-defold-green-lighter, -80%); -fx-border-color: transparent transparent transparent -df-defold-green-lighter; -fx-border-width: 0 0 0 3; }

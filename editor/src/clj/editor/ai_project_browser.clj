@@ -15,17 +15,25 @@
 
 (ns editor.ai-project-browser
   "Project-local creative library and lazy AI archive browser."
-  (:require [clojure.java.io :as io]
+  (:require [cljfx.api :as fx]
+            [cljfx.fx.tree-cell :as fx.tree-cell]
+            [cljfx.fx.tree-view :as fx.tree-view]
+            [clojure.java.io :as io]
             [clojure.string :as string]
+            [editor.ai-canvas :as canvas]
             [editor.ai-document :as document]
+            [editor.ai-roles :as roles]
             [editor.craft-project :as craft-project]
+            [editor.resource :as resource]
+            [editor.file-reveal :as file-reveal]
             [editor.ui :as ui]
             [util.coll :as coll])
-  (:import [java.io File]
+  (:import [com.defold.control ExtendedTreeViewSkin]
+           [java.io File]
            [java.nio.file Files]
            [javafx.beans.value ChangeListener]
            [javafx.event EventHandler]
-           [javafx.scene.control Button ContextMenu Label MenuItem TextInputDialog Tooltip TreeItem TreeView]
+           [javafx.scene.control ContextMenu Label MenuItem SeparatorMenuItem TextInputDialog TreeItem TreeView]
            [javafx.scene.input KeyCode MouseButton]
            [javafx.scene.layout HBox Priority VBox]
            [javafx.stage FileChooser]))
@@ -65,7 +73,7 @@
 
 (defn entries [root relative]
   (let [directory (directory-file root relative)
-        labels {"library" "创作资料" "canvases" "画布与任务" "conversations" "对话记录"
+        labels {"config" "项目配置" "library" "创作资料" "canvases" "画布与任务" "conversations" "对话记录"
                 "attachments" "参考附件" "artifacts" "生成资料" "candidates" "效果图候选" "deliveries" "成品归档"}]
     (->> (coll/into-> (.listFiles directory) []
            (remove (fn hidden-file [^File file]
@@ -76,10 +84,16 @@
                         section (when (= relative "ai-workspace/library")
                                   (coll/first-where #(= name (:path %)) sections))]
                     {:path (str relative "/" name)
-                     :title (or (:title section) (when (= relative "ai-workspace") (get labels name)) name)
+                     :title (or (:title section)
+                                (when (= (str "/" relative "/" name) roles/document-path) "项目职能")
+                                (when (= (str "/" relative "/" name) roles/config-path) "职能配表")
+                                (when (= relative "ai-workspace") (get labels name)) name)
                      :description (:description section)
                      :directory (.isDirectory file)}))))
-         (sort-by (juxt #(if (= "ai-workspace/library" (:path %)) 0 (if (:directory %) 1 2)) :path))
+         (sort-by (juxt #(case (:path %)
+                           "ai-workspace/library" 0
+                           "ai-workspace/config" 1
+                           (if (:directory %) 2 3)) :path))
          vec)))
 
 (defn import-files! [root relative files]
@@ -106,6 +120,8 @@
                     (str relative "/" (.getName target))
                     (recur (inc index))))))) files)))
 
+(declare refresh-item!)
+
 (defn- tree-item
   ^TreeItem [root entry expanded show!]
   (let [item (TreeItem. entry)]
@@ -116,38 +132,92 @@
                       (changed [_ _ _ opened]
                         (when opened
                           (try
-                            (.setAll (.getChildren item) ^java.util.Collection
-                                     (mapv #(tree-item root % expanded show!) (entries root (:path entry))))
+                            (refresh-item! root item expanded show!)
                             (catch Exception e (show! (.getMessage e))))))))
       (.setExpanded item (contains? expanded (:path entry))))
     item))
 
+(defn- refresh-item! [root ^TreeItem item expanded show!]
+  (let [children (.getChildren item)
+        existing (coll/into-> children {}
+                   (keep (fn [^TreeItem child]
+                           (when-let [path (:path (.getValue child))]
+                             [path child]))))
+        next-children (mapv (fn reconcile-entry [entry]
+                              (if-let [^TreeItem child (get existing (:path entry))]
+                                (do
+                                  (when (not= entry (.getValue child)) (.setValue child entry))
+                                  (when (and (:directory entry) (.isExpanded child))
+                                    (refresh-item! root child expanded show!))
+                                  child)
+                                (tree-item root entry expanded show!)))
+                            (entries root (:path (.getValue item))))]
+    (when (not= (vec children) next-children)
+      (.setAll children ^java.util.Collection next-children))))
+
 (defn- loaded-items [^TreeItem item]
   (coll/into-> (.getChildren item) [item] (mapcat loaded-items)))
 
-(defn make-browser [root open! changed! show!]
+(defn configure-browser! [{:keys [^VBox pane ^TreeView tree ^Label title resource-types]}]
+  (let [bar (HBox. 2.0)]
+    (.add (.getStyleClass bar) "ai-project-header")
+    (.setMaxWidth title Double/MAX_VALUE)
+    (HBox/setHgrow title Priority/ALWAYS)
+    ;; Match Assets: native TreeCells, resource type styling and 16 px icons.
+    (ui/advance-ui-user-data-component!
+      tree ::cells
+      {:fx/type (fx/make-ext-with-props fx.tree-view/props)
+       :desc {:fx/type ui/ext-value :value tree}
+       :props {:cell-factory
+               {:fx/cell-type fx.tree-cell/lifecycle
+                :describe (fn describe-project-entry [entry]
+                            (if-not entry
+                              {}
+                              (let [extension (string/lower-case (last (string/split (:path entry) #"\.")))
+                                    type (get resource-types extension {:ext extension})]
+                                {:text (:title entry)
+                                 :style-class (into ["cell" "indexed-cell" "tree-cell"]
+                                                    (if (:directory entry) #{"resource" "resource-folder"} (resource/type-style-classes type)))
+                                 :graphic {:fx/type ui/image-icon :size 16.0
+                                           :path (if (:directory entry) "icons/32/Icons_01-Folder-closed.png"
+                                                     (or (:icon type) "icons/32/Icons_29-AT-Unknown.png"))}
+                                 :tooltip {:fx/type :tooltip :text (str (when-let [description (:description entry)] (str description "\n")) (:path entry))}})))}}})
+    (when-not (instance? ExtendedTreeViewSkin (.getSkin tree))
+      (.setSkin tree (ExtendedTreeViewSkin. tree))
+      (ui/customize-tree-view! tree {:double-click-expand true}))
+    (.add (.getChildren bar) title)
+    (.clear (.getChildren pane))
+    (.addAll (.getChildren pane) ^java.util.Collection (identity [bar tree]))
+    (VBox/setVgrow tree Priority/ALWAYS)))
+
+(defn make-browser [root current-path open! changed! show! resource-types]
   (ensure-library! root)
+  (document/ensure-roles-document! root)
   (let [tree (doto (TreeView.) (.setId "ai-project-tree") (.setShowRoot false))
         menu (ContextMenu.)
-        create (doto (MenuItem. "新建 Canvas · 文本方案") (.setId "ai-project-new-canvas"))
+        creates (mapv (fn create-template-item [template]
+                        (doto (MenuItem. (str "新建 Canvas · " (:title template)))
+                          (.setId (if (= "concept" (:id template)) "ai-project-new-canvas" (str "ai-project-new-" (:id template)))))) canvas/templates)
         title (Label. "AI 工程")
-        refresh (doto (Button. "↻") (.setId "ai-project-refresh") (.setTooltip (Tooltip. "刷新工程目录")))
-        import (doto (Button. "导入资料") (.setId "ai-project-import") (.setDisable true))
-        selected (doto (Label. "选择分类查看资料") (.setWrapText true))
-        detail (doto (Label. "ai-workspace") (.setWrapText true))
-        bar (HBox. 6.0)
-        pane (VBox. 8.0)
+        refresh (doto (MenuItem. "刷新目录") (.setId "ai-project-refresh"))
+        import (doto (MenuItem. "导入资料…") (.setId "ai-project-import") (.setDisable true))
+        pane (VBox.)
         refresh! (fn refresh-project-tree []
                    (let [previous (.getRoot tree)
                          items (if previous (loaded-items previous) [])
-                         expanded (coll/into-> items (if previous #{"ai-workspace"} #{"ai-workspace" "ai-workspace/library"})
+                         expanded (coll/into-> items (if previous #{"ai-workspace"} #{"ai-workspace" "ai-workspace/library" "ai-workspace/config"})
                                     (filter #(.isExpanded ^TreeItem %))
                                     (map #(:path (.getValue ^TreeItem %))))
-                         selection (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue :path)
-                         next-root (tree-item root {:path "ai-workspace" :title "AI 工程" :directory true} expanded show!)]
-                     (.setRoot tree next-root)
-                     (when-let [item (coll/first-where #(= selection (:path (.getValue ^TreeItem %))) (loaded-items next-root))]
-                       (.select (.getSelectionModel tree) ^TreeItem item))))
+                         selection (or (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue :path)
+                                       (when current-path (string/replace-first current-path #"^/" "")))
+                         next-root (or previous (tree-item root {:path "ai-workspace" :title "AI 工程" :directory true} expanded show!))]
+                     (if previous
+                       (refresh-item! root previous expanded show!)
+                       (do
+                         (.setRoot tree next-root)
+                         (when-let [item (coll/first-where #(= selection (:path (.getValue ^TreeItem %))) (loaded-items next-root))]
+                           (.select (.getSelectionModel tree) ^TreeItem item)
+                           (.scrollTo tree (.getRow tree item)))))))
         open-selected! (fn open-selected-file []
                          (when-let [entry (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue)]
                            (when-not (:directory entry)
@@ -156,27 +226,13 @@
                                (open! (str "/" (:path entry)))
                                (catch Exception e (show! (.getMessage e)))))))]
     (.add (.getStyleClass pane) "ai-project-browser")
-    (.add (.getStyleClass detail) "ai-muted")
     (.setMinWidth pane 190.0)
     (.setPrefWidth pane 240.0)
-    (.setMaxWidth title Double/MAX_VALUE)
-    (HBox/setHgrow title Priority/ALWAYS)
-    (.addAll (.getChildren bar) ^java.util.Collection (identity [title refresh]))
-    (.addAll (.getChildren pane) ^java.util.Collection (identity [bar tree selected detail import]))
-    (VBox/setVgrow tree Priority/ALWAYS)
-    (ui/cell-factory! tree
-                      (fn render-project-entry [entry]
-                        {:text (:title entry)
-                         :icon (if (:directory entry)
-                                 "icons/32/Icons_01-Folder-closed.png"
-                                 "icons/64/Icons_29-AT-Unknown.png")
-                         :tooltip (Tooltip. (:path entry))}))
+    (configure-browser! {:pane pane :tree tree :title title :resource-types resource-types})
     (.addListener (.selectedItemProperty (.getSelectionModel tree))
                   (reify ChangeListener
                     (changed [_ _ _ item]
                       (let [entry (when item (.getValue ^TreeItem item))]
-                        (.setText selected (or (:description entry) (:title entry) "选择分类查看资料"))
-                        (.setText detail (or (:path entry) "ai-workspace"))
                         (.setDisable import (not (and (:directory entry)
                                                       (string/starts-with? (:path entry) "ai-workspace/library/"))))))))
     (.setOnMouseClicked tree
@@ -191,30 +247,34 @@
                           (when (= KeyCode/ENTER (.getCode ^javafx.scene.input.KeyEvent event))
                             (open-selected!)
                             (.consume ^javafx.scene.input.KeyEvent event)))))
-    (.add (.getItems menu) create)
+    (.addAll (.getItems menu) ^java.util.Collection creates)
+    (.addAll (.getItems menu) ^java.util.Collection (identity [(SeparatorMenuItem.) import refresh]))
     (.setContextMenu tree menu)
+    (file-reveal/install-tree! tree root
+                               (fn selected-project-file [] (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue :path)) show!)
     (.setOnShowing menu
                    (reify EventHandler
                      (handle [_ _]
                        (let [entry (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue)]
-                         (.setDisable create (not (and (:directory entry) (string/starts-with? (:path entry) "ai-workspace/library/"))))))))
-    (.setOnAction create
-                  (reify EventHandler
-                    (handle [_ _]
-                      (let [dialog (TextInputDialog. "核心玩法")
-                            entry (.getValue ^TreeItem (.getSelectedItem (.getSelectionModel tree)))]
-                        (.setTitle dialog "新建 Canvas")
-                        (.setHeaderText dialog (str (:title entry) " · 文本方案模板"))
-                        (.setContentText dialog "名称")
-                        (.initOwner dialog (.getWindow (.getScene pane)))
-                        (.addAll (.getStylesheets (.getDialogPane dialog)) ^java.util.Collection (.getStylesheets (.getScene pane)))
-                        (let [answer (.showAndWait dialog)]
-                          (when (.isPresent answer)
-                            (try
-                              (let [path (document/create-document! root (:path entry) (.get answer))]
-                                (refresh!) (changed!) (open! path))
-                              (catch java.nio.file.FileAlreadyExistsException _ (show! "同名 Canvas 已存在，请换一个名称"))
-                              (catch Exception e (show! (.getMessage e))))))))))
+                         (doseq [^MenuItem create creates] (.setDisable create (not (and (:directory entry) (string/starts-with? (:path entry) "ai-workspace/library/")))))))))
+    (doseq [[^MenuItem create template] (mapv vector creates canvas/templates)]
+      (.setOnAction create
+                    (reify EventHandler
+                      (handle [_ _]
+                        (let [dialog (TextInputDialog. (:default-name template))
+                              entry (.getValue ^TreeItem (.getSelectedItem (.getSelectionModel tree)))]
+                          (.setTitle dialog "新建 Canvas")
+                          (.setHeaderText dialog (str (:title entry) " · " (:title template)))
+                          (.setContentText dialog "名称")
+                          (.initOwner dialog (.getWindow (.getScene pane)))
+                          (.addAll (.getStylesheets (.getDialogPane dialog)) ^java.util.Collection (.getStylesheets (.getScene pane)))
+                          (let [answer (.showAndWait dialog)]
+                            (when (.isPresent answer)
+                              (try
+                                (let [path (document/create-document! root (:path entry) (.get answer) (:id template))]
+                                  (refresh!) (changed!) (open! path))
+                                (catch java.nio.file.FileAlreadyExistsException _ (show! "同名 Canvas 已存在，请换一个名称"))
+                                (catch Exception e (show! (.getMessage e)))))))))))
     (.setOnAction refresh (reify EventHandler (handle [_ _] (refresh!))))
     (.setOnAction import
                   (reify EventHandler
