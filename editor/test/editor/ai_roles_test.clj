@@ -54,7 +54,7 @@
               person (canvas/node-by-id added (:selected added))
               saved (document/save-document! root roles/document-path doc added)
               card (roles/assign-staff {:id "person" :kind :person :title "音频负责人"} person)]
-          (is (= 5 (count (:nodes model))))
+          (is (= 6 (count (:nodes model))))
           (is (= "audio" (:id (last (roles/rows model)))))
           (is (= 0 (:count (last (roles/rows model)))))
           (is (= "#20B2AA" (:color (roles/role-type person))))
@@ -71,15 +71,15 @@
                   old-person (canvas/node-by-id current (:id person))]
               (is (= "Astra" (:model old-person)))
               (is (= "声音设计" (:title (roles/role-type old-person))))
-              (is (= "Terra" (:model (last (:nodes (roles/add-role current "audio"))))))))
+              (is (= "Terra" (:model (last (filterv #(= "audio" (:role-type %)) (:nodes (roles/add-role current "audio")))))))))
           (roles/read-config other)
           (spit (io/file other (subs roles/config-path 1)) (slurp file :encoding "UTF-8") :encoding "UTF-8")
           (document/ensure-roles-document! other)
           (let [copied (document/model (document/read-document other roles/document-path) nil)
                 original-ids (set (mapv :id (:nodes added)))]
-            (is (= 7 (count (:nodes copied))))
+            (is (= 8 (count (:nodes copied))))
             (is (= #{"听澜" "知音"} (set (mapv :title (filterv #(= "audio" (:role-type %)) (:nodes copied))))))
-            (is (coll/not-any? #(contains? original-ids (:id %)) (:nodes copied))))))
+            (is (coll/not-any? #(and (not (:builtin %)) (contains? original-ids (:id %))) (:nodes copied))))))
       (finally (fs/delete-directory! root) (fs/delete-directory! other)))))
 
 ;; Invalid tables, removal of referenced IDs and stale edits never overwrite
@@ -141,10 +141,10 @@
             changed (canvas/update-node model id #(assoc % :assignee "Alice" :model "Astra" :effort "中"))
             saved (document/save-document! root path doc changed)]
         (is (= :roles (:workflow model)))
-        (is (= ["planning" "art" "programming" "pm" "qa"] (mapv :role-type (:nodes model))))
-        (is (= 5 (count (set (mapv :title (:nodes model))))))
+        (is (= ["planning" "art" "programming" "pm" "qa" "pm"] (mapv :role-type (:nodes model))))
+        (is (= 6 (count (set (mapv :title (:nodes model))))))
         (is (= (:nodes model) (:nodes (document/model doc nil))))
-        (is (= 5 (count (set (mapv :id (:nodes model))))))
+        (is (= 6 (count (set (mapv :id (:nodes model))))))
         (is (= path (document/ensure-roles-document! root)))
         (is (= saved (document/read-document root path)))
         (is (= "Alice" (:assignee (first (:nodes saved)))))
@@ -157,10 +157,10 @@
         (let [state (canvas/change-state {:canvas changed} #(roles/add-role % "planning"))
               added (:canvas state)
               undone (canvas/history-state state :undo)]
-          (is (= 6 (count (:nodes added))))
+          (is (= 7 (count (:nodes added))))
           (is (= (dissoc changed :viewport) (dissoc (:canvas undone) :viewport)))
           (is (= added (:canvas (canvas/history-state undone :redo))))
-          (is (= 5 (count (:nodes (canvas/remove-node added (:selected added))))))
+          (is (= 6 (count (:nodes (canvas/remove-node added (:selected added))))))
           (is (thrown? Exception (canvas/connect-nodes added id (:selected added))))))
       (finally (fs/delete-directory! root)))))
 
@@ -206,8 +206,37 @@
     (is (= roles/row-label-width (:x (first (:nodes by-person)))))
     (is (= 2 (count (:nodes by-role))))
     (is (= model (roles/visible-model model "")))
-    (is (= 6 (count (:nodes model))))
+    (is (= 7 (count (:nodes model))))
     (is (= [] (:nodes (roles/visible-model model "missing"))))))
+
+;; The built-in AI-PM staff always exists exactly once and cannot be deleted.
+(deftest ai-pm-staff-test
+  (let [model (roles/layout {:workflow :roles :nodes (roles/initial-nodes) :edges []})
+        ai-pm (coll/first-where :builtin (:nodes model))
+        again (roles/layout model)]
+    (is (some? ai-pm))
+    (is (= roles/ai-pm-id (:id ai-pm)))
+    (is (= "AI-PM" (:title ai-pm)))
+    (is (= "pm" (:role-type ai-pm)))
+    (is (:enabled ai-pm))
+    (is (= 1 (count (filterv :builtin (:nodes again)))))
+    (is (= (:nodes model) (:nodes again)))
+    (is (thrown? Exception (canvas/remove-node model (:id ai-pm))))))
+
+;; The built-in AI-PM editor is read-only: fields are disabled and saving is hidden.
+(deftest ai-pm-readonly-editor-test
+  (ui/run-now
+    (let [card (assoc (roles/new-role "pm" #{}) :builtin true)
+          saved (atom nil)
+          pane (roles/make-editor card (:roles (roles/default-config)) (fn capture-role [id fields] (reset! saved [id fields])))
+          _ (javafx.scene.Scene. pane)
+          _ (.applyCss pane)]
+      (doseq [id ["#ai-role-title" "#ai-role-type" "#ai-role-assignee" "#ai-role-model" "#ai-role-effort"
+                  "#ai-role-enabled" "#ai-role-responsibilities" "#ai-role-deliverables"]]
+        (is (.isDisabled ^javafx.scene.Node (.lookup pane id)) id))
+      (doseq [id ["#ai-role-save" "#ai-role-reset" "#ai-role-apply-defaults"]]
+        (is (not (.isVisible ^javafx.scene.Node (.lookup pane id))) id))
+      (is (nil? @saved)))))
 
 ;; The configuration entry is a library sibling and is selected on opening.
 (deftest role-browser-selection-test
@@ -294,7 +323,7 @@
         (is (not (contains? occupied (:title next-card)))))))
   (let [model {:nodes [(assoc (roles/new-role "art" #{}) :title (first (get roles/name-pools "planning")))]}
         added (roles/add-role model "planning")]
-    (is (= 2 (count (set (mapv :title (:nodes added))))))))
+    (is (= 2 (count (set (mapv :title (filterv #(not (:builtin %)) (:nodes added)))))))))
 
 ;; Migration preserves custom fields and IDs; saved names do not reroll.
 (deftest staff-name-migration-test

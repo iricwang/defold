@@ -19,6 +19,7 @@
             [clojure.java.io :as io]
             [clojure.string :as string]
             [editor.ai-canvas :as canvas]
+            [editor.ai-graph :as graph]
             [editor.ai-roles :as roles]
             [editor.craft-project :as craft-project]
             [util.coll :as coll])
@@ -44,7 +45,7 @@
         (throw (ex-info "当前编辑器不支持此 Canvas 方案类型" {:template (:template doc)})))
       (let [nodes (:nodes doc) ids (set (mapv :id nodes))]
         (when-not (and (vector? nodes) (= (count nodes) (count ids))
-                       (coll/every? #(and (string? (:id %)) (contains? (if (= "project-roles" (:template doc)) #{"role"} #{"person" "action" "result" "assets" "gui"}) (:kind %))) nodes)
+                       (coll/every? #(and (string? (:id %)) (contains? (if (= "project-roles" (:template doc)) #{"role"} #{"pm" "task" "person" "action" "result" "assets" "gui"}) (:kind %))) nodes)
                        (vector? (:edges doc))
                        (coll/every? #(and (contains? ids (:from %)) (contains? ids (:to %))) (:edges doc)))
           (throw (ex-info "Canvas nodes 或 edges 无效" {:path path})))
@@ -89,7 +90,9 @@
       (throw (ex-info "请选择创作分类，名称不能包含路径或特殊字符" {})))
     (let [path (str "/" directory "/" title ".aicanvas")
           file (craft-project/resource-file root path)
-          model (cond-> (canvas/initial-canvas) (= "gui" template-id) canvas/migrate-gui-cards)
+          model (if (= "ai-pm" template-id)
+                  {:nodes [{:id "pm-1" :kind :pm :title "AI-PM" :prompt "" :staff-id roles/ai-pm-id :staff-name "AI-PM" :staff-role "pm"}] :edges []}
+                  (cond-> (canvas/initial-canvas) (= "gui" template-id) canvas/migrate-gui-cards))
           ids (into {} (mapv (fn [node] [(:id node) (str "card_" (UUID/randomUUID))]) (:nodes model)))
           doc {:format "codexcamp.ai-canvas" :schemaVersion 1
                :id (str "canvas_" (UUID/randomUUID)) :title title :template (:id template) :revision 1
@@ -103,12 +106,12 @@
 
 (defn model [doc presentation]
   (let [positions (into {} (mapv (juxt :id #(select-keys % [:x :y])) (:nodes presentation)))]
-    (cond-> (merge (canvas/initial-canvas) (select-keys presentation [:selected :viewport :next-flow-id])
-                   {:workflow (if (= "project-roles" (:template doc)) :roles :document) :template (:template doc) :edges (:edges doc)
-                    :selected (or (:selected presentation) (:id (first (:nodes doc))))
-                    :nodes (mapv (fn [index node]
-                                   (merge {:x (* 310.0 index) :y 0.0} node (get positions (:id node)) {:kind (keyword (:kind node))}))
-                                 (range (count (:nodes doc))) (:nodes doc))})
+    (cond-> (graph/migrate-prerequisites (merge (canvas/initial-canvas) (select-keys presentation [:selected :viewport :next-flow-id])
+                                                {:workflow (if (= "project-roles" (:template doc)) :roles :document) :template (:template doc) :edges (:edges doc)
+                                                 :selected (or (:selected presentation) (:id (first (:nodes doc))))
+                                                 :nodes (mapv (fn [index node]
+                                                                (merge {:x (* 310.0 index) :y 0.0} node (get positions (:id node)) {:kind (keyword (:kind node))}))
+                                                              (range (count (:nodes doc))) (:nodes doc))}))
       (= "project-roles" (:template doc)) (-> (assoc :role-types (or (::role-types (meta doc)) (:roles (roles/default-config))))
                                               roles/layout roles/assign-staff-names roles/apply-defaults)
       (and (= "project-roles" (:template doc)) (coll/any? #(nil? (:role-type %)) (:nodes doc)))

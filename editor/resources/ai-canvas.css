@@ -128,6 +128,13 @@ specific language governing permissions and limitations under the License.
 .ai-markdown-reader .scroll-bar { -fx-background-color: -reading-paper; }
 .ai-markdown-reader .scroll-bar .thumb { -fx-background-color: derive(-reading-paper, 30%); -fx-background-radius: 4; }
 .ai-toolbar { -fx-padding: 8 12; -fx-alignment: center-left; -fx-background-color: -df-background-light; -fx-border-color: -df-component-darker; -fx-border-width: 0 0 1 0; }
+/* Plain action buttons carry the fork palette as literal colours: the editor
+   theme button style does not reach every nested region, and a lookup that
+   resolves to the panel colour leaves a bare label. */
+.ai-command { -fx-background-color: #303030; -fx-border-color: #181818; -fx-border-width: 1; -fx-background-radius: 3; -fx-border-radius: 3; -fx-text-fill: #c8c8c8; -fx-min-width: 0; -fx-padding: 5 12; }
+.ai-command:hover { -fx-background-color: #424242; }
+.ai-command:armed { -fx-background-color: #242424; }
+.ai-command:disabled { -fx-opacity: 0.5; }
 .ai-icon-button { -fx-min-width: 28; -fx-pref-width: 28; -fx-padding: 3; -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -df-text; }
 .ai-icon-button:hover { -fx-background-color: -df-component-dark; }
 .ai-resource-icon { -fx-fill: transparent; -fx-stroke: -df-text; -fx-stroke-width: 1.4; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
@@ -204,7 +211,7 @@ specific language governing permissions and limitations under the License.
 .ai-composer-input, .ai-composer-input:focused { -fx-border-color: transparent; -fx-background-color: transparent; -fx-padding: 0; -fx-font-size: 14; }
 .ai-composer-input .content, .ai-composer-input .scroll-pane, .ai-composer-input .viewport { -fx-background-color: transparent; }
 .ai-composer-input .content { -fx-padding: 4 6; }
-.ai-send { -fx-min-width: 36; -fx-pref-width: 36; -fx-min-height: 36; -fx-pref-height: 36; -fx-max-height: 36; -fx-padding: 6; -fx-background-radius: 18; -fx-border-radius: 18; -fx-border-color: transparent; -fx-background-color: -df-component-lighter; }
+.ai-send { -fx-min-width: 60; -fx-pref-width: 60; -fx-max-width: 60; -fx-min-height: 32; -fx-pref-height: 32; -fx-max-height: 32; -fx-padding: 4 10; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: transparent; -fx-background-color: -df-component-lighter; -fx-font-family: "Microsoft YaHei"; -fx-font-size: 13; -fx-text-fill: -df-text-light; }
 .ai-send:hover { -fx-background-color: -df-ui-accent; }
 .ai-send .send-glyph { -fx-fill: -df-text-light; }
 .ai-composer-heading { -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; }
@@ -282,3 +289,115 @@ specific language governing permissions and limitations under the License.
 .ai-compare-diff-side .ai-compare-line-number { -fx-text-fill: -df-text; -fx-font-size: 11; }
 .ai-compare-left:changed { -fx-background-color: derive(-df-error-severity-fatal, -78%); -fx-border-color: transparent -df-component-dark transparent -df-error-severity-fatal; -fx-border-width: 0 1 0 3; }
 .ai-compare-right:changed { -fx-background-color: derive(-df-defold-green-lighter, -80%); -fx-border-color: transparent transparent transparent -df-defold-green-lighter; -fx-border-width: 0 0 0 3; }
+
+/* Project overview: retain layout and inherit the engine theme. */
+#ai-project-overview {
+    -ov-bg: -df-background;
+    -ov-surface: -df-background-light;
+    -ov-ink: -df-text-light;
+    -ov-muted: -df-text;
+    -ov-blue: -df-defold-blue-lighter;
+    -ov-green: -df-defold-green-lighter;
+    -ov-gold: -df-error-severity-warning;
+    -fx-background-color: -df-background;
+}
+#ai-project-overview .label {  -fx-font-size: 14; -fx-text-fill: -ov-ink; }
+#ai-project-overview .ai-overview-title { -fx-font-size: 29; -fx-font-weight: bold; }
+#ai-project-overview .ai-overview-section-title { -fx-font-size: 18; -fx-font-weight: bold; }
+#ai-project-overview .ai-overview-subtitle { -fx-font-size: 15; -fx-font-weight: bold; }
+#ai-project-overview .ai-overview-muted { -fx-font-size: 13; -fx-text-fill: -ov-muted; }
+#ai-project-overview .ai-overview-accent { -fx-text-fill: -ov-blue; }
+#ai-project-overview .ai-overview-success { -fx-text-fill: -ov-green; }
+#ai-project-overview .ai-overview-warning { -fx-text-fill: -ov-gold; }
+#ai-project-overview .ai-overview-header { -fx-padding: 15 20 13 20; -fx-spacing: 8; }
+#ai-project-overview .ai-overview-heading { -fx-spacing: 5; }
+#ai-project-overview .ai-overview-section-scroll, #ai-project-overview .ai-overview-section-scroll > .viewport { -fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 0; }
+#ai-project-overview .ai-overview-section-content { -fx-padding: 0 7 0 0; -fx-spacing: 9; }
+#ai-project-overview .ai-overview-body { -fx-padding: 0 20 16 20; -fx-spacing: 14; }
+#ai-project-overview .ai-overview-copy { -fx-spacing: 5; }
+#ai-project-overview .ai-overview-summary-strip, #ai-project-overview .ai-overview-section {
+    -fx-background-color: -df-background-light;
+    -fx-border-color: -df-component-dark -df-component-dark -df-component-dark -df-component-dark;
+    -fx-border-radius: 8; -fx-background-radius: 8;
+    -fx-effect: null;
+}
+#ai-project-overview .ai-overview-summary-strip { -fx-padding: 14 20; -fx-spacing: 16; }
+#ai-project-overview .ai-overview-metric-main { -fx-spacing: 5; -fx-min-width: 260; }
+#ai-project-overview .ai-overview-metric-number { -fx-font-size: 23; -fx-font-weight: bold; }
+#ai-project-overview .ai-overview-complete-icon {  -fx-font-size: 30; -fx-text-fill: -ov-green; -fx-padding: 0 12 0 0; }
+#ai-project-overview .ai-overview-metric-cell { -fx-spacing: 4; -fx-alignment: center; -fx-border-color: transparent transparent transparent -df-component-dark; -fx-border-width: 0 0 0 1; -fx-min-width: 90; }
+#ai-project-overview .ai-overview-metric-cell .button {  -fx-font-size: 27; -fx-text-fill: -ov-ink; -fx-padding: 0; }
+#ai-project-overview .ai-overview-section { -fx-padding: 12 14; -fx-spacing: 10; }
+#ai-project-overview .ai-overview-stage-row {
+    -fx-background-color: -df-background;
+    -fx-border-color: -df-component-dark; -fx-border-radius: 6; -fx-background-radius: 6;
+    -fx-padding: 5 12; -fx-spacing: 14;
+}
+#ai-project-overview .ai-overview-stage-row:hover { -fx-background-color: -df-background-lightish; -fx-border-color: -df-component-light; }
+#ai-project-overview .ai-overview-stage-index {  -fx-font-size: 19; -fx-text-fill: -df-text-light; }
+#ai-project-overview .ai-overview-avatar { -fx-background-color: -df-component-dark; -fx-background-radius: 24; -fx-effect: null; }
+#ai-project-overview .ai-overview-progress { -fx-min-height: 11; -fx-pref-height: 11; -fx-max-height: 11; }
+#ai-project-overview .overview-segment, #ai-project-overview .overview-segment-done, #ai-project-overview .overview-segment-active { -fx-background-radius: 2; -fx-min-height: 11; -fx-pref-height: 11; -fx-max-height: 11; }
+#ai-project-overview .overview-segment { -fx-background-color: -df-component-dark; }
+#ai-project-overview .overview-segment-done { -fx-background-color: -df-defold-green-lighter; -fx-border-color: -df-defold-green-lighter; -fx-border-radius: 2; -fx-border-width: 1 0 0 0; }
+#ai-project-overview .overview-segment-active { -fx-background-color: -df-ui-accent; }
+#ai-project-overview .ai-overview-empty { -fx-padding: 12 6; -fx-text-fill: -ov-muted; }
+#ai-project-overview .ai-overview-empty-running { -fx-padding: 18 20; -fx-min-height: 96; -fx-spacing: 10; -fx-background-color: -df-background; -fx-border-color: -df-component-dark; -fx-border-radius: 6; -fx-background-radius: 6; }
+#ai-project-overview .ai-overview-execution-card, #ai-project-overview .ai-overview-output {
+    -fx-background-color: -df-background;
+    -fx-border-color: -df-component-dark; -fx-border-radius: 6; -fx-background-radius: 6;
+    -fx-effect: null;
+}
+#ai-project-overview .ai-overview-execution-card { -fx-padding: 14; -fx-min-height: 150; }
+#ai-project-overview .ai-overview-person-column { -fx-alignment: center; -fx-spacing: 6; -fx-min-width: 78; -fx-padding: 0 14 0 0; -fx-border-color: transparent -df-component-dark transparent transparent; -fx-border-width: 0 1 0 0; }
+#ai-project-overview .ai-overview-execution-copy { -fx-spacing: 7; }
+#ai-project-overview .ai-overview-role-badge { -fx-background-color: -df-background-lightish; -fx-background-radius: 2; -fx-padding: 2 8; -fx-font-size: 11; -fx-text-fill: -df-defold-green-lighter; }
+#ai-project-overview .ai-overview-output { -fx-padding: 9; -fx-spacing: 10; }
+#ai-project-overview .ai-overview-output:hover { -fx-border-color: -df-component-light; -fx-effect: null; }
+#ai-project-overview .ai-overview-preview { -fx-background-color: -df-background-darker; -fx-background-radius: 6; -fx-min-height: 180; -fx-pref-height: 190; -fx-max-height: 190; }
+#ai-project-overview .ai-overview-preview-copy { -fx-padding: 18; }
+#ai-project-overview .ai-overview-excerpt { -fx-background-color: -df-background-input; -fx-text-fill: -df-text; -fx-padding: 16; -fx-font-size: 13; -fx-alignment: top-left; }
+#ai-project-overview .ai-overview-review-row { -fx-padding: 10 0; -fx-border-color: transparent transparent -df-component-dark transparent; -fx-border-width: 0 0 1 0; -fx-spacing: 12; }
+#ai-project-overview .ai-overview-review-icon {  -fx-font-size: 22; -fx-text-fill: -ov-gold; -fx-background-color: -df-component-dark; -fx-background-radius: 2; -fx-padding: 6 10; }
+#ai-project-overview .ai-overview-count-badge { -fx-background-color: -df-ui-selection; -fx-padding: 2 8; -fx-background-radius: 2; -fx-font-weight: bold; }
+#ai-project-overview .ai-overview-issue { -fx-padding: 13; -fx-spacing: 7; -fx-background-color: -df-background; -fx-border-color: -df-error-severity-warning; -fx-border-radius: 6; -fx-background-radius: 6; }
+#ai-project-overview .ai-overview-issue > .ai-overview-warning { -fx-font-size: 16; -fx-font-weight: bold; }
+#ai-project-overview .ai-overview-staff-row { -fx-padding: 7 0; -fx-spacing: 12; -fx-border-color: transparent transparent -df-component-dark transparent; -fx-border-width: 0 0 1 0; }
+#ai-project-overview .ai-overview-task-row { -fx-padding: 7 0; -fx-border-color: transparent transparent -df-component-dark transparent; -fx-border-width: 0 0 1 0; }
+#ai-project-overview .button.ai-overview-link { -fx-font-size: 13; -fx-padding: 4 7; -fx-min-width: 0; }
+#ai-project-overview .ai-overview-metric-cell .button.ai-overview-link { -fx-font-size: 27; -fx-text-fill: -ov-ink; -fx-padding: 0;  -fx-background-color: transparent; -fx-border-color: transparent; }
+#ai-project-overview .button.ai-overview-tab, #ai-project-overview .button.ai-overview-tab-active { -fx-padding: 4 12; }
+#ai-project-overview .button.ai-overview-tab-active { -fx-background-color: -df-ui-selection; -fx-border-color: -df-ui-accent; -fx-effect: null; }
+#ai-project-overview .combo-box, #ai-project-overview .text-field { -fx-min-height: 32; }
+/* The selected display cell is not a selected popup row. */
+#ai-project-overview .combo-box > .list-cell { -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -df-text; }
+#ai-project-overview .ai-overview-section-scroll .scroll-bar:vertical { -fx-pref-width: 7; -fx-background-color: transparent; }
+#ai-project-overview .ai-overview-icon { -fx-fill: transparent; -fx-stroke: -df-component-icon; -fx-stroke-width: 1.6; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+#ai-project-overview .ai-overview-review-icon { -fx-min-width: 40; -fx-pref-width: 40; -fx-max-width: 40; -fx-min-height: 40; -fx-pref-height: 40; -fx-max-height: 40; -fx-padding: 0; -fx-background-color: -df-component-dark; }
+#ai-project-overview .ai-overview-review-icon .ai-overview-icon { -fx-stroke: -df-component-icon; }
+.ai-project-browser .ai-overview-home { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 4 14 4 29; -fx-text-fill: -df-text; -fx-alignment: center-left; -fx-font-size: 14; -fx-font-weight: normal; -fx-min-height: 30; -fx-pref-height: 30; -fx-max-height: 30; }
+.ai-project-entry-icon { -fx-min-width: 22; -fx-pref-width: 22; -fx-max-width: 22; -fx-min-height: 22; -fx-pref-height: 22; -fx-max-height: 22; }
+.ai-project-browser .ai-overview-home, .ai-project-browser .tree-cell { -fx-border-radius: 4; -fx-background-radius: 4; -fx-border-width: 1; -fx-background-insets: 0; -fx-border-insets: 0; -fx-effect: null; }
+.ai-project-browser .ai-overview-home:hover, .ai-project-browser .tree-cell:filled:hover { -fx-background-color: -df-component-dark; }
+.ai-project-browser .ai-overview-home:selected, .ai-project-browser .ai-overview-home:selected:hover, .ai-project-browser .tree-cell:filled:selected, .ai-project-browser .tree-cell:filled:selected:hover { -fx-background-color: -df-ui-selection; -fx-border-color: -df-ui-accent; -fx-text-fill: -df-text-selected; }
+.ai-project-header { -fx-padding: 10 14; -fx-min-height: 46; }
+.ai-project-header .label { -fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: -df-text-light; }
+.ai-project-browser .tree-cell {  -fx-font-size: 14; -fx-padding: 4 28 4 8; -fx-min-width: 0; -fx-pref-width: 0; }
+.ai-project-category-icon { -fx-fill: transparent; -fx-stroke: -df-text-light; -fx-stroke-width: 1.3; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.ai-project-storage { -fx-padding: 16 14; -fx-font-size: 13; -fx-text-fill: -df-text-dark; }
+.ai-workspace-tab-icon { -fx-fill: transparent; -fx-stroke: -df-text-light; -fx-stroke-width: 1.2; -fx-stroke-line-join: round; }
+#ai-project-overview .ai-overview-role-chip { -fx-padding: 2 7; -fx-background-radius: 2; -fx-font-size: 12; }
+#ai-project-overview .ai-overview-stage-copy { -fx-spacing: 3; -fx-alignment: center-left; }
+#ai-project-overview .ai-overview-dependency { -fx-font-size: 11; -fx-text-fill: -ov-muted; }
+#ai-project-overview .ai-overview-version {  -fx-font-size: 11; -fx-text-fill: -df-text-dark; }
+#ai-project-overview .ai-overview-output-owner { -fx-spacing: 1; }
+#ai-project-overview .ai-overview-output-owner .label { -fx-font-size: 12; }
+#ai-project-overview .ai-overview-asset-preview { -fx-padding: 10; }
+#ai-project-overview .ai-overview-asset-cell { -fx-background-color: -df-background-input; -fx-border-color: -df-component-dark; -fx-background-radius: 2; -fx-border-radius: 2; }
+#ai-project-overview .ai-overview-review-row > .button.ai-overview-link { -fx-padding: 5 9; }
+#ai-project-overview .button, #ai-project-overview .combo-box, #ai-project-overview .text-field { -fx-background-radius: 4; -fx-border-radius: 4; }
+#ai-project-overview .combo-box > .arrow-button { -fx-background-radius: 0 4 4 0; }
+#ai-project-overview .ai-overview-navigation { -fx-padding: 5 8; -fx-spacing: 10; -fx-background-color: -df-background-light; -fx-background-radius: 6; -fx-border-color: -df-component-dark; -fx-border-radius: 6; }
+#ai-project-overview .button.ai-overview-back { -fx-padding: 4 8; -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -df-text-light; }
+#ai-project-overview .button.ai-overview-back:hover { -fx-background-color: -df-component-dark; }
+#ai-project-overview .ai-overview-filter-caption { -fx-font-size: 13; -fx-text-fill: -df-text; }

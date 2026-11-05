@@ -19,8 +19,7 @@
            [javafx.geometry Pos]
            [javafx.scene.control Button Label TextArea Tooltip]
            [javafx.scene.input KeyCode KeyEvent]
-           [javafx.scene.layout HBox Priority VBox]
-           [javafx.scene.shape SVGPath]))
+           [javafx.scene.layout HBox Priority VBox]))
 
 (set! *warn-on-reflection* true)
 
@@ -62,11 +61,9 @@
     (.setAlignment row Pos/CENTER)
     (.setAlignment footer Pos/CENTER_LEFT)
     (HBox/setHgrow input Priority/ALWAYS)
-    (.setText send "")
-    (.setAccessibleText send "发送到 AI")
-    (.setTooltip send (Tooltip. "发送 · Ctrl / ⌘ + Enter"))
-    (.setGraphic send (doto (SVGPath.) (.setContent "M10 0 L1 11 L8 11 L6 21 L18 8 L11 8 L14 0 Z")
-                            (-> .getStyleClass (.add "send-glyph"))))
+    (.setText send "保存")
+    (.setAccessibleText send "保存任务内容")
+    (.setTooltip send (Tooltip. "保存任务内容 · Ctrl / ⌘ + Enter"))
     (.setText attach "+ 图片 / 文档")
     (.setText clear "清除附件")
     (doseq [button [attach clear]] (.add (.getStyleClass ^Button button) "button-small"))

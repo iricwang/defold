@@ -1,7 +1,7 @@
 .tab-pane {
     &:top {
-        -fx-tab-min-height: 3.0em;
-        -fx-tab-max-height: 100.0em;
+        -fx-tab-min-height: 2.0em;
+        -fx-tab-max-height: 2.0em;
         -fx-border-width: 0;
         -fx-border-color: -df-background-lighter;
         -fx-padding: 0.0em;
@@ -15,9 +15,15 @@
         -fx-background-insets: 0;
         -fx-background-color: -df-background;
         -fx-border-width: 0 0 2 0;
-        -fx-border-insets: 0 8 0 0;
+        -fx-border-insets: 0;
         -fx-border-color: -df-background;
-        -fx-padding: 0 0 0 2;
+        -fx-padding: 0 8 0 8;
+
+        // Keep the label and close button as one centered group.
+        > .tab-container {
+            -fx-alignment: center;
+            -fx-spacing: 5;
+        }
 
         &:hover {
             -fx-background-insets: 0;
@@ -26,7 +32,7 @@
             }
         }
         &:selected {
-            -fx-border-insets: 0 8 0 0;
+            -fx-border-insets: 0;
             -fx-border-color: -df-defold-orange;
             -fx-color: -df-text-selected;
 
@@ -39,7 +45,7 @@
         }
 
         .tab-label {
-            -fx-padding: 0 2 0 0;
+            -fx-padding: 0;
             -fx-text-fill: -df-text;
         }
 

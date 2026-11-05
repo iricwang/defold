@@ -29,7 +29,7 @@
         delivered (canvas/deliver-gui base "assets-1" output)
         id "gui_assets-1"
         bound (canvas/update-node delivered id #(assoc % :gui-resource "/game/final.gui"))]
-    (is (= [:gui] (get graph/successors :assets)))
+    (is (= [:gui :action] (get graph/successors :assets)))
     (is (= [] (get graph/successors :gui)))
     (is (= 4 (count (:nodes delivered))))
     (is (= (:gui output) (:gui-resource (canvas/node-by-id delivered id))))
@@ -374,7 +374,7 @@
       (is (nil? (.lookup root "#canvas-compose-action-1")))
       (is (nil? (.lookup detail-root "#ai-detail-staff-action-1")))
       (is (nil? (.lookup detail-root "#action-task-run")))
-      (is (not (.isDisabled (.lookup detail-root "#action-task-save"))))
+      (is (nil? (.lookup detail-root "#action-task-save")))
       (doseq [id ["canvas-out-action-1" "canvas-confirm-result-result-1"
                   "canvas-produce-assets-1" "canvas-gui-open-gui_assets-1" "canvas-gui-refresh-gui_assets-1"]]
         (is (.isDisabled (.lookup root (str "#" id)))))
@@ -395,6 +395,64 @@
       ((:render! view))
       (is (.isDisabled (.lookup root "#canvas-out-action-1")))
       (is (.isDisabled (.lookup root "#canvas-produce-assets-1"))))))
+
+;; Dragging a wire out of AI-PM creates a TaskCard that belongs to it, even
+;; before a project goal is saved, so follow-up work is always managed.
+(deftest add-card-from-ai-pm-test
+  (let [pm {:id "pm-1" :kind :pm :title "AI-PM" :prompt "" :x 0.0 :y 0.0
+            :staff-id roles/ai-pm-id :staff-name "AI-PM" :staff-role "pm"}
+        model {:nodes [pm] :edges [] :template "ai-pm"}
+        staff [(assoc (roles/new-role "pm" #{}) :id roles/ai-pm-id :title "AI-PM" :builtin true)]
+        next (canvas/add-card model :task 10.0 20.0 {:staff (first staff) :from "pm-1"})
+        task (canvas/node-by-id next (:selected next))
+        connected (graph/connect next staff "pm-1" (:id task))]
+    (is (= :task (:kind task)))
+    (is (nil? (:staff-id task)))
+    (is (= "pm-1" (:source-pm task)))
+    (is (= "review" (:status task)))
+    (is (= [] (:depends-on task)))
+    (is (nil? (graph/node-error pm staff)))
+    (is (nil? (graph/task-error connected staff (:id task))))))
+
+;; TaskCards chain through dependency wires instead of the old checkbox picker;
+;; a prerequisite wire must not look like an execution input and cannot cycle.
+(deftest task-dependency-edge-test
+  (let [staff [(assoc (roles/new-role "pm" #{}) :id roles/ai-pm-id :title "AI-PM" :builtin true)]
+        pm {:id "pm-1" :kind :pm :title "AI-PM" :prompt "" :x 0.0 :y 0.0
+            :staff-id roles/ai-pm-id :staff-name "AI-PM" :staff-role "pm"}
+        base {:nodes [pm] :edges [] :template "ai-pm"}
+        model (canvas/add-card base :task 0.0 0.0 {:staff (first staff) :from "pm-1"})
+        a (:selected model)
+        model (graph/connect model staff "pm-1" a)
+        model (canvas/add-card model :task 0.0 0.0 {:staff (first staff) :from "pm-1"})
+        b (:selected model)
+        model (graph/connect model staff "pm-1" b)
+        linked (graph/connect model staff a b)]
+    (is (graph/dependency-edge? linked {:from a :to b}))
+    (is (nil? (graph/task-error linked staff a)))
+    (is (nil? (graph/task-error linked staff b)))
+    (is (thrown? Exception (graph/connect linked staff b a)))
+    (is (thrown? Exception (graph/connect linked staff a a)))))
+
+;; Action task text is written in the bottom composer, so the inspector must not
+;; render task title/description/type controls or overwrite the stored prompt.
+(deftest action-task-content-composer-only-test
+  (ui/run-now
+    (let [staff [(roles/new-role "planning" #{})]
+          model (-> (canvas/initial-canvas)
+                    (assoc :workflow :document :template "gui" :selected "action-1")
+                    (canvas/update-node "action-1" #(-> % (assoc :title "生成界面" :prompt "原有任务内容")
+                                                        (roles/assign-staff (first staff)))))
+          state (atom {:canvas model :staff staff})
+          details (canvas/make-details state (fn [_ _]) (fn [_ _]) (fn [_ _ _]) (fn [_ _]) (constantly staff)
+                                       (fn [_ _]) (fn [_]) (fn [_ _ _]))
+          root ^javafx.scene.layout.BorderPane (:root details)]
+      (javafx.scene.Scene. root 360.0 800.0)
+      ((:refresh! details))
+      (.applyCss root) (.layout root)
+      (doseq [id ["#action-task-title" "#action-task-type" "#action-task-description" "#action-task-save"]]
+        (is (nil? (.lookup root id))))
+      (is (= "原有任务内容" (:prompt (canvas/node-by-id (:canvas @state) "action-1")))))))
 
 ;; Undo preserves asynchronous outputs and archived sessions.
 (deftest canvas-undo-redo-test

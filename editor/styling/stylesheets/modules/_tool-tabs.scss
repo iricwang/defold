@@ -1,7 +1,13 @@
 #tool-tabs {
-    -fx-tab-min-height: 25px;
+    -fx-tab-min-height: 22px;
+    -fx-tab-max-height: 22px;
     -fx-tab-min-width: 40px;
     -fx-padding: 0 0 0 0;
+
+    // Tool tabs keep their leading icon, so center within the text area only.
+    .tab > .tab-container {
+        -fx-alignment: center-left;
+    }
 
     .list-view {
         -fx-background-insets: 0;
@@ -35,7 +41,7 @@
         -fx-background-position: 10 3;
         -fx-background-repeat: no-repeat;
         -fx-background-size: 17 17;
-        -fx-padding: 0 10 5 32;
+        -fx-padding: 0 10 3 32;
         -fx-spacing: 0;
     }
 }

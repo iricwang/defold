@@ -23,26 +23,38 @@
             [editor.ai-canvas :as canvas]
             [editor.ai-card-view :as card-view]
             [editor.ai-composer :as composer]
+            [editor.ai-delivery :as delivery]
             [editor.ai-document :as document]
             [editor.ai-graph :as graph]
             [editor.ai-gui-preview :as gui-preview]
+            [editor.ai-import-workflow :as import-workflow]
             [editor.ai-production :as production]
             [editor.ai-production-view :as production-view]
             [editor.ai-project-browser :as project-browser]
+            [editor.ai-pm :as pm]
+            [editor.ai-project-work :as project-work]
+            [editor.ai-resource-import :as resource-import]
             [editor.ai-result-compare :as result-compare]
             [editor.ai-results :as results]
             [editor.ai-roles :as roles]
             [editor.ai-tasks :as tasks]
             [editor.ai-workspace :as ai-workspace]
             [editor.app-view :as app-view]
+            [editor.build :as build]
             [editor.craft-project :as craft-project]
             [editor.defold-project :as project]
+            [editor.editor-extensions :as extensions]
             [editor.editor-tab :as editor-tab]
             [editor.file-reveal :as file-reveal]
+            [editor.pipeline :as pipeline]
+            [editor.progress :as progress]
             [editor.resource :as resource]
+            [editor.resource-types :as resource-types]
+            [editor.shared-editor-settings :as shared-editor-settings]
             [editor.ui :as ui]
             [editor.view :as view]
             [editor.workspace :as workspace]
+            [internal.system :as system]
             [util.coll :as coll]
             [util.digest :as digest])
   (:import [javafx.beans.value ChangeListener]
@@ -50,7 +62,7 @@
            [java.io BufferedReader InputStream InputStreamReader StringReader]
            [java.net URI URLEncoder]
            [java.net.http HttpClient HttpRequest HttpRequest$BodyPublishers HttpResponse$BodyHandlers]
-           [java.nio.file Files StandardCopyOption]
+           [java.nio.file Files]
            [java.time Duration]
            [java.util UUID]
            [javafx.application Platform]
@@ -73,20 +85,28 @@
     (string/replace address #"/$" "")))
 
 (defn message-text [text context]
-  (str (if (:result-confirmation context)
-         "[方案确认] 这是人工选定的正式版本。记录确认并整理此方案交付，不重新生成候选，不覆盖其他已确认方案。\n\n"
-         (if (canvas/text-workflow? context)
-           "[方案创作] 返回文字方案供选择，不生成图片或修改游戏文件。\n\n"
-           (case (get-in context [:canvasCard :type])
-             "action" (if (= "gui" (:template context))
-                        "[完整界面效果图] 按项目屏幕比例生成完整、已排版的游戏界面候选，包含标题、内容、文字和操作区。文件命名 *_screen.png。禁止用组件拼贴、拆图或 sprite sheet 充当界面效果图；拆分组件属于 Assets 阶段。使用生图工具，不修改游戏文件。\n\n"
-                        "[效果图] 使用生图工具生成候选图片，不修改游戏文件。\n\n")
-             "result" "[候选评审] 讨论或调整候选图片，不修改游戏文件。\n\n"
-             "assets" "[资源规划] 返回拆分方案，不直接写游戏文件。\n\n"
-             "")))
-       (when (and (not (:result-confirmation context)) (= "action" (get-in context [:canvasCard :type])))
+  (str (when (:pm-planning context)
+         (str (pm/instructions (:project-staff context))
+              "已有分配记录（不要重复分配已确认工作；结合驳回记录和当前目标调整待确认工作）：\n"
+              (json/write-str (:pm-current-tasks context)) "\n\n"))
+       (when (:acceptance-feedback context)
+         (str "[项目验收反馈数据]\n" (json/write-str (:acceptance-feedback context)) "\n\n"))
+       (if (:resource-import context)
+         "[资源入库记录] 本次任务由编辑器确定性工具执行。只在当前职员对话记录下面的实际结果；不要调用工具修改文件，不生成候选、不再次入库。编译通过不代表视觉验收通过。\n\n"
+         (if (:result-confirmation context)
+           "[方案确认] 这是人工选定的正式版本。记录确认并整理此方案交付，不重新生成候选，不覆盖其他已确认方案。\n\n"
+           (if (canvas/text-workflow? context)
+             "[方案创作] 返回文字方案供选择，不生成图片或修改游戏文件。\n\n"
+             (case (get-in context [:canvasCard :type])
+               "action" (if (= "gui" (:template context))
+                          "[完整界面效果图] 按项目屏幕比例生成完整、已排版的游戏界面候选，包含标题、内容、文字和操作区。文件命名 *_screen.png。禁止用组件拼贴、拆图或 sprite sheet 充当界面效果图；拆分组件属于 Assets 阶段。使用生图工具，不修改游戏文件。\n\n"
+                          "[效果图] 使用生图工具生成候选图片，不修改游戏文件。\n\n")
+               "result" "[候选评审] 讨论或调整候选图片，不修改游戏文件。\n\n"
+               "assets" "[资源规划] 返回拆分方案，不直接写游戏文件。\n\n"
+               ""))))
+       (when (and (not (:resource-import context)) (not (:result-confirmation context)) (= "action" (get-in context [:canvasCard :type])))
          "如提供多个文字方案，每个方案分别以二级 Markdown 标题“方案 A：名称”“方案 B：名称”开头，各方案内容完整独立。\n\n")
-       (when (and (= :document (:workflow context)) (not (:result-confirmation context)))
+       (when (and (= :document (:workflow context)) (not (:result-confirmation context)) (not (:resource-import context)))
          (str "方案类型：" (:title (canvas/template (:template context))) "\n"
               (:instructions (canvas/template (:template context))) "\n\n"))
        (when-let [person (:staff context)]
@@ -201,13 +221,26 @@
 (defn task-context [state id staff]
   (let [model (:canvas state)
         action (canvas/node-by-id model (flow-action-id model id))
-        person-card (if (= :person (:kind action)) action (canvas/node-by-id model (tasks/person-id model (:id action))))
+        person-card (if (contains? #{:person :pm} (:kind action)) action (canvas/node-by-id model (tasks/person-id model (:id action))))
         person (roles/assigned-staff person-card staff)]
-    (cond-> (card-context state id) person (assoc :staff person))))
+    (cond-> (card-context state id) person (assoc :staff person)
+      (get-in state [:task-origin :task])
+      (assoc :acceptance-feedback (last (filterv #(and (= "task-acceptance" (:kind %))
+                                                       (= (get-in state [:task-origin :task]) (:subject-id %)))
+                                                 (get-in state [:project-work :approvals]))))
+      (= :pm (:kind action))
+      (assoc :pm-planning true :project-staff staff :workflow :document :template "ai-pm"
+             :pm-current-tasks (coll/into-> (:nodes model) []
+                                 (filter #(and (= id (:source-pm %)) (not= "superseded" (:status %))))
+                                 (map (fn managed-task [card]
+                                        (assoc (select-keys card [:id :title :stage :staff-id :prompt :deliverables :status :allocated-path :delivery-type])
+                                          :work-status (project-work/task-status (:project-work state) (:id card))
+                                          :acceptance (last (filterv #(and (= "task-acceptance" (:kind %)) (= (:id card) (:subject-id %)))
+                                                                     (get-in state [:project-work :approvals])))))))))))
 
 (defn task-owner [model id path]
   (let [action (canvas/node-by-id model (flow-action-id model id))
-        person (if (= :person (:kind action)) action (canvas/node-by-id model (tasks/person-id model (:id action))))
+        person (if (contains? #{:person :pm} (:kind action)) action (canvas/node-by-id model (tasks/person-id model (:id action))))
         staff-id (:staff-id person)]
     (if staff-id
       (str "person/" staff-id)
@@ -215,13 +248,16 @@
 
 (defn task-name [staff action]
   (let [clean (fn clean-title [s] (string/trim (string/replace (or s "") #"[\p{Cntrl}\s]+" " ")))
-        person (clean (:title staff))
+        truncate (fn truncate-text [limit s] (subs s 0 (min limit (count s))))
+        role (truncate 20 (clean (:title (roles/role-type staff))))
+        person (truncate 60 (clean (:title staff)))
         title (clean (:title action))
         title (if (string/blank? title) "未命名任务" title)
-        prefix (if (string/blank? person) "" (str (subs person 0 (min 80 (count person))) "("))
-        suffix (if (string/blank? prefix) "" ")")
-        limit (- 120 (count prefix) (count suffix))]
-    (str prefix (subs title 0 (min limit (count title))) suffix)))
+        label (cond
+                (string/blank? person) ""
+                (string/blank? role) (str "【" person "】")
+                :else (str "【" role "-" person "】"))]
+    (str label (truncate (- 120 (count label)) title))))
 
 (defn bind-task [state owner thread-id]
   (update state :sessions
@@ -315,6 +351,66 @@
          " · Codex 侧栏状态未确认")
        " · 点击重新检查"))
 
+(defn assert-import-resources-saved! [project paths]
+  (let [paths (set paths)
+        dirty (coll/into-> (project/dirty-save-data project) [] (map #(resource/proj-path (:resource %))) (filter paths))]
+    (when (coll/not-empty dirty)
+      (throw (ex-info "入库涉及的资源有未保存修改，请先保存或取消编辑后重试" {:paths dirty})))))
+
+(defn validate-import! [project output]
+  ;; Validation owns both its graph and build output. It cannot prune the
+  ;; running project's build/default or replace nodes retained by editor undo.
+  (let [source-workspace (project/workspace project)
+        source-system g/*the-system*
+        paths (into (:paths output) (:source-paths output))
+        _ (assert-import-resources-saved! project paths)
+        root (workspace/project-directory source-workspace)
+        localization (g/node-value source-workspace :localization)
+        config (shared-editor-settings/load-project-workspace-config root localization)]
+    (binding [g/*the-system* (atom (system/make-system {:cache-size 10000 :cache-retain? project/cache-retain?}))]
+      (let [workspace (workspace/make-workspace root {} config localization)
+            _ (g/user-data! workspace :editor.workspace/build-directory (io/file (:build-directory output)))
+            _ (resource-types/register-resource-types! workspace)
+            _ (workspace/resource-sync! workspace)
+            isolated-project (-> (project/make-project workspace (extensions/make)) project/load-project!)
+            result (g/with-auto-evaluation-context evaluation-context
+                     (let [atlas (project/get-resource-node isolated-project (:atlas output) evaluation-context)
+                           size (g/node-value atlas :layout-size evaluation-context)
+                           nodes (mapv #(project/ensure-resource-loaded! isolated-project %) (into [(:gui output)] (:reference-paths output)))
+                           targets (build/resolve-dependencies (mapv #(g/node-value % :build-targets evaluation-context) nodes) isolated-project evaluation-context)]
+                       (when (or (g/error? size) (coll/any? #(> % (get-in output [:rules :maxAtlasSize])) size))
+                         (throw (ex-info "图集超过项目尺寸限制，请拆分入库模块或调整资源规则" {})))
+                       (when (g/error? targets) (throw (ex-info "入库 GUI 或图集依赖校验失败" {:error (pr-str targets)})))
+                       (pipeline/build! targets (:build-directory output) {} evaluation-context progress/null-render-progress!)))]
+        (when-let [error (:error result)]
+          (throw (ex-info "入库 GUI 或图集引擎编译失败" {:error (pr-str error)})))
+        (binding [g/*the-system* source-system]
+          (assert-import-resources-saved! project paths))
+        (let [directory (.toPath (io/file (:build-directory output)))
+              files (with-open [stream (Files/walk directory (make-array java.nio.file.FileVisitOption 0))]
+                      (let [iterator (.iterator stream)]
+                        (loop [files []]
+                          (if-not (.hasNext iterator) files
+                                  (let [path ^java.nio.file.Path (.next iterator)]
+                                    (recur (cond-> files
+                                             (Files/isRegularFile path (make-array java.nio.file.LinkOption 0))
+                                             (conj [(str (.relativize directory path))
+                                                    (with-open [input (io/input-stream (.toFile path))] (digest/stream->sha256-hex input))]))))))))
+              sources (coll/into-> (:artifacts result) []
+                        (keep (fn compiled-source [artifact]
+                                (let [source (:resource (:resource artifact)) path (resource/proj-path source)]
+                                  (when (and path (not (string/starts-with? path "/builtins/")))
+                                    (let [file (craft-project/resource-file root path)]
+                                      (when (.isFile file)
+                                        {:path path :sha256 (subs (craft-project/file-hash root path) 7)}))))))
+                        (distinct))
+              _ (binding [g/*the-system* source-system] (assert-import-resources-saved! project (mapv :path sources)))
+              engine (System/getProperty "defold.engine.sha1")]
+          (when-not (coll/not-empty files) (throw (ex-info "引擎未产生构建产物" {})))
+          {:status "passed" :compiler "editor-resource-pipeline" :visualReview "pending"
+           :build-id (digest/string->sha256-hex (pr-str [engine (vec (sort files))]))
+           :engine-sha1 engine :compiled-files (vec (sort files)) :source-files sources})))))
+
 (defn make-view [^AnchorPane parent {:keys [root context tab project app-view prefs localization connect-on-open shared-browser] :or {connect-on-open true}}]
   (let [node (first (g/tx-nodes-added (g/transact {:undoable false} (g/make-node AIWorkbenchView))))
         _ (archive/migrate-legacy! root)
@@ -322,21 +418,26 @@
         role-document (= "project-roles" (:template doc))
         _ (when (and doc (not= 1 (:schemaVersion doc))) (throw (ex-info "此 Canvas 版本暂不支持编辑，请使用文本查看器查看" {})))
         document-state (atom doc)
-        context (cond-> context doc (assoc :template (:template doc) :workflow (if role-document :roles :document) :routing-path (str "/canvas/" (:id doc))))
+        context (cond-> context doc (assoc :canvas-id (:id doc) :template (:template doc) :workflow (if role-document :roles :document) :routing-path (str "/canvas/" (:id doc))))
         storage-key (or (:routing-path context) (:path context))
         saved (archive/load-canvas root storage-key)
         staff! (fn project-staff []
-                 (:nodes (document/model (document/read-document root (document/ensure-roles-document! root)) nil)))
+                 (:nodes (roles/ensure-ai-pm (document/model (document/read-document root (document/ensure-roles-document! root)) nil))))
         staff (staff!)
+        _ (project-work/initialize! root)
+        registration-error (try
+                             (when (= "ai-pm" (:template doc)) (pm/register-allocated! root (:path context) (document/model doc nil)))
+                             (when (:pm-origin doc) (pm/register-origin! root (:pm-origin doc)))
+                             nil
+                             (catch Exception e (.getMessage e)))
         state (atom (tasks/recover (archive/archive-state-files! root {:project-id (:project-id saved)
                                                                        :canvas (graph/stamp-legacy (results/migrate (canvas/separate-gui-candidates (canvas/migrate-gui-cards (if doc (document/model doc (:canvas saved)) (or (:canvas saved) (canvas/initial-canvas)))))) staff)
-                                                                       :staff staff :project-root root
+                                                                       :staff staff :project-root root :task-origin (:pm-origin doc) :project-work (project-work/read-work root)
                                                                        :sessions (or (:sessions saved) {"action-1" (select-keys saved [:thread-id :create-id :pending])})
-                                                                       :upload-paths (set (:upload-paths saved)) :address (:address saved) :closed false :connected false :context context :busy #{}})))
+                                                                       :address (:address saved) :closed false :connected false :context context :busy #{}})))
         client (-> (HttpClient/newBuilder) (.connectTimeout (Duration/ofSeconds 10)) .build)
         save-lock (Object.) refresh-lock (Object.)
         connect (Button.) connection-tip (Tooltip. "连接本机 Codex")
-        sync-button (Button. "同步资料")
         heading (Label.) history (doto (TextArea.) (.setEditable false) (.setWrapText true))
         conversation (TitledPane. "卡片对话" history)
         input (doto (TextArea.) (.setPromptText "描述目标或继续修改，支持图片和文档附件…") (.setPrefRowCount 3) (.setWrapText true))
@@ -346,6 +447,7 @@
         right (VBox. 8.0) right-dock (VBox.) split (SplitPane.) pane (VBox.)
         browser-ui (atom shared-browser) canvas-ui (atom nil) details-ui (atom nil) displayed (atom nil)
         pump-ref (atom (fn no-pump []))
+        import-preview-ref (atom nil)
         show! (fn show-status [notification]
                 (Platform/runLater (fn update-status []
                                      (when-not (:closed @state)
@@ -366,28 +468,14 @@
                               (catch Exception e
                                 (show! {:id :document-save :level :error :text (.getMessage e)}))))
                        (archive/save-canvas! root storage-key @state))))
-        sync-archive! (fn sync-project-archive []
-                        (when-let [project-id (:project-id @state)]
-                          (when (:connected @state)
-                            (let [base (:address @state) secret (:secret @state)]
-                              (try
-                                (let [result (archive/sync!
-                                               root project-id
-                                               (fn archive-api [path body] (api client base secret path body))
-                                               (fn upload-object [path file]
-                                                 (let [req (-> (HttpRequest/newBuilder (URI/create (str base path)))
-                                                               (.timeout (Duration/ofSeconds 90))
-                                                               (.header "Authorization" (str "Bearer " secret))
-                                                               (.POST (HttpRequest$BodyPublishers/ofFile (.toPath ^java.io.File file))) .build)
-                                                       response (.send client req (HttpResponse$BodyHandlers/ofString))]
-                                                   (when-not (= 200 (.statusCode response)) (throw (ex-info "CodexCamp 资料上传失败，已保留本地副本" {})))))
-                                               (fn download-object [path] (request client base secret path nil (HttpResponse$BodyHandlers/ofByteArray))))]
-                                  (Platform/runLater (fn refresh-project-directory []
-                                                       (when-not (:closed @state)
-                                                         (when-let [refresh! (:refresh! @browser-ui)] (refresh!)))))
-                                  (show! {:id :archive-sync :level (if (= "conflict" (:status result)) :warning :info)
-                                          :resolved (not= "conflict" (:status result)) :text (if (= "conflict" (:status result)) "资料存在冲突，两边版本已保留" (str "资料已同步 · 版本 " (:revision result)))}))
-                                (catch Exception e (show! {:id :archive-sync :level :warning :text (str "资料待同步：" (.getMessage e))})))))))
+        refresh-library! (fn refresh-local-library []
+                           (try
+                             (archive/refresh-local! root)
+                             (resolve! :local-library)
+                             (Platform/runLater (fn refresh-project-directory []
+                                                  (when-not (:closed @state)
+                                                    (when-let [refresh! (:refresh! @browser-ui)] (refresh!)))))
+                             (catch Exception e (show! {:id :local-library :level :warning :text (.getMessage e)}))))
         save-draft! (fn save-draft []
                       (when-let [id @displayed]
                         (when-not (or (contains? (:busy @state) id) (get-in @state [:sessions id :pending]))
@@ -397,7 +485,7 @@
                          card (canvas/node-by-id (:canvas @state) id)
                          session (get-in @state [:sessions id])
                          pending (:pending session) busy (or (contains? (:busy @state) id) (and (tasks/active? @state id) (not pending)))
-                         action (= :action (:kind card))
+                         action (contains? #{:action :pm} (:kind card))
                          blocked (when-not role-document (graph/task-error (:canvas @state) (:staff @state) id))
                          dock ^VBox (:dock @canvas-ui)]
                      (reset! displayed id)
@@ -409,7 +497,7 @@
                                            (:text (coll/first-where #(= (:chosen card) (:id %)) (:candidates card)))
                                            (when (coll/not-empty (:assets card)) (str "当前资源\n" (coll/join-to-string "\n\n" (mapv #(or (:source %) (:text %)) (:assets card)))))
                                            "这张卡片还没有对话。"))
-                     (.setText input (or (:draft pending) (:draft session) ""))
+                     (.setText input (or (:draft pending) (:draft session) (when (contains? #{:action :pm} (:kind card)) (:prompt card)) ""))
                      (let [menu (javafx.scene.control.ContextMenu.)]
                        (doseq [file (:attachments session)]
                          (let [^javafx.scene.control.MenuItem item (file-reveal/add-item! menu root (constantly file) warn!)]
@@ -417,10 +505,14 @@
                        (.setContextMenu attachment-label menu))
                      (.setText attachment-label (if (coll/not-empty (:attachments session))
                                                   (coll/join-to-string ", " (mapv :name (:attachments session))) ""))
-                     (.setAccessibleText send (if pending "重试同一请求" "发送到 AI"))
-                     (.setTooltip send (Tooltip. (or blocked (if pending "重试同一请求" "发送 · Ctrl / ⌘ + Enter"))))
-                     (.setDisable send true) (.setVisible send false) (.setManaged send false)
-                     (.setDisable input (boolean (or (nil? card) busy pending blocked)))
+                     (let [action? (contains? #{:action :pm} (:kind card))]
+                       (.setAccessibleText send (if action? "保存任务内容" (if pending "重试同一请求" "发送到 AI")))
+                       (.setTooltip send (Tooltip. (cond action? "保存任务内容 · Ctrl / ⌘ + Enter"
+                                                         pending "重试同一请求"
+                                                         :else "发送 · Ctrl / ⌘ + Enter")))
+                       (.setVisible send action?) (.setManaged send action?)
+                       (.setDisable send (boolean (or (nil? card) busy pending (tasks/locked? @state)))))
+                     (.setDisable input (boolean (or (nil? card) busy pending (and blocked (not (contains? #{:action :pm} (:kind card)))))))
                      (.setDisable attach (boolean (or (nil? card) busy pending blocked))) (.setDisable clear (boolean (or (nil? card) busy pending blocked)))
                      (let [target (if action dock right-dock)
                            composer-root ^Node (:root @composer-ui)]
@@ -445,38 +537,35 @@
                              _ (when-not (= (.getCanonicalPath (io/file root)) (.getCanonicalPath (io/file (get-in snapshot [:thread :cwd]))))
                                  (throw (ex-info "对话不属于当前项目" {})))
                              _ (archive/save-history! root snapshot)
-                             _ (when (coll/every? #(not= "inProgress" (:status %)) (get-in snapshot [:thread :turns]))
-                                 (doseq [reference (get-in snapshot [:thread :referencedFiles])]
-                                   (try
-                                     (archive/receive-artifact! root reference
-                                                                {:threadId thread-id :turnId (:id (last (get-in snapshot [:thread :turns])))}
-                                                                (fn fetch-artifact [] (request client base secret (str "/api/file?threadId=" (query-value thread-id) "&path=" (query-value (:path reference))) nil (HttpResponse$BodyHandlers/ofInputStream))))
-                                     (catch Exception e (show! {:id [:artifact (:path reference)] :level :warning :text (str "资料归档失败：" (.getMessage e))})))))
+                             archived (when (coll/every? #(not= "inProgress" (:status %)) (get-in snapshot [:thread :turns]))
+                                        (coll/into-> (get-in snapshot [:thread :referencedFiles]) {}
+                                          (keep (fn archive-reference [reference]
+                                                  (try
+                                                    [(:source reference)
+                                                     (archive/receive-artifact! root reference
+                                                                                {:threadId thread-id :turnId (:id (last (get-in snapshot [:thread :turns])))})]
+                                                    (catch Exception e
+                                                      (show! {:id [:artifact (:path reference)] :level :warning :text (str "资料归档失败：" (.getMessage e))}) nil))))))
+                             snapshot (update-in snapshot [:thread :referencedFiles]
+                                                 #(mapv (fn bind-local-reference [reference]
+                                                          (if-let [record (get archived (:source reference))]
+                                                            (assoc reference :local-path (.getCanonicalPath (craft-project/resource-file root (str "/" (:path record)))) :sha256 (:sha256 record))
+                                                            reference)) %))
                              snapshot (if (get-in @state [:sessions id :shared-thread])
                                         (card-snapshot snapshot storage-key id (get-in @state [:sessions id :execution :turn-id])) snapshot)
                              candidates (cond->> (canvas/snapshot-candidates snapshot thread-id)
                                           (and (not (canvas/text-workflow? (:canvas @state))) (contains? #{:action :result} (:kind (canvas/node-by-id (:canvas @state) id))))
                                           (filterv :image-path))
                              candidates
-                             (mapv (fn cache-preview [candidate]
+                             (mapv (fn local-preview [candidate]
                                      (if-let [path (:image-path candidate)]
                                        (try
-                                         (let [directory (prepare-artifact-directory! root {:path (:path context) :canvasCard {:id (flow-action-id (:canvas @state) id)}})
-                                               file (io/file directory (str "candidate_" (subs (digest/string->sha256-hex (str (:id candidate) path)) 0 20) ".png"))]
-                                           (when-not (.exists file)
-                                             (with-open [stream ^InputStream (request client base secret (str "/api/file?threadId=" (query-value thread-id) "&path=" (query-value path)) nil (HttpResponse$BodyHandlers/ofInputStream))]
-                                               (let [bytes (.readNBytes stream (inc (* 16 1024 1024)))
-                                                     temp (.toFile (Files/createTempFile (.toPath (io/file directory)) "candidate-" ".tmp" (make-array java.nio.file.attribute.FileAttribute 0)))]
-                                                 (try
-                                                   (when (> (alength bytes) (* 16 1024 1024)) (throw (ex-info "候选图片超过 16 MB" {})))
-                                                   (with-open [out (io/output-stream temp)] (.write out bytes))
-                                                   (let [image (production/read-image temp)]
-                                                     (when-not (javax.imageio.ImageIO/write image "png" temp) (throw (ex-info "无法保存候选图片" {}))))
-                                                   (Files/move (.toPath temp) (.toPath file) (into-array StandardCopyOption [StandardCopyOption/REPLACE_EXISTING StandardCopyOption/ATOMIC_MOVE]))
-                                                   (finally (.delete temp))))))
-                                           (swap! state update :upload-paths conj (str "/" (.relativize (.toPath (io/file root)) (.toPath file))))
+                                         (let [reference (coll/first-where #(= path (:path %)) (:files candidate))
+                                               file (archive/local-file root (or (:local-path reference) (:source reference)))]
+                                           (when-not (.isFile file) (throw (ex-info "候选图片已丢失，请恢复本地文件" {:path path})))
+                                           (production/read-image file)
                                            (assoc candidate :preview (str (.toURI file)) :local-path (.getCanonicalPath file)))
-                                         (catch Exception e (show! {:id [:preview path] :level :warning :text (str "候选图片读取失败：" (.getMessage e))}) candidate))
+                                         (catch Exception e (show! {:id [:preview path] :level :warning :text (.getMessage e)}) candidate))
                                        candidate)) candidates)
                              split-plan (when-let [suggestion (production/plan-from-snapshot snapshot)]
                                           (let [expected (:production-plan (canvas/node-by-id (:canvas @state) id))]
@@ -487,14 +576,15 @@
                          (when-not (= (.getCanonicalPath (io/file root)) (.getCanonicalPath (io/file (get-in snapshot [:thread :cwd]))))
                            (throw (ex-info "对话不属于当前项目" {})))
                          (swap! state (fn accept-snapshot [s]
-                                        (-> s (tasks/accept-snapshot id snapshot) (assoc-in [:sessions id :transcript] (transcript snapshot))
-                                            (cond-> (not (get-in s [:sessions id :confirmation]))
+                                        (-> s (tasks/accept-snapshot id snapshot) (pm/accept-snapshot id snapshot) (assoc-in [:sessions id :transcript] (transcript snapshot))
+                                            (cond-> (and (not= :pm (:kind (canvas/node-by-id (:canvas s) id))) (not (get-in s [:sessions id :confirmation])) (not (import-workflow/handles? (:canvas s) id)))
                                               (update :canvas canvas/merge-candidates id candidates))
                                             (cond-> (and split-plan (= (:sourceKey split-plan) (:source-candidate (canvas/node-by-id (:canvas s) id))))
                                               (update :canvas canvas/update-node id #(assoc % :production-plan split-plan))))))
+                         (project-work/record-execution! root @state id)
                          (persist!)
                          (when (coll/every? #(not= "inProgress" (:status %)) (get-in snapshot [:thread :turns]))
-                           (sync-archive!))
+                           (refresh-library!))
                          (Platform/runLater
                            (fn display-history []
                              (when-not (:closed @state)
@@ -513,7 +603,7 @@
                       (run-task! state (fn refresh-selected [] (try (refresh! id (:address @state) (:secret @state) true)
                                                                     (catch Exception e (problem! e))))))))
         assign! (fn assign-work [id staff-id]
-                  (when-not (= :person (:kind (canvas/node-by-id (:canvas @state) id)))
+                  (when-not (contains? #{:person :pm} (:kind (canvas/node-by-id (:canvas @state) id)))
                     (throw (ex-info "请通过 Person 卡配置职员并连接 Action" {})))
                   (when (tasks/locked? @state) (throw (ex-info "执行队列未结束，暂不能更换职员" {})))
                   (swap! state assoc :staff (staff!))
@@ -574,38 +664,68 @@
                                          (swap! state (fn archive-input-files [s] (archive/archive-attachments! root s)))
                                          (let [pending (get-in @state [:sessions id :pending])
                                                context (cond-> (if pending context (task-context @state id (staff!)))
-                                                         (get-in @state [:sessions id :confirmation]) (assoc :result-confirmation true))
+                                                         (get-in @state [:sessions id :confirmation]) (assoc :result-confirmation true)
+                                                         (import-workflow/handles? (:canvas @state) id) (assoc :resource-import true))
+                                               action-id (flow-action-id (:canvas @state) id)
+                                               inputs (delivery/admit! root (get-in @state [:task-origin :task])
+                                                                       (delivery/action-inputs (:canvas @state) (canvas/node-by-id (:canvas @state) action-id))
+                                                                       (get-in @state [:sessions id :project-job-id]))
+                                               selected-id (get-in @state [:sessions id :confirmation :artifact-id])
+                                               selected-version (when selected-id
+                                                                  (let [data (project-work/read-work root)]
+                                                                    (when-not (delivery/approved? data selected-id) (throw (ex-info "所选方案版本缺少人工批准记录" {})))
+                                                                    (delivery/verify-artifact! root (delivery/artifact data selected-id))))
+                                               inputs (cond-> inputs selected-version (conj selected-version))
                                                person (:staff context)
+                                               _ (when (and (:pm-planning context)
+                                                            (not (get-in (api client base secret "/api/status" nil) [:capabilities :pmPlanning])))
+                                                   (throw (ex-info "本机 Companion 尚不支持 AI-PM 规划，请更新服务后重试；本次未分配工作" {})))
                                                settings (when person (roles/request-settings person (:data (api client base secret "/api/models" nil))))
                                                thread-id (ensure-thread! id base secret)
+                                               _ (when (and (:resource-import context) (nil? pending))
+                                                   (api client base secret "/api/thread/name"
+                                                        {:threadId thread-id :name (task-name person (canvas/node-by-id (:canvas @state) (flow-action-id (:canvas @state) id)))
+                                                         :requestId (str "import-name-" id "-" (get-in @state [:sessions id :confirmation :revision] (str (UUID/randomUUID))))})
+                                                   (let [updated (if (:result-confirmation context)
+                                                                   (let [plan (resource-import/parse-plan (:text (results/candidate (canvas/node-by-id (:canvas @state) id))))
+                                                                         paths (into (into (mapv :source (:files plan)) (mapv :target (:files plan))) (mapv :path (:references plan)))]
+                                                                     (assert-import-resources-saved! project paths)
+                                                                     (import-workflow/apply-state! root @state id (partial validate-import! project)))
+                                                                   (import-workflow/plan-state! root @state id))]
+                                                     (swap! state assoc :canvas (:canvas updated))
+                                                     (persist!)
+                                                     (when (:result-confirmation context)
+                                                       (let [assets-id (:to (coll/first-where #(= id (:from %)) (get-in @state [:canvas :edges])))
+                                                             output (:production (canvas/node-by-id (:canvas @state) assets-id))]
+                                                         (try (archive/save-delivery! root output)
+                                                              (catch Exception e (show! {:id [:import-archive id] :level :warning :text (str "已入库，资料归档待重试：" (.getMessage e))})))
+                                                         (Platform/runLater (fn preview-imported-gui []
+                                                                              (when-not (:closed @state) (@import-preview-ref assets-id))))))))
+                                               record-text (if (:resource-import context)
+                                                             (if (:result-confirmation context)
+                                                               (let [assets-id (:to (coll/first-where #(= id (:from %)) (get-in @state [:canvas :edges])))
+                                                                     output (:production (canvas/node-by-id (:canvas @state) assets-id))]
+                                                                 (str "入库执行完成。正式资源及引擎校验记录：\n" (json/write-str output)))
+                                                               "入库方案已由编辑器生成，正在等待人工确认。尚未写入正式资源。后续 Action 可以继续，确认事项另行排队。")
+                                                             draft)
                                                files (get-in @state [:sessions id :attachments])]
                                            (persist!)
                                            (refresh! id base secret false)
                                            (when-not (get-in @state [:sessions id :pending])
-                                             (doseq [{:keys [path name] attachment-id :id} files]
-                                               (let [file (io/file path)
-                                                     path (str "/api/upload?threadId=" (query-value thread-id) "&id=" attachment-id "&name=" (query-value name))
-                                                     req (-> (HttpRequest/newBuilder (URI/create (str base path)))
-                                                             (.timeout (Duration/ofSeconds 90)) (.header "Authorization" (str "Bearer " secret))
-                                                             (.header "Content-Type" "application/octet-stream")
-                                                             (.POST (HttpRequest$BodyPublishers/ofFile (.toPath file))) .build)
-                                                     response (.send client req (HttpResponse$BodyHandlers/ofString))]
-                                                 (when-not (<= 200 (.statusCode response) 299) (throw (ex-info (str "附件上传失败：" name) {})))
-                                                 (let [receipt (json/read-str (.body response) :key-fn keyword)
-                                                       path (:path receipt)]
-                                                   (when (and (= attachment-id (:id receipt)) (string? path) (string/starts-with? path "codex-attachments/"))
-                                                     (craft-project/resource-file root (str "/" path))
-                                                     (swap! state update :upload-paths (fnil conj #{}) (str "/" path))))))
                                              (swap! state assoc-in [:sessions id :pending]
                                                     {:draft draft :task-name (task-name person (if (:result-confirmation context)
                                                                                                  (update (canvas/node-by-id (:canvas @state) id) :title #(str "确认方案 · " %))
                                                                                                  (canvas/node-by-id (:canvas @state) (flow-action-id (:canvas @state) id))))
                                                      :body (merge {:threadId thread-id :requestId (str (UUID/randomUUID))
-                                                                   :text (message-text draft context) :canvasContext (canvas-metadata context)
-                                                                   :attachments (mapv :id files) :exclusive true} settings)})
+                                                                   :text (message-text (str record-text (archive/attachment-text root files) (when (coll/not-empty inputs) (delivery/input-text inputs))) context) :canvasContext (canvas-metadata context)
+                                                                   :exclusive true} settings)})
                                              (persist!))
                                            (when-let [error (graph/task-error (:canvas @state) (staff!) id)] (throw (ex-info error {})))
                                            (let [pending (get-in @state [:sessions id :pending])
+                                                 _ (when-let [job-id (get-in @state [:sessions id :project-job-id])]
+                                                     (project-work/update-jobs! root #{job-id} {:request-id (get-in pending [:body :requestId]) :thread-id thread-id
+                                                                                                :confirmation-artifact-id selected-id}))
+                                                 _ (doseq [record inputs] (delivery/verify-artifact! root record))
                                                  response (dispatch-pending! (fn call-companion [path body] (api client base secret path body)) pending)]
                                              (when-not (:turnId response) (throw (ex-info "任务已提交，但尚未收到轮次编号，请重试核对" {})))
                                              (swap! state update :sessions
@@ -614,7 +734,8 @@
                                                         (map (fn [[key session]]
                                                                [key (cond-> session (= thread-id (:thread-id session)) (assoc :thread-name (:task-name pending)))])))))
                                              (resolve! [:submission id])
-                                             (swap! state assoc-in [:sessions id :execution] {:status "running" :turn-id (:turnId response)}))
+                                             (swap! state assoc-in [:sessions id :execution] {:status "running" :turn-id (:turnId response)})
+                                             (project-work/record-execution! root @state id))
                                            (swap! state (fn accept-message [s]
                                                           (-> s (update-in [:sessions id] dissoc :pending)
                                                               (assoc-in [:sessions id :draft] "") (assoc-in [:sessions id :attachments] [])
@@ -628,6 +749,7 @@
                                                                               (if (or (get-in s [:sessions id :execution :turn-id]) (get-in s [:sessions id :pending])) "unknown" "failed"))
                                                                   (assoc-in [:sessions id :execution :error] (.getMessage e)) tasks/reconcile))))
                                            (persist!)
+                                           (project-work/record-execution! root @state id)
                                            (show! {:id [:submission id] :level :error :text (str (.getMessage e) "；重试会复用已提交请求的编号。")}))
                                          (finally
                                            (swap! state update :busy disj id)
@@ -653,7 +775,11 @@
                                                            (string/starts-with? line "event: ") (recur (subs line 7))
                                                            (string/starts-with? line "data: ")
                                                            (let [data (json/read-str (subs line 6) :key-fn keyword)
-                                                                 thread (or (get-in data [:params :threadId]) (get-in data [:params :thread :id]))]
+                                                                 thread (or (get-in data [:params :threadId]) (get-in data [:params :thread :id]))
+                                                                 _ (project-work/observe-event! root data)
+                                                                 _ (when (contains? #{"ready" "resync"} event)
+                                                                     (project-work/reconcile-native! root (fn fetch-project-run [thread-id]
+                                                                                                            (api client base secret (str "/api/thread?id=" (query-value thread-id) "&recent=1") nil))))]
                                                              (doseq [[id session] (:sessions @state)
                                                                      :when (and (:thread-id session) (or (= event "ready") (= event "resync") (= thread (:thread-id session))))]
                                                                (refresh! id base secret (contains? #{"ready" "resync"} event)))
@@ -669,8 +795,7 @@
                          (when-not (= (.getCanonicalPath (io/file root))
                                       (.getCanonicalPath (workspace/project-directory (project/workspace project))))
                            (throw (ex-info "生成目录与当前编辑器项目不一致" {})))
-                         (craft-project/safe-refresh! project (into (conj (:paths output) "/ai-workspace/sync.json")
-                                                                    (into (:upload-paths @state) (mapv #(str "/" (:path %)) (archive/manifest root)))))
+                         (craft-project/safe-refresh! project (into (:paths output) (mapv #(str "/" (:path %)) (archive/manifest root))))
                          (craft-project/open-resource! {:root root :project project :app-view app-view :prefs prefs :localization localization} (kind output))
                          (show! "已在 Defold 原生编辑器打开，可直接编辑节点")
                          (catch Exception e (warn! (str "文件已生成，打开预览失败：" (.getMessage e) "；重新加载项目资源后可再次打开。")))))
@@ -708,15 +833,8 @@
                                   (fn prepare-source []
                                     (try
                                       (let [source (production-source root context (:canvas @state) id asset)
-                                            _ (when-not (.exists source)
-                                                (when-not (:connected @state) (throw (ex-info "本机 Codex 尚未连接，请点击右上角连接图标重试 下载候选原图" {})))
-                                                (io/make-parents source)
-                                                (with-open [stream ^InputStream (request client (:address @state) (:secret @state)
-                                                                                         (str "/api/file?threadId=" (query-value (first (string/split source-key #"/"))) "&path=" (query-value (:path asset)))
-                                                                                         nil (HttpResponse$BodyHandlers/ofInputStream))]
-                                                  (let [bytes (.readNBytes stream (inc (* 64 1024 1024)))]
-                                                    (when (> (alength bytes) (* 64 1024 1024)) (throw (ex-info "候选图超过 64 MB" {})))
-                                                    (with-open [out (io/output-stream source)] (.write out bytes)))))
+                                            _ (when-not (.isFile source)
+                                                (throw (ex-info "候选原图在本地不存在，请恢复文件或重新选择方案" {:path (.getPath source)})))
                                             image (production/read-image source)
                                             width (.getWidth image) height (.getHeight image)
                                             plan (or (:production-plan card)
@@ -760,7 +878,7 @@
                                                                                                        (when-not (:closed @state)
                                                                                                          ((:render! @canvas-ui)) (open-output! result :gui)
                                                                                                          (gui! :refresh (:to (coll/first-where #(= id (:from %)) (get-in @state [:canvas :edges]))) nil))))
-                                                                                  (sync-archive!)
+                                                                                  (refresh-library!)
                                                                                   (done! (str "已生成 " (:count result) " 个 PNG、GUI 与 atlas：" (:directory result))))
                                                                                 (catch Exception e (done! (str "生成失败：" (.getMessage e))))
                                                                                 (finally (swap! state update :producing disj id))))))))
@@ -775,6 +893,27 @@
                   (swap! state assoc :staff (staff!))
                   (let [model (:canvas @state) card (canvas/node-by-id model id)]
                     (case op
+                      :open-project-job
+                      (when-let [job (coll/first-where #(= id (:id %)) (:jobs (project-work/read-work root)))]
+                        (when-let [open! (:open! @browser-ui)] (open! {:path (project-work/resolve-canvas! root (:canvas-id job) (:canvas-path job))})))
+                      :confirm-pm-task
+                      (do
+                        (when (tasks/locked? @state) (throw (ex-info "请等待当前规划完成后确认分配" {})))
+                        (when (and doc (not= @document-state (document/read-document root (:path context))))
+                          (throw (ex-info "规划已被外部修改，请重新打开后确认" {})))
+                        (when (coll/not-empty (get-in @state [:pm-drafts id]))
+                          (throw (ex-info "请先保存 TaskCard 的修改后再确认分配" {})))
+                        (let [next (pm/allocate! root (:path context) model id (:staff @state))]
+                          (when doc (reset! document-state (document/save-document! root (:path context) @document-state next)))
+                          (swap! state assoc :canvas next :canvas-undo [] :canvas-redo [])
+                          ((:refresh! @browser-ui))
+                          (show! "工作已分配，已生成带负责人和任务的 Canvas；可打开后由负责人执行")))
+                      :open-pm-task
+                      (when-let [path (:allocated-path card)]
+                        (when-let [open! (:open! @browser-ui)] (open! {:path (project-work/resolve-canvas! root (:allocated-canvas-id card) path)})))
+                      :edit-import-rules
+                      (let [path (resource-import/ensure-rules! root)]
+                        (when-let [open! (:open! @browser-ui)] (open! {:path path})))
                       :view-action-results
                       (let [proposals (results/produced-cards model id)
                             key [:action-results id]
@@ -862,35 +1001,93 @@
                               :remove-result-file
                               (cond-> (assoc edit-fields :files (filterv #(not= (:path fields) (:path %)) (:files proposal)))
                                 (= (:path fields) (:image-path proposal)) (assoc :image-path nil :preview nil :local-path nil))
-                              edit-fields)]
+                              edit-fields)
+                            preflight (results/edit-state @state id edit-fields)
+                            _ (when (= :confirm-result op) (results/confirm-state preflight id))
+                            edited-card (canvas/node-by-id (:canvas preflight) id)
+                            _ (when (and (= :confirm-result op) (import-workflow/handles? model id))
+                                (import-workflow/validate-confirmation! root edited-card))
+                            frozen (when (= :confirm-result op)
+                                     (delivery/card-snapshot! root preflight edited-card
+                                                              (if (import-workflow/handles? model id) "integration-plan" "proposal")))
+                            preflight (if frozen (results/bind-content-version preflight id (:revision frozen)) preflight)
+                            edited-card (canvas/node-by-id (:canvas preflight) id)
+                            _ (when frozen (results/confirm-state preflight id))
+                            frozen-confirmation (when frozen
+                                                  (results/confirmation
+                                                    (canvas/update-node (:canvas preflight) id
+                                                                        #(update % :candidates (fn freeze-result-references [candidates]
+                                                                                                 [(assoc (first candidates) :files (:files frozen) :image-path nil)]))) id))
+                            _ (when frozen (delivery/approve! root (:id frozen) "人工选定 Result 方案"))
+                            attachments (mapv #(hash-map :id (digest/string->sha256-hex (str (:id frozen) "/" (:path %)))
+                                                         :path (.getCanonicalPath (craft-project/resource-file root (:path %)))
+                                                         :name (:name %)) (:files frozen))]
                         (swap! state
-                               (fn update-result [s]
-                                 (let [edited (results/edit-state s id edit-fields)]
-                                   (if-not (= :confirm-result op)
-                                     edited
-                                     (let [confirmed (results/confirm-state edited id)]
-                                       (if (identical? edited confirmed)
-                                         confirmed
-                                         (let [proposal (results/candidate (canvas/node-by-id (:canvas confirmed) id))
-                                               paths (coll/into-> (:files proposal) [(:local-path proposal)]
-                                                       (map #(or (:local-path %) (:source %) (:path %))))
-                                               paths (coll/into-> paths [] (remove nil?) (distinct))
-                                               attachments (coll/into-> paths []
-                                                             (keep (fn result-attachment [path]
-                                                                     (let [file (if (.isAbsolute (io/file path)) (io/file path)
-                                                                                    (io/file root (string/replace-first path #"^/" "")))]
-                                                                       (when (.isFile file)
-                                                                         {:id (digest/string->sha256-hex (str id "/" (results/revision (canvas/node-by-id (:canvas confirmed) id)) "/" path))
-                                                                          :path (.getCanonicalPath file) :name (.getName file)})))))]
-                                           (-> confirmed
-                                               (assoc-in [:sessions id :attachments] attachments)
-                                               (update :canvas #(-> % (canvas/ensure-result-assets id) (canvas/adopt-candidate id)
-                                                                    (assoc :selected id)))))))))))
-                        (show! (if (= :confirm-result op) "方案已选定，确认事项已加入负责人队列" "方案修改已保存")))
-                      :pause (when (get-in @state [:sessions id :queue]) (swap! state tasks/pause id))
-                      :cancel (when (get-in @state [:sessions id :queue]) (swap! state tasks/cancel id))
-                      :run (if (= :person (:kind card))
-                             (let [ids (tasks/action-ids model id)
+                               (fn update-result [current]
+                                 (let [edited (cond-> (results/edit-state current id edit-fields)
+                                                frozen (results/bind-content-version id (:revision frozen)))]
+                                   (when-not (= (results/revision edited-card) (results/revision (canvas/node-by-id (:canvas edited) id)))
+                                     (throw (ex-info "方案已被修改，请重新核对" {})))
+                                   (if-not frozen edited
+                                           (let [next (results/confirm-state edited id)
+                                                 next (if (identical? next edited) next
+                                                          (update next :canvas #(-> % (canvas/ensure-result-assets id) (canvas/adopt-candidate id) (assoc :selected id))))
+                                                 assets-id (:to (coll/first-where #(= id (:from %)) (get-in next [:canvas :edges])))
+                                                 next (-> next
+                                                          (update :canvas canvas/update-node id #(assoc % :artifact-id (:id frozen)))
+                                                          (assoc-in [:sessions id :confirmation :artifact-id] (:id frozen))
+                                                          (assoc-in [:sessions id :confirmation :candidate] (:candidate frozen-confirmation))
+                                                          (assoc-in [:sessions id :confirmation :draft] (:draft frozen-confirmation))
+                                                          (assoc-in [:sessions id :attachments] attachments))]
+                                             (if (get-in (canvas/node-by-id (:canvas next) assets-id) [:production :import-id]) next
+                                                 (update next :canvas canvas/update-node assets-id #(assoc % :artifact-id (:id frozen)))))))))
+                        (show! (if (= :confirm-result op) "已批准固定方案版本，确认事项已加入负责人队列" "方案修改已保存")))
+                      :refresh-delivery nil
+                      :open-approved-file
+                      (let [path (:path fields)]
+                        (craft-project/resource-file root path)
+                        (when-let [open! (:open! @browser-ui)] (open! {:path path})))
+                      :bind-inputs
+                      (do
+                        (when (tasks/locked? @state) (throw (ex-info "请结束当前队列后修改任务输入" {})))
+                        (doseq [artifact-id (:artifact-ids fields)]
+                          (when-not (delivery/approved? (project-work/read-work root) artifact-id) (throw (ex-info "只能选择已批准版本" {}))))
+                        (change! #(canvas/update-node % id (fn bind-inputs [card] (assoc card :inputs (mapv (fn input [artifact-id] {:artifact-id artifact-id}) (:artifact-ids fields)))))))
+                      :approve-assets
+                      (do
+                        (when (contains? (:producing @state) id) (throw (ex-info "请等待资源生成完成后批准" {})))
+                        (let [record (delivery/card-snapshot! root @state card "asset-bundle")
+                              receipt (delivery/delivery (project-work/read-work root) (:delivery-id card))]
+                          (when (and receipt (not= (:artifact-id receipt) (:id record)))
+                            (throw (ex-info "工程文件在构建后已变化，请重新执行入库后批准" {})))
+                          (delivery/approve! root (:id record) "人工批准当前资产包")
+                          (change! #(canvas/update-node % id (fn approved-card [card] (assoc card :artifact-id (:id record)))))
+                          (show! "资产固定版本已批准")))
+                      :record-delivery-check
+                      (let [chooser (FileChooser.)
+                            files (.showOpenMultipleDialog chooser (.getWindow (.getScene parent)))
+                            evidence (mapv (fn import-evidence [file]
+                                             (dissoc (archive/import-file! root "artifacts" file {:role "qa-evidence" :task id}) :file)) files)]
+                        (when (coll/not-empty evidence)
+                          (delivery/record-check! root (:delivery-id fields) (:check fields) (:status fields) (:notes fields) evidence)
+                          (show! "检查记录已绑定当前工程构建")))
+                      (:accept-delivery :reject-delivery)
+                      (do
+                        (delivery/decide-task! root id (if (= :accept-delivery op) "accepted" "rejected")
+                                               (:artifact-ids fields) (:delivery-id fields) (:notes fields))
+                        (show! (if (= :accept-delivery op) "验收通过，项目状态及前置成果已更新" "已退回，修改要求已记录到项目台账")))
+                      :pause (when (get-in @state [:sessions id :queue])
+                               (project-work/control! root (project-work/queue-job-ids @state id) :pause)
+                               (swap! state tasks/pause id))
+                      :cancel (when (get-in @state [:sessions id :queue])
+                                (project-work/control! root (project-work/queue-job-ids @state id) :cancel)
+                                (swap! state tasks/cancel id))
+                      :run (if (contains? #{:person :pm} (:kind card))
+                             (let [_ (when (coll/not-empty (get-in @state [:pm-drafts id]))
+                                       (throw (ex-info "请先保存规划目标后再执行" {})))
+                                   _ (when (and (= :pm (:kind card)) (string/blank? (:prompt card)))
+                                       (throw (ex-info "请先填写并保存项目目标" {})))
+                                   ids (tasks/action-ids model id)
                                    person (roles/assigned-staff card (staff!))
                                    queue (get-in @state [:sessions id :queue])]
                                (when-not person (throw (ex-info "请先为 Person 选择具体职员" {})))
@@ -904,22 +1101,42 @@
                                    (throw (ex-info (str "请先填写任务描述：" (:title (canvas/node-by-id model action-id))) {}))))
                                (cond
                                  (= "running" (:status queue)) nil
-                                 (= "paused" (:status queue)) (swap! state tasks/resume id)
-                                 :else (swap! state tasks/start id ids)))
+                                 (= "paused" (:status queue))
+                                 (do
+                                   (doseq [action-id (:actions queue)
+                                           :let [pending (get-in @state [:sessions action-id :pending])]
+                                           :when pending]
+                                     (project-work/retry-pending! root (get-in @state [:sessions action-id :project-job-id]) (get-in pending [:body :requestId])))
+                                   (swap! state tasks/resume id))
+                                 :else (swap! state tasks/start id ids))
+                               (let [prepared (project-work/prepare-queue! root @state id)]
+                                 (swap! state project-work/bind-jobs prepared)))
                              (throw (ex-info "请在 Person 负责人卡上按顺序执行任务" {})))
                       (do
                         (when (tasks/locked? @state) (throw (ex-info "请先结束执行队列再修改任务" {})))
                         (case op
-                          :save-task (do (when (or (string/blank? (:title fields)) (string/blank? (:prompt fields)))
-                                           (throw (ex-info "请填写任务名称和描述" {})))
+                          :save-pm-task (let [next (pm/edit-task model id fields (:staff @state))]
+                                          (when doc (reset! document-state (document/save-document! root (:path context) @document-state next)))
+                                          (change! (constantly next))
+                                          (swap! state update :pm-drafts dissoc id))
+                          :reject-pm-task (do
+                                            (when-not (= "review" (:status card)) (throw (ex-info "只能驳回待确认任务" {})))
+                                            (change! #(canvas/update-node % id (fn reject-task [task] (assoc task :status "rejected")))))
+                          :save-task (do (when (string/blank? (:title fields))
+                                           (throw (ex-info "请填写任务名称" {})))
                                          (when doc (reset! document-state (document/save-document! root (:path context) @document-state (canvas/update-node model id #(merge % fields)))))
                                          (change! #(canvas/update-node % id (fn update-task [node] (merge node fields))))
-                                         (swap! state assoc-in [:sessions id :draft] (:prompt fields))
+                                         (when (contains? fields :prompt)
+                                           (swap! state assoc-in [:sessions id :draft] (:prompt fields)))
+                                         (swap! state update :pm-drafts dissoc id)
                                          (display!))
                           :move (change! #(canvas/move-action % id (:id fields) (:delta fields)))
                           :add-task (let [next (canvas/add-node model :action (+ (:x card) 330.0) (+ (:y card) (* 500.0 (count (tasks/action-ids model id)))))]
                                       (change! (constantly (graph/connect next (:staff @state) id (:selected next))))
                                       (select! (:selected next)))
+                          :add-import (let [next (import-workflow/add-action model (:staff @state) id)]
+                                        (change! (constantly next))
+                                        (select! (:selected next)))
                           nil)))
                     (persist!)
                     ((:render! @canvas-ui))
@@ -931,17 +1148,52 @@
                           :when (and (= "running" (get-in session [:queue :status]))
                                      (nil? (get-in session [:queue :current]))
                                      (coll/not-empty (get-in session [:queue :remaining])))]
-                    (let [claimed (swap! state tasks/claim-next id)
-                          action-id (get-in claimed [:sessions id :queue :current])
-                          draft (or (coll/not-empty (get-in claimed [:sessions action-id :draft]))
-                                    (get-in claimed [:sessions action-id :confirmation :draft])
-                                    (:prompt (canvas/node-by-id (:canvas claimed) action-id)))]
-                      (try (submit! action-id draft id)
-                           (catch Exception e
-                             (swap! state (fn fail-queue [s] (-> s (assoc-in [:sessions action-id :execution] {:status "failed" :error (.getMessage e)}) tasks/reconcile)))
-                             (persist!) (problem! e)))))))]
+                    (try
+                      (let [prepared (project-work/prepare-queue! root @state id)
+                            _ (swap! state project-work/bind-jobs prepared)
+                            data (project-work/read-work root)
+                            remaining (get-in prepared [:sessions id :queue :remaining])
+                            _ (doseq [action-id remaining
+                                      :let [job-id (get-in prepared [:sessions action-id :project-job-id])
+                                            job (coll/first-where #(= job-id (:id %)) (:jobs data))
+                                            action (delivery/action-inputs (:canvas prepared) (canvas/node-by-id (:canvas prepared) (flow-action-id (:canvas prepared) action-id)))
+                                            error (delivery/admission-error data (get-in prepared [:task-origin :task]) action job)]
+                                      :when (contains? #{"queued" "blocked"} (:status job))]
+                                (project-work/admission-state! root job-id error))
+                            data (project-work/read-work root)
+                            action-id (coll/first-where (fn ready-job [action-id]
+                                                          (= "queued" (:status (coll/first-where #(= (get-in prepared [:sessions action-id :project-job-id]) (:id %)) (:jobs data))))) remaining)
+                            job-id (get-in prepared [:sessions action-id :project-job-id])]
+                        (when (and job-id (project-work/claim! root job-id))
+                          (let [claimed (swap! state tasks/claim-id id action-id)
+                                draft (or (coll/not-empty (get-in claimed [:sessions action-id :draft]))
+                                          (get-in claimed [:sessions action-id :confirmation :draft])
+                                          (:prompt (canvas/node-by-id (:canvas claimed) action-id)))]
+                            (try (submit! action-id draft id)
+                                 (catch Exception e
+                                   (swap! state (fn fail-queue [s] (-> s (assoc-in [:sessions action-id :execution] {:status "failed" :error (.getMessage e)}) tasks/reconcile)))
+                                   (project-work/record-execution! root @state action-id)
+                                   (persist!) (problem! e))))))
+                      (catch Exception e (problem! e))))))]
 
     (reset! pump-ref pump!)
+    (when registration-error (show! {:id :task-registration :level :warning :text (str "旧任务关联待核对：" registration-error)}))
+    (add-watch project-work/revision state
+               (fn project-work-changed [_ _ before after]
+                 (when (not= (get before (project-work/project-key root)) (get after (project-work/project-key root)))
+                   (Platform/runLater (fn refresh-project-work []
+                                        (when-not (:closed @state)
+                                          (try
+                                            (swap! state assoc :project-work (project-work/read-work root))
+                                            ((:render! @canvas-ui)) ((:refresh! @details-ui)) (@pump-ref)
+                                            (catch Exception e (problem! e)))))))))
+    (reset! import-preview-ref
+            (fn refresh-imported-gui [assets-id]
+              (let [output (:production (canvas/node-by-id (:canvas @state) assets-id))
+                    gui-id (:to (coll/first-where #(and (= assets-id (:from %)) (= :gui (:kind (canvas/node-by-id (:canvas @state) (:to %))))) (get-in @state [:canvas :edges])))]
+                (open-output! output :gui)
+                (gui! :refresh gui-id nil)
+                ((:refresh! @browser-ui)))))
     (add-watch state ::execution
                (fn execution-changed [_ _ before after]
                  (when (not= (select-keys before [:sessions :connected :staff]) (select-keys after [:sessions :connected :staff]))
@@ -967,9 +1219,6 @@
                                                                                                              (show! (str "文档已归档：" path)))
                                                                                                            (catch Exception e (problem! e)))))) open-output! gui! #(.fire attach) staff! assign! work!))
     (.setTop ^BorderPane (:root @canvas-ui) nil)
-    (.setId sync-button "ai-sync-archive")
-    (.setOnAction sync-button (reify EventHandler (handle [_ _] (save-draft!) (persist!) (run-task! state sync-archive!))))
-    (.add (.getChildren ^javafx.scene.layout.HBox (:toolbar @canvas-ui)) sync-button)
     (.add (.getChildren ^javafx.scene.layout.HBox (:toolbar @canvas-ui)) connect)
     (.setTooltip connect connection-tip)
     (.setAccessibleText connect "本机 Codex 连接状态，点击重新连接")
@@ -985,12 +1234,17 @@
                                                     (select! id))))
                                             open-output! gui!
                                             (fn save-role [id fields]
+                                              (when (:builtin (canvas/node-by-id (:canvas @state) id))
+                                                (throw (ex-info "AI-PM 是内置职员，配置不可修改" {})))
                                               (let [update-role (fn update-role [model] (canvas/update-node model id #(merge % fields)))
                                                     next-model (update-role (:canvas @state))]
                                                 ;; Check conflicts first.
                                                 (reset! document-state (document/save-document! root (:path context) @document-state next-model))
                                                 (change! update-role)
                                                 (select! id))) staff! assign! warn! work!))
+    ;; The card details can be hosted outside the tab's .ai-workbench subtree
+    ;; (docked panes), so make the canvas stylesheet reach it explicitly.
+    (ai-workspace/apply-styles! (:root @details-ui))
     (Platform/runLater (fn load-gui-previews []
                          (when-not (:closed @state)
                            (doseq [card (get-in @state [:canvas :nodes])
@@ -1021,14 +1275,14 @@
                     (let [workspace (project/workspace project)
                           file (craft-project/resource-file root path)]
                       (when-not (workspace/find-resource workspace path)
-                        (craft-project/safe-refresh! project (coll/into-> (archive/manifest root) #{"/ai-workspace/sync.json"}
+                        (craft-project/safe-refresh! project (coll/into-> (archive/manifest root) #{}
                                                                (map #(str "/" (:path %))))))
                       (if-let [asset (workspace/find-resource workspace path)]
                         (if (resource/editor-openable-resource? asset)
                           (craft-project/open-resource! {:root root :project project :app-view app-view :prefs prefs :localization localization} path)
                           (ui/open-file file show!))
                         (ui/open-file file show!)))))
-                (fn project-library-changed [] (run-task! state sync-archive!))
+                (fn project-library-changed [] (run-task! state refresh-library!))
                 show! (workspace/get-resource-type-map (project/workspace project)))))
     (.addAll (.getItems split) ^java.util.Collection (identity (if shared-browser [(:root @canvas-ui) right] [(:root @browser-ui) (:root @canvas-ui) right])))
     (when-not shared-browser (SplitPane/setResizableWithParent (:root @browser-ui) false))
@@ -1039,7 +1293,14 @@
     (doseq [setter [#(AnchorPane/setTopAnchor pane %) #(AnchorPane/setRightAnchor pane %) #(AnchorPane/setBottomAnchor pane %) #(AnchorPane/setLeftAnchor pane %)]] (setter 0.0))
     (.add (.getChildren parent) pane)
     (ui/user-data! parent ::state state) (ui/user-data! parent ::canvas @canvas-ui)
-    (ui/user-data! parent ::library-changed! (fn sync-library-change [] (run-task! state sync-archive!)))
+    (when tab (ui/user-data! tab ::inspect-card! (fn inspect-overview-card [id] (work! :inspect-card id nil))))
+    (when tab (ui/user-data! tab ::select-card! select!))
+    (when tab (ui/user-data! tab ::show-conversation!
+                             (fn show-card-conversation []
+                               (.setExpanded conversation true)
+                               ((:set-expanded! @composer-ui) true)
+                               (.requestFocus history))))
+    (ui/user-data! parent ::library-changed! (fn refresh-library-change [] (run-task! state refresh-library!)))
     (when tab (ui/user-data! tab ::state state) (ui/user-data! tab ::canvas @canvas-ui))
     (doseq [[control id] [[connect "ai-connect"] [history "ai-history"]
                           [input "ai-input"] [send "ai-send"] [attach "ai-attach"] [clear "ai-clear"] [heading "ai-card-heading"]]]
@@ -1101,15 +1362,6 @@
                                          (when (= connection-id (:connection-id @state))
                                            (swap! state assoc :address address :secret secret)
                                            (persist!))
-                                         (doseq [thread-id (archive/saved-thread-ids root)]
-                                           (try
-                                             (let [snapshot (api client address secret (str "/api/thread?id=" (query-value thread-id)) nil)]
-                                               (when (= (.getCanonicalPath (io/file root)) (.getCanonicalPath (io/file (get-in snapshot [:thread :cwd]))))
-                                                 (archive/save-history! root snapshot)
-                                                 (doseq [reference (get-in snapshot [:thread :referencedFiles])]
-                                                   (archive/receive-artifact! root reference {:threadId thread-id :turnId (:id (last (get-in snapshot [:thread :turns])))}
-                                                                              (fn fetch-legacy-artifact [] (request client address secret (str "/api/file?threadId=" (query-value thread-id) "&path=" (query-value (:path reference))) nil (HttpResponse$BodyHandlers/ofInputStream)))))))
-                                             (catch Exception e (show! {:id [:legacy-archive thread-id] :level :warning :text (str "旧资料待归档：" (.getMessage e))}))))
                                          (when (= connection-id (:connection-id @state))
                                            (start-stream! address secret connection-id))
                                          (catch Exception e (show! {:id :connection :level :error :text (.getMessage e)}))))))
@@ -1118,12 +1370,26 @@
                   (reify EventHandler
                     (handle [_ _]
                       (try
-                        (save-draft!)
-                        (show! "任务草稿已保存，请在 Person 负责人卡上执行")
+                        (let [id @displayed
+                              card (canvas/node-by-id (:canvas @state) id)
+                              text (.getText input)]
+                          (if (contains? #{:action :pm} (:kind card))
+                            (do
+                              (when (string/blank? text)
+                                (throw (ex-info "请先填写任务内容" {})))
+                              (work! :save-task id {:title (:title card) :prompt text})
+                              (when (= text (:prompt (canvas/node-by-id (:canvas @state) id)))
+                                (show! "任务内容已保存，可在 Person 负责人卡按顺序执行")))
+                            (do
+                              (save-draft!)
+                              (show! "任务草稿已保存，请在 Person 负责人卡上执行"))))
                         (catch Exception e (problem! e))))))
     (ui/user-data! parent ::close
                    (fn close-client []
                      (save-draft!)
+                     (remove-watch project-work/revision state)
+                     (try (project-work/control! root (coll/into-> (:sessions @state) #{} (keep (comp :project-job-id val))) :pause)
+                          (catch Exception e (problem! e)))
                      (remove-watch state ::connection-ui)
                      (remove-watch state ::card-details)
                      (remove-watch state ::execution)
@@ -1163,6 +1429,7 @@
       (.setText ^Label (.lookup ^Node (:root @composer-ui) "#ai-composer-heading") (str "✦  " (:title (canvas/template (:template doc))))))
     (display!)
     ((:set-expanded! @composer-ui) (not (:composer-collapsed saved)))
+    (run-task! state refresh-library!)
     (when (and connect-on-open (not role-document))
       (Platform/runLater (fn connect-local-on-open [] (when-not (:closed @state) (.fire connect)))))
     node))
@@ -1203,7 +1470,7 @@
                                      (g/transact {:undoable false} (g/delete-node child-node)))
                            :library-changed! (ui/user-data child ::library-changed!)
                            :update-context! (fn update-document-context [context]
-                                              (when (contains? context :selectedNodeIds)
+                                              (when (or (:card-id context) (contains? context :selectedNodeIds))
                                                 (update-context! child-tab context)))}))))]
     (ui/user-data! parent ::workspace workspace)
     (ui/user-data! (:tab opts) ::workspace workspace)
@@ -1227,4 +1494,13 @@
     (swap! state assoc :context context)
     (when-let [canvas-ui (ui/user-data tab ::canvas)]
       (Platform/runLater (fn refresh-context []
-                           (when-not (:closed @state) ((:render! canvas-ui))))))))
+                           (when-not (:closed @state)
+                             (when-let [id (:card-id context)]
+                               (when (canvas/node-by-id (:canvas @state) id)
+                                 ((ui/user-data tab ::select-card!) id)
+                                 ((:focus-node! canvas-ui) id)
+                                 (when (:conversation context)
+                                   ((ui/user-data tab ::show-conversation!)))
+                                 (when (:inspect-card context)
+                                   (when-let [inspect! (ui/user-data tab ::inspect-card!)] (inspect! id)))))
+                             ((:render! canvas-ui))))))))

@@ -203,27 +203,48 @@
                                (-> acc (update :nodes conj node) (update :used conj (:title node)))))
                            {:used used-names :nodes []} (:nodes model))))))
 
-(defn layout [model]
-  (let [catalog (types model)
-        nodes (mapv (fn migrate-role [index node]
-                      (let [type (if (:role-type node)
-                                   (or (coll/first-where #(= (:id %) (:role-type node)) catalog)
-                                       (throw (ex-info (str "职能配表缺少已使用的职能：" (:role-type node)) {})))
-                                   (or (when (= "制作人" (:title node)) (coll/first-where #(= "pm" (:id %)) catalog))
-                                       (coll/first-where #(string/starts-with? (:title node) (:title %)) catalog)
-                                       (get catalog index) (first catalog)))]
-                        (with-meta (cond-> (assoc node :role-type (:id type))
-                                     (= "制作人" (:title node)) (assoc :title "PM")) {::definition type})))
-                    (range (count (:nodes model))) (:nodes model))
-        positions (coll/into-> catalog {} (map-indexed (fn row-position [index type] [(:id type) (* row-height index)])))]
-    (assoc model :nodes
-           (:nodes (reduce (fn place-card [{:keys [counts] :as acc} node]
-                             (let [type-id (:role-type node)
-                                   column (get counts type-id 0)]
-                               (-> acc
-                                   (update :nodes conj (assoc node :x (+ row-label-width (* column-step column)) :y (get positions type-id)))
-                                   (assoc-in [:counts type-id] (inc column)))))
-                           {:counts {} :nodes []} nodes)))))
+(def ai-pm-id "ai-pm")
+
+(defn ai-pm-card [catalog]
+  (let [type (or (coll/first-where #(= "pm" (:id %)) catalog) (first catalog))]
+    (with-meta (merge (:defaults type)
+                      {:id ai-pm-id :kind :role :role-type (:id type) :title "AI-PM"
+                       :builtin true :enabled true})
+      {::definition type})))
+
+;; AI-PM is a permanent planning identity. Production staff are assigned
+;; explicitly; this identity cannot be removed from the project catalog.
+(defn ensure-ai-pm [model]
+  (let [nodes (:nodes model)
+        ai-pm (coll/first-where #(or (:builtin %) (= ai-pm-id (:id %))) nodes)]
+    (if ai-pm
+      (assoc model :nodes (conj (vec (filterv #(not= (:id ai-pm) (:id %)) nodes)) ai-pm))
+      (update model :nodes #(conj (vec %) (ai-pm-card (types model)))))))
+
+(defn layout
+  ([model] (layout model true))
+  ([model ensure?]
+   (let [model (if ensure? (ensure-ai-pm model) model)
+         catalog (types model)
+         nodes (mapv (fn migrate-role [index node]
+                       (let [type (if (:role-type node)
+                                    (or (coll/first-where #(= (:id %) (:role-type node)) catalog)
+                                        (throw (ex-info (str "职能配表缺少已使用的职能：" (:role-type node)) {})))
+                                    (or (when (= "制作人" (:title node)) (coll/first-where #(= "pm" (:id %)) catalog))
+                                        (coll/first-where #(string/starts-with? (:title node) (:title %)) catalog)
+                                        (get catalog index) (first catalog)))]
+                         (with-meta (cond-> (assoc node :role-type (:id type))
+                                      (= "制作人" (:title node)) (assoc :title "PM")) {::definition type})))
+                     (range (count (:nodes model))) (:nodes model))
+         positions (coll/into-> catalog {} (map-indexed (fn row-position [index type] [(:id type) (* row-height index)])))]
+     (assoc model :nodes
+            (:nodes (reduce (fn place-card [{:keys [counts] :as acc} node]
+                              (let [type-id (:role-type node)
+                                    column (get counts type-id 0)]
+                                (-> acc
+                                    (update :nodes conj (assoc node :x (+ row-label-width (* column-step column)) :y (get positions type-id)))
+                                    (assoc-in [:counts type-id] (inc column)))))
+                            {:counts {} :nodes []} nodes))))))
 
 (defn rows [model]
   (let [catalog (types model)
@@ -241,7 +262,8 @@
                       (fn matching-staff [nodes]
                         (filterv #(string/includes?
                                     (string/lower-case (str (:title %) " " (:assignee %) " " (:model %) " " (:title (role-type %))))
-                                    query) nodes)))))))
+                                    query) nodes)))
+              false))))
 
 (defn validate-role [role]
   (when-not (and (string? (:title role)) (<= 1 (count (string/trim (:title role))) 80)
@@ -490,6 +512,13 @@
     (HBox/setHgrow save Priority/ALWAYS)
     (.addAll (.getChildren actions) ^java.util.Collection (identity [reset save]))
     (.addAll (.getChildren footer) ^java.util.Collection (identity [error actions]))
+    (when (:builtin card)
+      (doseq [^javafx.scene.Node node [title role assignee model effort enabled responsibilities deliverables]]
+        (.setDisable node true))
+      (doseq [^javafx.scene.Node node [apply-defaults reset save]]
+        (.setVisible node false)
+        (.setManaged node false))
+      (.setText error "AI-PM 是内置职员，配置固定不可修改；新建节点会自动指派它。"))
     (.setCenter root scroll)
     (.setBottom root footer)
     root))

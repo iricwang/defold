@@ -86,7 +86,10 @@ ordinary paths."
 
 (defn build-path
   (^File [workspace]
-   (io/file (project-directory workspace) (skip-first-char build-dir)))
+   ;; Private validation graphs can own their output without redirecting the
+   ;; live editor's Play build. The override belongs to this workspace only.
+   (or (g/user-data workspace ::build-directory)
+       (io/file (project-directory workspace) (skip-first-char build-dir))))
   (^File [workspace build-resource-path]
    (io/file (build-path workspace) (skip-first-char build-resource-path))))
 

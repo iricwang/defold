@@ -3,6 +3,8 @@
 ## Overview
 Editor overview [here](README_SYSTEMS_OVERVIEW.md).
 
+AI Canvas [project overview](doc/ai-project-overview.md): local project progress, staff, reviews and deliveries.
+
 
 ## Setup
 (Setup instructions for the engine [here](../README_SETUP.md)).

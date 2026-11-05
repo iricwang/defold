@@ -1,0 +1,891 @@
+{
+  "date": "2026-11-05",
+  "editor_version": "1.14.1-patch.115",
+  "companion_version": "0.8.60",
+  "companion_port": 8769,
+  "companion_sha256": "881726BF3ECD676CD016C578594A7D5601CC27F93EC4C7F4392F9720E3307601",
+  "patch_baseline": [
+    113,
+    115
+  ],
+  "validation": {
+    "ai_canvas_tests": 161,
+    "assertions": 1404,
+    "installer_tests": 11,
+    "rust_tests": 103
+  },
+  "tasks": [
+    {
+      "stage": "阶段一：核验既有素材与原生 GUI",
+      "task": "task_62e46bbf2f73aa17792d_verify-existing-assets",
+      "title": "核验既有素材包与当前原生 GUI",
+      "status": "已验收",
+      "acceptance-id": "acceptance_c2ac4eac-f46f-4b08-b7e2-bf4d7b898422"
+    },
+    {
+      "stage": "阶段二：受控入库与工程证据交付",
+      "task": "task_62e46bbf2f73aa17792d_integrate-verified-assets",
+      "title": "复用确认素材完成受控入库、编译与验收证据交付",
+      "status": "已验收",
+      "acceptance-id": "acceptance_cd759836-22c2-4699-878f-c5fac11c2d2f"
+    }
+  ],
+  "native_pm_labels": [
+    "已验收 2 / 2 项工作",
+    "阶段 · 阶段一：核验既有素材与原生 GUI · 验收 1/1 · 已完成",
+    "阶段 · 阶段二：受控入库与工程证据交付 · 验收 1/1 · 已完成"
+  ],
+  "native_build_id": "82e5d7079b5e4d9a16904bda99a2ab1d308411b6935bbf6ad3aa530ce9afc246",
+  "backend_build_id": "d8c4278a78e94628bf8eb0cd176b8f57",
+  "backend_resource_fingerprint": "72d9e858e97cea70e08ceaa20275618486dc486b90158d2ad1c4851f7bfec127",
+  "backend_engine_sha256": "0660d541d424ad7db40c5857589c471316a3f119c12532fe1db6bbd2a78199af",
+  "backend_symbols_sha256": "6b96f9dc56a640ae1d9e9615fdc46e89fa1297865f7e2af73e79f389f771c1ff",
+  "artifact_id": "artifact_ef7c30877c65980400898af0574fb8a9afe217455da85b431e97144c435a8ed2",
+  "artifact_revision": "224e134f5ec2453562114768934d73a1db8d0f33d3aba1645d6af7e02c621d9f",
+  "delivery_id": "delivery_b3cefa1c-01ad-422a-8194-791a427d6f20",
+  "checks": [
+    {
+      "name": "build",
+      "status": "passed",
+      "actor": "engine",
+      "build-id": "82e5d7079b5e4d9a16904bda99a2ab1d308411b6935bbf6ad3aa530ce9afc246",
+      "created-at": "2026-11-05T03:55:39.501158300Z"
+    },
+    {
+      "name": "runtime",
+      "status": "passed",
+      "notes": "后台自动化：同一冻结构建 d8c4278a78e94628bf8eb0cd176b8f57 的替换、出售、空槽装备、多英雄4场景均通过。每次点击有精确关联业务回执，并核对装备UID或出售金币/库存。实际加载 /gui/loot_reward/loot_reward.gui；运行主GUI、图集、字体和控制器编译摘要与工程收据一致。独立QA存档，最终人工验收另行确认。",
+      "evidence-id": "artifact_512cfb85d9aaecad7e93839e21f979b128a47d852fe9b70b2fc6f204f5a589d2",
+      "actor": "automation",
+      "build-id": "82e5d7079b5e4d9a16904bda99a2ab1d308411b6935bbf6ad3aa530ce9afc246",
+      "created-at": "2026-11-05T04:08:31.063069900Z"
+    },
+    {
+      "name": "visual",
+      "status": "passed",
+      "notes": "后台GPU像素比较及助手画面核对：584×1280奖励界面与入库前固定基线747520像素完全一致，差异0；多英雄与空槽画面完整。保留已批准的normal素材、透明边缘及按钮状态图缺失限制。本记录来源为automation，不代替管理人员最终工程验收。",
+      "evidence-id": "artifact_3c50afb228752bf9a48be635fee8bd94527e5d95d95fe2da669678b0941e1952",
+      "actor": "automation",
+      "build-id": "82e5d7079b5e4d9a16904bda99a2ab1d308411b6935bbf6ad3aa530ce9afc246",
+      "created-at": "2026-11-05T04:08:31.706500400Z"
+    }
+  ],
+  "business_cases": [
+    {
+      "fixture": "loot_comparison",
+      "action": "equip",
+      "pendingUid": 2,
+      "selectedHero": "hero_0",
+      "passed": true,
+      "image": "X:\\AI\\UI\\defold\\tmp\\ai-roles\\background-postimport-115\\artifacts\\sessions\\306460d88c6d45fbb4212cd28fef375a\\568385c9d7d247668455142b36bfe65e.png",
+      "image_sha256": "d16ad013c3cd0fa56b331a3fc1435beae9cddb4892e894c120fd484a64d21393",
+      "backend_build_id": "d8c4278a78e94628bf8eb0cd176b8f57"
+    },
+    {
+      "fixture": "loot_comparison",
+      "action": "sell",
+      "pendingUid": 2,
+      "selectedHero": "hero_0",
+      "passed": true,
+      "image": "X:\\AI\\UI\\defold\\tmp\\ai-roles\\background-postimport-115\\artifacts\\sessions\\306460d88c6d45fbb4212cd28fef375a\\dd9baa1adc0744449b8df3563a31c008.png",
+      "image_sha256": "d16ad013c3cd0fa56b331a3fc1435beae9cddb4892e894c120fd484a64d21393",
+      "backend_build_id": "d8c4278a78e94628bf8eb0cd176b8f57"
+    },
+    {
+      "fixture": "loot_empty",
+      "action": "equip",
+      "pendingUid": 1,
+      "selectedHero": "hero_0",
+      "passed": true,
+      "image": "X:\\AI\\UI\\defold\\tmp\\ai-roles\\background-postimport-115\\artifacts\\sessions\\306460d88c6d45fbb4212cd28fef375a\\23da83ed879c41c7b85075458694c963.png",
+      "image_sha256": "986875c603af56b42e7a64e2b27536bd0b072d3bcac6953d798db835d4c0b8de",
+      "backend_build_id": "d8c4278a78e94628bf8eb0cd176b8f57"
+    },
+    {
+      "fixture": "loot_team",
+      "action": "equip",
+      "pendingUid": 4,
+      "selectedHero": "hero_0",
+      "passed": true,
+      "image": "X:\\AI\\UI\\defold\\tmp\\ai-roles\\background-postimport-115\\artifacts\\sessions\\306460d88c6d45fbb4212cd28fef375a\\dae70781bc6f4ff6b704e9fecd84bbce.png",
+      "image_sha256": "191e039802c231f23e894c92533b9b9bc92a9bd801ab77b5fbf903da4222a7f4",
+      "backend_build_id": "d8c4278a78e94628bf8eb0cd176b8f57"
+    }
+  ],
+  "pixel_comparison": {
+    "verdict": "match",
+    "compared_pixels": 747520,
+    "changed_pixels": 0,
+    "changed_ratio": 0.0,
+    "max_channel_delta": 0
+  },
+  "compiled_association": {
+    "native_build_id": "82e5d7079b5e4d9a16904bda99a2ab1d308411b6935bbf6ad3aa530ce9afc246",
+    "native_engine_sha1": "4c9b2971629407214f114090d2e559f600583c7b",
+    "source_files": [
+      {
+        "path": "/assets/atlases/ui/loot_reward.atlas",
+        "sha256": "43a87922d3850aac0647ecc4b1376a3c7559cd742a36c72a1b1393405f58e5d3",
+        "matches": true
+      },
+      {
+        "path": "/assets/ui/loot_reward/loot_reward_component_component_001_normal.png",
+        "sha256": "2974c4ffcfd49adea40644cef57f329ac41b283fcd2fd40eff97f9d436c48c67",
+        "matches": true
+      },
+      {
+        "path": "/assets/ui/loot_reward/loot_reward_component_component_002_normal.png",
+        "sha256": "b5a536fcfdc93202ac1aebf310dedd55630bb7edff52c842ca7116617dd98d43",
+        "matches": true
+      },
+      {
+        "path": "/assets/ui/loot_reward/loot_reward_component_component_003_normal.png",
+        "sha256": "8700bb5bb7f7784defb65303c590b427686f7697305b016352483d88bad8f98b",
+        "matches": true
+      },
+      {
+        "path": "/assets/ui/loot_reward/loot_reward_component_component_004_normal.png",
+        "sha256": "ea2c7c099c7a1a8a8b30971ea0ae290bdb973aeb53fe4d2512879889cc0ac92c",
+        "matches": true
+      },
+      {
+        "path": "/assets/ui/loot_reward/loot_reward_component_component_005_normal.png",
+        "sha256": "d6ee71c95fc141738f9e9526bc8fd2c2f8a34234eb82288f9bdba494a9da5997",
+        "matches": true
+      },
+      {
+        "path": "/game/dialogs/system/system.gui",
+        "sha256": "38df3fc0c390a611190908382a1a4809a8cb31ce9aad82f992be9f15734eb2a1",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/loot_reward_ui.lua",
+        "sha256": "3c5c87bfd643ac6d1fd876efd88af2e1db2c2bde253b9eed5f0bd0f4f9659252",
+        "matches": true
+      },
+      {
+        "path": "/game/layouts/loot_reward.gui",
+        "sha256": "ca97e803955de56cd6c6bf4a9c750b05519e2f31be9f6980f94976d0f27602a3",
+        "matches": true
+      },
+      {
+        "path": "/gui/loot_reward/loot_reward.gui",
+        "sha256": "ca97e803955de56cd6c6bf4a9c750b05519e2f31be9f6980f94976d0f27602a3",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/pixel.font",
+        "sha256": "8389f768eb0c13f214f948f2a6718f51f9a3eceba2ac64d1e79343d1b5c22ea9",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/chinese.font",
+        "sha256": "1a69205591d5899e5073dda12ff9f1a8a205baa4a3f93bc1f90921e05d45ee39",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/loot_reward.font",
+        "sha256": "0ccf2c357133e7987ede6e6f8d9d17d10524bfab2421a3779a84f0a5e5245740",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/latin.font",
+        "sha256": "c191e0fcd273618bb558a55a922966d4dd0c9acdddd03680b39c65e1de0ed8ba",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/boss_presentation.lua",
+        "sha256": "d45148d7e38e3a4311497e2534c6a14c57123bbda62080be7f46aa52e96d7b2c",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/main_hud.lua",
+        "sha256": "b1ec62828782b6952f92080ff36b6bd893a6e4293f2587a14cba23c023c567f0",
+        "matches": true
+      },
+      {
+        "path": "/game/data/scene_variant_sprites.lua",
+        "sha256": "c935ac05b02fcc6455f1f79ceecb6689456107cac0f34265dbf6c29b26a3a831",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/static_grid.lua",
+        "sha256": "e08e30e46f1fa7041c2da85f909fafcdf3f644931a8b7c4edbc25b2e85b1466d",
+        "matches": true
+      },
+      {
+        "path": "/game/data/loot_swipe_feedback.lua",
+        "sha256": "7ad79c1f981223313842d0c0c67df073db2b77cbe34e8e14c3cf663352b0d6fe",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/back_handler.lua",
+        "sha256": "b3d18ea7204499d07e14a9f3b1072a66be26fdf2bb00ed423e286ef215cd678e",
+        "matches": true
+      },
+      {
+        "path": "/game/data/particle_sprites.lua",
+        "sha256": "e8986916f77fc56deb0040edd4a1245598f152a680bed1d852bafccf6dccb3c9",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/battle_space.lua",
+        "sha256": "210d9da417567a3a79a47403a9d50aa5b89a5f8ce1388885f833ac5139af92cd",
+        "matches": true
+      },
+      {
+        "path": "/panthera/adapters/adapter_go.lua",
+        "sha256": "43661ec4f4a06a87b6adc8882c9a8ceacd6a29b8dfc197df2ca624e7a2fc8578",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/materials/source_ui_soft.material",
+        "sha256": "339fc684e3e01f957090e8e291f935f5aa76c80c6340df390ccfc4cc5b706867",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/progress.lua",
+        "sha256": "e5e40ef4d1e764c8f9a895dc4d4687f4926e234f3a503d6b6898b5a9fda76b89",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/materials/hp_context.material",
+        "sha256": "986d7a4f371605411dd21d883f412e01bb9d20a370d923ea589fd757411b8af8",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/automation.lua",
+        "sha256": "00370b58064788905bae0166db2fae17a0040f61b4185359258c6adffa1b952d",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/input/dispatcher.lua",
+        "sha256": "28acc0ebc9468284122a63de0b46dc0cfcabbc95aeac9e0a1e408694270ccf78",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/button.lua",
+        "sha256": "1fa6adfb52a12082752d5f0f4b2645162ee39bd8b9b90cdd8f68d770d1f9b938",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/context/toast.lua",
+        "sha256": "d026d4e145581183fa6c766c9fb68bd4c7aa0a8680346be0a6d2a2599c5ac109",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/base/enums.lua",
+        "sha256": "018dea4323a37552a373af62311cf7346f5e1e443166d17ae7c1ab2e0a094a3b",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/format_numbers.lua",
+        "sha256": "3fc02516be9222fe0e8bb53a96881f5440997aff9d3a9b1e9b780d2e5e0f33aa",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/loot_reward_ui.lua",
+        "sha256": "3c5c87bfd643ac6d1fd876efd88af2e1db2c2bde253b9eed5f0bd0f4f9659252",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/source_ui_image.lua",
+        "sha256": "b1413489787a88601e7e1d3a7c53969ee3309a6c0f6e47d28ad9078699c17118",
+        "matches": true
+      },
+      {
+        "path": "/panthera/panthera_internal.lua",
+        "sha256": "7c49f7950f5db709d234c3bbf57ed0d5273a33e2acdd4a6739ab14ff6f549560",
+        "matches": true
+      },
+      {
+        "path": "/panthera/adapters/adapter_gui.lua",
+        "sha256": "ebbef0dc641ac2d2b9e0fcad65606faf30d5f264909a299f0758887bf879e087",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/base/callback.lua",
+        "sha256": "b7676b0d7869a66d35bb9a1679d2e8b0256cfc67101febf390c9e7eb2f350d31",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/particle_curves.lua",
+        "sha256": "f59e392897a57dab5de9043e1fc1c312e641ea6b2122402388a610bda24e4ee3",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/model.lua",
+        "sha256": "87216d759bbf2ffff72778350910df172fbb7f9e41c360ad6aa6aeb631b39ec8",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/input/normalizer.lua",
+        "sha256": "15027eaf14c79f35f23134a87b1a0d9e6370e57b58cc214a776ffe55e89d85c2",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/data_list.lua",
+        "sha256": "118f6752a6616a2ec1c4657087fe000653dbcf779e4a369b15c3e9c81f552f7a",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/base/log.lua",
+        "sha256": "47235dff7fec7cc6160caad123ae22a9375ca6a6e00db55fe41f1c609088e319",
+        "matches": true
+      },
+      {
+        "path": "/druid/custom/rich_text/module/rt_tags.lua",
+        "sha256": "b07f4a9ac0515917258913ef72abed06bee75dee54eb8db1c0eca0fe0549b6df",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/input/recognizers/swipe.lua",
+        "sha256": "35c874f1924ad8bdbbeda878e131b515d96076b02e759a31c10a17155c6fb32e",
+        "matches": true
+      },
+      {
+        "path": "/game/data/inventory_lpc_hud_sprites.lua",
+        "sha256": "f714f3fff10a54b7cc792c82159cca04e5f4551a71db0ef7adb28bda35791f57",
+        "matches": true
+      },
+      {
+        "path": "/game/data/inventory_dynamic_sprites.lua",
+        "sha256": "2f92d85edfa44d2a4ebec1722c76d54642010ca1d9eeba98076fe85e3defa653",
+        "matches": true
+      },
+      {
+        "path": "/event/events.lua",
+        "sha256": "cd33a13ad406a99d19ce70331cba72f0055a43055a3d4053db8faba0b159828a",
+        "matches": true
+      },
+      {
+        "path": "/event/event.lua",
+        "sha256": "22bfaea3fb15b7433aff0794dee96a3cdb226e85da38f9ac1575442e9a4a5d4f",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/gui/safe_area_layout.lua",
+        "sha256": "dacbb86d89e9b0450b4fc913308457073746378993c037a5f33333701d08024f",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/blocker.lua",
+        "sha256": "b68f0874bd0db019f25412ff8aec8cd22d3c48d742a9af762dede21e535a8d5b",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/hotkey.lua",
+        "sha256": "f64006a4c1dc98d8c5d59b33421dac3044d18d2a8e1c80a8065b60cedacbf6df",
+        "matches": true
+      },
+      {
+        "path": "/game/data/qte_sprites.lua",
+        "sha256": "b690c23a3bf51a0cf40fffcff17e07f1cae04099a22b1f53dfd23f9095d2971f",
+        "matches": true
+      },
+      {
+        "path": "/assets/atlases/ui/loot_reward.atlas",
+        "sha256": "43a87922d3850aac0647ecc4b1376a3c7559cd742a36c72a1b1393405f58e5d3",
+        "matches": true
+      },
+      {
+        "path": "/game/data/loot_ui_sprites.lua",
+        "sha256": "921d54063e3797fb574e48f70279e7cfbf3ff6087b4027e389e933ce3ff43147",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/scroll.lua",
+        "sha256": "ac57bff93effc5a90d0b30dacf8778ad7639b85bb73d721372285f58bdae560d",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/input.lua",
+        "sha256": "1e554b41e437888d6cf3fb6444a97358eed4635218b638469c3d349111acbe97",
+        "matches": true
+      },
+      {
+        "path": "/druid/system/utf8.lua",
+        "sha256": "8e9878bbf5c5c017e58314da5772ba5c18cace8318bcff654601669fea74d413",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/combat_timeline.lua",
+        "sha256": "1b57ff9cabf02a57464361e06b29730df9d656d8acdadda5f253c8335c7b36e0",
+        "matches": true
+      },
+      {
+        "path": "/druid/system/settings.lua",
+        "sha256": "b9c2f1c35da3821ebfc215a6b3561edd1aa65f1237f0fd932abcb5d9ba4a28cd",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/swipe.lua",
+        "sha256": "a27f58f5130e0c4720bf199c32be2634acc3527763cd062295ce5d39eef75610",
+        "matches": true
+      },
+      {
+        "path": "/game/data/hud_rules.lua",
+        "sha256": "a2911ee00f07e6e74dce6683b69c527452a5b98991fa424085f4cc1db0456c51",
+        "matches": true
+      },
+      {
+        "path": "/druid/custom/rich_text/module/rt.lua",
+        "sha256": "af238524dcad92983d354ca911b334d00235b472099ccdf651fbf17b7334df6c",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/input/recognizers/long_press.lua",
+        "sha256": "0b1ebeb203790ac99effd9c4b2e12f499a592770e71cbe5d45710d954271e224",
+        "matches": true
+      },
+      {
+        "path": "/game/dialogs/system/system.gui",
+        "sha256": "38df3fc0c390a611190908382a1a4809a8cb31ce9aad82f992be9f15734eb2a1",
+        "matches": true
+      },
+      {
+        "path": "/game/data/loot_ui_layout.lua",
+        "sha256": "6006eb8f89eeb795d1eb0dd368255d9b227f9c00b4fd27fe8926b6068f868068",
+        "matches": true
+      },
+      {
+        "path": "/druid/system/druid_instance.lua",
+        "sha256": "cd6f81aba7db2653432a6c1ceb15ce2d1ec19a7939d7677ee6b20665839b0a9b",
+        "matches": true
+      },
+      {
+        "path": "/druid/component.lua",
+        "sha256": "76717e7ba2988223cc1d36d24d1c3829bf7521e5e9ec06153e2b9d0dcbfe1cd9",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/loot_flow.lua",
+        "sha256": "b82a6eeea1ff1eb27038852d33ddc64b4ede04e8112f71e0de54cd9c6a2fe78f",
+        "matches": true
+      },
+      {
+        "path": "/game/data/asset_aliases.lua",
+        "sha256": "abd1fb5ff1049bfc4cd682a67f53489616d702879e3405623a48576f6335b5dd",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/source_ui_soft_clip.lua",
+        "sha256": "c5ac847d751406e5ae076d56d7b671005515c43e15cb38fdaee52cfb7a6d1e6e",
+        "matches": true
+      },
+      {
+        "path": "/druid/helper.lua",
+        "sha256": "1f771e2315b1be07dbc5a23d98ad8cb32e967d828260873229fbe5f5a5ccc269",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/manager/input_mgr.lua",
+        "sha256": "bdfab7f19dfbf3d9e373934cc7ef46206e507102e7f886c28e45949e4d3dcd14",
+        "matches": true
+      },
+      {
+        "path": "/game/data/scene_variants.lua",
+        "sha256": "aa21e93b699e093fa0219fb1a9168a151f2311334e3d71adf2f918c47459ff94",
+        "matches": true
+      },
+      {
+        "path": "/game/data/render_source.lua",
+        "sha256": "873d1f53a1acfbf05f8f85488c42638dacf7073aa905c99d257ebaad5c75be0c",
+        "matches": true
+      },
+      {
+        "path": "/game/data/main_hud.lua",
+        "sha256": "c8fb7bf6529387e5fff2a7768b0d89c04511e6fc226272bb8c297e20d56a491c",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/source_ui_tree.lua",
+        "sha256": "07fee3e03f50f58ce314e2c5a89cdfe76791de6eb01ff5b0ad2914ad009fcf3e",
+        "matches": true
+      },
+      {
+        "path": "/game/data/sprites.lua",
+        "sha256": "32263a2c046dfd93261ecb7e419e42fb1227627fa3d509b44109c207e870bf48",
+        "matches": true
+      },
+      {
+        "path": "/game/layouts/loot_reward.gui",
+        "sha256": "ca97e803955de56cd6c6bf4a9c750b05519e2f31be9f6980f94976d0f27602a3",
+        "matches": true
+      },
+      {
+        "path": "/druid/custom/rich_input/rich_input.lua",
+        "sha256": "f5d32ca792e92685c5812ff2e1e51bee15c6b6ea7b55d3845767e24bfc7f77c4",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/materials/source_ui_mask.material",
+        "sha256": "c8ae02263b78cf2a3910dcd106ddf9a59cd759cecf4c84d258ad105061a9a849",
+        "matches": true
+      },
+      {
+        "path": "/game/data/dice_timing.lua",
+        "sha256": "acf6503f5b86bf26a45c2bb5340496520b1ec3b678dbe3529a543af74238386e",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/input/event.lua",
+        "sha256": "f01f9be879a5554dabe7d6747db6f69ffb9afbf3b89405c7d5f6319bb248720f",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/quick_time.lua",
+        "sha256": "8f50e60b685f0c06ced96407d571f56bd7dd4f312f0b64a2cdf9cbd116b0a40b",
+        "matches": true
+      },
+      {
+        "path": "/game/data/inventory_hud.lua",
+        "sha256": "e58417146507dab339af061e54ca58317cc8e1a07f99b2a664b33b5b399724b2",
+        "matches": true
+      },
+      {
+        "path": "/druid/system/druid_logger.lua",
+        "sha256": "e98f91d136259d41f809e800d7801396d2508b24becb7ecdb544afbfdd11f6bf",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/loot_rules.lua",
+        "sha256": "11ae7312c32565af759ddf497bedc3169ebc84295faba51508916c19c8129f4c",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/hover.lua",
+        "sha256": "c23fdc2bd894ab5ecebced716edacc0a16fde4f786bacacf9e1e35ac934fb9c5",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/gui/safe_area_math.lua",
+        "sha256": "24a3e84fecc7908b9d00b2bb55bfa4a730ce3d3201919306d8c53ae16a7bc539",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/base/class.lua",
+        "sha256": "47cb9c7d14792aa359fc94d81770cc371aa70b7f93706f72117fd7e5aa1b5a93",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/materials/combat_particle.material",
+        "sha256": "9e97c06ff2c36d53db44abfce4750d6c8c67b080fe91d23d32a5e7e039f743a0",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/spatial.lua",
+        "sha256": "950bbaba8b43018eff3e9d88f02d3eef48a47bdc36e678c52f6fed62dcfa7530",
+        "matches": true
+      },
+      {
+        "path": "/game/data/profile_names.lua",
+        "sha256": "ba0d832d5adec1f06ea399256f091932a092df6d153a532b96d874938fd0299e",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/dice_rules.lua",
+        "sha256": "019e45ce07856218dde6e1a1f47521cabb4a2c9ca073b7894cc42acff78e76a5",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/stat_component_layout.lua",
+        "sha256": "1388a0db034e45a5cfa7478d6d421a95f339858c04a7849e30fbd5caf1936983",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/input/recognizers/pinch.lua",
+        "sha256": "619af09ce54436f2eebcb266706646803ff5842d5a69cd2e48251c7098684529",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/loot_ui.lua",
+        "sha256": "196d71740aeadd46a7c63ed4579c927c3a71219845efef461be1e472ef3ca281",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/slider.lua",
+        "sha256": "dbee2c2db267b5323421c05729bedd95b52540c9d11fb29b86176facb3686bd1",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/session.lua",
+        "sha256": "4a44fbe4f712f83d396207df4cc0c3a5dd8fc7ea133d9d2104f2c870ddffca6a",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/scripts/context.gui_script",
+        "sha256": "9fbe709e844b787a524f601739cffec56a5d6a8dd57ec5492478f2176e6f993a",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/context/dialog.lua",
+        "sha256": "c7f9ef61d29591423ec58e4c866ed68a97530f6004198df4819d44d84c791741",
+        "matches": true
+      },
+      {
+        "path": "/druid/custom/rich_text/module/rt_parse.lua",
+        "sha256": "4e42a77c9c4512df794239535969418e90ef94125bc6c75c4f8b0e44b3d71f7e",
+        "matches": true
+      },
+      {
+        "path": "/panthera/panthera.lua",
+        "sha256": "5afd1dfaa9520358f69ac3b98693635e85d54335baf9911d012601e78426d94b",
+        "matches": true
+      },
+      {
+        "path": "/game/data/tables.lua",
+        "sha256": "f89a5bd5a4f452d870613c61ee1c77f3ac98460f82f7f1734ee823c53883fd13",
+        "matches": true
+      },
+      {
+        "path": "/gui/loot_reward/loot_reward.gui",
+        "sha256": "ca97e803955de56cd6c6bf4a9c750b05519e2f31be9f6980f94976d0f27602a3",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/main_hud_state.lua",
+        "sha256": "8c53ca5934a79dabad8b3647f5ce7cb4a835d01e341439312e3b60fee254a498",
+        "matches": true
+      },
+      {
+        "path": "/game/data/gameconfig.lua",
+        "sha256": "f6c262900332e997eb5e12f3cab533afada5e01f90a5b4b647f0e9a04ffbc03e",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/ability_description.lua",
+        "sha256": "323e2bd439c4eeb5b160b4ca3ac963d48140f58992d7f3676014d42881b6b7a6",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/input/recognizers/tap.lua",
+        "sha256": "bcdd0b637bb4382a70e0269467c07d0aba9da8e6baaae29b24661c3c975ecf4f",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/context/activity.lua",
+        "sha256": "0baf83173c34995467fc0ddcaff6a5773caa4efc511aa0745f9adeab4140b6fb",
+        "matches": true
+      },
+      {
+        "path": "/game/data/ui_hero_icons.lua",
+        "sha256": "0df5e8f52375a5e0866fe962d7519619fc8da4ac2ac9685b5cdc549464f6cac7",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/layout.lua",
+        "sha256": "a2104ffb66d446b50f66daa66cb0b2c2d3d5ee3eae7659214548c75cbf29fdde",
+        "matches": true
+      },
+      {
+        "path": "/game/data/scene_paths.lua",
+        "sha256": "98fdcf779a900c3f15471edf85664f25c2cc75154bef099f20471f2e78626759",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/materials/source_ui_soft_font.material",
+        "sha256": "7d5e66f08bd9aa3ec76793c60e4781e3b66253d1faa035bc94ada9d910ee9b8c",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/timer.lua",
+        "sha256": "6c2084233c03627fe0c2eb182cb3889c0da759c5872c413cbd9f2a9f0451c48b",
+        "matches": true
+      },
+      {
+        "path": "/game/data/world_scene.lua",
+        "sha256": "57b4044af2a25aa5cdb26c840495955f97966ea85bde6c1ad269401306064fb6",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/context/instances.lua",
+        "sha256": "20e73cfd50542576284afe53dc8d35c29a6ef9e9903f41b3e3bcd25c996b5cbc",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/lang_text.lua",
+        "sha256": "fb7145f3fe1344a3bb1c58c963b9eabca00b144da96918f528af1e4efab7ef4d",
+        "matches": true
+      },
+      {
+        "path": "/druid/druid.lua",
+        "sha256": "7c0ef1f63863ba9ab71c3d077ce2a673c025937d1ab35939902ab938d4e54da0",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/ui.lua",
+        "sha256": "917331c37713b84901d6600ac0820b20d1b54ee1a62f6d044c53de3dd3aadf51",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/text.lua",
+        "sha256": "060ba276485170309e0df355f1b3626638081766f056485f4d8f771c20570e45",
+        "matches": true
+      },
+      {
+        "path": "/game/data/main_hud_sprites.lua",
+        "sha256": "1b103f489e94998f48e772cb3182f69ebac12310f33850e95fce7a7b0099e326",
+        "matches": true
+      },
+      {
+        "path": "/druid/custom/rich_text/rich_text.lua",
+        "sha256": "33fa779dfb210d899220430dd13db1c34d5a05d6873ba4f6ff17be8f9b9296b9",
+        "matches": true
+      },
+      {
+        "path": "/game/data/world_sprites.lua",
+        "sha256": "6a8beb5260739b5b2ebc6dca8c2784d6f7c2df0ebf8e7a9731862790c99ae908",
+        "matches": true
+      },
+      {
+        "path": "/druid/color.lua",
+        "sha256": "a779aa1ebd43b84963e180d1ffcbf21529477420b7a0bbb59af9f6f21bad8494",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/base/global.lua",
+        "sha256": "1c02d3b58e3ce61b36d84d3c39d483d4a217abc97e26fcc1ed12fb7534ccca02",
+        "matches": true
+      },
+      {
+        "path": "/game/data/inventory_lpc_hud.lua",
+        "sha256": "621089144ac710abb71dcedf0c99aefa08eec3a6e5e893848448d57a5076edf9",
+        "matches": true
+      },
+      {
+        "path": "/druid/base/drag.lua",
+        "sha256": "bfcedae8395064fbbdf52852af6bf6bfc8388ee3bd07d60ea2f1e5c4f154d1b5",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/video_ui.lua",
+        "sha256": "27dcc51743825a48c0a3b6dbc40445ddf7394d092d378a040f84a3d4b8aa0e61",
+        "matches": true
+      },
+      {
+        "path": "/game/data/abilities.lua",
+        "sha256": "c1a06e0649308dfcd5c53f8f65577eface7a2905ad8d161616fa857cba0101be",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/materials/qte_font_flash.material",
+        "sha256": "a4f045445f7c63aa3cb55231b7d4ad7429f4ddff4fa8eb3f7939152359d86cbd",
+        "matches": true
+      },
+      {
+        "path": "/druid/extended/container.lua",
+        "sha256": "49fe839445b844085257dc7fecef13f5ebb39b2880a7c8d912308c6bef7cb5ff",
+        "matches": true
+      },
+      {
+        "path": "/game/data/inventory_hud_sprites.lua",
+        "sha256": "4bdb3145d66ea562303ac13df198be5a4b39b9f4168d7414fb9a286076e16bc5",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/battle_camera.lua",
+        "sha256": "fd90134dbe84e20426914aae1348130e705aeb0e681c70e1b912102e6738f69f",
+        "matches": true
+      },
+      {
+        "path": "/tweener/tweener.lua",
+        "sha256": "ace2a58dc0e19e7835d0f9b0b386fe87220d0639b785d5b09010bcb6186d4078",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/loot_ui_state.lua",
+        "sha256": "d2548cd9a11a0c2e03c3a48797d5ba42fefc448371e2282636ef08f726b14aff",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/base/global_core.lua",
+        "sha256": "f814d86758fdfa0ebfbbee3119dd51794b2e39392b5145646d7d35e821d3fd9e",
+        "matches": true
+      },
+      {
+        "path": "/druid/const.lua",
+        "sha256": "6b96ff2e16aee337b96332f4748fc46c102910195de3f5384a6f263f7606da6a",
+        "matches": true
+      },
+      {
+        "path": "/game/assets/materials/qte_flash.material",
+        "sha256": "5f20cca723e1cd0e15b13ee1428172b536dd1dae4b7c3b8fc0eea75844114439",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/dice_timeline.lua",
+        "sha256": "80713daaa5c7b9849ce1c57575676c960bbfd92a154c87aeb797c6cc29619433",
+        "matches": true
+      },
+      {
+        "path": "/game/data/boss_presentation.lua",
+        "sha256": "857e392b4d1f0936d1f4294fb3de9e8445c736847726158965c6b184c6ae2bbe",
+        "matches": true
+      },
+      {
+        "path": "/nanyu/core/context/context.lua",
+        "sha256": "0229e5bb2f808e697858cd94ef611e7117ff74935fcefa37db29f7ae67612525",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/inventory_hud_state.lua",
+        "sha256": "abde4b88a89af1229087696523822b6a9ea984fd7d33f70bf96e9221ca13f4b5",
+        "matches": true
+      },
+      {
+        "path": "/druid/styles/default/style.lua",
+        "sha256": "fcf3509c0e6432beedb7746cb607e90c7136b7f48c2f8b665c2ecc1d2ad9d530",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/gui_layout.lua",
+        "sha256": "aece2a7ec1ff1e88c66c84c38404c8f19032742e4e2b3e1a2ed8d7690f4de3f0",
+        "matches": true
+      },
+      {
+        "path": "/game/gameplay/world_geometry.lua",
+        "sha256": "d7da6b4a366ca6e083cc606821769ad62bfbbf40f8f063f6ecf28c8ef04ea904",
+        "matches": true
+      },
+      {
+        "path": "/game/data/dice_source.lua",
+        "sha256": "9a4512c3a5c133384b8645385c99effb49019eb0305e3cd054239835ee6089d9",
+        "matches": true
+      }
+    ],
+    "runtime_primary_compiled_files": [
+      {
+        "path": "assets/atlases/ui/loot_reward.a.texturesetc",
+        "sha256": "fa5e11294e35090f3c92808897cdb4657ef3da11b4a69d4eae62c98bb10f88c5",
+        "matches": true
+      },
+      {
+        "path": "game/assets/loot_reward.fontc",
+        "sha256": "5089d3605bbb9f65a895100f1f93f9acfa236b16cf2b47eea77f593744c7f618",
+        "matches": true
+      },
+      {
+        "path": "game/dialogs/system/system.guic",
+        "sha256": "897778bc85949620d68954a9cf24b6f48d0e5b8de95c08793e378b6874468cc6",
+        "matches": true
+      },
+      {
+        "path": "game/gameplay/loot_reward_ui.luac",
+        "sha256": "58fbd93727742bbc022bb2ccd34e9510faf70f6ea18c2be69119593aec684e3f",
+        "matches": true
+      }
+    ],
+    "explanation": "The runtime compiles GUI templates into system.guic. Standalone template preview outputs and shader program names can differ with the build root set.",
+    "backend_build_id": "d8c4278a78e94628bf8eb0cd176b8f57",
+    "backend_resource_fingerprint": "72d9e858e97cea70e08ceaa20275618486dc486b90158d2ad1c4851f7bfec127",
+    "backend_engine_sha256": "0660d541d424ad7db40c5857589c471316a3f119c12532fe1db6bbd2a78199af",
+    "backend_symbols_sha256": "6b96f9dc56a640ae1d9e9615fdc46e89fa1297865f7e2af73e79f389f771c1ff",
+    "frozen_runtime_primary_matches": true
+  },
+  "known_limits": [
+    "Existing normal-state art reused; alpha edges and missing independent button states retained as approved.",
+    "Runtime validation covers four deterministic QA scenarios at 584x1280; this is not acceptance of all game systems."
+  ],
+  "source_policy": "Native editor full project compile, then defold-background compiled import; primary runtime compiled resources and source hashes verified against native receipt."
+}

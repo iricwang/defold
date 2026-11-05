@@ -194,11 +194,11 @@
 ;; Failed renames must never dispatch work. Retries retain the original title
 ;; and request identity.
 (deftest rename-before-dispatch-test
-  (let [pending {:task-name "林知远(核心玩法)" :body {:threadId "thread" :requestId "request" :text "work"}}
+  (let [pending {:task-name "【策划-林知远】核心玩法" :body {:threadId "thread" :requestId "request" :text "work"}}
         calls (atom [])
         call! (fn capture-call [path body] (swap! calls conj [path body]) {:turnId "turn"})]
     (is (= {:turnId "turn"} (ai/dispatch-pending! call! pending)))
-    (is (= [["/api/thread/name" {:threadId "thread" :name "林知远(核心玩法)" :requestId "name-request"}]
+    (is (= [["/api/thread/name" {:threadId "thread" :name "【策划-林知远】核心玩法" :requestId "name-request"}]
             ["/api/message" (:body pending)]] @calls))
     (ai/dispatch-pending! call! pending)
     (is (= (subvec @calls 0 2) (subvec @calls 2 4)))
@@ -206,8 +206,10 @@
     (is (thrown? Exception (ai/dispatch-pending! (fn fail-name [path _] (swap! calls conj path) (throw (ex-info "offline" {}))) pending)))
     (is (= ["/api/thread/name"] @calls))))
 
-;; Task names follow staff(task) and fit the Companion title boundary.
+;; Task names use the staff role and name so Codex thread titles read like
+;; 【策划-林知远】写战斗玩法, and still fit the Companion 120-character boundary.
 (deftest staff-task-name-test
-  (is (= "林知远(核心玩法设计)" (ai/task-name {:title "林知远"} {:title "核心玩法设计"})))
-  (is (= "林知远(任务 整理)" (ai/task-name {:title " 林知远 "} {:title "任务\n整理"})))
-  (is (= 120 (count (ai/task-name {:title "林知远"} {:title (.repeat "长" 150)})))))
+  (is (= "【策划-林知远】核心玩法设计" (ai/task-name {:title "林知远" :role-type "planning"} {:title "核心玩法设计"})))
+  (is (= "【策划-林知远】任务 整理" (ai/task-name {:title " 林知远 " :role-type "planning"} {:title "任务\n整理"})))
+  (is (= "【林知远】未命名任务" (ai/task-name {:title "林知远"} {})))
+  (is (= 120 (count (ai/task-name {:title "林知远" :role-type "planning"} {:title (.repeat "长" 150)})))))

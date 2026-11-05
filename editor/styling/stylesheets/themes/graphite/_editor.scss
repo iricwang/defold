@@ -39,7 +39,7 @@
   .split-pane > .split-pane-divider {
     -fx-background-color: -df-ui-divider;
     -fx-opacity: 1;
-    -fx-padding: 2px;
+    -fx-padding: 1px;
     &:hover, &:armed {
       -fx-background-color: -df-component-light;
       -fx-opacity: 1;
@@ -49,13 +49,13 @@
   #main-split, #workbench-split {
     > .split-pane-divider {
       -fx-background-image: none;
-      -fx-padding: 0px 3px;
+      -fx-padding: 0px 1px;
     }
   }
 
   #center-split > .split-pane-divider {
     -fx-background-image: none;
-    -fx-padding: 3px 0px;
+    -fx-padding: 0 2px;
   }
 }
 

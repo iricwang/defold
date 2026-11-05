@@ -17,7 +17,11 @@
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as string]
+            [editor.ai-delivery-view :as delivery-view]
             [editor.ai-graph :as graph]
+            [editor.ai-pm-view :as pm-view]
+            [editor.ai-project-work :as project-work]
+            [editor.ai-resource-import :as resource-import]
             [editor.ai-results :as results]
             [editor.ai-roles :as roles]
             [editor.ai-tasks :as tasks]
@@ -43,10 +47,12 @@
 
 (set! *warn-on-reflection* true)
 
-(def colors {:action "#5B8CFF" :result "#AD7BFF" :gui "#59BFD9" :assets "#48C78E" :role "#E6AF57" :person "#E6AF57"})
+(def colors {:pm "#E6AF57" :task "#59BFD9" :action "#5B8CFF" :result "#AD7BFF" :gui "#59BFD9" :assets "#48C78E" :role "#E6AF57" :person "#E6AF57"})
 
 (def templates
-  [{:id "concept" :title "文本方案" :default-name "核心玩法" :action "设计目标" :result "玩法方案候选" :assets "方案文档"
+  [{:id "ai-pm" :title "AI-PM · 项目规划" :default-name "AI-PM项目规划" :pm "AI-PM" :task "任务"
+    :brief "描述项目目标、范围、阶段和交付约束" :instructions "将目标拆为阶段与具体职员任务，等待人工确认分配。"}
+   {:id "concept" :title "文本方案" :default-name "核心玩法" :action "设计目标" :result "玩法方案候选" :assets "方案文档"
     :brief "描述游戏定位、核心循环与设计目标"
     :instructions "围绕游戏定位、核心循环、系统规则和验收标准给出可比较的文字方案。"}
    {:id "gui" :title "GUI 方案" :default-name "界面设计" :action "界面设计目标" :result "界面效果图候选" :assets "界面资源" :gui "GUI 界面"
@@ -88,11 +94,19 @@
 (defn auto-layout [model]
   (if (= :roles (:workflow model))
     (roles/layout model)
-    (let [columns {:person 0 :action 1 :result 2 :assets 3 :gui 4}
+    (let [columns {:pm 0 :task 1 :person 0 :action 1 :result 2 :assets 3 :gui 4}
           cards (coll/into-> (:nodes model) {} (map (juxt :id identity)))
+          levels (letfn [(depth [id visited]
+                           (if (contains? visited id)
+                             0
+                             (reduce max (get columns (:kind (get cards id)) 1)
+                                     (coll/into-> (:edges model) [] (filter #(and (= id (:to %)) (contains? cards (:from %))))
+                                       (map #(inc (depth (:from %) (conj visited id))))))))]
+                   (coll/into-> (:nodes model) {} (map #(vector (:id %) (depth (:id %) #{})))))
           parents (reduce (fn collect-parent [parents {:keys [from to]}]
-                            (if (and (contains? cards from) (contains? cards to) (not (contains? parents to))
-                                     (< (get columns (:kind (get cards from)) 1) (get columns (:kind (get cards to)) 1)))
+                            (if (and (contains? cards from) (contains? cards to)
+                                     (> (get levels from) (get levels (get parents to) -1))
+                                     (< (get levels from) (get levels to)))
                               (assoc parents to from)
                               parents)) {} (:edges model))
           children (reduce (fn collect-children [children {:keys [from to]}]
@@ -106,7 +120,7 @@
                                   {:positions (merge positions (:positions branch)) :bottom (:bottom branch)}))
                               {:positions {} :bottom top} (get children id))
                       bottom (max (+ top 520.0) bottom)]
-                  {:positions (assoc positions id {:x (* 340.0 (get columns (:kind (get cards id)) 1))
+                  {:positions (assoc positions id {:x (* 340.0 (get levels id))
                                                    :y (+ top (/ (- bottom top 520.0) 2.0))})
                    :bottom bottom}))]
         (let [{:keys [positions]}
@@ -161,15 +175,22 @@
       state)))
 
 (defn connect-nodes [canvas from to]
-  (let [source (node-by-id canvas from) target (node-by-id canvas to)]
-    (when-not (contains? #{[:person :action] [:action :result] [:result :assets] [:assets :gui]} [(:kind source) (:kind target)])
+  (let [source (node-by-id canvas from) target (node-by-id canvas to)
+        dependency? (= [:task :task] (mapv :kind [source target]))]
+    (when (and (graph/input-edge? canvas {:from from :to to}) (not (resource-import/import-action? target)))
+      (throw (ex-info "Assets 只能作为资源入库 Action 的输入" {})))
+    (when-not (contains? #{[:pm :task] [:task :task] [:person :action] [:action :result] [:result :assets] [:assets :gui] [:assets :action]} (mapv :kind [source target]))
       (throw (ex-info "连线顺序为 Person → Action → Result → Assets → GUI" {})))
-    (when (and (:source-action target) (not= from (:source-action target)))
+    (when (and (not dependency?) (or (:source-action target) (:source-pm target)) (not= from (or (:source-action target) (:source-pm target))))
       (throw (ex-info "Result 固定绑定产出它的 Action" {})))
+    (when (and dependency? (or (= from to) (graph/dependency-cycle? canvas from to)))
+      (throw (ex-info "前置任务不能形成循环" {})))
     ;; A result/asset has exactly one upstream source, keeping provenance clear.
-    (when (coll/any? #(and (= to (:to %)) (not= from (:from %))) (:edges canvas))
+    (when (and (not dependency?)
+               (coll/any? #(and (not (graph/dependency-edge? canvas %)) (= to (:to %)) (not= from (:from %))
+                                (= (graph/input-edge? canvas {:from from :to to}) (graph/input-edge? canvas %))) (:edges canvas)))
       (throw (ex-info "目标卡片已连接上游，请使用新的流程卡片" {})))
-    (when (and (not (contains? #{:person :action} (:kind source))) (coll/any? #(and (= from (:from %)) (not= to (:to %))) (:edges canvas)))
+    (when (and (not (contains? #{:person :pm :action :assets :task} (:kind source))) (coll/any? #(and (= from (:from %)) (not= to (:to %))) (:edges canvas)))
       (throw (ex-info "当前阶段只支持线性流程，一张卡片连接一个下游" {})))
     (if (coll/any? #(= [from to] [(:from %) (:to %)]) (:edges canvas))
       canvas
@@ -187,15 +208,32 @@
 (defn add-node [model kind x y]
   (when-not (contains? graph/successors kind) (throw (ex-info "不支持的节点类型" {})))
   (let [id (str "card_" (java.util.UUID/randomUUID))
-        node (cond-> {:id id :kind kind :title (if (= :person kind) "负责人" (get (template (:template model)) kind (if (= :gui kind) "GUI 界面" (name kind)))) :x x :y y}
-               (= :action kind) (assoc :prompt "")
+        node (cond-> {:id id :kind kind :title (if (contains? #{:person :pm} kind) (if (= :pm kind) "AI-PM" "负责人") (get (template (:template model)) kind (if (= :gui kind) "GUI 界面" (name kind)))) :x x :y y}
+               (contains? #{:action :pm} kind) (assoc :prompt "")
                (= :result kind) (assoc :candidates [])
                (= :assets kind) (assoc :assets []))]
     (-> model (update :nodes conj node) (assoc :selected id))))
 
+(defn add-card [model kind x y {:keys [staff from]}]
+  (let [next (add-node model kind x y)
+        id (:selected next)
+        next (if (and (= :action kind) (= :assets (:kind (node-by-id model from))))
+               (update-node next id #(assoc % :title "资源入库" :task-type "resource-import"
+                                            :prompt "整理 Assets 输入的 GUI 资源，生成入库方案供确认。"))
+               next)
+        next (if (and staff (or (= :pm kind) (and (not (:builtin staff)) (contains? #{:person :task} kind))))
+               (update-node next id #(roles/assign-staff % staff))
+               next)
+        next (if (and (= :task kind) from)
+               (update-node next id #(assoc % :status "review" :stage "" :template "concept"
+                                            :depends-on [] :source-pm (or (:source-pm (node-by-id model from))
+                                                                          (when (= :pm (:kind (node-by-id model from))) from))))
+               next)]
+    next))
+
 (defn ensure-gui-card [model assets-id]
   (let [asset (node-by-id model assets-id)
-        existing (:to (coll/first-where #(= assets-id (:from %)) (:edges model)))]
+        existing (:to (coll/first-where #(and (= assets-id (:from %)) (= :gui (:kind (node-by-id model (:to %))))) (:edges model)))]
     (if (or (not= :assets (:kind asset)) existing)
       model
       (let [id (str "gui_" assets-id)]
@@ -206,7 +244,7 @@
 
 (defn deliver-gui [model assets-id output]
   (let [model (ensure-gui-card model assets-id)
-        id (:to (coll/first-where #(= assets-id (:from %)) (:edges model)))]
+        id (:to (coll/first-where #(and (= assets-id (:from %)) (= :gui (:kind (node-by-id model (:to %))))) (:edges model)))]
     (-> model
         (update-node assets-id #(assoc % :production output))
         (update-node id #(assoc % :production output :gui-resource (:gui output) :gui-stale false)))))
@@ -216,7 +254,7 @@
     model
     (reduce (fn migrate-output [model card]
               (let [model (ensure-gui-card model (:id card))
-                    id (:to (coll/first-where #(= (:id card) (:from %)) (:edges model)))]
+                    id (:to (coll/first-where #(and (= (:id card) (:from %)) (= :gui (:kind (node-by-id model (:to %))))) (:edges model)))]
                 (if (and (:production card) (nil? (:gui-resource (node-by-id model id))))
                   (deliver-gui model (:id card) (:production card))
                   model)))
@@ -243,6 +281,11 @@
                     1)) (:nodes canvas))))
 
 (defn remove-node [canvas id]
+  (when (:builtin (node-by-id canvas id))
+    (throw (ex-info "AI-PM 是内置职员，不能删除" {})))
+  (when (or (= :task (:kind (node-by-id canvas id)))
+            (coll/any? #(= id (:source-pm %)) (:nodes canvas)))
+    (throw (ex-info "请使用驳回管理 TaskCard；有规划记录的 AI-PM 不能直接删除" {})))
   (let [removed (coll/into-> (results/cards canvas id) #{id} (map :id))
         nodes (filterv #(not (contains? removed (:id %))) (:nodes canvas))]
     (-> canvas
@@ -317,7 +360,10 @@
           (connect-nodes result-id id)))))
 
 (defn disconnect-edge [model edge]
-  (when (results/locked-edge? model edge)
+  (when (and (graph/dependency-edge? model edge) (= "allocated" (:status (node-by-id model (:to edge)))))
+    (throw (ex-info "已分配任务的前置关系已冻结，请提出任务变更后再调整" {})))
+  (when (or (results/locked-edge? model edge)
+            (= [:pm :task] (mapv #(:kind (node-by-id model %)) [(:from edge) (:to edge)])))
     (throw (ex-info "Result 与来源 Action 固定绑定，不能断开" {})))
   (update model :edges #(filterv (fn remove-edge [item] (not= [(:from edge) (:to edge)] [(:from item) (:to item)])) %)))
 
@@ -334,17 +380,17 @@
   (let [result (node-by-id canvas result-id)
         chosen (coll/first-where #(= (:chosen result) (:id %)) (:candidates result))
         target (:to (coll/first-where #(= result-id (:from %)) (:edges canvas)))]
-    (when-not (and (if (text-workflow? canvas)
+    (when-not (and (if (or (text-workflow? canvas) (resource-import/import-action? (node-by-id canvas (results/action-id canvas result-id))))
                      (or (not (string/blank? (:text chosen))) (:image-path chosen) (coll/not-empty (:files chosen)))
                      (:image-path chosen))
                    (= :assets (:kind (node-by-id canvas target))))
       (throw (ex-info "先选择候选，并连接 Assets 卡片" {})))
     (-> canvas
-        (update-node target #(assoc (dissoc % :production :production-plan :production-source-key :document-output) :assets (if (coll/not-empty (:files chosen))
-                                                                                                                              (mapv (fn [file] (cond-> file
-                                                                                                                                                 (and (:preview chosen) (= (:path file) (:image-path chosen)))
-                                                                                                                                                 (assoc :preview (:preview chosen)))) (:files chosen))
-                                                                                                                              [{:name "设计方案" :text (:text chosen)}])
+        (update-node target #(assoc (dissoc % :production :production-plan :production-source-key :document-output :artifact-id :delivery-id) :assets (if (coll/not-empty (:files chosen))
+                                                                                                                                                        (mapv (fn [file] (cond-> file
+                                                                                                                                                                           (and (:preview chosen) (= (:path file) (:image-path chosen)))
+                                                                                                                                                                           (assoc :preview (:preview chosen)))) (:files chosen))
+                                                                                                                                                        [{:name "设计方案" :text (:text chosen)}])
                                     :source-result result-id :source-candidate (:id chosen)
                                     :source-revision (results/revision result) :proposal-text (:text chosen)))
         (update-node (:to (coll/first-where #(= target (:from %)) (:edges canvas)))
@@ -389,10 +435,10 @@
                       (map-indexed (fn proposal-output [index section]
                                      (let [files (filterv #(string/includes? section (:source %)) files)
                                            image (coll/first-where #(string/includes? section (:source %)) images)]
-                                       (cond-> {:id (str prefix "/proposal-" (inc index)) :text section :files files}
+                                       (cond-> {:id (str prefix "/proposal-" (inc index)) :source-thread-id thread-id :source-turn-id (:id turn) :text section :files files}
                                          image (assoc :image-path (:path image)))))))
-                    (coll/not-empty images) (mapv (fn [file] {:id (str prefix "/" (:path file)) :text text :files [file] :image-path (:path file)}) images)
-                    (not (string/blank? text)) [{:id prefix :text text :files files}]
+                    (coll/not-empty images) (mapv (fn [file] {:id (str prefix "/" (:path file)) :source-thread-id thread-id :source-turn-id (:id turn) :text text :files [file] :image-path (:path file)}) images)
+                    (not (string/blank? text)) [{:id prefix :source-thread-id thread-id :source-turn-id (:id turn) :text text :files files}]
                     :else [])))))))
 
 (defn- button
@@ -400,8 +446,27 @@
   (doto (Button. text)
     (.setId id)
     (-> .getStyleClass (.add "button-small"))
+    (-> .getStyleClass (.add "ai-command"))
     (.setOnAction (reify EventHandler (handle [_ _] (action))))))
 
+(def ^:private detail-button-style
+  "-fx-background-color: #303030; -fx-border-color: #181818; -fx-border-width: 1; -fx-background-radius: 3; -fx-border-radius: 3; -fx-text-fill: #c8c8c8; -fx-min-width: 0; -fx-padding: 5 12;")
+
+(defn style-detail-buttons!
+  "Inline the fork button colours on detail actions: theme lookups do not reach
+  every detail host, so relying on stylesheet classes can leave bare labels."
+  [^javafx.scene.Parent root]
+  (letfn [(walk [^javafx.scene.Node node]
+            (cond
+              (instance? javafx.scene.control.Button node)
+              (let [classes (set (.getStyleClass ^javafx.scene.control.Button node))]
+                (when-not (or (contains? classes "ai-primary")
+                              (contains? classes "ai-card-link")
+                              (contains? classes "ai-icon-button"))
+                  (.setStyle ^javafx.scene.control.Button node detail-button-style)))
+              (instance? javafx.scene.Parent node)
+              (doseq [child (.getChildrenUnmodifiable ^javafx.scene.Parent node)] (walk child))))]
+    (walk root)))
 (defn- label
   ^Label [text]
   (doto (Label. text) (.setWrapText true) (.setMaxWidth 242.0)))
@@ -505,7 +570,7 @@
      :y (- (/ viewport-height 2.0) (* (+ y (/ card-height 2.0)) zoom))}))
 
 (defn card-content-key [state]
-  [(:gui-previews state)
+  [(:gui-previews state) (:project-work state)
    (mapv #(dissoc % :chosen) (get-in state [:canvas :nodes]))
    (get-in state [:canvas :edges])
    (:staff state)
@@ -523,6 +588,21 @@
              (identity [(doto (label icon) (.setStyle "-fx-font-size: 32; -fx-text-fill: -ai-accent;")) (label text)]))
     box))
 
+(defn- attach-detail-stylesheet!
+  "The details pane can be mounted in a detached dock scene that never inherits
+  the tab's parent stylesheet, so make the canvas cascade reach that scene too."
+  [^javafx.scene.Parent root]
+  (let [url (some-> (io/resource "ai-canvas.css") str)]
+    (when (and url (not (string/blank? url)))
+      (letfn [(attach [^javafx.scene.Scene scene]
+                (when (and scene (not (some #(= url %) (.getStylesheets scene))))
+                  (.add (.getStylesheets scene) url)
+                  (when-let [scene-root (.getRoot scene)]
+                    (.applyCss scene-root))))]
+        (attach (.getScene root))
+        (.addListener (.sceneProperty root)
+                      (reify javafx.beans.value.ChangeListener
+                        (changed [_ _ _ scene] (attach scene))))))))
 (defn make-details [state _choose! open-output! gui! save-role! staff! assign! report! work!]
   (let [root (BorderPane.)
         content (VBox. 12.0)
@@ -554,7 +634,7 @@
                          key [(get-in s [:gui-previews (:id card)]) (dissoc card :x :y) files (:context s) (:execution session) (:queue session) (:thread-id session) (:thread-name session) (:edges (:canvas s))
                               (:staff s) (mapv roles/role-type (:staff s)) (get-in s [:canvas :role-types])
                               (when (= :person (:kind card)) (mapv :execution (coll/vals (:sessions s))))
-                              (tasks/locked? s) (mapv #(select-keys % [:id :title :staff-name]) (get-in s [:canvas :nodes]))]]
+                              (tasks/locked? s) (:project-work s) (get-in s [:delivery-drafts (:id card)]) (mapv #(select-keys % [:id :title :staff-name]) (get-in s [:canvas :nodes]))]]
                      (when-not (= key @rendered)
                        (reset! rendered key)
                        (.clear (.getChildren content))
@@ -565,12 +645,22 @@
                          (when-let [error (graph/execution-error (:canvas s) (:staff s) (:id card))]
                            (text! (section! "配置 / 连接待确认") error)))
                        (case (:kind card)
+                         (:pm :task)
+                         (.add (.getChildren content) (pm-view/details state card staff! assign! report! work!))
                          :role
                          (.setCenter root (roles/make-editor card (roles/types (:canvas @state)) save-role!))
 
                          :person
                          (do
                            (.add (.getChildren ^VBox (section! "负责人")) (roles/make-assignment card staff! assign! report! "ai-detail-staff-"))
+                           (let [section ^VBox (section! "项目职员队列 · 跨画布")
+                                 jobs (filterv #(contains? #{"queued" "running" "unknown" "paused"} (:status %))
+                                               (project-work/jobs-for (:project-work s) (:staff-id card)))]
+                             (if-not (coll/not-empty jobs)
+                               (text! section "暂无待执行工作")
+                               (doseq [job jobs]
+                                 (text! section (str (:title job) " · " (get tasks/status-labels (:status job) (:status job))))
+                                 (.add (.getChildren section) (button "打开所属工作 Canvas" (str "project-job-" (:id job)) #(work! :open-project-job (:id job) nil))))))
                            (let [section (section! "Codex 项目子任务")]
                              (text! section (or (:thread-name session) "首次执行时自动创建并绑定"))
                              (when-let [thread-id (:thread-id session)] (text! section thread-id)))
@@ -598,19 +688,23 @@
 
                          :action
                          (do
+                           (.add (.getChildren content) (delivery-view/details state card work! report!))
                            (let [section ^VBox (section! "负责人")
                                  owner (node-by-id (:canvas s) (tasks/person-id (:canvas s) (:id card)))]
                              (if owner
                                (text! section (str (:staff-name owner "待选择职员") " · 由 Person 卡统一安排"))
                                (text! section "等待连接 Person 负责人；职员由 Person 卡统一配置")))
-                           (let [section ^VBox (section! "任务描述")
-                                 title (doto (TextField. (:title card)) (.setId "action-task-title") (.setDisable (boolean (tasks/locked? s))))
-                                 prompt (doto (TextArea. (or (:prompt card) "")) (.setId "action-task-description") (.setWrapText true) (.setPrefRowCount 4) (.setDisable (boolean (tasks/locked? s))))]
-                             (.addAll (.getChildren section) ^java.util.Collection
-                                      (identity [title prompt (button "保存任务" "action-task-save" #(work! :save-task (:id card) {:title (.getText title) :prompt (.getText prompt)}))])))
+                           (when (resource-import/import-action? card)
+                             (let [section (section! "资源入库 · 输入与规则")
+                                   edge (coll/first-where #(and (= (:id card) (:to %)) (graph/input-edge? (:canvas s) %)) (get-in s [:canvas :edges]))]
+                               (text! section (if edge (str "输入：" (:title (node-by-id (:canvas s) (:from edge)))) "从 Assets 输出接点拖入，绑定待入库素材"))
+                               (file-text! section resource-import/rules-path)
+                               (.add (.getChildren ^VBox section) (button "编辑入库规则" "action-import-rules" #(work! :edit-import-rules (:id card) nil)))
+                               (text! section "先生成入库方案；人工确认后再排队写入正式目录、更新图集和 GUI 引用，并执行引擎编译。")))
                            (let [section ^VBox (section! "执行状态")
                                  status (tasks/status s (:id card))]
                              (text! section (get tasks/status-labels status))
+                             (when-let [status (:import-status card)] (text! section status))
                              (when (tasks/active? s (:id card))
                                (.add (.getChildren section) (doto (ProgressBar. -1.0) (.setMaxWidth Double/MAX_VALUE))))
                              (when-let [error (get-in session [:execution :error])] (text! section error))
@@ -674,6 +768,10 @@
                                       (.setId "ai-gui-resource") (.setPromptText "/game/layouts/screen.gui"))
                                actions (HBox. 6.0)]
                            (.add (.getChildren preview) (file-reveal/install! (gui-preview-pane s card 300.0 420.0) (:project-root s) (constantly (:gui-resource card)) report!))
+                           (when-let [receipt (coll/first-where #(= (:delivery-id card) (:id %)) (get-in s [:project-work :deliveries]))]
+                             (text! preview (str "工程交付 · " (:id receipt)))
+                             (text! preview (str "构建 · " (:build-id receipt)))
+                             (text! preview "编译、运行检查与人工验收分别记录，请在源 TaskCard 查看验收状态。"))
                            (file-reveal/install! path (:project-root s) (fn gui-path [] (.getText path)) report!)
                            (.add (.getChildren preview) path)
                            (doseq [[title id action] [["绑定" "ai-gui-bind" #(gui! :bind (:id card) (.getText path))]
@@ -683,6 +781,7 @@
                            (.add (.getChildren preview) actions))
                          :assets
                          (do
+                           (.add (.getChildren content) (delivery-view/details state card work! report!))
                            (let [source (section! "采用的资源")]
                              (if (coll/not-empty (:assets card))
                                (doseq [asset (:assets card)]
@@ -698,13 +797,16 @@
                                (doseq [region (:regions plan)]
                                  (text! regions (str (or (:name region) (:id region)) "  " (:x region) ", " (:y region) "  ·  " (:width region) " × " (:height region))))))
                            (when-let [output (:production card)]
-                             (let [^VBox delivery (section! "Defold 成品")]
-                               (text! delivery (str (:count output) " 个组件 · 已归档"))
+                             (let [^VBox delivery (section! "Defold 资源")]
+                               (text! delivery (str (:count output) " 个组件 · " (if (= "imported" (:status output)) "已入库 · 编译通过" "暂存 · 待入库")))
+                               (when-not (= "imported" (:status output))
+                                 (.add (.getChildren delivery) (button "新建资源入库 Action" "ai-detail-create-import" #(work! :add-import (:id card) nil))))
                                (doseq [[kind title] [[:atlas "打开 Atlas"]]]
                                  (when-let [path (get output kind)] (file-text! delivery path))
                                  (.add (.getChildren delivery) (button title (str "ai-detail-open-" (name kind)) #(open-output! output kind)))))))
                          nil)
-                       (.setDisable content (boolean (and (contains? #{:result :assets :gui} (:kind card))
+                       (style-detail-buttons! content)
+                       (.setDisable content (boolean (and (contains? #{:result :assets :gui} (:kind card)) (nil? (:artifact-id card))
                                                           (graph/task-error (:canvas s) (:staff s) (:id card))))))))]
     (.setId root "ai-card-details")
     (.setCenter root scroll)
@@ -714,6 +816,7 @@
     (.add (.getStyleClass scroll) "ai-details")
     (configure-scroll! scroll)
     (.setStyle content "-fx-padding: 8;")
+    (attach-detail-stylesheet! root)
     {:root root :refresh! refresh!}))
 
 (defn- display-model [state]
@@ -746,25 +849,37 @@
                      (try
                        (when (tasks/locked? @state) (throw (ex-info "执行队列未结束，暂不能新建节点" {})))
                        (let [model (:canvas @state) staff (read-staff!)
-                             error (when from (graph/output-error model staff from))
-                             kinds (if from (get graph/successors (:kind (node-by-id model from))) [:person :action :assets :gui])
+                             error (when (and from (not= :pm (:kind (node-by-id model from))))
+                                     (graph/output-error model staff from))
+                             kinds (if from (get graph/successors (:kind (node-by-id model from))) (if (= "ai-pm" (:template model)) [:pm] [:pm :person :action :assets :gui]))
                              menu (ContextMenu.)]
                          (when error (throw (ex-info error {})))
-                         (when (and from (not= :person (:kind (node-by-id model from)))
+                         (when (and from (not (contains? #{:person :assets :pm} (:kind (node-by-id model from))))
                                     (coll/any? #(= from (:from %)) (:edges model)))
                            (throw (ex-info "此接点已有后续节点，请先断开原连线；重新确认时可直接拖到原输入接点" {})))
                          (doseq [kind kinds]
                            (.add (.getItems menu)
-                                 (doto (MenuItem. ({:person "Person · 负责人" :action "Action · 执行任务" :result "Result · 方案结果" :assets "Assets · 交付内容" :gui "GUI · 引擎界面"} kind))
+                                 (doto (MenuItem. (if (and (= :action kind) (= :assets (:kind (node-by-id model from)))) "Action · 资源入库"
+                                                      ({:pm "AI-PM · 项目统筹" :task "Task · 工作分配" :person "Person · 负责人" :action "Action · 执行任务" :result "Result · 方案结果" :assets "Assets · 交付内容" :gui "GUI · 引擎界面"} kind)))
                                    (.setId (str "canvas-create-" (name kind)))
                                    (.setOnAction
                                      (reify EventHandler
                                        (handle [_ _]
                                          (try
-                                           (let [staff (read-staff!)]
+                                           (let [staff (read-staff!)
+                                                 ai-pm (coll/first-where :builtin staff)]
                                              (change! (fn create-connected-node [model]
-                                                        (let [next (add-node model kind x y)]
-                                                          (if from (graph/connect next staff from (:selected next)) next)))))
+                                                        (let [next (add-card model kind x y {:staff ai-pm :from from})]
+                                                          (if from
+                                                            (let [id (:selected next)
+                                                                  linked (graph/connect next staff from id)
+                                                                  pm-id (:source-pm (node-by-id model from))]
+                                                              ;; PM owner.
+                                                              (if (and (= :task kind) pm-id (node-by-id linked pm-id)
+                                                                       (coll/not-any? #(and (= pm-id (:from %)) (= id (:to %))) (:edges linked)))
+                                                                (graph/connect linked staff pm-id id)
+                                                                linked))
+                                                            next)))))
                                            (select! (get-in @state [:canvas :selected]))
                                            (catch Exception e (report! (.getMessage e))))))))))
                          (.setAutoHide menu true)
@@ -879,7 +994,7 @@
                           (let [selected (= id (:selected canvas)) color (if (= :role kind) (:color (roles/role-type model)) (colors kind))
                                 blocked (when-not (= :role kind) (graph/execution-error canvas (:staff @state) id))
                                 card (VBox. 10.0) header (HBox. 8.0)
-                                kind-label (label (if (= :role kind) (:title (roles/role-type model)) ({:person "Person · 负责人" :action "Action · 执行任务" :result "Result · 执行结果" :assets "Assets · 产物资源" :gui "GUI · 引擎界面"} kind)))
+                                kind-label (label (if (= :role kind) (:title (roles/role-type model)) ({:pm "AI-PM · 项目统筹" :task "Task · 工作分配" :person "Person · 负责人" :action "Action · 执行任务" :result "Result · 执行结果" :assets "Assets · 产物资源" :gui "GUI · 引擎界面"} kind)))
                                 title-label (label title)
                                 spacer (Region.)
                                 more (Button. "···")
@@ -889,6 +1004,9 @@
                                                                :else "查看卡片详情"))
                                           (.setId (str "canvas-inspect-" id)))
                                 delete (MenuItem. "删除卡片")
+                                import-item (doto (MenuItem. "新建资源入库 Action")
+                                              (.setId (str "canvas-create-import-" id))
+                                              (.setDisable (or (tasks/locked? @state) (nil? (get-in model [:production :manifest])))))
                                 proposals (when (= :action kind) (results/produced-cards canvas id))
                                 view-results (doto (MenuItem. (if (> (count proposals) 1) "对比方案" "查看方案"))
                                                (.setId (str "canvas-action-results-" id))
@@ -897,8 +1015,8 @@
                                 port-in (doto (Button.) (.setId (str "canvas-in-" id)))
                                 port-out (doto (Button.) (.setId (str "canvas-out-" id)))
                                 port-error (or (when (tasks/locked? @state) "执行队列未结束，暂不能修改连线")
-                                               (when (= :action kind) "Result 随 Action 产出自动创建并固定连接")
-                                               (graph/output-error canvas (:staff @state) id))]
+                                               (when (= :action kind) "产出卡片由执行结果自动创建并固定连接")
+                                               (when (not= :pm kind) (graph/output-error canvas (:staff @state) id)))]
                             (.setDisable port-out (boolean port-error))
                             (.addEventFilter port-out MouseEvent/MOUSE_PRESSED
                               (reify EventHandler
@@ -907,7 +1025,7 @@
                                     (when (= MouseButton/PRIMARY (.getButton e))
                                       (try
                                         (when (tasks/locked? @state) (throw (ex-info "执行队列未结束，暂不能修改连线" {})))
-                                        (when-let [error (graph/output-error (:canvas @state) (read-staff!) id)] (throw (ex-info error {})))
+                                        (when-let [error (when (not= :pm kind) (graph/output-error (:canvas @state) (read-staff!) id))] (throw (ex-info error {})))
                                         (.requestFocus viewport)
                                         (report! "")
                                         (reset! connecting {:from id})
@@ -927,8 +1045,8 @@
                             (.pseudoClassStateChanged card (PseudoClass/getPseudoClass "selected") selected)
                             (.pseudoClassStateChanged card (PseudoClass/getPseudoClass "running") (= "running" (tasks/status @state id)))
                             (.setStyle card (str "-ai-accent: " color ";"))
-                            (.setOpacity card (if (and blocked (contains? #{:action :result :assets :gui} kind)) 0.55 1.0))
-                            (.setDisable content (boolean (and blocked (contains? #{:result :assets :gui} kind))))
+                            (.setOpacity card (if (and blocked (nil? (:artifact-id (node-by-id canvas id))) (contains? #{:task :action :result :assets :gui} kind)) 0.55 1.0))
+                            (.setDisable content (boolean (and blocked (nil? (:artifact-id (node-by-id canvas id))) (contains? #{:result :assets :gui} kind))))
                             (.setDisable discuss (boolean (and (= :action kind) blocked)))
                             (let [width (if (= :role kind) roles/card-width 268.0)]
                               (.setPrefWidth card width) (.setMinWidth card width) (.setMaxWidth card width))
@@ -941,10 +1059,13 @@
                             (.add (.getStyleClass more) "ai-icon-button")
                             (.setAccessibleText more "卡片操作")
                             (.setId delete (str "canvas-delete-" id))
+                            (.setDisable delete (boolean (and (= :role kind) (:builtin model))))
                             (.addAll (.getItems menu) ^java.util.Collection
                                      (identity (cond (contains? #{:role :person} kind) [delete]
                                                      (= :action kind) [view-results discuss delete]
+                                                     (= :assets kind) [discuss import-item delete]
                                                      :else [discuss delete])))
+                            (.setOnAction import-item (ui/event-handler _ (work! :add-import id nil)))
                             (.setOnAction view-results (ui/event-handler _ (work! :view-action-results id nil)))
                             (.setOnAction delete
                                           (reify EventHandler
@@ -967,12 +1088,12 @@
                                                     (handle [_ _]
                                                       (select! id)
                                                       (cond
-                                                        (= :action kind) (focus!)
+                                                        (contains? #{:action :pm} kind) (focus!)
                                                         (contains? #{:result :assets} kind) (work! :inspect-card id nil)))))
                             (HBox/setHgrow spacer Priority/ALWAYS)
                             (.setId header (str "canvas-drag-" id))
                             (.addAll (.getChildren header) ^java.util.Collection (identity [kind-label spacer more]))
-                            (doseq [[port px hidden] [[port-in -8.0 (contains? #{:person :role} kind)] [port-out 260.0 (contains? #{:gui :role} kind)]]]
+                            (doseq [[port px hidden] [[port-in -8.0 (contains? #{:pm :person :role} kind)] [port-out 260.0 (contains? #{:gui :role} kind)]]]
                               (.setManaged ^Button port false)
                               (.resize ^Button port 16.0 16.0)
                               (.setVisible ^Button port (not hidden))
@@ -1036,6 +1157,8 @@
                             (when blocked
                               (.add (.getChildren content) (doto (label blocked) (-> .getStyleClass (.add "ai-muted")))))
                             (case kind
+                              (:pm :task)
+                              (.add (.getChildren content) (pm-view/summary state model select! work!))
                               :role
                               (.add (.getChildren content) (roles/make-card-summary model more))
 
@@ -1081,6 +1204,7 @@
                                                                (.setId (str "canvas-status-" id))
                                                                (-> .getStyleClass (.add "ai-status-badge"))
                                                                (.pseudoClassStateChanged (PseudoClass/getPseudoClass "completed") (= "completed" status))))
+                                (when-let [status (:import-status model)] (.add (.getChildren content) (label status)))
                                 (when (tasks/active? @state id) (.add (.getChildren content) (doto (ProgressBar. -1.0) (.setMaxWidth Double/MAX_VALUE))))
                                 (.add (.getStyleClass prompt) "ai-card-summary")
                                 (.add (.getChildren content) prompt)
@@ -1152,10 +1276,11 @@
                                           (doto (button (str "查看全部内容 · " (count files) " 项  ↗") (str "canvas-inspect-button-" id) inspect!)
                                             (.setMaxWidth Double/MAX_VALUE) (-> .getStyleClass (.add "ai-card-link"))))))
                                 (when-let [output (:production model)]
-                                  (.add (.getChildren content) (label (str (:count output) " 个组件 · 已归档")))
+                                  (.add (.getChildren content) (label (str (:count output) " 个组件 · " (if (= "imported" (:status output)) "已入库 · 编译通过" "暂存 · 待入库"))))
                                   (.add (.getChildren content) (button "打开 Atlas" (str "canvas-open-atlas-" id) #(open-output! output :atlas))))
-                                (.add (.getChildren card) (doto (primary-button (if (gui-production? canvas) "拆分 / 生成 GUI" (if (:document-output model) "另存文档版本" "归档方案文档")) (str "canvas-produce-" id)
-                                                                                (fn produce-assets [] (select! id) (produce! id)))
+                                (.add (.getChildren card) (doto (primary-button (if (= "imported" (get-in model [:production :status])) "查看入库资源"
+                                                                                    (if (gui-production? canvas) "拆分 / 生成 GUI" (if (:document-output model) "另存文档版本" "归档方案文档"))) (str "canvas-produce-" id)
+                                                                                (fn produce-assets [] (select! id) (if (= "imported" (get-in model [:production :status])) (work! :inspect-card id nil) (produce! id))))
                                                             (.setDisable (boolean blocked))))))
                             (.addAll (.getChildren card) ^java.util.Collection (identity [port-in port-out]))
                             (.add (.getChildren cards) card))))))

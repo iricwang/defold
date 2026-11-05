@@ -120,32 +120,75 @@
         (is (.contains (slurp (io/file (.getParentFile file) "messages.md")) "first")))
       (finally (fs/delete-directory! root)))))
 
-;; Uploads restore missing files, and simultaneous edits preserve both versions.
-(deftest bidirectional-sync-and-conflict-test
-  (let [root (temp-root) objects (atom {})
-        remote (atom {:revision 0 :files {}})
-        api (fn fake-api [_path body]
-              (if body
-                (swap! remote (fn commit [r] {:revision (inc (:revision r)) :files (reduce #(assoc %1 (:path %2) (dissoc %2 :path)) (:files r) (:files body))}))
-                (json/read-str (json/write-str @remote) :key-fn keyword)))
-        upload (fn store-object [path file] (swap! objects assoc (last (string/split path #"=")) (java.nio.file.Files/readAllBytes (.toPath file))))
-        download (fn read-object [path] (get @objects (last (string/split path #"="))))]
+;; Offline refresh preserves legacy history and user documents.
+(deftest local-library-migration-test
+  (let [root (temp-root)]
     (try
       (archive/ensure-project! root "project")
-      (let [file (io/file root "ai-workspace" "notes.txt")]
-        (spit file "v1")
-        (is (= "synced" (:status (archive/sync! root "project" api upload download))))
-        (.delete file)
-        (archive/sync! root "project" api upload download)
-        (is (= "v1" (slurp file)))
-        (spit file "local edit")
-        (swap! remote assoc-in [:files "ai-workspace/notes.txt" :sha256] "remote-edit-hash")
-        (is (= "conflict" (:status (archive/sync! root "project" api upload download))))
-        (is (= "local edit" (slurp file)))
-        (is (= "remote-edit-hash" (get-in @remote [:files "ai-workspace/notes.txt" :sha256])))
-        (swap! remote assoc-in [:files "game/source.gui"] {:sha256 "bad"})
-        (is (thrown? Exception (archive/sync! root "project" api upload download))))
+      (let [identity-file (io/file root "ai-workspace/project.json")
+            original (json/read-str (slurp identity-file) :key-fn keyword)
+            notes (io/file root "ai-workspace/notes.md")
+            legacy (io/file root "ai-workspace/sync.json")]
+        (spit identity-file (json/write-str (assoc original :storage "project-local-with-codexcamp-backup")))
+        (spit notes "local edit")
+        (spit legacy "legacy sync receipt")
+        (let [lock (io/file root "ai-workspace/project/.work.lock")
+              hidden (io/file root "ai-workspace/.private/state.json")]
+          (io/make-parents lock)
+          (io/make-parents hidden)
+          (spit lock "task lock")
+          (spit hidden "private record"))
+        (archive/refresh-local! root)
+        (is (coll/not-any? #(re-find #"(?:^|/)\." (:path %)) (archive/manifest root)))
+        (is (= (assoc original :storage "project-local") (json/read-str (slurp identity-file) :key-fn keyword)))
+        (is (= "local edit" (slurp notes)))
+        (is (= "legacy sync receipt" (slurp legacy)))
+        (is (not (string/includes? (slurp (io/file root "ai-workspace/index.md")) "CodexCamp 保存对应备份")))
+        (spit (io/file root "ai-workspace/README.md") "My custom library")
+        (.delete notes)
+        (archive/refresh-local! root)
+        (is (= "My custom library" (slurp (io/file root "ai-workspace/README.md"))))
+        (is (not (.exists notes)) "Deleted local files are not silently restored by remote sync"))
       (finally (fs/delete-directory! root)))))
+
+;; Local versions survive missing originals; damaged copies are rejected.
+(deftest local-artifact-versions-test
+  (let [root (temp-root) source (io/file root "proposal.md")
+        reference {:source (.getCanonicalPath source) :path "@referenced/proposal"}
+        origin {:threadId "staff" :turnId "turn"}]
+    (try
+      (spit source "version one")
+      (let [first-version (archive/receive-artifact! root reference origin)]
+        (spit source "version two")
+        (let [second-version (archive/receive-artifact! root reference origin)]
+          (is (not= (:sha256 first-version) (:sha256 second-version)))
+          (is (= "version one" (slurp (io/file root (:path first-version)))))
+          (.delete source)
+          (is (= second-version (archive/receive-artifact! root reference origin)))
+          (spit (io/file root (:path second-version)) "corrupt")
+          (is (thrown? Exception (archive/receive-artifact! root reference origin)))))
+      (finally (fs/delete-directory! root)))))
+
+;; Task attachments reject missing, changed and out-of-project files.
+(deftest local-task-attachments-test
+  (let [root (temp-root) outside (temp-root) source (io/file outside "说明.md")]
+    (try
+      (spit source "input")
+      (let [record (archive/import-file! root "attachments" source {})
+            attachment {:path (.getCanonicalPath ^java.io.File (:file record)) :name "说明.md" :sha256 (:sha256 record)}
+            text (archive/attachment-text root [attachment])]
+        (is (string/includes? text "本地任务附件"))
+        (is (string/includes? text "说明.md"))
+        (is (string/includes? text (:sha256 record)))
+        (is (thrown? Exception (archive/attachment-text root [{:path (.getCanonicalPath source)}])))
+        (spit (:file record) "changed")
+        (is (thrown? Exception (archive/attachment-text root [attachment])))
+        (.delete ^java.io.File (:file record))
+        (is (thrown? Exception (archive/attachment-text root [attachment]))))
+      (is (= "" (archive/attachment-text root [])))
+      (is (thrown? Exception (archive/local-file root "https://example.com/remote.md")))
+      (is (thrown? Exception (archive/local-file root "../escaped.md")))
+      (finally (fs/delete-directory! root) (fs/delete-directory! outside)))))
 
 ;; Flat pre-canvas sessions must still use the normal canvas/session fallback.
 (deftest flat-legacy-session-test

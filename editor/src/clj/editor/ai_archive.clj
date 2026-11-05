@@ -14,7 +14,7 @@
 
 
 (ns editor.ai-archive
-  "Project-owned AI records and CodexCamp archive synchronization."
+  "Project-owned AI documents, immutable file copies and local indexes."
   (:require [clojure.data.json :as json]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
@@ -23,7 +23,7 @@
             [editor.craft-project :as craft-project]
             [util.coll :as coll]
             [util.digest :as digest])
-  (:import [java.io File InputStream]
+  (:import [java.io File]
            [java.net URI]
            [java.nio.file AccessDeniedException Files StandardCopyOption]
            [java.util UUID]))
@@ -31,7 +31,6 @@
 (set! *warn-on-reflection* true)
 
 (defonce ^:private archive-lock (Object.))
-(defonce ^:private sync-lock (Object.))
 
 (defn- file-at
   ^File [root relative]
@@ -65,12 +64,15 @@
   (locking archive-lock
     (let [file (file-at root "project.json")
           previous (read-json file)
-          record (cond-> (merge {:schemaVersion 1 :id (str (UUID/randomUUID)) :storage "project-local-with-codexcamp-backup"} previous)
+          record (cond-> (assoc (merge {:schemaVersion 1 :id (str (UUID/randomUUID))} previous) :storage "project-local")
                    project-id (assoc :codexProjectId project-id))]
       (when (not= previous record) (write-json! file record))
       (let [readme (file-at root "README.md")]
-        (when-not (.isFile readme)
-          (atomic-bytes! readme (.getBytes "# AI 项目资料库\n\nproject.json：项目身份；canvases：画布与离线对话；conversations：公开对话原始记录及 Markdown；attachments：输入附件；artifacts：生成资料；candidates：候选图片；deliveries：游戏成品索引；sync.json：本机同步状态。\n\n本目录是项目资料，不是临时缓存。成品保留在游戏模块目录。CodexCamp 后台按内容校验值保留文件与历史版本；冲突不会自动覆盖，删除不会自动传播。密钥不写入本目录。\n" "UTF-8"))))
+        ;; Replace only the former generated text; retain user-written docs.
+        (when (or (not (.isFile readme))
+                  (= (string/replace (slurp readme :encoding "UTF-8") "\r\n" "\n")
+                     "# AI 项目资料库\n\nproject.json：项目身份；canvases：画布与离线对话；conversations：公开对话原始记录及 Markdown；attachments：输入附件；artifacts：生成资料；candidates：候选图片；deliveries：游戏成品索引；sync.json：本机同步状态。\n\n本目录是项目资料，不是临时缓存。成品保留在游戏模块目录。CodexCamp 后台按内容校验值保留文件与历史版本；冲突不会自动覆盖，删除不会自动传播。密钥不写入本目录。\n"))
+          (atomic-bytes! readme (.getBytes "# AI 项目资料库\n\nproject.json：项目身份；library：可编辑文档与画布；canvases：画布会话状态；conversations：公开对话记录；attachments：输入附件；artifacts：成果版本；candidates：候选图片；deliveries：工程交付记录。\n\n文件直接保存在本项目，离线也可管理。Companion 只连接职员对话，不上传或同步资料。旧 sync.json 停用并保留。已批准成果按内容校验值冻结，修改应形成新版本。备份请包含整个 ai-workspace 和工程资源；密钥不写入本目录。\n" "UTF-8"))))
       record)))
 
 (defn canvas-file
@@ -107,7 +109,7 @@
 (defn save-canvas! [root gui state]
   (locking archive-lock
     (ensure-project! root (:project-id state))
-    (let [data (portable root (select-keys state [:address :project-id :sessions :canvas :upload-paths :composer-collapsed]) false)
+    (let [data (portable root (select-keys state [:address :project-id :sessions :canvas :composer-collapsed]) false)
           file (canvas-file root gui)]
       (atomic-bytes! file (.getBytes (pr-str data) "UTF-8"))
       (write-json! (io/file (.getParentFile file) "canvas.json") {:schemaVersion 1 :gui gui :canvas (:canvas data) :sessions (:sessions data)}))))
@@ -131,23 +133,54 @@
       (when (not= previous record) (write-json! metadata record))
       (assoc record :file file))))
 
-(defn receive-artifact! [root reference origin fetch-stream]
-  (let [key (digest/string->sha256-hex (str origin (:path reference)))
-        receipt (file-at root (str "artifacts/references/" key ".json"))
-        saved (read-json receipt)]
-    (if (and (:path saved) (.isFile (craft-project/resource-file root (str "/" (:path saved)))))
-      saved
-      (let [directory (.toFile (Files/createTempDirectory "defold-artifact-" (make-array java.nio.file.attribute.FileAttribute 0)))
-            source (io/file directory (.getName (io/file (:source reference))))]
-        (try
-          (with-open [input ^InputStream (fetch-stream)]
-            (let [bytes (.readNBytes input (inc (* 64 1024 1024)))]
-              (when (> (alength bytes) (* 64 1024 1024)) (throw (ex-info "资料超过 64 MB，未归档" {})))
-              (with-open [out (io/output-stream source)] (.write out bytes))))
-          (let [record (dissoc (import-file! root "artifacts" source (assoc origin :source (:source reference))) :file)]
-            (locking archive-lock (write-json! receipt record))
-            record)
-          (finally (.delete source) (.delete directory)))))))
+(defn local-file
+  "Resolve a local file; never resolve virtual HTTP paths."
+  ^File [root path]
+  (when-not (and (string? path) (not (string/blank? path)))
+    (throw (ex-info "资料缺少本地路径" {:path path})))
+  (when (or (re-find #"(?i)^(?:https?|sandbox):" path)
+            (string/starts-with? path "//") (string/starts-with? path "\\\\"))
+    (throw (ex-info "资料必须是本地文件，请先保存到项目" {:path path})))
+  (let [file (cond
+               (string/starts-with? path "file:") (io/file (URI/create path))
+               (.isAbsolute (io/file path)) (io/file path)
+               :else (craft-project/resource-file root (str "/" (string/replace-first path #"^/" ""))))]
+    (.getCanonicalFile ^File file)))
+
+(defn receive-artifact! [root reference origin]
+  (locking archive-lock
+    (let [key (digest/string->sha256-hex (str origin (:path reference)))
+          receipt (file-at root (str "artifacts/references/" key ".json"))
+          saved (read-json receipt)
+          source (local-file root (:source reference))
+          cached (when (:path saved) (craft-project/resource-file root (str "/" (:path saved))))]
+      (cond
+        (.isFile source)
+        (let [record (dissoc (import-file! root "artifacts" source (assoc origin :source (:source reference))) :file)]
+          (when (not= saved record) (write-json! receipt record))
+          record)
+
+        (and cached (.isFile ^File cached)
+             (= (:sha256 saved) (with-open [input (io/input-stream cached)] (digest/stream->sha256-hex input))))
+        saved
+
+        :else (throw (ex-info "本地资料不存在或副本已损坏，请恢复文件后重试" {:path (:source reference)}))))))
+
+(defn attachment-text [root attachments]
+  (if-not (coll/not-empty attachments)
+    ""
+    (str "\n\n[本地任务附件]\n以下文件已保存在当前工程。请直接读取；图片使用图片查看工具，不经过资料上传。\n"
+         (json/write-str
+           (mapv (fn describe-attachment [{:keys [path name sha256]}]
+                   (let [file (local-file root path)
+                         boundary (.toPath (.getCanonicalFile (io/file root)))]
+                     (when-not (and (.isFile file) (.startsWith (.toPath file) boundary))
+                       (throw (ex-info "附件不在当前项目或已丢失，请重新添加" {:path path})))
+                     (let [actual (with-open [input (io/input-stream file)] (digest/stream->sha256-hex input))]
+                       (when (and sha256 (not= sha256 actual))
+                         (throw (ex-info "附件已修改，请重新添加后执行" {:path path})))
+                       {:name name :path (.getCanonicalPath file) :sha256 actual}))) attachments)
+           :escape-unicode false :escape-slash false))))
 
 (defn archive-attachments! [root state]
   (let [archive (fn archive-input [entry]
@@ -186,7 +219,7 @@
             target (file-at root (str "canvases/" key "/state.edn"))]
         (when-not (.isFile target)
           (let [state (archive-state-files! root (edn/read-string (slurp source)))
-                data (portable root (select-keys state [:address :project-id :sessions :canvas :upload-paths :composer-collapsed :thread-id]) false)]
+                data (portable root (select-keys state [:address :project-id :sessions :canvas :composer-collapsed :thread-id]) false)]
             (atomic-bytes! target (.getBytes (pr-str data) "UTF-8"))
             (write-json! (file-at root (str "canvases/" key "/canvas.json"))
                          {:schemaVersion 1 :migrated true :canvas (:canvas data) :sessions (:sessions data)})))))))
@@ -251,22 +284,26 @@
         (reduce (fn describe-file [result ^java.nio.file.Path path]
                   (let [file (.toFile path)
                         relative (string/replace (str (.relativize (.toPath (.getCanonicalFile (io/file root))) path)) "\\" "/")]
-                    (if (or (not (.isFile file)) (= relative "ai-workspace/sync.json") (string/ends-with? relative ".tmp"))
+                    (if (or (not (.isFile file)) (Files/isSymbolicLink path)
+                            (re-find #"(?:^|/)\." relative)
+                            (= relative "ai-workspace/sync.json") (string/ends-with? relative ".tmp"))
                       result
                       (let [file (craft-project/resource-file root (str "/" relative))]
-                        (conj result {:path relative :sha256 (with-open [input (io/input-stream file)] (digest/stream->sha256-hex input)) :size (.length file)})))))
+                        (conj result {:path relative :size (.length file)})))))
                 [] (vec (.toArray paths)))))))
 
 (defn write-index! [root]
   (locking archive-lock
     (let [entries (manifest root)
-          sections [["对话记录" #(string/ends-with? % "/messages.md")]
+          sections [["创作资料" #(string/starts-with? % "ai-workspace/library/")]
+                    ["项目配置" #(string/starts-with? % "ai-workspace/config/")]
+                    ["对话记录" #(string/ends-with? % "/messages.md")]
                     ["画布与任务" #(string/ends-with? % "/canvas.json")]
                     ["输入附件" #(string/starts-with? % "ai-workspace/attachments/files/")]
                     ["效果图候选" #(string/starts-with? % "ai-workspace/candidates/")]
                     ["生成的原始资料" #(string/starts-with? % "ai-workspace/artifacts/files/")]
                     ["成品来源与校验" #(boolean (re-matches #"ai-workspace/deliveries/[a-f0-9]+\.json" %))]]
-          text (str "# AI 项目资料索引\n\n公开对话、附件、生成资料和成品版本均保存在本项目；CodexCamp 保存对应备份。\n"
+          text (str "# AI 项目资料索引\n\n公开对话、附件、生成资料和成品版本均直接保存在本项目，不经过 Companion 同步。\n"
                     (coll/join-to-string "\n"
                                          (mapv (fn index-section [[title matches]]
                                                  (str "\n## " title "\n\n"
@@ -290,48 +327,7 @@
       (when (or (not (.isFile file)) (not= text (slurp file)))
         (atomic-bytes! file (.getBytes text "UTF-8"))))))
 
-(defn sync! [root project-id api upload download]
-  ;; No automatic deletion or overwrite when both copies changed.
-  (locking sync-lock
-    (refresh-deliveries! root)
-    (write-index! root)
-    (let [status-file (file-at root "sync.json")
-          prior (read-json status-file)
-          remote (api (str "/api/project-archive?projectId=" project-id) nil)
-          local (coll/into-> (manifest root) {} (map (juxt :path identity)))
-          remote-files (coll/into-> (:files remote) {} (map (fn [[path record]] [(if (keyword? path) (subs (str path) 1) path) record])))
-          baseline (coll/into-> (:synced prior) {} (map (fn [[path hash]] [(if (keyword? path) (subs (str path) 1) path) hash])))
-          _ (doseq [[path _entry] remote-files]
-              (when-not (and (string/starts-with? path "ai-workspace/") (not= path "ai-workspace/sync.json"))
-                (throw (ex-info "CodexCamp 返回了资料目录以外的路径" {:path path})))
-              (craft-project/resource-file root (str "/" path)))
-          conflicts (coll/into-> local [] (keep (fn [[path entry]]
-                                                  (when-let [remote-hash (get-in remote-files [path :sha256])]
-                                                    (when (and (not= remote-hash (:sha256 entry))
-                                                               (not= remote-hash (get baseline path))
-                                                               (or (string/starts-with? path "ai-workspace/canvases/")
-                                                                   (not= (:sha256 entry) (get baseline path)))) path)))))]
-      (if (coll/not-empty conflicts)
-        (do (write-json! status-file {:status "conflict" :projectId project-id :revision (:revision remote) :conflicts conflicts :synced (:synced prior)})
-            {:status "conflict" :conflicts conflicts})
-        (do
-          (doseq [[path entry] remote-files
-                  :when (and (not= (:sha256 entry) (get-in local [path :sha256]))
-                             (or (nil? (get local path)) (= (get baseline path) (get-in local [path :sha256]))))]
-            (let [bytes (download (str "/api/project-archive/object?projectId=" project-id "&sha256=" (:sha256 entry)))
-                  actual (with-open [input (java.io.ByteArrayInputStream. bytes)] (digest/stream->sha256-hex input))]
-              (when-not (= actual (:sha256 entry)) (throw (ex-info "CodexCamp 资料校验失败" {:path path})))
-              (locking archive-lock
-                (let [file (craft-project/resource-file root (str "/" path))
-                      current (when (.isFile file) (with-open [input (io/input-stream file)] (digest/stream->sha256-hex input)))]
-                  (when (not= current (get-in local [path :sha256])) (throw (ex-info "本地资料已更新，请重新同步" {:path path})))
-                  (atomic-bytes! file bytes)))))
-          (let [files (manifest root)
-                changed (filterv #(not= (:sha256 %) (get-in remote-files [(:path %) :sha256])) files)]
-            (doseq [entry changed]
-              (upload (str "/api/project-archive/object?projectId=" project-id "&sha256=" (:sha256 entry)) (craft-project/resource-file root (str "/" (:path entry)))))
-            (let [result (if (coll/not-empty changed)
-                           (api "/api/project-archive/commit" {:projectId project-id :baseRevision (:revision remote) :files changed}) remote)]
-              (write-json! status-file {:status "synced" :projectId project-id :revision (:revision result)
-                                        :synced (coll/into-> files {} (map (juxt :path :sha256)))})
-              {:status "synced" :revision (:revision result)})))))))
+(defn refresh-local! [root]
+  (ensure-project! root nil)
+  (refresh-deliveries! root)
+  (write-index! root))

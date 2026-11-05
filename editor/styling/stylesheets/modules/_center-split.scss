@@ -19,7 +19,11 @@
         }
     }
 
-    .split-pane-divider {
-        -fx-padding: 0 5 !important;
+    // Only the divider above the tool area. A descendant selector would also
+    // thicken every split pane nested in the editor area, e.g. the AI canvas
+    // panes and the curve editor. SplitPaneSkin derives a horizontal divider's
+    // thickness from the left/right padding.
+    > .split-pane-divider {
+        -fx-padding: 0 2 !important;
     }
 }

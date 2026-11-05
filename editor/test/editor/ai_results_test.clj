@@ -34,6 +34,25 @@
                   (canvas/merge-candidates "action-1" [{:id "a" :text "方案 A"} {:id "b" :text "方案 B"}]))]
     {:staff staff :canvas model :sessions {} :person person}))
 
+;; External file edits change the frozen content version even when the card's
+;; text/path are unchanged. A queued version is immutable and a rerun gets a
+;; separate confirmation after the original completes.
+(deftest frozen-content-version-confirmation-test
+  (let [state (fixture) person (:person state)
+        result (first (results/cards (:canvas state) "action-1")) id (:id result)
+        first-version (results/bind-content-version state id "bytes-v1")
+        queued (results/confirm-state first-version id)
+        finished (-> queued (tasks/claim-next person)
+                     (assoc-in [:sessions id :execution] {:status "completed"}) tasks/reconcile)
+        next-version (results/bind-content-version finished id "bytes-v2")
+        confirmed (results/confirm-state next-version id)]
+    (is (not (:manually-edited (graph/node (:canvas first-version) id))))
+    (is (identical? queued (results/bind-content-version queued id "bytes-v1")))
+    (is (thrown? Exception (results/bind-content-version queued id "bytes-v2")))
+    (is (not= (get-in queued [:sessions id :confirmation :revision]) (get-in confirmed [:sessions id :confirmation :revision])))
+    (is (= [id] (get-in confirmed [:sessions person :queue :remaining])))
+    (is (= "bytes-v1" (get-in (graph/node (:canvas confirmed) id) [:revision-history 0 :candidate :content-revision])))))
+
 ;; Each proposal keeps its provenance and branch; replay preserves edits.
 (deftest independent-proposals-test
   (let [state (fixture)

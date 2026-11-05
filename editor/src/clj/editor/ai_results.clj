@@ -23,8 +23,9 @@
 (defn candidate [card] (first (:candidates card)))
 
 (defn revision [card]
-  (let [{:keys [id text image-path files]} (candidate card)]
-    (digest/string->sha256-hex (pr-str [id text image-path (mapv #(select-keys % [:path :sha256 :name]) files)]))))
+  (let [{:keys [id text image-path files content-revision]} (candidate card)]
+    (digest/string->sha256-hex (pr-str (cond-> [id text image-path (mapv #(select-keys % [:path :sha256 :name]) files)]
+                                         content-revision (conj content-revision))))))
 
 (defn action-id [model result-id]
   (let [id (:from (coll/first-where #(= result-id (:to %)) (:edges model)))]
@@ -102,7 +103,9 @@
     (when-not (and (= :result (:kind card)) proposal)
       (throw (ex-info "此 Result 尚未产出方案" {})))
     (put-card model (assoc card :generated-candidate (or (:generated-candidate card) proposal)
-                           :candidates [(merge proposal fields)] :manually-edited true))))
+                           :candidates [(merge proposal fields)] :manually-edited true
+                           :revision-history (if (= proposal (merge proposal fields)) (:revision-history card)
+                                                 (conj (vec (:revision-history card)) {:revision (revision card) :candidate proposal :edited-at (str (java.time.Instant/now))}))))))
 
 (defn confirmation [model id]
   (let [card (graph/node model id)
@@ -129,6 +132,17 @@
         (when (tasks/confirmation-locked? state id)
           (throw (ex-info "此版本已加入负责人队列，请等待处理完成后再修改" {})))
         (-> state (assoc :canvas after) (update :result-drafts dissoc id))))))
+
+(defn bind-content-version [state id version]
+  (let [card (graph/node (:canvas state) id) proposal (candidate card)]
+    (if (= version (:content-revision proposal)) state
+        (do
+          (when (tasks/confirmation-locked? state id)
+            (throw (ex-info "文件内容已变化，但原版本仍在负责人队列中，请完成后再确认新版本" {})))
+          (update state :canvas put-card
+                  (cond-> (assoc card :candidates [(assoc proposal :content-revision version)])
+                    (:content-revision proposal)
+                    (update :revision-history (fnil conj []) {:revision (revision card) :candidate proposal :edited-at (str (java.time.Instant/now))})))))))
 
 (defn confirm-state [state id]
   (let [model (:canvas state)

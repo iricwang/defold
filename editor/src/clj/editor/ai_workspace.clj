@@ -17,8 +17,11 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [editor.ai-document :as document]
+            [editor.ai-overview-view :as overview-view]
             [editor.ai-project-browser :as project-browser]
+            [editor.ai-resource-import :as resource-import]
             [editor.ai-roles :as roles]
+            [editor.ai-toast :as toast]
             [editor.craft-project :as craft-project]
             [editor.file-reveal :as file-reveal]
             [editor.fxui :as fxui]
@@ -26,12 +29,13 @@
             [editor.markdown-view :as markdown-view]
             [editor.ui :as ui]
             [util.coll :as coll])
-  (:import [javafx.collections ListChangeListener ListChangeListener$Change]
+  (:import [javafx.beans.value ChangeListener]
+           [javafx.collections ListChangeListener ListChangeListener$Change]
            [javafx.css PseudoClass]
            [javafx.event Event]
            [javafx.geometry Insets Pos]
            [javafx.scene Parent]
-           [javafx.scene.control Button ContextMenu Label MenuItem ScrollPane SplitPane Tab TabPane TabPane$TabClosingPolicy TextArea TitledPane Tooltip]
+           [javafx.scene.control Button ContextMenu Label MenuItem ScrollPane SplitPane Tab TabPane TabPane$TabClosingPolicy TextArea TitledPane Tooltip TreeView]
            [javafx.scene.image Image ImageView]
            [javafx.scene.layout AnchorPane HBox Priority StackPane VBox]
            [javafx.scene.shape SVGPath]
@@ -56,7 +60,7 @@
     (doseq [^Window window (vec (Window/getWindows))
             :let [scene (.getScene window)]
             :when scene]
-      (doseq [selector [".ai-workbench" ".ai-markdown-reader"]
+      (doseq [selector [".ai-workbench" ".ai-markdown-reader" ".ai-overview"]
               ^Parent parent (.lookupAll (.getRoot scene) selector)]
         (.forget (com.sun.javafx.css.StyleManager/getInstance) parent)
         (apply-styles! parent))
@@ -216,45 +220,61 @@
      :close! (fn close-markdown-preview []
                (ui/advance-ui-user-data-component! preview ::markdown nil))}))
 
-(defn- make-role-config-view! [root file]
+(defn- make-config-view! [root file resource-rules]
   (let [saved-text (slurp file :encoding "UTF-8")
+        prefix (if resource-rules "ai-resource-rules" "ai-role-config")
         source (TextArea. saved-text)
         expected (atom saved-text)
-        save (doto (Button. "保存配表") (.setId "ai-role-config-save"))
-        reload (doto (Button. "重载") (.setId "ai-role-config-reload"))
-        status (doto (Label. "修改后保存，返回项目职能页即可生效。默认参数用于新增职员；现有职员可单独应用。") (.setWrapText true))
+        save (doto (Button. "保存配表") (.setId (str prefix "-save")))
+        reload (doto (Button. "重载") (.setId (str prefix "-reload")))
+        status (doto (Label. (if resource-rules "保存后用于新生成的入库方案；已有方案保留原规则快照。"
+                                 "修改后保存，返回项目职能页即可生效。默认参数用于新增职员；现有职员可单独应用。")) (.setWrapText true))
+        notifications (when resource-rules (toast/make-view))
+        notify! (fn notify-config [level text]
+                  (if notifications ((:show! notifications) {:id :config :level level :resolved (= :info level) :text text})
+                      (.setText status text)))
         help (doto (TitledPane. "字段说明 / 跨项目复用"
-                                (doto (Label. (str "roles 数组顺序决定职能行顺序；复制一行并使用新的 id 即可新增职能。\n"
-                                                   "id：稳定标识（小写英文、数字、下划线或短横线）；title：职能名；color：#RRGGBB。\n"
-                                                   "icon：planning / art / programming / pm / qa / person / model / document / status；portrait：前五种人物样式。\n"
-                                                   "namePool：随机姓名数组；initialCount：新项目首次创建职员数（0～20）。\n"
-                                                   "defaults：assignee 负责人、model 模型名或模型 ID、effort 低/中/高/极高、enabled true/false、responsibilities 职责、deliverables 交付要求。\n"
-                                                   "复制 ai-workspace/config/role-types.json 到另一项目同一路径即可复用。不要复制职员文档或聊天归档；已有职员引用的 id 不能直接删除。"))
+                                (doto (Label. (if resource-rules
+                                                "gui.images / atlas / scene：正式图片目录、图集和 GUI 路径，使用 {module} 占位。\nmaxImageSize / maxAtlasSize：图片与图集尺寸上限；innerPadding / extrudeBorders：图集留白与边缘扩展像素。\n复制 ai-workspace/config/resource-rules.json 到其他项目即可复用。第一版支持 GUI 静态图集；不会自动覆盖重名文件。"
+                                                (str "roles 数组顺序决定职能行顺序；复制一行并使用新的 id 即可新增职能。\n"
+                                                     "id：稳定标识（小写英文、数字、下划线或短横线）；title：职能名；color：#RRGGBB。\n"
+                                                     "icon：planning / art / programming / pm / qa / person / model / document / status；portrait：前五种人物样式。\n"
+                                                     "namePool：随机姓名数组；initialCount：新项目首次创建职员数（0～20）。\n"
+                                                     "defaults：assignee 负责人、model 模型名或模型 ID、effort 低/中/高/极高、enabled true/false、responsibilities 职责、deliverables 交付要求。\n"
+                                                     "复制 ai-workspace/config/role-types.json 到另一项目同一路径即可复用。不要复制职员文档或聊天归档；已有职员引用的 id 不能直接删除。")))
                                   (.setWrapText true))) (.setExpanded false))
         bar (HBox. 8.0)
         pane (VBox. 8.0)]
-    (.setId source "ai-role-config-source")
-    (.setId status "ai-role-config-status")
+    (.setId source (str prefix "-source"))
+    (.setId status (str prefix "-status"))
     (.setStyle source "-fx-font-family: Consolas; -fx-font-size: 14;")
     (.setStyle pane "-fx-padding: 8;")
     (.setOnAction save (ui/event-handler _
                          (try
-                           (roles/save-config! root @expected (.getText source))
+                           (if resource-rules (resource-import/save-rules! root @expected (.getText source))
+                               (roles/save-config! root @expected (.getText source)))
                            (reset! expected (.getText source))
-                           (.setText status "配表已保存。返回项目职能页即可生效；可复制此 JSON 文件到其他项目。")
-                           (catch Exception e (.setText status (.getMessage e))))))
+                           (notify! :info (if resource-rules "入库规则已保存，新方案使用此配置。已有方案保留原规则快照。"
+                                              "配表已保存。返回项目职能页即可生效；可复制此 JSON 文件到其他项目。"))
+                           (catch Exception e (notify! (if (instance? clojure.lang.ExceptionInfo e) :warning :error) (.getMessage e))))))
     (.setOnAction reload (ui/event-handler _
                            (try
                              (let [text (slurp file :encoding "UTF-8")]
                                (.setText source text)
                                (reset! expected text))
-                             (.setText status "已重载磁盘上的配表。")
-                             (catch Exception e (.setText status (.getMessage e))))))
+                             (notify! :info "已重载磁盘上的配表。")
+                             (catch Exception e (notify! :error (.getMessage e))))))
     (.addAll (.getChildren bar) ^java.util.Collection (identity [save reload status]))
     (.addAll (.getChildren pane) ^java.util.Collection (identity [bar help source]))
     (HBox/setHgrow status Priority/ALWAYS)
     (VBox/setVgrow source Priority/ALWAYS)
-    {:root pane :close! (fn close-role-config [] nil)}))
+    {:root (if notifications
+             (let [overlay (StackPane.)]
+               (.addAll (.getChildren overlay) ^java.util.Collection (identity [pane (:root notifications)]))
+               (StackPane/setAlignment (:root notifications) Pos/TOP_CENTER)
+               overlay)
+             pane)
+     :close! (fn close-config [] (when notifications ((:dispose! notifications))))}))
 
 (defn make-file-view! [^AnchorPane parent root path opts]
   (let [file (craft-project/resource-file root path)
@@ -264,7 +284,8 @@
         pane (VBox. 8.0)
         markdown (when (contains? #{"md" "markdown"} extension)
                    (make-markdown-view! file opts))
-        config (when (= roles/config-path path) (make-role-config-view! root file))
+        config (when (contains? #{roles/config-path resource-import/rules-path} path)
+                 (make-config-view! root file (= resource-import/rules-path path)))
         content (cond
                   config (:root config)
                   markdown (:root markdown)
@@ -293,6 +314,31 @@
       (file-reveal/install! input root (fn preview-source-file [] file) #(.setText status %)))
     {:close! (or (:close! config) (:close! markdown) (fn close-file-preview []))}))
 
+(defn- configure-sidebar-selection! [^Button home ^TreeView tree ^TabPane tabs ^Tab overview-tab]
+  (let [selected (PseudoClass/getPseudoClass "selected")
+        select-home! (fn select-project-home []
+                       (.clearSelection (.getSelectionModel tree))
+                       (.pseudoClassStateChanged home selected true))
+        open-home (.getOnAction home)]
+    (.setOnAction home
+                  (reify javafx.event.EventHandler
+                    (handle [_ event]
+                      (select-home!)
+                      (.handle open-home event))))
+    (.addListener (.selectedItemProperty (.getSelectionModel tree))
+                  (reify ChangeListener
+                    (changed [_ _ _ item]
+                      (when item
+                        (.pseudoClassStateChanged home selected false)))))
+    (.addListener (.selectedItemProperty (.getSelectionModel tabs))
+                  (reify ChangeListener
+                    (changed [_ _ _ tab]
+                      (if (identical? overview-tab tab)
+                        (select-home!)
+                        (.pseudoClassStateChanged home selected false)))))
+    (when (identical? overview-tab (.getSelectedItem (.getSelectionModel tabs)))
+      (select-home!))))
+
 (defn make-view! [^AnchorPane parent root initial-context resource-types make-content!]
   (let [tabs (doto (TabPane.) (.setId "ai-document-tabs") (.setTabClosingPolicy TabPane$TabClosingPolicy/ALL_TABS))
         status (Label.)
@@ -300,32 +346,49 @@
         pane (VBox.)
         documents (atom {})
         browser (atom nil)
+        overview-tab (doto (Tab. "项目总览") (.setClosable false) (.setId "ai-overview-tab"))
         closed (atom false)]
-    (letfn [(show! [message] (.setText status message))
+    (letfn [(show! [message]
+              (let [text (or message "")]
+                (.setText status text)
+                ;; An empty status line would otherwise reserve a blank strip
+                ;; under the document area.
+                (let [showing? (not (string/blank? text))]
+                  (.setVisible status showing?)
+                  (.setManaged status showing?))))
             (open! [context]
               (when-not @closed
-                (let [key (document-key root context)
-                      existing (get @documents key)]
-                  (if existing
-                    (do
-                      (.select (.getSelectionModel tabs) ^Tab (:tab existing))
-                      (when-let [update! (:update-context! existing)] (update! context)))
-                    (let [doc (when (document/document-path? (:path context)) (document/read-document root (:path context)))
-                          title (or (:title doc) (when (= roles/config-path (:path context)) "职能配表") (.getName (io/file (:path context))))
-                          child (AnchorPane.)
-                          tab (doto (Tab. title child) (.setTooltip (Tooltip. (:path context))))
-                          content (make-content! child tab context (assoc @browser :open! open!))
-                          disposed (atom false)
-                          dispose! (fn dispose-document []
-                                     (when (compare-and-set! disposed false true)
-                                       ((:close! content))
-                                       (swap! documents dissoc key)))]
-                      (ui/user-data! tab ::path (:path context))
-                      (ui/user-data! tab ::file (craft-project/resource-file root (:path context)))
-                      (ui/on-closed! tab (fn close-document-tab [_] (dispose!)))
-                      (swap! documents assoc key (assoc content :tab tab :dispose! dispose!))
-                      (.add (.getTabs tabs) tab)
-                      (.select (.getSelectionModel tabs) tab))))))
+                (if (:overview context)
+                  (do
+                    ((:reset! (::overview @documents)))
+                    (.select (.getSelectionModel tabs) overview-tab))
+                  (let [key (document-key root context)
+                        existing (get @documents key)]
+                    (if existing
+                      (do
+                        (.select (.getSelectionModel tabs) ^Tab (:tab existing))
+                        (when-let [update! (:update-context! existing)] (update! context)))
+                      (let [doc (when (document/document-path? (:path context)) (document/read-document root (:path context)))
+                            title (or (:title doc) (when (= roles/config-path (:path context)) "职能配表") (.getName (io/file (:path context))))
+                            child (AnchorPane.)
+                            tab (doto (Tab. title child)
+                                  (.setGraphic (doto (SVGPath.)
+                                                 (.setContent (if doc "M1 2 H15 V12 H1 Z M5 5 H11 M5 9 H9" "M3 1 H10 L14 5 V15 H3 Z M10 1 V5 H14"))
+                                                 (-> .getStyleClass (.add "ai-workspace-tab-icon"))))
+                                  (.setTooltip (Tooltip. (:path context))))
+                            content (make-content! child tab context (assoc @browser :open! open!))
+                            disposed (atom false)
+                            dispose! (fn dispose-document []
+                                       (when (compare-and-set! disposed false true)
+                                         ((:close! content))
+                                         (swap! documents dissoc key)))]
+                        (ui/user-data! tab ::path (:path context))
+                        (ui/user-data! tab ::file (craft-project/resource-file root (:path context)))
+                        (ui/on-closed! tab (fn close-document-tab [_] (dispose!)))
+                        (swap! documents assoc key (assoc content :tab tab :dispose! dispose!))
+                        (.add (.getTabs tabs) tab)
+                        (.select (.getSelectionModel tabs) tab)
+                        (when-let [update! (:update-context! content)] (update! context))))))))
             (changed! []
               (when-let [entry (coll/first-where #(identical? (:tab %) (.getSelectedItem (.getSelectionModel tabs))) (coll/vals @documents))]
                 (when-let [changed! (:library-changed! entry)] (changed!))))
@@ -335,6 +398,31 @@
                 (.clear (.getTabs tabs))))]
       (reset! browser (project-browser/make-browser root (:path initial-context)
                                                     (fn open-library-item [path] (open! {:path path})) changed! show! resource-types))
+      (let [overview (overview-view/make-view root overview-tab open!
+                                              (fn project-connected []
+                                                (coll/any? #(when-let [state (ui/user-data (:tab %) :editor.ai-workbench/state)] (:connected @state)) (coll/vals @documents))))
+            home (doto (Button. "项目总览")
+                   (.setGraphic (doto (StackPane.)
+                                  (-> .getStyleClass (.add "ai-project-entry-icon"))
+                                  (-> .getChildren (.add (doto (SVGPath.)
+                                                           (.setContent "M1 8 H4 V16 H1 Z M7 2 H10 V16 H7 Z M13 5 H16 V16 H13 Z")
+                                                           (-> .getStyleClass (.add "ai-workspace-tab-icon")))))))
+                   (.setId "ai-project-home")
+                   (.setMaxWidth Double/MAX_VALUE)
+                   (-> .getStyleClass (.add "ai-overview-home"))
+                   (.setOnAction (reify javafx.event.EventHandler (handle [_ _] (open! {:overview true})))))]
+        (apply-styles! (:root overview))
+        (.setGraphic overview-tab (doto (SVGPath.) (.setContent "M1 8 H4 V16 H1 Z M7 2 H10 V16 H7 Z M13 5 H16 V16 H13 Z")
+                                        (-> .getStyleClass (.add "ai-workspace-tab-icon"))))
+        (.setContent overview-tab (:root overview))
+        (swap! documents assoc ::overview (assoc overview :tab overview-tab :dispose! (:close! overview)))
+        (.add (.getTabs tabs) overview-tab)
+        (.add (.getChildren ^VBox (:root @browser)) 1 home)
+        (configure-sidebar-selection! home (.lookup ^Parent (:root @browser) "#ai-project-tree") tabs overview-tab)
+        (.add (.getChildren ^VBox (:root @browser))
+              (doto (Label. "●  资料保存在本地")
+                (.setId "ai-project-storage")
+                (-> .getStyleClass (.add "ai-project-storage")))))
       (ui/user-data! tabs ::project-root root)
       (ui/user-data! tabs ::file-error! #(.setText status %))
       (configure-tabs! tabs (:root @browser))
@@ -343,7 +431,7 @@
       (apply-styles! parent)
       (.addAll (.getItems split) ^java.util.Collection (identity [(:root @browser) tabs]))
       (SplitPane/setResizableWithParent (:root @browser) false)
-      (.setDividerPositions split (double-array [0.18]))
+      (.setDividerPositions split (double-array [0.13]))
       (.addAll (.getChildren pane) ^java.util.Collection (identity [split status]))
       (VBox/setVgrow split Priority/ALWAYS)
       (doseq [setter [#(AnchorPane/setTopAnchor pane %) #(AnchorPane/setRightAnchor pane %) #(AnchorPane/setBottomAnchor pane %) #(AnchorPane/setLeftAnchor pane %)]] (setter 0.0))

@@ -14,7 +14,7 @@
 
 
 (ns editor.ai-project-browser
-  "Project-local creative library and lazy AI archive browser."
+  "Project-local creative documents and editable project configuration."
   (:require [cljfx.api :as fx]
             [cljfx.fx.tree-cell :as fx.tree-cell]
             [cljfx.fx.tree-view :as fx.tree-view]
@@ -24,16 +24,17 @@
             [editor.ai-document :as document]
             [editor.ai-roles :as roles]
             [editor.craft-project :as craft-project]
-            [editor.resource :as resource]
             [editor.file-reveal :as file-reveal]
+            [editor.resource :as resource]
             [editor.ui :as ui]
             [util.coll :as coll])
   (:import [com.defold.control ExtendedTreeViewSkin]
            [java.io File]
            [java.nio.file Files]
+           [javafx.application Platform]
            [javafx.beans.value ChangeListener]
            [javafx.event EventHandler]
-           [javafx.scene.control ContextMenu Label MenuItem SeparatorMenuItem TextInputDialog TreeItem TreeView]
+           [javafx.scene.control ContextMenu Label MenuItem SeparatorMenuItem TextInputDialog TreeCell TreeItem TreeView]
            [javafx.scene.input KeyCode MouseButton]
            [javafx.scene.layout HBox Priority VBox]
            [javafx.stage FileChooser]))
@@ -73,12 +74,22 @@
 
 (defn entries [root relative]
   (let [directory (directory-file root relative)
-        labels {"config" "项目配置" "library" "创作资料" "canvases" "画布与任务" "conversations" "对话记录"
-                "attachments" "参考附件" "artifacts" "生成资料" "candidates" "效果图候选" "deliveries" "成品归档"}]
+        labels {"config" "项目配置" "library" "创作资料"}
+        section (coll/first-where #(= relative (str "ai-workspace/library/" (:path %))) sections)]
     (->> (coll/into-> (.listFiles directory) []
            (remove (fn hidden-file [^File file]
-                     (or (.isHidden file) (Files/isSymbolicLink (.toPath file))
-                         (string/ends-with? (.getName file) ".tmp"))))
+                     (let [name (.getName file)]
+                       (or (.isHidden file) (string/starts-with? name ".")
+                           (Files/isSymbolicLink (.toPath file))
+                           (string/ends-with? name ".tmp")
+                           (and (= relative "ai-workspace")
+                                (contains? #{"canvases" "conversations" "attachments" "artifacts"
+                                             "candidates" "deliveries" "project" "project.json"
+                                             "sync.json" "index.md" "README.md"} name))
+                           (and section (= "README.md" name) (.isFile file)
+                                (< (.length file) 4096)
+                                (= (str "# " (:title section) "\n\n" (:description section) "。\n")
+                                   (string/replace (slurp file :encoding "UTF-8") "\r\n" "\n")))))))
            (map (fn describe-entry [^File file]
                   (let [name (.getName file)
                         section (when (= relative "ai-workspace/library")
@@ -87,6 +98,7 @@
                      :title (or (:title section)
                                 (when (= (str "/" relative "/" name) roles/document-path) "项目职能")
                                 (when (= (str "/" relative "/" name) roles/config-path) "职能配表")
+                                (when (= (str relative "/" name) "ai-workspace/config/resource-rules.json") "资源入库规则")
                                 (when (= relative "ai-workspace") (get labels name)) name)
                      :description (:description section)
                      :directory (.isDirectory file)}))))
@@ -158,6 +170,18 @@
 (defn- loaded-items [^TreeItem item]
   (coll/into-> (.getChildren item) [item] (mapcat loaded-items)))
 
+(defn- make-project-tree-cell []
+  (proxy [TreeCell] []
+    (layoutChildren []
+      (proxy-super layoutChildren)
+      ;; Keep the native disclosure node and its mouse/keyboard behavior, but
+      ;; align it to the row's trailing edge after the skin lays out the label.
+      (let [^TreeCell cell this]
+        (when-let [disclosure (.getDisclosureNode cell)]
+          (.relocate disclosure
+                     (- (.getWidth cell) 8.0 (.getWidth (.getLayoutBounds disclosure)))
+                     (.getLayoutY disclosure)))))))
+
 (defn configure-browser! [{:keys [^VBox pane ^TreeView tree ^Label title resource-types]}]
   (let [bar (HBox. 2.0)]
     (.add (.getStyleClass bar) "ai-project-header")
@@ -169,18 +193,34 @@
       {:fx/type (fx/make-ext-with-props fx.tree-view/props)
        :desc {:fx/type ui/ext-value :value tree}
        :props {:cell-factory
-               {:fx/cell-type fx.tree-cell/lifecycle
+               {:fx/cell-type (assoc fx.tree-cell/lifecycle :ctor make-project-tree-cell)
                 :describe (fn describe-project-entry [entry]
                             (if-not entry
                               {}
                               (let [extension (string/lower-case (last (string/split (:path entry) #"\.")))
-                                    type (get resource-types extension {:ext extension})]
+                                    type (get resource-types extension {:ext extension})
+                                    category-icon (get {"library" "M3 1 H11 L15 5 V17 H3 Z M11 1 V5 H15 M6 9 H12 M6 13 H12"
+                                                        "config" "M3 3 H17 V17 H3 Z M7 1 V5 M13 1 V5 M1 7 H5 M15 7 H19 M7 15 V19 M13 15 V19 M1 13 H5 M15 13 H19"
+                                                        "01-concept" "M5 5 H15 C19 5 21 17 17 17 L13 13 H7 L3 17 C-1 17 1 5 5 5 Z M5 8 V12 M3 10 H7 M14 9 H15 M16 12 H17"
+                                                        "02-world" "M10 4 Q5 1 1 3 V17 Q5 15 10 18 Q15 15 19 17 V3 Q15 1 10 4 V18"
+                                                        "03-characters" "M14 5 A4 4 0 1 1 6 5 A4 4 0 1 1 14 5 M2 19 V16 C2 10 18 10 18 16 V19 Z"
+                                                        "04-levels" "M1 17 L7 5 L11 11 L14 7 L20 17 Z M5 9 L7 11 L9 9"
+                                                        "05-systems" "M10 1 L20 6 L10 11 L0 6 Z M1 11 L10 16 L19 11 M1 16 L10 21 L19 16"
+                                                        "06-interface" "M1 2 H19 V18 H1 Z M1 7 H19 M6 7 V18"
+                                                        "07-motion" "M10 0 V5 M10 15 V20 M0 10 H5 M15 10 H20 M3 3 L6 6 M14 14 L17 17 M3 17 L6 14 M14 6 L17 3"
+                                                        "08-audio" "M8 15 V4 L18 2 V13 M8 6 L18 4 M8 15 A3 2 0 1 1 2 15 A3 2 0 1 1 8 15 M18 13 A3 2 0 1 1 12 13 A3 2 0 1 1 18 13"
+                                                        "09-balancing" "M1 4 H19 M1 10 H19 M1 16 H19 M6 2 V6 M14 8 V12 M8 14 V18"
+                                                        "10-delivery" "M2 2 H18 V18 H2 Z M5 10 L9 14 L15 6"}
+                                                       (last (string/split (:path entry) #"/")))]
                                 {:text (:title entry)
                                  :style-class (into ["cell" "indexed-cell" "tree-cell"]
                                                     (if (:directory entry) #{"resource" "resource-folder"} (resource/type-style-classes type)))
-                                 :graphic {:fx/type ui/image-icon :size 16.0
-                                           :path (if (:directory entry) "icons/32/Icons_01-Folder-closed.png"
-                                                     (or (:icon type) "icons/32/Icons_29-AT-Unknown.png"))}
+                                 :graphic {:fx/type :stack-pane :style-class "ai-project-entry-icon"
+                                           :children [(if category-icon
+                                                        {:fx/type :svg-path :content category-icon :style-class "ai-project-category-icon"}
+                                                        {:fx/type ui/image-icon :size 16.0
+                                                         :path (if (:directory entry) "icons/32/Icons_01-Folder-closed.png"
+                                                                   (or (:icon type) "icons/32/Icons_29-AT-Unknown.png"))})]}
                                  :tooltip {:fx/type :tooltip :text (str (when-let [description (:description entry)] (str description "\n")) (:path entry))}})))}}})
     (when-not (instance? ExtendedTreeViewSkin (.getSkin tree))
       (.setSkin tree (ExtendedTreeViewSkin. tree))
@@ -193,7 +233,12 @@
 (defn make-browser [root current-path open! changed! show! resource-types]
   (ensure-library! root)
   (document/ensure-roles-document! root)
-  (let [tree (doto (TreeView.) (.setId "ai-project-tree") (.setShowRoot false))
+  (let [tree (doto (TreeView.) (.setId "ai-project-tree") (.setShowRoot false) (.setFixedCellSize 30.0))
+        fit-scroll! (fn fit-short-tree []
+                      (when (and (.getSkin tree) (<= (* 30.0 (.getExpandedItemCount tree)) (.getHeight tree)))
+                        (let [flow (.getVirtualFlowInstance ^ExtendedTreeViewSkin (.getSkin tree))]
+                          (.setPosition flow 0.0)
+                          (.scrollToTop flow (int 0)))))
         menu (ContextMenu.)
         creates (mapv (fn create-template-item [template]
                         (doto (MenuItem. (str "新建 Canvas · " (:title template)))
@@ -217,7 +262,8 @@
                          (.setRoot tree next-root)
                          (when-let [item (coll/first-where #(= selection (:path (.getValue ^TreeItem %))) (loaded-items next-root))]
                            (.select (.getSelectionModel tree) ^TreeItem item)
-                           (.scrollTo tree (.getRow tree item)))))))
+                           (.scrollTo tree (.getRow tree item)))))
+                     (Platform/runLater fit-scroll!)))
         open-selected! (fn open-selected-file []
                          (when-let [entry (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue)]
                            (when-not (:directory entry)
@@ -229,6 +275,7 @@
     (.setMinWidth pane 190.0)
     (.setPrefWidth pane 240.0)
     (configure-browser! {:pane pane :tree tree :title title :resource-types resource-types})
+    (.addListener (.heightProperty tree) (reify ChangeListener (changed [_ _ _ _] (fit-scroll!))))
     (.addListener (.selectedItemProperty (.getSelectionModel tree))
                   (reify ChangeListener
                     (changed [_ _ _ item]

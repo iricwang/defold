@@ -28,12 +28,16 @@
   (contains? #{"submitting" "running" "waiting" "unknown"} (status state id)))
 
 (defn person-id [model action-id]
-  (let [id (:from (coll/first-where #(= action-id (:to %)) (:edges model)))]
-    (when (coll/any? #(and (= id (:id %)) (= :person (:kind %))) (:nodes model))
-      id)))
+  (let [people (coll/into-> (:nodes model) #{} (filter #(= :person (:kind %))) (map :id))
+        id (:from (coll/first-where #(and (= action-id (:to %)) (contains? people (:from %))) (:edges model)))]
+    (if (coll/any? #(and (= action-id (:id %)) (= :pm (:kind %))) (:nodes model))
+      action-id
+      (when (coll/any? #(and (= id (:id %)) (= :person (:kind %))) (:nodes model)) id))))
 
 (defn action-ids [model person-id]
-  (coll/into-> (:edges model) [] (filter #(= person-id (:from %))) (map :to)))
+  (if (coll/any? #(and (= person-id (:id %)) (= :pm (:kind %))) (:nodes model))
+    [person-id]
+    (coll/into-> (:edges model) [] (filter #(= person-id (:from %))) (map :to))))
 
 (defn locked? [state]
   (or (coll/any? #(active? state %) (coll/keys (:sessions state)))
@@ -71,6 +75,13 @@
       (let [id (first remaining)]
         (-> state (assoc-in [:sessions person :queue :current] id)
             (assoc-in [:sessions person :queue :remaining] (subvec remaining 1))))
+      state)))
+
+(defn claim-id [state person id]
+  (let [queue (get-in state [:sessions person :queue])]
+    (if (and (= "running" (:status queue)) (nil? (:current queue)) (contains? (set (:remaining queue)) id))
+      (-> state (assoc-in [:sessions person :queue :current] id)
+          (update-in [:sessions person :queue :remaining] #(filterv (fn other-action [candidate] (not= id candidate)) %)))
       state)))
 
 (defn enqueue-confirmation [state person confirmation]

@@ -55,6 +55,19 @@
         (is (= (:edges reopened) (:edges (graph/stamp-legacy reopened [(assoc (first staff) :model "Astra")])))))
       (finally (fs/delete-directory! root)))))
 
+;; A new AI-PM canvas starts with the built-in AI-PM staff already assigned.
+(deftest ai-pm-document-default-staff-test
+  (let [root (.toFile (Files/createTempDirectory "ai-pm-document" (make-array java.nio.file.attribute.FileAttribute 0)))]
+    (try
+      (browser/ensure-library! root)
+      (let [path (document/create-document! root "ai-workspace/library/01-concept" "项目规划" "ai-pm")
+            model (document/model (document/read-document root path) nil)
+            pm (canvas/node-by-id model (:id (first (:nodes model))))]
+        (is (= :pm (:kind pm)))
+        (is (= roles/ai-pm-id (:staff-id pm)))
+        (is (= "AI-PM" (:staff-name pm))))
+      (finally (fs/delete-directory! root)))))
+
 ;; Moving preserves identity; camera edits do not change semantic revisions.
 (deftest document-round-trip-test
   (let [root (.toFile (Files/createTempDirectory "ai-document-test" (make-array java.nio.file.attribute.FileAttribute 0)))]
@@ -127,7 +140,7 @@
   (let [root (.toFile (Files/createTempDirectory "canvas-templates" (make-array java.nio.file.attribute.FileAttribute 0)))]
     (try
       (browser/ensure-library! root)
-      (doseq [{:keys [id title action result assets]} canvas/templates]
+      (doseq [{:keys [id title action result assets]} (filterv :action canvas/templates)]
         (let [path (document/create-document! root "ai-workspace/library/01-concept" title id)
               doc (document/read-document root path)
               model (document/model doc nil)
