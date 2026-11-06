@@ -23,6 +23,7 @@
             [editor.ai-graph :as graph]
             [editor.ai-graph-test :as graph-test]
             [editor.ai-import-workflow :as workflow]
+            [editor.ai-production :as production]
             [editor.ai-project-work :as work]
             [editor.ai-resource-import :as admission]
             [editor.ai-resource-import-test :as admission-test]
@@ -30,6 +31,7 @@
             [editor.ai-tasks :as tasks]
             [editor.ai-workbench :as workbench]
             [editor.ai-workspace :as ai-workspace]
+            [editor.craft-project :as craft]
             [editor.defold-project :as project]
             [editor.editor-extensions :as extensions]
             [editor.localization :as localization]
@@ -82,14 +84,20 @@
     (is (nil? (graph/task-error (:canvas applied) staff (:id gui))))))
 
 ;; Compile the real GUI, atlas, texture and material dependencies in isolation.
-;; Validation preserves Play output and yields a traceable receipt; human
+;; Preserve 51 native GUI nodes and controller binding, plus Play output.
+;; Validation yields a traceable receipt; human
 ;; acceptance remains blocked until separately supplied runtime/visual evidence.
 (deftest native-import-compilation-test
   (test-support/with-clean-system
     (let [{:keys [root output]} (admission-test/fixture)
+          layout (io/file root "runtime.gui")
+          _ (spit layout (str (slurp (craft/resource-file root (:gui output)))
+                              "\nscript: \"/reward.gui_script\"\n"
+                              (coll/join-to-string "\n" (mapv #(str "nodes { id: \"runtime_" % "\" type: TYPE_BOX size { x: 8.0 y: 8.0 } }") (range 50)))))
+          _ (spit (io/file root "reward.gui_script") "function init(self) end\n")
           component (io/file root "reward.go")
-          _ (spit component (str "components { id: \"reward\" component: \"" (:gui output) "\" }"))
-          plan (admission/plan! root (:manifest output) "reward")
+          _ (spit component "components { id: \"reward\" component: \"/runtime.gui\" }")
+          plan (admission/plan-existing-gui! root (:manifest output) "reward" "/runtime.gui")
           prefs (prefs/make :scopes {:global (io/file root ".internal/test.editor_settings")} :schemas [:default])
           localization (localization/make prefs ::test {"en.editor_localization" #(io/reader (io/resource "localization/en.editor_localization"))}
                                           (fn report-error [error] (throw error)))
@@ -100,7 +108,14 @@
           snapshot (g/node-value workspace :resource-snapshot)
           marker (io/file root "build/default/keep-me.txt")
           _ (io/make-parents marker) _ (spit marker "existing play build")
-          output (admission/apply! root plan (partial workbench/validate-import! project))]
+          output (admission/apply! root plan
+                                   (fn validate-candidate [candidate]
+                                     (is (:candidate candidate))
+                                     (is (not (.exists (craft/resource-file root (:gui candidate)))))
+                                     (workbench/validate-import! project candidate)))
+          actual (:data (production/validate-resource-text :gui (slurp (craft/resource-file root (:gui output)))))]
+      (is (= 51 (count (:nodes actual))))
+      (is (= "/reward.gui_script" (:script actual)))
       (is (= "passed" (get-in output [:validation :status])))
       (is (= "editor-resource-pipeline" (get-in output [:validation :compiler])))
       (is (re-matches #"[a-f0-9]{64}" (get-in output [:validation :build-id])))
@@ -139,7 +154,23 @@
         (doseq [check ["runtime" "visual"]]
           (delivery/record-check! root (:id receipt) check "passed" "验收契约测试用证据" [{:path (:gui output)}]))
         (delivery/decide-task! root "integrate" "accepted" [(:artifact-id receipt)] (:id receipt) "测试验收回流")
-        (is (= "已验收" (work/task-status (work/read-work root) "integrate"))))
+        (is (= "已验收" (work/task-status (work/read-work root) "integrate")))
+        (let [config (io/file root "game.project") original (slurp config)]
+          (try
+            (spit config (str original "\n; changed after validation\n"))
+            (is (thrown-with-msg? Exception #"配置或依赖" (delivery/record-check! root (:id receipt) "runtime" "passed" "stale environment" [{:path (:gui output)}])))
+            (finally (spit config original)))))
+      (let [broken (io/file root "broken.gui")
+            checked (atom false)
+            _ (spit broken (str (slurp layout) "\nnodes { id: \"broken\" type: TYPE_BOX texture: \"components/missing_frame\" }"))
+            broken-plan (admission/plan-existing-gui! root (:source-manifest output) "broken" "/broken.gui")]
+        (is (thrown? Exception (admission/apply! root broken-plan
+                                                 (fn validate-broken-candidate [candidate]
+                                                   (reset! checked true)
+                                                   (workbench/validate-import! project candidate)))))
+        (is @checked)
+        (doseq [entry (:files broken-plan)]
+          (is (not (.exists (craft/resource-file root (:target entry)))))))
       (let [source (get-in plan [:files 2 :source])
             node (project/get-resource-node project source)]
         (g/transact (g/set-property node :max-nodes 1024))
@@ -181,6 +212,7 @@
           (is (= "p" (tasks/person-id (:canvas @state) id)))
           (is (= "resource-import" (:task-type (canvas/node-by-id (:canvas @state) id)))))
         (is (some? (plorer/one root "#action-import-rules")))
+        (is (some? (plorer/one root "#action-import-report")))
         (finally ((:dispose! view)) (.close stage))))))
 
 ;; Admission rules use a native editable child tab and preserve invalid drafts.

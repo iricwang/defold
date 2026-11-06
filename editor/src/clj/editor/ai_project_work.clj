@@ -75,12 +75,16 @@
 (defn enqueue! [root entries]
   (let [now (str (Instant/now))
         jobs (mapv #(merge % {:id (str (UUID/randomUUID)) :status "queued" :created-at now}) entries)]
-    (transact! root #(update % :jobs
-                             (fn insert-jobs [current]
-                               (reduce (fn insert-job [current job]
-                                         (let [index (.indexOf ^java.util.List (mapv :id current) (:before-job-id job))
-                                               index (if (neg? index) (count current) index)]
-                                           (into (conj (subvec current 0 index) (dissoc job :before-job-id)) (subvec current index)))) current jobs))))
+    (transact! root (fn enqueue-current [data]
+                      (doseq [entry entries :let [task (coll/first-where #(= (:task-id entry) (:id %)) (:tasks data))]]
+                        (when (or (:planning-hold task) (contains? #{"cancelled" "superseded" "pending-change"} (:scope-status task)))
+                          (throw (ex-info "任务正在重规划或已退出当前范围，不能加入执行队列" {}))))
+                      (update data :jobs
+                              (fn insert-jobs [current]
+                                (reduce (fn insert-job [current job]
+                                          (let [index (.indexOf ^java.util.List (mapv :id current) (:before-job-id job))
+                                                index (if (neg? index) (count current) index)]
+                                            (into (conj (subvec current 0 index) (dissoc job :before-job-id)) (subvec current index)))) current jobs)))))
     jobs))
 
 (defn update-jobs! [root ids fields]
@@ -109,10 +113,14 @@
         data (transact! root
                         (fn claim-job [data]
                           (let [job (coll/first-where #(= id (:id %)) (:jobs data))
+                                task (coll/first-where #(= (:task-id job) (:id %)) (:tasks data))
                                 staff (:staff-id job)
                                 active (coll/first-where #(and (= staff (:staff-id %)) (contains? #{"running" "unknown"} (:status %))) (:jobs data))
-                                first-job (coll/first-where #(and (= staff (:staff-id %)) (= "queued" (:status %))) (:jobs data))]
-                            (if-not (and job (= id (:id first-job)) (nil? active)) data
+                                held (coll/into-> (:tasks data) #{}
+                                       (filter #(or (:planning-hold %) (contains? #{"cancelled" "superseded" "pending-change"} (:scope-status %)))) (map :id))
+                                first-job (coll/first-where #(and (= staff (:staff-id %)) (= "queued" (:status %)) (not (contains? held (:task-id %)))) (:jobs data))]
+                            (if-not (and job (= id (:id first-job)) (nil? active)
+                                         (not (:planning-hold task)) (not (contains? #{"cancelled" "superseded" "pending-change"} (:scope-status task)))) data
                                     (update data :jobs #(mapv (fn start-job [candidate]
                                                                 (cond-> candidate (= id (:id candidate)) (assoc :status "running" :claim-token claim-token :started-at (str (Instant/now))))) %))))))]
     (= claim-token (:claim-token (coll/first-where #(= id (:id %)) (:jobs data))))))
@@ -188,6 +196,12 @@
   (reduce-kv (fn bind-job [state id session]
                (if-let [job-id (:project-job-id session)] (assoc-in state [:sessions id :project-job-id] job-id) state)) state (:sessions prepared)))
 
+(defn next-ready-action [data state person]
+  (let [job-actions (into {} (mapv (fn job-action [id] [(get-in state [:sessions id :project-job-id]) id])
+                                   (get-in state [:sessions person :queue :remaining])))]
+    (when-let [job (coll/first-where #(and (= "queued" (:status %)) (contains? job-actions (:id %))) (:jobs data))]
+      (get job-actions (:id job)))))
+
 (defn retry-pending! [root id request-id]
   (transact! root #(update % :jobs
                            (fn retry-jobs [jobs]
@@ -244,6 +258,8 @@
         spec (coll/first-where #(= id (:id %)) (:tasks data))
         decision (last (filterv #(and (= "task-acceptance" (:kind %)) (= id (:subject-id %))) (:approvals data)))]
     (cond
+      (contains? #{"cancelled" "superseded"} (:scope-status spec)) "已取消"
+      (:planning-hold spec) "变更待处理"
       (and (= "accepted" (:decision decision)) (= (:spec-revision spec) (:revision decision))
            (= (set (mapv :id jobs)) (set (:job-ids decision)))) "已验收"
       (coll/any? #(= "unknown" (:status %)) jobs) "待核对"

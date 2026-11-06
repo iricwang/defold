@@ -144,22 +144,21 @@
           view (overview-view/make-view "." tab (fn open-target [_]) (constantly true))
           root (:root view)
           scene (Scene. root 1400.0 900.0)
-          ^TextField search (.lookup root "#ai-overview-search")
-          ^ComboBox mode (.lookup root "#ai-overview-filter")]
+          ^TextField search (.lookup root "#ai-overview-search")]
       (try
         (reset! (:snapshot view) {:accepted 0 :total 0 :tasks [] :stages [] :staff []
                                   :running [] :reviews [] :issues [] :artifacts [] :activity []})
         (.setText search " ")
         (.applyCss root)
         (.layout root)
-        (let [^Button button (.lookup root "#ai-overview-all-running")]
+        (let [^Button button (.lookup root "#overview-metric-running")]
           (.requestFocus button)
           (is (identical? button (.getFocusOwner scene)))
           (.fire button)
           (is (nil? (.getScene button)))
           (is (identical? root (.getFocusOwner scene)))
           (is (identical? scene (.getScene (.getFocusOwner scene))))
-          (is (= "执行中" (.getValue mode))))
+          (is (= "running" (.getValue ^javafx.beans.property.SimpleStringProperty (:section view)))))
         (.requestFocus search)
         (.setText search "next query")
         (is (identical? search (.getFocusOwner scene)))
@@ -190,24 +189,29 @@
         (is (not (instance? ScrollPane (.getCenter root))))
         (is (= 6 (count (.lookupAll root ".ai-overview-section-scroll"))))
         (is (coll/empty? (.lookupAll root ".ai-overview-disclosure")))
-        (doseq [id ["stages" "running" "outputs" "reviews" "staff" "tasks"]
+        (doseq [id ["stages" "running" "outputs" "reviews" "staff" "issues"]
                 :let [^ScrollPane viewport (.lookup root (str "#ai-overview-" id "-scroll"))]]
-          (is (> (.getHeight (.getBoundsInLocal (.getContent viewport))) (.getHeight (.getViewportBounds viewport))))
           (let [bounds (.localToScene viewport (.getBoundsInLocal viewport))]
             (is (>= (.getMinY bounds) 0.0))
             (is (<= (.getMaxY bounds) (.getHeight scene)))))
-        (is (= 20 (count (.lookupAll root ".ai-overview-task-row"))))
+        (let [^ScrollPane stages (.lookup root "#ai-overview-stages-scroll")]
+          (is (> (.getWidth (.getBoundsInLocal (.getContent stages))) (.getWidth (.getViewportBounds stages)))))
         (is (= 6 (count (.lookupAll root ".ai-overview-execution-card"))))
         (is (= 9 (count (.lookupAll root ".ai-overview-output"))))
-        (.setVvalue ^ScrollPane (.lookup root "#ai-overview-tasks-scroll") 0.75)
         (.setVvalue ^ScrollPane (.lookup root "#ai-overview-staff-scroll") 0.4)
-        (is (= 0.0 (.getVvalue ^ScrollPane (.lookup root "#ai-overview-stages-scroll"))))
         (.setText search "  ")
         (.applyCss root) (.layout root)
-        (is (= 0.75 (.getVvalue ^ScrollPane (.lookup root "#ai-overview-tasks-scroll"))))
         (is (= 0.4 (.getVvalue ^ScrollPane (.lookup root "#ai-overview-staff-scroll"))))
+        ((:show-section! view) "tasks")
+        (.applyCss root) (.layout root)
+        (is (= 20 (count (.lookupAll root ".ai-overview-task-row"))))
+        (is (= 1 (count (.lookupAll root ".ai-overview-section-scroll"))))
+        (.setVvalue ^ScrollPane (.lookup root "#ai-overview-tasks-scroll") 0.75)
+        (.setText search "   ")
+        (.applyCss root) (.layout root)
+        (is (= 0.75 (.getVvalue ^ScrollPane (.lookup root "#ai-overview-tasks-scroll"))))
         ((:reset! view))
-        (is (coll/every? #(zero? (.getVvalue ^ScrollPane %)) (.lookupAll root ".ai-overview-section-scroll")))
+        (is (= 6 (count (.lookupAll root ".ai-overview-section-scroll"))))
         (finally ((:close! view)))))))
 
 ;; Batch closing must respect a veto and non-closable tabs, sharing normal tab
@@ -372,4 +376,37 @@
             (is (identical? category (.getSelectedItem (.getSelectionModel tree))))
             (is (= (inc before) (count (.getChildren category)))))
           ((:close! workspace))))
+      (finally (fs/delete-directory! root)))))
+;; The studio navigation must keep the same browser and document tabs while
+;; switching dashboard sections; resources expose the resident file tree.
+(deftest studio-navigation-keeps-workspace-test
+  (let [root (.toFile (Files/createTempDirectory "ai-studio-navigation" (make-array java.nio.file.attribute.FileAttribute 0)))]
+    (try
+      (ui/run-now
+        (let [pane (AnchorPane.)
+              view (workspace/make-view! pane root {} {} (fn make-content [_ _ _ _] {:close! (fn close-content [])}))
+              ^TabPane tabs (:tabs view)
+              _scene (Scene. pane 1584.0 993.0)
+              _ (do (ui/apply-css! pane) (.applyCss pane) (.layout pane))
+              ^TreeView tree (.lookup pane "#ai-project-tree")
+              original-root (.getRoot tree)]
+          (try
+            (is (not (.isManaged tree)))
+            ((:open! view) {:path "/notes.md"})
+            (let [doc-tab (ui/selected-tab tabs)]
+              (doseq [id ["studio-nav-tasks" "studio-nav-stages" "studio-nav-outputs" "studio-nav-staff"]]
+                (.fire ^Button (.lookup pane (str "#" id)))
+                (is (= "ai-overview-tab" (.getId (ui/selected-tab tabs))))
+                (is (= 2 (count (.getTabs tabs)))))
+              (.fire ^Button (.lookup pane "#studio-nav-resources"))
+              (is (.isManaged tree))
+              (is (identical? original-root (.getRoot tree)))
+              (.fire ^Button (.lookup pane "#ai-project-home"))
+              (is (not (.isManaged tree)))
+              (.select (.getSelectionModel tabs) doc-tab)
+              (is (not (.contains (.getPseudoClassStates tabs) (javafx.css.PseudoClass/getPseudoClass "studio-home"))))
+              (.setText ^TextField (.lookup pane "#studio-search") "装备")
+              (is (= "ai-overview-tab" (.getId (ui/selected-tab tabs))))
+              (is (= "装备" (.getText ^TextField (.lookup (.getContent (first (.getTabs tabs))) "#ai-overview-search")))))
+            (finally ((:close! view))))))
       (finally (fs/delete-directory! root)))))

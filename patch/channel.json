@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 119,
-  "version": "1.14.1-patch.119",
+  "revision": 122,
+  "version": "1.14.1-patch.122",
   "repository": "iricwang/defold",
-  "notes": "Complete people-first AI Canvas planning, local document management, asset review and engineering acceptance; add project overview and unify workspace navigation."
+  "notes": "AI workbench phase 5: portable staff and Canvas templates with import previews; reference-safe local file moves, recoverable trash and transaction recovery; verified backups and cross-project migration without inherited approvals or chat bindings; task grouping and folding in the existing editor layout and theme."
 }

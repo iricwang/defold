@@ -29,7 +29,7 @@
 
 (def task-fields [:title :stage :staff-id :directory :template :prompt :deliverables :depends-on :delivery-type :required-checks])
 (def template-ids #{"concept" "gui" "art-characters" "art-levels" "balancing"})
-(def statuses {"review" "待人工确认" "allocated" "已分配" "rejected" "已驳回" "superseded" "已被新规划替代"})
+(def statuses {"review" "待人工确认" "allocated" "已分配" "rejected" "已驳回" "superseded" "已被新规划替代" "cancelled" "已撤销"})
 
 (defn- validate-dependencies! [tasks]
   (loop [pending tasks completed #{}]
@@ -45,6 +45,9 @@
        "每项任务由人工确认后，编辑器才生成工作 Canvas。考虑任务顺序、职员负荷、交付物和验收标准。"
        "delivery-type 为 document（文档）、assets（实际资源包）或 engineering（工程集成，须构建、运行和视觉检查）。前置成果必须验收通过才执行后续工作。"
        "前置任务使用 depends-on 引用任务 id，不能循环；不同职员的工作分成独立任务。"
+       "重规划时保留任务的 plan-task-id；修改已有工作请填写 existing-task-id（现有 TaskCard 的完整 id）。"
+       "返回本次建议范围即可，未提及的旧工作保持不变；撤销必须显式填写 change: cancel 和 existing-task-id，并保留完整任务字段。"
+       "依赖既可使用本次规划的短 id，也可使用已有 TaskCard 完整 id。编辑器会逐项展示差异、等待人工批准；不要声称已改派或已停止任务。"
        "只返回一个标记为 ai-pm-plan 的 JSON 代码块，格式如下：\n"
        "```ai-pm-plan\n{\"version\":1,\"stages\":[{\"id\":\"design\",\"title\":\"系统设计\",\"tasks\":["
        "{\"id\":\"interaction\",\"title\":\"设计系统交互\",\"staff-id\":\"现有职员ID\","
@@ -78,7 +81,7 @@
     (throw (ex-info error {})))
   task)
 
-(defn parse-plan [text staff]
+(defn parse-plan [text staff existing-ids]
   (let [blocks (vec (re-seq #"(?s)```ai-pm-plan\s*\n(.*?)```" (or text "")))
         _ (when-not (= 1 (count blocks)) (throw (ex-info "AI-PM 必须返回一个完整的 ai-pm-plan 规划块，请调整目标后重试" {})))
         plan (json/read-str (second (first blocks)) :key-fn keyword)
@@ -87,40 +90,96 @@
                    (coll/every? #(and (string? (:id %)) (not (string/blank? (:title %))) (vector? (:tasks %))) stages)
                    (= (count stages) (count (set (mapv :id stages)))))
       (throw (ex-info "阶段格式无效：需要 1–20 个不重复的阶段" {})))
-    (let [tasks (coll/into-> stages [] (mapcat (fn stage-tasks [stage] (mapv #(assoc % :stage (:title stage) :stage-id (:id stage)) (:tasks stage)))))
+    (let [tasks (coll/into-> stages [] (mapcat (fn stage-tasks [stage] (mapv #(assoc % :stage (:title stage) :stage-id (:id stage)
+                                                                                     :delivery-type (or (:delivery-type %) (if (contains? #{"concept" "balancing"} (:template %)) "document" "assets"))) (:tasks stage)))))
           ids (set (mapv :id tasks))]
       (when-not (and (<= 1 (count tasks) 100) (= (count tasks) (count ids))
                      (coll/every? #(and (string? %) (re-matches #"[A-Za-z0-9_-]{1,64}" %)) ids))
         (throw (ex-info "规划需要 1–100 项任务，任务 ID 必须唯一且使用英文、数字或下划线" {})))
       (doseq [task tasks]
         (validate-task! task staff)
-        (when-not (coll/every? ids (:depends-on task)) (throw (ex-info "前置任务不存在" {:task (:id task)}))))
-      (validate-dependencies! tasks)
+        (when-not (coll/every? (into ids existing-ids) (:depends-on task))
+          (throw (ex-info "前置任务不存在" {:task (:id task)})))
+        (when (and (:change task) (not (contains? #{"cancel" "update" "add"} (:change task))))
+          (throw (ex-info "未知规划变更类型" {}))))
+      (validate-dependencies! (mapv #(update % :depends-on (fn local-dependencies [deps] (filterv ids deps))) tasks))
       tasks)))
+
+(defn task-snapshot [model task]
+  (assoc (select-keys task (into task-fields [:id :status :allocated-revision :allocated-path]))
+    :depends-on (graph/prerequisite-ids model (:id task))))
+
+(defn- propose-changes [model pm-id turn-id tasks]
+  (let [manager (graph/node model pm-id)
+        _ (when (coll/any? #(= "review" (:status %)) (:plan-changes manager))
+            (throw (ex-info "仍有未处理的重规划变更，请逐项确认或拒绝后再生成" {})))
+        old (filterv #(and (= pm-id (:source-pm %)) (not (contains? #{"rejected" "superseded" "cancelled"} (:status %)))) (:nodes model))
+        keyed (group-by :plan-task-id old)
+        key (subs (digest/string->sha256-hex (str pm-id "/" turn-id)) 0 20)
+        rows (mapv (fn match-task [task]
+                     (let [matches (if-let [id (:existing-task-id task)] (filterv #(= id (:id %)) old) (get keyed (:id task)))
+                           before (first matches)]
+                       (when (or (> (count matches) 1) (and (:existing-task-id task) (nil? before))
+                                 (and (= "cancel" (:change task)) (nil? before)))
+                         (throw (ex-info "已有任务匹配不唯一或已失效，请明确 existing-task-id" {:task (:id task)})))
+                       {:input task :before before :new-id (str "task_" key "_" (:id task))})) tasks)
+        _ (when-not (= (count (filterv :before rows)) (count (coll/into-> rows #{} (keep #(get-in % [:before :id])))))
+            (throw (ex-info "同一任务不能在一次重规划中修改两次" {})))
+        changed (loop [changed (coll/into-> rows #{}
+                                 (filter #(or (nil? (:before %)) (= "cancel" (get-in % [:input :change]))
+                                              (not= (select-keys (:input %) (filterv (complement #{:depends-on}) task-fields))
+                                                    (select-keys (:before %) (filterv (complement #{:depends-on}) task-fields)))))
+                                 (map #(get-in % [:input :id])))]
+                  (let [ids (into {} (mapv #(vector (get-in % [:input :id]) (if (contains? changed (get-in % [:input :id])) (:new-id %) (get-in % [:before :id]))) rows))
+                        next (into changed (coll/into-> rows []
+                                             (filter #(not= (vec (sort (mapv (fn dependency [id] (get ids id id)) (get-in % [:input :depends-on]))))
+                                                            (when (:before %) (graph/prerequisite-ids model (get-in % [:before :id])))))
+                                             (map #(get-in % [:input :id]))))]
+                    (if (= next changed) changed (recur next))))
+        ids (into {} (mapv #(vector (get-in % [:input :id]) (if (contains? changed (get-in % [:input :id])) (:new-id %) (get-in % [:before :id]))) rows))
+        allowed (into (set (mapv :id old)) (coll/vals ids))
+        changes (mapv (fn change-row [{:keys [input before new-id]}]
+                        (let [after (assoc (select-keys input task-fields) :depends-on (vec (sort (mapv #(get ids % %) (:depends-on input)))))
+                              kind (cond (= "cancel" (:change input)) "cancel" (nil? before) "add" (contains? changed (:id input)) "revise" :else "keep")]
+                          (when-not (coll/every? allowed (:depends-on after)) (throw (ex-info "前置任务不存在" {:task (:id input)})))
+                          {:id (str "change_" key "_" (:id input)) :turn-id turn-id :kind kind
+                           :status (if (= "keep" kind) "kept" "review") :before (when before (task-snapshot model before))
+                           :after (merge after {:id new-id :kind :task :source-pm pm-id :source-turn turn-id
+                                                :plan-task-id (or (:plan-task-id before) (:id input)) :stage-id (:stage-id input)
+                                                :previous-task-id (:id before) :status "review" :dependency-wires true})})) rows)]
+    (update model :nodes #(mapv (fn store-proposal [node]
+                                  (if (= pm-id (:id node))
+                                    (-> node (update :plan-history (fnil into []) (:plan-changes node))
+                                        (assoc :planned-turn turn-id :plan-changes changes)) node)) %))))
 
 (defn accept-plan [model pm-id turn-id text staff]
   (if (= turn-id (:planned-turn (graph/node model pm-id)))
     model
-    (let [tasks (parse-plan text staff)
-          key (subs (digest/string->sha256-hex (str pm-id "/" turn-id)) 0 20)
-          ids (into {} (mapv #(vector (:id %) (str "task_" key "_" (:id %))) tasks))
-          top (+ 540.0 (reduce max -540.0 (mapv #(double (or (:y %) 0.0)) (filterv #(= :task (:kind %)) (:nodes model)))))
-          cards (mapv (fn task-card [index task]
-                        (merge (select-keys task task-fields)
-                               {:id (get ids (:id task)) :kind :task :source-pm pm-id :source-turn turn-id
-                                :plan-task-id (:id task) :stage-id (:stage-id task) :status "review"
-                                :depends-on (mapv ids (:depends-on task)) :dependency-wires true
-                                :x 350.0 :y (+ top (* 540.0 index))})) (range (count tasks)) tasks)
-          model (update model :nodes #(into (mapv (fn supersede [node]
-                                                    (cond-> node
-                                                      (and (= pm-id (:source-pm node)) (= "review" (:status node))) (assoc :status "superseded")
-                                                      (= pm-id (:id node)) (assoc :planned-turn turn-id))) %) cards))
-          model (update model :edges into (mapv #(graph/stamp-edge model staff {:from pm-id :to (:id %)}) cards))
-          prerequisites (coll/into-> cards []
-                          (mapcat (fn prerequisite-edges [card]
-                                    (mapv #(graph/stamp-edge model staff {:from % :to (:id card)})
-                                          (:depends-on card)))))]
-      (update model :edges into prerequisites))))
+    (let [tasks (parse-plan text staff (coll/into-> (:nodes model) #{} (filter #(= pm-id (:source-pm %))) (map :id)))]
+      (if (coll/any? #(= pm-id (:source-pm %)) (:nodes model))
+        (propose-changes model pm-id turn-id tasks)
+        (let [_ (when (coll/any? #(or (:existing-task-id %) (= "cancel" (:change %))) tasks)
+                  (throw (ex-info "首次规划没有可修改或撤销的旧任务" {})))
+              _ (validate-dependencies! tasks)
+              key (subs (digest/string->sha256-hex (str pm-id "/" turn-id)) 0 20)
+              ids (into {} (mapv #(vector (:id %) (str "task_" key "_" (:id %))) tasks))
+              top (+ 540.0 (reduce max -540.0 (mapv #(double (or (:y %) 0.0)) (filterv #(= :task (:kind %)) (:nodes model)))))
+              cards (mapv (fn task-card [index task]
+                            (merge (select-keys task task-fields)
+                                   {:id (get ids (:id task)) :kind :task :source-pm pm-id :source-turn turn-id
+                                    :plan-task-id (:id task) :stage-id (:stage-id task) :status "review"
+                                    :depends-on (mapv ids (:depends-on task)) :dependency-wires true
+                                    :x 350.0 :y (+ top (* 540.0 index))})) (range (count tasks)) tasks)
+              model (update model :nodes #(into (mapv (fn supersede [node]
+                                                        (cond-> node
+                                                          (and (= pm-id (:source-pm node)) (= "review" (:status node))) (assoc :status "superseded")
+                                                          (= pm-id (:id node)) (assoc :planned-turn turn-id))) %) cards))
+              model (update model :edges into (mapv #(graph/stamp-edge model staff {:from pm-id :to (:id %)}) cards))
+              prerequisites (coll/into-> cards []
+                              (mapcat (fn prerequisite-edges [card]
+                                        (mapv #(graph/stamp-edge model staff {:from % :to (:id card)})
+                                              (:depends-on card)))))]
+          (update model :edges into prerequisites))))))
 
 (defn accept-snapshot [state id snapshot]
   (let [turn-id (get-in state [:sessions id :execution :turn-id])
@@ -151,6 +210,8 @@
 
 (defn allocate! [root source-path model id staff]
   (let [task (graph/node model id)]
+    (when (contains? #{"cancelled" "superseded"} (:scope-status (coll/first-where #(= id (:id %)) (:tasks (project-work/read-work root)))))
+      (throw (ex-info "原任务已撤销或替代，请打开后续修订" {})))
     (when-not (and (= :task (:kind task)) (contains? #{"review" "allocated"} (:status task)))
       (throw (ex-info "只有待确认任务可以分配" {})))
     (validate-task! task staff)
@@ -159,7 +220,8 @@
           dependencies (mapv #(graph/node model %) dependency-ids)]
       (when (coll/any? nil? dependencies) (throw (ex-info "前置任务不存在" {})))
       (let [task (assoc task :delivery-type (or (:delivery-type task) (if (contains? #{"concept" "balancing"} (:template task)) "document" "assets")))
-            revision (digest/string->sha256-hex (json/write-str (mapv #(get (assoc task :depends-on dependency-ids) %) task-fields)))
+            revision (digest/string->sha256-hex (json/write-str (cond-> (mapv #(get (assoc task :depends-on dependency-ids) %) task-fields)
+                                                                  (:handoff task) (conj (:handoff task)))))
             suffix (subs (digest/string->sha256-hex (str source-path "/" id)) 0 12)
             path (str (:directory task) "/" (:title task) "-" suffix ".aicanvas")
             file (craft-project/resource-file root path)
@@ -168,6 +230,9 @@
             p (roles/assign-staff {:id (str "person_" suffix) :kind :person :title "负责人"} person)
             a {:id (str "action_" suffix) :kind :action :title (:title task)
                :prompt (str (:prompt task) "\n\n交付与验收要求：\n" (:deliverables task)
+                            (when-let [handoff (:handoff task)]
+                              (str "\n\n人工确认的任务交接：\n" (json/write-str handoff :escape-unicode false :escape-slash false)
+                                   "\n原工作文件与成果只读保留；根据交接说明继续工作。旧批准不代表本次任务已交付，正式成果输入仍须通过准入检查。"))
                             "\n\n阶段：" (:stage task)
                             (when (coll/not-empty dependencies)
                               (str "\n前置工作（执行前检查交付物，未完成则报告阻塞，不自行假设已完成）：\n"
@@ -194,7 +259,7 @@
             (throw (ex-info "目标工作 Canvas 已存在或确认内容已变化，本次没有覆盖；请恢复原计划或创建新的规划" {:path path}))))
         (project-work/register-task! root {:id id :spec-revision revision :staff-id (:id person)
                                            :canvas-id (:id doc) :canvas-path path :action-ids [(:id a)]
-                                           :source-path source-path :dependencies dependency-ids :title (:title task)
+                                           :source-path source-path :dependencies dependency-ids :title (:title task) :handoff (:handoff task)
                                            :deliverables (:deliverables task) :delivery-type (:delivery-type task)
                                            :required-checks (if (= "engineering" (:delivery-type task)) ["build" "runtime" "visual"] (:required-checks task))})
         (update model :nodes #(mapv (fn allocated-task [node]

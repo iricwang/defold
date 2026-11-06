@@ -22,6 +22,7 @@
             [clojure.string :as string]
             [editor.ai-canvas :as canvas]
             [editor.ai-document :as document]
+            [editor.ai-governance-view :as governance]
             [editor.ai-roles :as roles]
             [editor.craft-project :as craft-project]
             [editor.file-reveal :as file-reveal]
@@ -84,7 +85,7 @@
                            (string/ends-with? name ".tmp")
                            (and (= relative "ai-workspace")
                                 (contains? #{"canvases" "conversations" "attachments" "artifacts"
-                                             "candidates" "deliveries" "project" "project.json"
+                                             "candidates" "deliveries" "project" "project.json" "migrations"
                                              "sync.json" "index.md" "README.md"} name))
                            (and section (= "README.md" name) (.isFile file)
                                 (< (.length file) 4096)
@@ -245,6 +246,7 @@
                           (.setId (if (= "concept" (:id template)) "ai-project-new-canvas" (str "ai-project-new-" (:id template)))))) canvas/templates)
         title (Label. "AI 工程")
         refresh (doto (MenuItem. "刷新目录") (.setId "ai-project-refresh"))
+        manage (doto (MenuItem. "模板与文件管理…") (.setId "ai-project-governance"))
         import (doto (MenuItem. "导入资料…") (.setId "ai-project-import") (.setDisable true))
         pane (VBox.)
         refresh! (fn refresh-project-tree []
@@ -295,7 +297,7 @@
                             (open-selected!)
                             (.consume ^javafx.scene.input.KeyEvent event)))))
     (.addAll (.getItems menu) ^java.util.Collection creates)
-    (.addAll (.getItems menu) ^java.util.Collection (identity [(SeparatorMenuItem.) import refresh]))
+    (.addAll (.getItems menu) ^java.util.Collection (identity [(SeparatorMenuItem.) import manage refresh]))
     (.setContextMenu tree menu)
     (file-reveal/install-tree! tree root
                                (fn selected-project-file [] (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue :path)) show!)
@@ -323,6 +325,11 @@
                                 (catch java.nio.file.FileAlreadyExistsException _ (show! "同名 Canvas 已存在，请换一个名称"))
                                 (catch Exception e (show! (.getMessage e)))))))))))
     (.setOnAction refresh (reify EventHandler (handle [_ _] (refresh!))))
+    (.setOnAction manage
+                  (ui/event-handler _
+                    (governance/show! root (.getWindow (.getScene pane))
+                                      (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue :path (->> (str "/")))
+                                      (fn refresh-managed-files [] (refresh!) (changed!)) open! show!)))
     (.setOnAction import
                   (reify EventHandler
                     (handle [_ _]

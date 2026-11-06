@@ -33,9 +33,13 @@
             [editor.ai-project-browser :as project-browser]
             [editor.ai-pm :as pm]
             [editor.ai-project-work :as project-work]
+            [editor.ai-publication :as publication]
+            [editor.ai-replan :as replan]
             [editor.ai-resource-import :as resource-import]
             [editor.ai-result-compare :as result-compare]
             [editor.ai-results :as results]
+            [editor.ai-review :as review]
+            [editor.ai-review-view :as review-view]
             [editor.ai-roles :as roles]
             [editor.ai-tasks :as tasks]
             [editor.ai-workspace :as ai-workspace]
@@ -231,9 +235,10 @@
       (= :pm (:kind action))
       (assoc :pm-planning true :project-staff staff :workflow :document :template "ai-pm"
              :pm-current-tasks (coll/into-> (:nodes model) []
-                                 (filter #(and (= id (:source-pm %)) (not= "superseded" (:status %))))
+                                 (filter #(and (= id (:source-pm %)) (contains? #{"review" "allocated"} (:status %))))
                                  (map (fn managed-task [card]
-                                        (assoc (select-keys card [:id :title :stage :staff-id :prompt :deliverables :status :allocated-path :delivery-type])
+                                        (assoc (select-keys card (into pm/task-fields [:id :plan-task-id :status :allocated-path]))
+                                          :depends-on (graph/prerequisite-ids model (:id card))
                                           :work-status (project-work/task-status (:project-work state) (:id card))
                                           :acceptance (last (filterv #(and (= "task-acceptance" (:kind %)) (= (:id card) (:subject-id %)))
                                                                      (get-in state [:project-work :approvals])))))))))))
@@ -364,7 +369,7 @@
         source-system g/*the-system*
         paths (into (:paths output) (:source-paths output))
         _ (assert-import-resources-saved! project paths)
-        root (workspace/project-directory source-workspace)
+        root (or (:project-root output) (workspace/project-directory source-workspace))
         localization (g/node-value source-workspace :localization)
         config (shared-editor-settings/load-project-workspace-config root localization)]
     (binding [g/*the-system* (atom (system/make-system {:cache-size 10000 :cache-retain? project/cache-retain?}))]
@@ -431,7 +436,7 @@
                              nil
                              (catch Exception e (.getMessage e)))
         state (atom (tasks/recover (archive/archive-state-files! root {:project-id (:project-id saved)
-                                                                       :canvas (graph/stamp-legacy (results/migrate (canvas/separate-gui-candidates (canvas/migrate-gui-cards (if doc (document/model doc (:canvas saved)) (or (:canvas saved) (canvas/initial-canvas)))))) staff)
+                                                                       :canvas (replan/reconcile-model root (:path context) (graph/stamp-legacy (results/migrate (canvas/separate-gui-candidates (canvas/migrate-gui-cards (if doc (document/model doc (:canvas saved)) (or (:canvas saved) (canvas/initial-canvas)))))) staff) staff)
                                                                        :staff staff :project-root root :task-origin (:pm-origin doc) :project-work (project-work/read-work root)
                                                                        :sessions (or (:sessions saved) {"action-1" (select-keys saved [:thread-id :create-id :pending])})
                                                                        :address (:address saved) :closed false :connected false :context context :busy #{}})))
@@ -893,6 +898,41 @@
                   (swap! state assoc :staff (staff!))
                   (let [model (:canvas @state) card (canvas/node-by-id model id)]
                     (case op
+                      :refresh-pm-changes
+                      (do (swap! state assoc :project-work (project-work/read-work root)) (display!))
+                      (:apply-pm-change :reject-pm-change :ack-pm-change :stop-pm-change)
+                      (do
+                        (when (tasks/locked? @state) (throw (ex-info "请先等待当前规划结束" {})))
+                        (when (and doc (not= @document-state (document/read-document root (:path context))))
+                          (throw (ex-info "规划已被外部修改，请重新打开后审核" {})))
+                        (let [item (replan/change model id (:change-id fields))]
+                          (case op
+                            :stop-pm-change
+                            (let [jobs (replan/request-stop! root model item)
+                                  base (:address @state) secret (:secret @state)]
+                              (run-task! state
+                                         (fn stop-replanned-jobs []
+                                           (try
+                                             (when-not (:connected @state) (throw (ex-info "已暂停此任务的后续领取；请连接本机 Companion 后重试停止" {})))
+                                             (project-work/reconcile-native! root #(api client base secret (str "/api/thread?id=" (query-value %)) nil))
+                                             (doseq [job (:jobs (project-work/read-work root))
+                                                     :when (and (contains? (set (mapv :id jobs)) (:id job)) (contains? #{"running" "unknown"} (:status job)))]
+                                               (when-not (and (:thread-id job) (:turn-id job)) (throw (ex-info "执行身份尚不完整，请先到原工作核对真实任务状态" {})))
+                                               (api client base secret "/api/interrupt" {:threadId (:thread-id job) :turnId (:turn-id job)}))
+                                             (project-work/reconcile-native! root #(api client base secret (str "/api/thread?id=" (query-value %)) nil))
+                                             (show! "已发送停止请求；等待实际结束后刷新影响并核对产出")
+                                             (catch Exception e (problem! e))
+                                             (finally (swap! state assoc :project-work (project-work/read-work root)) (display!))))))
+                            :ack-pm-change (replan/acknowledge! root model item (:note fields))
+                            (:apply-pm-change :reject-pm-change)
+                            (let [next (if (= :apply-pm-change op)
+                                         (replan/apply! root (:path context) model id item (:staff @state) (:token fields))
+                                         (replan/reject! root model id item (:staff @state)))]
+                              (when doc (reset! document-state (document/save-document! root (:path context) @document-state next)))
+                              (swap! state assoc :canvas next :canvas-undo [] :canvas-redo [])
+                              ((:refresh! @browser-ui)))))
+                        (swap! state assoc :project-work (project-work/read-work root))
+                        (persist!) (display!))
                       :open-project-job
                       (when-let [job (coll/first-where #(= id (:id %)) (:jobs (project-work/read-work root)))]
                         (when-let [open! (:open! @browser-ui)] (open! {:path (project-work/resolve-canvas! root (:canvas-id job) (:canvas-path job))})))
@@ -914,6 +954,45 @@
                       :edit-import-rules
                       (let [path (resource-import/ensure-rules! root)]
                         (when-let [open! (:open! @browser-ui)] (open! {:path path})))
+                      :open-import-report
+                      (let [result (if (= :result (:kind card)) card (first (results/produced-cards model id)))
+                            plan (when result (resource-import/parse-plan (:text (results/candidate result))))
+                            path (or (get-in card [:production :publication-report])
+                                     (when plan (or (publication/matching-report-path root plan)
+                                                    (resource-import/inspect-plan! root plan))))]
+                        (when-not path (throw (ex-info "请先由负责人生成入库方案，再查看检查报告" {})))
+                        (when-let [open! (:open! @browser-ui)] (open! {:path path})))
+                      :open-staff
+                      (when-let [open! (:open! @browser-ui)] (open! {:staff-id (:staff-id card)}))
+                      :queue-rework
+                      (let [proposal (review/rework (project-work/read-work root) (:rework-id fields))]
+                        (when-not (and (= "allocated" (:status proposal)) (= id (:person-id proposal))
+                                       (= (:path context) (:canvas-path proposal)))
+                          (throw (ex-info "返修尚未人工确认或负责人不匹配" {})))
+                        (when-not (coll/any? #(= (:id proposal) (:task-id %)) (:jobs (project-work/read-work root)))
+                          (when-let [error (graph/node-error card (staff!))] (throw (ex-info error {})))
+                          (swap! state tasks/start id (tasks/action-ids model id))
+                          (let [prepared (project-work/prepare-queue! root @state id)]
+                            (swap! state project-work/bind-jobs prepared))))
+                      :adopt-reviewed
+                      (let [version (delivery/verify-artifact! root (:version fields))
+                            bundle (str (or (get-in @state [:context :canvas-id]) (:path context)) "/" id)]
+                        (when-not (and (= :result (:kind card)) (= bundle (:bundle-id version)))
+                          (throw (ex-info "方案版本不属于当前 Result" {})))
+                        (when (coll/not-empty (get-in @state [:result-drafts id]))
+                          (throw (ex-info "原 Result 有未保存修改，请先保存或取消后再采用审阅版本" {})))
+                        (work-command :confirm-result id {:review-version version}))
+                      :review-card
+                      (let [version (if-let [artifact-id (:artifact-id fields)]
+                                      (delivery/verify-artifact! root (delivery/artifact (project-work/read-work root) artifact-id))
+                                      (delivery/card-snapshot! root @state card (if (= :result (:kind card)) "proposal" "asset-bundle")))
+                            view (review-view/open! (.getWindow (.getScene parent)) root (:id version)
+                                                    {:adopt! (fn adopt-version [record] (work-command :adopt-reviewed id {:version record}))
+                                                     :markdown-opts {:project project
+                                                                     :base-resource (workspace/resolve-workspace-resource (project/workspace project) (:path context))
+                                                                     :on-open-resource (fn open-review-link [resource]
+                                                                                         (when-let [open! (:open! @browser-ui)] (open! {:path (resource/proj-path resource)})))}})]
+                        (swap! state assoc-in [:card-windows [:review (:id version)]] view))
                       :view-action-results
                       (let [proposals (results/produced-cards model id)
                             key [:action-results id]
@@ -947,7 +1026,8 @@
                                      (.getWindow (.getScene parent)) root
                                      (fn current-card []
                                        (or (canvas/node-by-id (:canvas @state) id) {:kind (:kind card) :title "卡片已删除"}))
-                                     {:save-body! (fn save-preview-body [expected text]
+                                     {:review! (fn review-card [] (work-command :review-card id nil))
+                                      :save-body! (fn save-preview-body [expected text]
                                                     (when (:closed @state) (throw (ex-info "画布已关闭，请重新打开后保存" {})))
                                                     (let [current (:text (results/candidate (canvas/node-by-id (:canvas @state) id)))
                                                           draft (get-in @state [:result-drafts id :text])]
@@ -977,7 +1057,11 @@
                           (swap! state assoc-in [:card-windows id] view)))
                       (:save-result :replace-result-image :add-result-files :remove-result-file :confirm-result)
                       (let [proposal (results/candidate card)
-                            edit-fields (merge (get-in @state [:result-drafts id]) (select-keys fields [:text]))
+                            review-version (:review-version fields)
+                            edit-fields (if review-version
+                                          {:text (:text review-version) :files (:files review-version)
+                                           :image-path nil :preview nil :local-path nil :content-revision (:revision review-version)}
+                                          (merge (get-in @state [:result-drafts id]) (select-keys fields [:text])))
                             edit-fields
                             (case op
                               (:replace-result-image :add-result-files)
@@ -1008,8 +1092,9 @@
                             _ (when (and (= :confirm-result op) (import-workflow/handles? model id))
                                 (import-workflow/validate-confirmation! root edited-card))
                             frozen (when (= :confirm-result op)
-                                     (delivery/card-snapshot! root preflight edited-card
-                                                              (if (import-workflow/handles? model id) "integration-plan" "proposal")))
+                                     (if review-version (delivery/verify-artifact! root review-version)
+                                         (delivery/card-snapshot! root preflight edited-card
+                                                                  (if (import-workflow/handles? model id) "integration-plan" "proposal"))))
                             preflight (if frozen (results/bind-content-version preflight id (:revision frozen)) preflight)
                             edited-card (canvas/node-by-id (:canvas preflight) id)
                             _ (when frozen (results/confirm-state preflight id))
@@ -1161,8 +1246,7 @@
                                       :when (contains? #{"queued" "blocked"} (:status job))]
                                 (project-work/admission-state! root job-id error))
                             data (project-work/read-work root)
-                            action-id (coll/first-where (fn ready-job [action-id]
-                                                          (= "queued" (:status (coll/first-where #(= (get-in prepared [:sessions action-id :project-job-id]) (:id %)) (:jobs data))))) remaining)
+                            action-id (project-work/next-ready-action data prepared id)
                             job-id (get-in prepared [:sessions action-id :project-job-id])]
                         (when (and job-id (project-work/claim! root job-id))
                           (let [claimed (swap! state tasks/claim-id id action-id)
@@ -1294,6 +1378,8 @@
     (.add (.getChildren parent) pane)
     (ui/user-data! parent ::state state) (ui/user-data! parent ::canvas @canvas-ui)
     (when tab (ui/user-data! tab ::inspect-card! (fn inspect-overview-card [id] (work! :inspect-card id nil))))
+    (when tab (ui/user-data! tab ::review-card! (fn review-overview-card [id artifact-id] (work! :review-card id {:artifact-id artifact-id}))))
+    (when tab (ui/user-data! tab ::queue-rework! (fn queue-reviewed-work [id rework-id] (work! :queue-rework id {:rework-id rework-id}))))
     (when tab (ui/user-data! tab ::select-card! select!))
     (when tab (ui/user-data! tab ::show-conversation!
                              (fn show-card-conversation []
@@ -1502,5 +1588,9 @@
                                  (when (:conversation context)
                                    ((ui/user-data tab ::show-conversation!)))
                                  (when (:inspect-card context)
-                                   (when-let [inspect! (ui/user-data tab ::inspect-card!)] (inspect! id)))))
+                                   (when-let [inspect! (ui/user-data tab ::inspect-card!)] (inspect! id)))
+                                 (when-let [artifact-id (:review-artifact context)]
+                                   (when-let [review! (ui/user-data tab ::review-card!)] (review! id artifact-id)))
+                                 (when-let [rework-id (:queue-rework context)]
+                                   (when-let [queue! (ui/user-data tab ::queue-rework!)] (queue! id rework-id)))))
                              ((:render! canvas-ui))))))))

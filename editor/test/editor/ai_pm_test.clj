@@ -153,13 +153,13 @@
         replanned (pm/accept-plan allocated "pm" "t2" text staff)]
     (doseq [[key value] [[:directory "/../escape"] [:directory "/ai-workspace/library/06-interface/../config"]
                          [:directory "/game"] [:staff-id "missing"] [:depends-on ["absent"]] [:template "ai-pm"]]]
-      (is (thrown? Exception (pm/parse-plan (render (assoc-in plan [:stages 0 :tasks 0 key] value)) staff))))
-    (is (thrown? Exception (pm/parse-plan (render (assoc-in plan [:stages 0 :tasks 0 :depends-on] ["art"])) staff)))
-    (is (thrown? Exception (pm/parse-plan (render (assoc-in plan [:stages 0 :tasks 1 :id] "design")) staff)))
+      (is (thrown? Exception (pm/parse-plan (render (assoc-in plan [:stages 0 :tasks 0 key] value)) staff #{}))))
+    (is (thrown? Exception (pm/parse-plan (render (assoc-in plan [:stages 0 :tasks 0 :depends-on] ["art"])) staff #{})))
+    (is (thrown? Exception (pm/parse-plan (render (assoc-in plan [:stages 0 :tasks 1 :id] "design")) staff #{})))
     (is (thrown? Exception (pm/edit-task planned (:id a) {:depends-on [(:id b)]} staff)))
     (is (= "allocated" (:status (graph/node replanned (:id a)))))
-    (is (= "superseded" (:status (graph/node replanned (:id b)))))
-    (is (thrown? Exception (pm/allocate! root "/pm.aicanvas" replanned (:id b) staff)))
+    (is (= "review" (:status (graph/node replanned (:id b)))))
+    (is (= "allocated" (:status (graph/node (pm/allocate! root "/pm.aicanvas" replanned (:id b) staff) (:id b)))))
     (is (thrown? Exception (canvas/disconnect-edge planned (first (:edges planned)))))
     (is (string? (graph/task-error (canvas/update-node planned "pm" #(assoc % :prompt "新目标")) staff (:id a))))))
 

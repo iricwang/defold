@@ -105,14 +105,14 @@
   (let [{:keys [root plan]} (fixture)
         target (craft-project/resource-file root (:target (first (:files plan))))]
     (is (thrown-with-msg? Exception #"人工修改"
-                          (admission/apply! root plan (fn concurrent-edit [_] (spit target "human edit") (throw (ex-info "compile failed" {}))))))
+                          (admission/apply! root plan (fn concurrent-edit [_] (io/make-parents target) (spit target "human edit") (throw (ex-info "compile failed" {}))))))
     (is (= "human edit" (slurp target)))))
 
 ;; A compiler success cannot hide edits made while validation was running.
 (deftest post-validation-guard-test
   (let [{:keys [root plan]} (fixture)
         target (craft-project/resource-file root (:target (first (:files plan))))]
-    (is (thrown? Exception (admission/apply! root plan (fn modify-during-validation [output] (spit target "human edit") (passed output)))))
+    (is (thrown? Exception (admission/apply! root plan (fn modify-during-validation [output] (io/make-parents target) (spit target "human edit") (passed output)))))
     (is (= "human edit" (slurp target)))))
 
 ;; Portable rule edits reject traversal and stale saves without changing disk.

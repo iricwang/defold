@@ -71,6 +71,8 @@
           (text! root (if (:inputs-fixed job) "本次执行已锁定输入，修改只应用于下一次执行。" (:block-reason job)))))
       :assets
       (do
+        (when (get-in card [:production :publication-report])
+          (command! root "查看发布检查报告" "delivery-publication-report" #(work! :open-import-report id nil) false))
         (text! root "资产版本审批")
         (if-let [record (delivery/artifact data (:artifact-id card))]
           (do

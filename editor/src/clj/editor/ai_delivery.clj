@@ -18,6 +18,7 @@
             [clojure.string :as string]
             [editor.ai-archive :as archive]
             [editor.ai-project-work :as work]
+            [editor.ai-publication :as publication]
             [editor.craft-project :as craft]
             [util.coll :as coll]
             [util.digest :as digest])
@@ -68,16 +69,20 @@
       (throw (ex-info "批准版本的归档文件缺失或被修改，已禁止执行" {:artifact-id (:id record) :path (:path file)}))))
   record)
 
-(defn snapshot! [root record]
+(defn freeze-artifact! [root record]
   (let [files (vec (sort-by (juxt :source-path :sha256) (coll/into-> (:files record) [] (map #(freeze-file! root %)) (distinct))))
         manifest [(:kind record) (:text record) files (into (sorted-map) (:entrypoints record))]
         hash (fingerprint manifest)
         id (str "artifact_" (fingerprint [(:bundle-id record) hash]))
-        frozen (merge record {:id id :revision hash :manifest-hash hash :files files :created-at (now)})
-        _ (when (and (string/blank? (:text frozen)) (not (coll/not-empty files)))
-            (throw (ex-info "没有可批准的成果内容" {})))
+        frozen (merge record {:id id :revision hash :manifest-hash hash :files files :created-at (now)})]
+    (when (and (string/blank? (:text frozen)) (not (coll/not-empty files)))
+      (throw (ex-info "没有可批准的成果内容" {})))
+    frozen))
+
+(defn snapshot! [root record]
+  (let [frozen (freeze-artifact! root record)
         data (work/transact! root #(append-record % :artifacts frozen))]
-    (artifact data id)))
+    (artifact data (:id frozen))))
 
 (defn approved? [data id]
   (let [record (artifact data id)]
@@ -97,7 +102,7 @@
         production (:production card)
         files (into (vec (or (:files candidate) (:assets card)))
                     (mapv #(hash-map :path %) (into (vec (:paths production))
-                                                    (filterv string? [(:document-output card) (:manifest production) (:gui production) (:atlas production)]))))
+                                                    (filterv string? [(:document-output card) (:manifest production) (:gui production) (:atlas production) (:publication-report production)]))))
         files (filterv #(or (:local-path %) (:source %) (:path %) (:preview %)) files)
         files (mapv #(cond-> % (and (:local-path candidate) (= (:path %) (:image-path candidate))) (assoc :local-path (:local-path candidate))) files)
         files (cond-> files (and (:image-path candidate) (coll/not-any? #(= (:path %) (:image-path candidate)) files))
@@ -140,6 +145,9 @@
         (assoc :unapproved-input (coll/any? #(nil? (:artifact-id %)) edges)))))
 
 (defn admission [data task-id action job]
+  (let [spec (task data task-id)]
+    (when (or (:planning-hold spec) (contains? #{"cancelled" "superseded" "pending-change"} (:scope-status spec)))
+      (throw (ex-info "任务正在重规划或已退出当前范围，不能执行" {}))))
   (when (:unapproved-input action) (throw (ex-info "输入 Assets 尚未批准，请批准资产版本后重新确认连线" {})))
   (if (:inputs-fixed job)
     {:artifacts (:input-snapshot job) :dependencies (:dependency-snapshot job)}
@@ -205,6 +213,8 @@
                  :plan-artifact-id (:approved-plan-id card) :plan-approval-id (:id plan-approval)
                  :job-id (:job-id record) :import-id (:import-id output) :created-at (now)
                  :build-id (:build-id validation) :engine-sha1 (:engine-sha1 validation)
+                 :publication-report (:publication-report output) :publication-attempt-id (:publication-report-id output)
+                 :baseline-hash (:baseline-hash validation) :final-baseline-hash (:final-baseline-hash validation)
                  :files (mapv #(select-keys % [:source-path :sha256]) (:files record))
                  :validation validation
                  :checks (if (and (= "passed" (:status validation)) (:build-id validation))
@@ -214,6 +224,9 @@
 
 (defn- verify-delivery! [root receipt]
   (when-not (and receipt (:build-id receipt)) (throw (ex-info "缺少可追溯的工程构建记录，请重新执行资源入库" {})))
+  (when-let [expected (get-in receipt [:validation :environment-files])]
+    (when-not (= expected (publication/environment-files (publication/inventory root)))
+      (throw (ex-info "工程配置或依赖缓存已变化，请重新构建并提交验收" {}))))
   (doseq [file (into (:files receipt) (get-in receipt [:validation :source-files]))]
     (let [path (or (:source-path file) (:path file))]
       (when-not (= (str "sha256:" (:sha256 file)) (craft/file-hash root path))
@@ -246,6 +259,8 @@
         records (mapv #(artifact data %) artifact-ids)
         receipt (delivery data delivery-id)]
     (when-not spec (throw (ex-info "任务没有登记到台账" {})))
+    (when (or (:planning-hold spec) (contains? #{"cancelled" "superseded" "pending-change"} (:scope-status spec)))
+      (throw (ex-info "任务处于重规划或已退出当前范围，不能修改验收决定" {})))
     (when (string/blank? notes) (throw (ex-info "请填写验收或退回说明" {})))
     (when (= "accepted" decision)
       (when-not (and (coll/not-empty jobs) (coll/every? #(contains? #{"completed" "cancelled"} (:status %)) jobs)

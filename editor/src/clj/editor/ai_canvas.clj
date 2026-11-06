@@ -19,11 +19,13 @@
             [clojure.string :as string]
             [editor.ai-delivery-view :as delivery-view]
             [editor.ai-graph :as graph]
+            [editor.ai-groups :as groups]
             [editor.ai-pm-view :as pm-view]
             [editor.ai-project-work :as project-work]
             [editor.ai-resource-import :as resource-import]
             [editor.ai-results :as results]
             [editor.ai-roles :as roles]
+            [editor.ai-studio :as studio]
             [editor.ai-tasks :as tasks]
             [editor.ai-toast :as toast]
             [editor.file-reveal :as file-reveal]
@@ -443,14 +445,14 @@
 
 (defn- button
   ^Button [text id action]
-  (doto (Button. text)
+  (doto (studio/decorate-navigation! (Button. text))
     (.setId id)
     (-> .getStyleClass (.add "button-small"))
     (-> .getStyleClass (.add "ai-command"))
     (.setOnAction (reify EventHandler (handle [_ _] (action))))))
 
 (def ^:private detail-button-style
-  "-fx-background-color: #303030; -fx-border-color: #181818; -fx-border-width: 1; -fx-background-radius: 3; -fx-border-radius: 3; -fx-text-fill: #c8c8c8; -fx-min-width: 0; -fx-padding: 5 12;")
+  "-fx-background-color: #2c303a; -fx-border-color: #3a404c; -fx-border-width: 1; -fx-background-radius: 7; -fx-border-radius: 7; -fx-text-fill: #e6eaf2; -fx-min-width: 0; -fx-padding: 5 12;")
 
 (defn style-detail-buttons!
   "Inline the fork button colours on detail actions: theme lookups do not reach
@@ -490,11 +492,12 @@
         size (:size file)
         metadata (doto (Label. (if (number? size)
                                  (if (>= size 1048576) (format "%.1f MB" (/ (double size) 1048576)) (format "%.0f KB" (/ (double size) 1024)))
-                                 (if open! "↗" "")))
+                                 ""))
                    (-> .getStyleClass (.add "ai-muted")))
         icon (roles/make-icon "document")]
     (HBox/setHgrow title Priority/ALWAYS)
     (.addAll (.getChildren row) ^java.util.Collection (identity [icon title metadata]))
+    (when open! (.add (.getChildren row) (studio/compact-icon :open)))
     (file-reveal/install! row project-root (constantly file) report!)
     (if-not open!
       (doto row (-> .getStyleClass (.add "ai-resource-row")))
@@ -578,7 +581,7 @@
    (get-in state [:canvas :role-types])
    (coll/into-> (:sessions state) {} (map (fn [[id session]] [id (:attachments session)])))
    (get-in state [:context :path])
-   (:role-search state)
+   (:role-search state) (:group-mode state) (:folded-groups state)
    (mapv #(select-keys % [:queue :execution]) (coll/vals (:sessions state)))])
 
 (defn- empty-card [icon text]
@@ -592,10 +595,11 @@
   "The details pane can be mounted in a detached dock scene that never inherits
   the tab's parent stylesheet, so make the canvas cascade reach that scene too."
   [^javafx.scene.Parent root]
+  (.add (.getStyleClass root) "ai-studio")
   (let [url (some-> (io/resource "ai-canvas.css") str)]
     (when (and url (not (string/blank? url)))
       (letfn [(attach [^javafx.scene.Scene scene]
-                (when (and scene (not (some #(= url %) (.getStylesheets scene))))
+                (when (and scene (coll/not-any? #(= url %) (.getStylesheets scene)))
                   (.add (.getStylesheets scene) url)
                   (when-let [scene-root (.getRoot scene)]
                     (.applyCss scene-root))))]
@@ -700,7 +704,8 @@
                                (text! section (if edge (str "输入：" (:title (node-by-id (:canvas s) (:from edge)))) "从 Assets 输出接点拖入，绑定待入库素材"))
                                (file-text! section resource-import/rules-path)
                                (.add (.getChildren ^VBox section) (button "编辑入库规则" "action-import-rules" #(work! :edit-import-rules (:id card) nil)))
-                               (text! section "先生成入库方案；人工确认后再排队写入正式目录、更新图集和 GUI 引用，并执行引擎编译。")))
+                               (.add (.getChildren ^VBox section) (button "查看入库检查报告" "action-import-report" #(work! :open-import-report (:id card) nil)))
+                               (text! section "先生成方案并人工确认，再由负责人排队检查。隔离候选工程编译通过、基线复核无变化后才写入正式目录；失败可查看检查报告。")))
                            (let [section ^VBox (section! "执行状态")
                                  status (tasks/status s (:id card))]
                              (text! section (get tasks/status-labels status))
@@ -821,7 +826,8 @@
 
 (defn- display-model [state]
   (let [model (:canvas state)]
-    (if (= :roles (:workflow model)) (roles/visible-model model (:role-search state)) model)))
+    (if (= :roles (:workflow model)) (roles/visible-model model (:role-search state))
+        (groups/visible-model model (or (:group-mode state) :staff) (:folded-groups state)))))
 
 (defn make-canvas [state change! select! focus! report! produce! open-output! gui! attach! staff! assign! work!]
   (let [root (BorderPane.) viewport (Pane.) world (Group.) grid (Canvas.) grid-paint (Rectangle.) links (Group.) cards (Group.) role-rows (Group.)
@@ -931,7 +937,7 @@
                       (.setDisable redo (or (tasks/locked? @state) (not (coll/not-empty (:canvas-redo @state)))))
                       (.clear (.getChildren links))
                       (let [canvas (:canvas @state)]
-                        (doseq [{:keys [from to] :as edge} (:edges canvas)]
+                        (doseq [{:keys [from to] :as edge} (:edges (display-model @state))]
                           (let [a (node-by-id canvas from) b (node-by-id canvas to)
                                 error (graph/edge-error canvas (:staff @state) edge)
                                 x1 (+ (:x a) 268.0) y1 (+ (:y a) 225.0) x2 (:x b) y2 (+ (:y b) 225.0)
@@ -972,7 +978,7 @@
                                (.getVvalue ^ScrollPane (.get (.getChildren old-card) 1))))
                       (.clear (.getChildren cards))
                       (.clear (.getChildren role-rows))
-                      (let [canvas (display-model @state)]
+                      (let [canvas (:canvas @state)]
                         (when (= :roles (:workflow canvas))
                           (doseq [{:keys [id title color x y] :as row} (roles/rows canvas)]
                             (let [heading (roles/make-row-heading row)
@@ -990,7 +996,7 @@
                                         (.setStyle (str "-ai-accent: " color ";"))
                                         (-> .getStyleClass (.add "ai-role-add")))]
                               (.addAll (.getChildren role-rows) ^java.util.Collection (identity [separator heading add])))))
-                        (doseq [{:keys [id kind title x y assets] :as model} (:nodes canvas)]
+                        (doseq [{:keys [id kind title x y assets] :as model} (:nodes (display-model @state))]
                           (let [selected (= id (:selected canvas)) color (if (= :role kind) (:color (roles/role-type model)) (colors kind))
                                 blocked (when-not (= :role kind) (graph/execution-error canvas (:staff @state) id))
                                 card (VBox. 10.0) header (HBox. 8.0)
@@ -999,7 +1005,8 @@
                                 spacer (Region.)
                                 more (Button. "···")
                                 menu (ContextMenu.)
-                                discuss (doto (MenuItem. (cond (= :action kind) "查看任务与对话"
+                                discuss (doto (MenuItem. (cond (= :person kind) "打开职员工作页"
+                                                               (= :action kind) "查看任务与对话"
                                                                (contains? #{:result :assets} kind) "在新窗口查看详情"
                                                                :else "查看卡片详情"))
                                           (.setId (str "canvas-inspect-" id)))
@@ -1039,6 +1046,8 @@
                             (doseq [port [port-in port-out]]
                               (.setOnMouseClicked ^Button port (reify EventHandler (handle [_ e] (.consume ^MouseEvent e)))))
                             (.setId card (str "canvas-card-" id))
+                            (when-let [n (:folded-count model)]
+                              (.setText kind-label (str (.getText kind-label) " · 收纳 " n " 项")))
                             (.setUserData card id)
                             (.add (.getStyleClass card) "ai-card")
                             (.add (.getStyleClass card) (str "ai-" (name kind)))
@@ -1061,7 +1070,8 @@
                             (.setId delete (str "canvas-delete-" id))
                             (.setDisable delete (boolean (and (= :role kind) (:builtin model))))
                             (.addAll (.getItems menu) ^java.util.Collection
-                                     (identity (cond (contains? #{:role :person} kind) [delete]
+                                     (identity (cond (= :person kind) [discuss delete]
+                                                     (= :role kind) [delete]
                                                      (= :action kind) [view-results discuss delete]
                                                      (= :assets kind) [discuss import-item delete]
                                                      :else [discuss delete])))
@@ -1088,6 +1098,7 @@
                                                     (handle [_ _]
                                                       (select! id)
                                                       (cond
+                                                        (= :person kind) (work! :open-staff id nil)
                                                         (contains? #{:action :pm} kind) (focus!)
                                                         (contains? #{:result :assets} kind) (work! :inspect-card id nil)))))
                             (HBox/setHgrow spacer Priority/ALWAYS)
@@ -1317,7 +1328,7 @@
               (history! (if (or (.isShiftDown e) (= KeyCode/Y (.getCode e))) :redo :undo))
               (.consume e))))))
     (.setId viewport "ai-canvas-viewport")
-    (.setStyle viewport "-fx-background-color: -df-background;")
+    (.add (.getStyleClass root) "ai-studio")
     (.setMinSize viewport 240.0 220.0)
     (.bind (.widthProperty clip) (.widthProperty viewport))
     (.bind (.heightProperty clip) (.heightProperty viewport))
@@ -1423,6 +1434,24 @@
                                                 (.setVisible (not= :roles (get-in @state [:canvas :workflow])))
                                                 (.setManaged (not= :roles (get-in @state [:canvas :workflow]))))
                                               (doto (Region.) (HBox/setHgrow Priority/ALWAYS))]))
+    (when-not (= :roles (get-in @state [:canvas :workflow]))
+      (let [menu (doto (MenuButton. "任务分组") (.setId "canvas-task-groups"))]
+        (.setOnShowing menu
+                       (ui/event-handler _
+                         (.clear (.getItems menu))
+                         (doseq [[mode title] [[:staff "按负责人"] [:stage "按阶段"] [:task "按任务"]]]
+                           (.add (.getItems menu)
+                                 (doto (MenuItem. title)
+                                   (.setOnAction (ui/event-handler _ (swap! state assoc :group-mode mode :folded-groups #{}) (render!) (fit!))))))
+                         (.add (.getItems menu) (doto (MenuItem. "全部展开")
+                                                  (.setOnAction (ui/event-handler _ (swap! state assoc :folded-groups #{}) (render!) (fit!)))))
+                         (doseq [{:keys [id title members]} (groups/groups (:canvas @state) (or (:group-mode @state) :staff))]
+                           (.add (.getItems menu)
+                                 (doto (MenuItem. (str (if (contains? (:folded-groups @state) id) "展开 · " "收纳 · ") title "（" (count members) "）"))
+                                   (.setOnAction (ui/event-handler _
+                                                   (swap! state update :folded-groups (fn toggle-group [ids] (if (contains? ids id) (disj ids id) (conj (or ids #{}) id))))
+                                                   (render!) (fit!))))))))
+        (.add (.getChildren toolbar) menu)))
     (when (= :roles (get-in @state [:canvas :workflow]))
       (let [search (doto (TextField.) (.setId "ai-role-search") (.setPromptText "搜索职能或人员…") (.setPrefWidth 180.0) (.setMinWidth 110.0))
             add (doto (MenuButton. "+ 添加职员") (.setId "ai-role-add-menu"))]
@@ -1455,5 +1484,6 @@
     (.addAll (.getChildren surface) ^java.util.Collection (identity [viewport dock (:root notifications)]))
     (.setTop root toolbar) (.setCenter root surface)
     (render!)
-    {:root root :toolbar toolbar :dock dock :render! render! :fit! fit! :focus-node! focus-node!
+    {:root root :toolbar toolbar :dock dock :render! render! :fit! fit!
+     :focus-node! (fn focus-grouped-node [id] (swap! state assoc :folded-groups #{}) (render!) (focus-node! id))
      :show-toast! (:show! notifications) :resolve-toast! (:resolve! notifications) :dispose! (:dispose! notifications)}))

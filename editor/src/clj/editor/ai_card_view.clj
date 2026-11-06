@@ -18,6 +18,7 @@
             [clojure.string :as string]
             [editor.ai-project-browser :as project-browser]
             [editor.ai-results :as results]
+            [editor.ai-review :as review]
             [editor.ai-toast :as toast]
             [editor.ai-workspace :as ai-workspace]
             [editor.file-reveal :as file-reveal]
@@ -53,6 +54,8 @@
 
 (defn save-markdown! [root file expected text]
   (let [file (local-file root [(.getPath ^java.io.File file)])]
+    (when (and file (review/protected-file? root file))
+      (throw (ex-info "固定成果不能直接修改，请基于此版本创建工作副本" {})))
     (when-not (and file (re-find #"(?i)\.(md|markdown)$" (.getName ^java.io.File file)))
       (throw (ex-info "只能保存项目内的 Markdown 文件" {})))
     (when (> (alength (.getBytes ^String text "UTF-8")) (* 8 1024 1024))
@@ -109,6 +112,7 @@
         edit (doto (Button.) (.setId "ai-card-resource-edit"))
         save (doto (Button.) (.setId "ai-card-resource-save"))
         cancel (doto (Button.) (.setId "ai-card-resource-cancel"))
+        review-button (doto (Button. "版本与审阅") (.setId "ai-card-review") (.setVisible (boolean (:review! opts))) (.setManaged (boolean (:review! opts))))
         editing (atom nil)
         editable? (fn editable-entry? [entry]
                     (or (and (:file entry) (re-find #"(?i)\.(md|markdown)$" (.getName ^java.io.File (:file entry)))
@@ -218,12 +222,15 @@
                       (when item (let [entry (.getValue ^TreeItem item)] (when-not (:directory entry) (show-entry! entry)))))))
     (.setOnAction edit (ui/event-handler _
                          (try
-                           (when (editable? @current)
-                             (if @editing
-                               (swap! editing update :source not)
-                               (let [entry @current text (if-let [file (:file entry)] (slurp file :encoding "UTF-8") (:text entry))]
-                                 (reset! editing {:entry entry :base text :text text :source true})))
-                             (show-entry! @current))
+                           (if (and (:file @current) (review/protected-file? root (:file @current)))
+                             (if-let [review! (:review! opts)] (review!)
+                                     (throw (ex-info "固定成果只能通过版本与审阅创建工作副本" {})))
+                             (when (editable? @current)
+                               (if @editing
+                                 (swap! editing update :source not)
+                                 (let [entry @current text (if-let [file (:file entry)] (slurp file :encoding "UTF-8") (:text entry))]
+                                   (reset! editing {:entry entry :base text :text text :source true})))
+                               (show-entry! @current)))
                            (catch Exception e
                              ((:show! notifications) {:id :preview :level :error :text (.getMessage e)})))))
     (.setOnAction save (ui/event-handler _ (save!)))
@@ -241,6 +248,7 @@
     (file-reveal/install-tree! tree root (fn selected-resource-file [] (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue :file))
                                (fn report-reveal [message] ((:show! notifications) {:level :warning :text message})))
     (.setOnAction refresh (ui/event-handler _ (refresh!)))
+    (.setOnAction review-button (ui/event-handler _ (when-let [review! (:review! opts)] (review!))))
     (.setOnAction open (ui/event-handler _
                          (when-let [file (:file @current)]
                            (try ((:open-file! opts) file)
@@ -257,7 +265,7 @@
       (.add (.getStyleClass button) "ai-icon-button"))
     (.setAlignment bar Pos/CENTER_LEFT)
     (.setStyle bar "-fx-padding: 8 12;")
-    (.addAll (.getChildren bar) ^java.util.Collection (identity [heading edit save cancel open refresh]))
+    (.addAll (.getChildren bar) ^java.util.Collection (identity [heading review-button edit save cancel open refresh]))
     (.setTop right bar) (.setCenter right content)
     (.addAll (.getItems split) ^java.util.Collection (identity [browser right]))
     (SplitPane/setResizableWithParent browser false) (.setDividerPositions split (double-array [0.23]))

@@ -21,7 +21,9 @@
             [editor.ai-project-browser :as project-browser]
             [editor.ai-resource-import :as resource-import]
             [editor.ai-roles :as roles]
+            [editor.ai-studio :as studio]
             [editor.ai-toast :as toast]
+            [editor.ai-work-views :as work-views]
             [editor.craft-project :as craft-project]
             [editor.file-reveal :as file-reveal]
             [editor.fxui :as fxui]
@@ -46,6 +48,7 @@
 (defonce ^:private live-stylesheet (atom nil))
 
 (defn apply-styles! [^Parent parent]
+  (when-not (.contains (.getStyleClass parent) "ai-studio") (.add (.getStyleClass parent) "ai-studio"))
   (let [styles (.getStylesheets parent)
         url (or @live-stylesheet (str (io/resource "ai-canvas.css")))
         retained (filterv #(not (re-find #"(?:^|/)ai-canvas\.css(?:\?.*)?$" %)) styles)]
@@ -67,9 +70,12 @@
       (.applyCss (.getRoot scene)))))
 
 (defn document-key [root context]
-  (if (document/document-path? (:path context))
+  (cond
+    (:staff-id context) [:staff (:staff-id context)]
+    (:task-id context) [:task (:task-id context)]
+    (document/document-path? (:path context))
     (:id (document/read-document root (:path context)))
-    (:path context)))
+    :else (:path context)))
 
 (defn close-tabs! [^TabPane tabs ^Tab target mode]
   ;; A popup can outlive its tab. Never let a stale target close sibling views.
@@ -339,6 +345,92 @@
     (when (identical? overview-tab (.getSelectedItem (.getSelectionModel tabs)))
       (select-home!))))
 
+(defn- make-studio-shell! [root browser overview ^TabPane tabs overview-tab open!]
+  (let [sidebar ^VBox (:root browser)
+        tree ^TreeView (.lookup sidebar "#ai-project-tree")
+        nav (VBox. 4.0)
+        content (VBox.)
+        top (HBox. 14.0)
+        links (HBox. 12.0)
+        search (doto (javafx.scene.control.TextField.) (.setId "studio-search") (.setPromptText "搜索任务、成果、成员…") (.setPrefWidth 340.0))
+        title (doto (Label. (str "项目    /    " (studio/project-name root))) (.setGraphic (studio/icon :flame)) (.setGraphicTextGap 12.0) (-> .getStyleClass (.add "studio-breadcrumb")))
+        search-box (doto (HBox. 8.0) (.setAlignment Pos/CENTER_LEFT) (-> .getStyleClass (.add "studio-search-box")))
+        member-button (studio/button "" "studio-members" :people #(open! {:overview true :preserve true :section "staff"}))
+        notification-button (studio/button "" "studio-notifications" :bell #(open! {:overview true :preserve true :section "reviews"}))
+        badge (doto (javafx.scene.shape.Circle. 3.5) (.setMouseTransparent true) (-> .getStyleClass (.add "studio-notification-dot")))
+        notification (StackPane.)
+        watch-key (Object.)
+        gap (javafx.scene.layout.Region.)
+        buttons (atom [])
+        select! (fn select-section [section]
+                  (ui/visible! tree (= "resources" section))
+                  (if (= "settings" section)
+                    (open! {:path roles/document-path})
+                    (open! {:overview true :preserve true :section section})))
+        home (studio/button "项目总览" "ai-project-home" :home #(do ((:reset! overview)) (select! "overview")))
+        sync! (fn sync-navigation []
+                (let [home-selected (identical? overview-tab (.getSelectedItem (.getSelectionModel ^TabPane tabs)))
+                      section (.getValue ^javafx.beans.property.SimpleStringProperty (:section overview))]
+                  (.pseudoClassStateChanged tabs (PseudoClass/getPseudoClass "studio-home") home-selected)
+                  (doseq [[^Button button target] @buttons]
+                    (.pseudoClassStateChanged button (PseudoClass/getPseudoClass "selected") (and home-selected (= section target))))))]
+    (.add (.getStyleClass sidebar) "studio-sidebar")
+    (.setMinWidth sidebar 238.0) (.setPrefWidth sidebar 238.0) (.setMaxWidth sidebar 238.0)
+    (.clear (.getChildren sidebar))
+    (.setId nav "studio-navigation")
+    (doseq [[text target kind] [["项目总览" "overview" :home] ["任务" "tasks" :tasks] ["阶段" "stages" :stages] ["成果" "outputs" :assets] ["成员" "staff" :people] ["资源" "resources" :resources] ["配置" "settings" :settings]]]
+      (let [button (if (= target "overview") home (studio/button text (str "studio-nav-" target) kind #(select! target)))]
+        (.setMaxWidth button Double/MAX_VALUE)
+        (swap! buttons conj [button target])
+        (.add (.getChildren nav) button)
+        (when (= target "resources")
+          (.add (.getChildren nav) tree))))
+    (.bind (.managedProperty tree) (.visibleProperty tree))
+    (ui/visible! tree false)
+    (.setMinHeight tree 0.0)
+    (.bind (.prefHeightProperty tree) (.add (.multiply (.expandedItemCountProperty tree) 30.0) 4.0))
+    (.setMaxHeight tree javafx.scene.layout.Region/USE_PREF_SIZE)
+    (VBox/setMargin tree (Insets. 0.0 0.0 4.0 18.0))
+    (VBox/setVgrow tree Priority/ALWAYS)
+    (.setMinHeight nav 0.0)
+    (VBox/setVgrow nav Priority/ALWAYS)
+    (.addAll (.getChildren sidebar) ^java.util.Collection (identity [(studio/brand) nav]))
+    (.bindBidirectional (.textProperty search) (.textProperty ^javafx.scene.control.TextField (:search overview)))
+    (.setVisible ^javafx.scene.control.TextField (:search overview) false)
+    (.setManaged ^javafx.scene.control.TextField (:search overview) false)
+    (.addListener (.textProperty search) (reify ChangeListener (changed [_ _ _ _] (.select (.getSelectionModel ^TabPane tabs) overview-tab))))
+    (.setAlignment top Pos/CENTER_LEFT)
+    (.add (.getStyleClass top) "studio-topbar")
+    (HBox/setHgrow gap Priority/ALWAYS)
+    (.addAll (.getChildren search-box) ^java.util.Collection (identity [(studio/icon :search) search]))
+    (HBox/setHgrow search Priority/ALWAYS)
+    (.addAll (.getChildren notification) ^java.util.Collection (identity [notification-button badge]))
+    (StackPane/setAlignment badge Pos/TOP_RIGHT)
+    (StackPane/setMargin badge (Insets. 3.0 3.0 0.0 0.0))
+    (ui/visible! badge false)
+    (add-watch (:snapshot overview) watch-key (fn update-studio-header [_ _ _ model] (ui/visible! badge (pos? (count (:reviews model))))))
+    (.setGraphic member-button (overview-view/portrait {:id "studio-team" :role-type "planning"}))
+    (.setTooltip member-button (Tooltip. "查看项目成员"))
+    (.setTooltip notification-button (Tooltip. "待我处理"))
+    (.setAccessibleText member-button "查看项目成员")
+    (.setAccessibleText notification-button "待我处理")
+    (.addAll (.getChildren top) ^java.util.Collection (identity [title gap search-box notification member-button]))
+    (.add (.getStyleClass links) "studio-top-tabs")
+    (doseq [[text target] [["概览" "overview"] ["任务" "tasks"] ["列表" "list"] ["成果" "outputs"] ["资源" "resources"] ["设置" "settings"]]]
+      (let [button (doto (Button. text) (.setId (str "studio-tab-" target))
+                         (-> .getStyleClass (.add "studio-top-tab"))
+                         (.setOnAction (ui/event-handler _ (select! target))))]
+        (swap! buttons conj [button target])
+        (.add (.getChildren links) button)))
+    (.addListener (.selectedItemProperty (.getSelectionModel ^TabPane tabs)) (reify ChangeListener (changed [_ _ _ _] (sync!))))
+    (.addListener ^javafx.beans.value.ObservableValue (:section overview) (reify ChangeListener (changed [_ _ _ _] (sync!))))
+    (.addAll (.getChildren content) ^java.util.Collection (identity [top links tabs]))
+    (.setMinWidth content 0.0)
+    (VBox/setVgrow tabs Priority/ALWAYS)
+    (configure-sidebar-selection! home tree tabs overview-tab)
+    (sync!)
+    {:root content :close! (fn close-studio-shell [] (remove-watch (:snapshot overview) watch-key))}))
+
 (defn make-view! [^AnchorPane parent root initial-context resource-types make-content!]
   (let [tabs (doto (TabPane.) (.setId "ai-document-tabs") (.setTabClosingPolicy TabPane$TabClosingPolicy/ALL_TABS))
         status (Label.)
@@ -346,6 +438,7 @@
         pane (VBox.)
         documents (atom {})
         browser (atom nil)
+        shell (atom nil)
         overview-tab (doto (Tab. "项目总览") (.setClosable false) (.setId "ai-overview-tab"))
         closed (atom false)]
     (letfn [(show! [message]
@@ -360,7 +453,8 @@
               (when-not @closed
                 (if (:overview context)
                   (do
-                    ((:reset! (::overview @documents)))
+                    (when-not (:preserve context) ((:reset! (::overview @documents))))
+                    (when-let [section (:section context)] ((:show-section! (::overview @documents)) section))
                     (.select (.getSelectionModel tabs) overview-tab))
                   (let [key (document-key root context)
                         existing (get @documents key)]
@@ -368,22 +462,28 @@
                       (do
                         (.select (.getSelectionModel tabs) ^Tab (:tab existing))
                         (when-let [update! (:update-context! existing)] (update! context)))
-                      (let [doc (when (document/document-path? (:path context)) (document/read-document root (:path context)))
-                            title (or (:title doc) (when (= roles/config-path (:path context)) "职能配表") (.getName (io/file (:path context))))
+                      (let [virtual (or (:staff-id context) (:task-id context))
+                            doc (when (and (not virtual) (document/document-path? (:path context))) (document/read-document root (:path context)))
+                            title (or (:title doc) (when virtual (if (:staff-id context) "职员工作" "任务详情")) (when (= roles/config-path (:path context)) "职能配表") (.getName (io/file (:path context))))
                             child (AnchorPane.)
                             tab (doto (Tab. title child)
                                   (.setGraphic (doto (SVGPath.)
                                                  (.setContent (if doc "M1 2 H15 V12 H1 Z M5 5 H11 M5 9 H9" "M3 1 H10 L14 5 V15 H3 Z M10 1 V5 H14"))
                                                  (-> .getStyleClass (.add "ai-workspace-tab-icon"))))
                                   (.setTooltip (Tooltip. (:path context))))
-                            content (make-content! child tab context (assoc @browser :open! open!))
+                            content (if virtual
+                                      (let [view (work-views/make-view root tab context open!)]
+                                        (.setContent tab (:root view))
+                                        (apply-styles! (:root view))
+                                        view)
+                                      (make-content! child tab context (assoc @browser :open! open!)))
                             disposed (atom false)
                             dispose! (fn dispose-document []
                                        (when (compare-and-set! disposed false true)
                                          ((:close! content))
                                          (swap! documents dissoc key)))]
                         (ui/user-data! tab ::path (:path context))
-                        (ui/user-data! tab ::file (craft-project/resource-file root (:path context)))
+                        (when (:path context) (ui/user-data! tab ::file (craft-project/resource-file root (:path context))))
                         (ui/on-closed! tab (fn close-document-tab [_] (dispose!)))
                         (swap! documents assoc key (assoc content :tab tab :dispose! dispose!))
                         (.add (.getTabs tabs) tab)
@@ -394,44 +494,30 @@
                 (when-let [changed! (:library-changed! entry)] (changed!))))
             (close! []
               (when (compare-and-set! closed false true)
+                (when-let [dispose! (:close! @shell)] (dispose!))
                 (doseq [entry (vec (coll/vals @documents))] ((:dispose! entry)))
                 (.clear (.getTabs tabs))))]
       (reset! browser (project-browser/make-browser root (:path initial-context)
                                                     (fn open-library-item [path] (open! {:path path})) changed! show! resource-types))
       (let [overview (overview-view/make-view root overview-tab open!
                                               (fn project-connected []
-                                                (coll/any? #(when-let [state (ui/user-data (:tab %) :editor.ai-workbench/state)] (:connected @state)) (coll/vals @documents))))
-            home (doto (Button. "项目总览")
-                   (.setGraphic (doto (StackPane.)
-                                  (-> .getStyleClass (.add "ai-project-entry-icon"))
-                                  (-> .getChildren (.add (doto (SVGPath.)
-                                                           (.setContent "M1 8 H4 V16 H1 Z M7 2 H10 V16 H7 Z M13 5 H16 V16 H13 Z")
-                                                           (-> .getStyleClass (.add "ai-workspace-tab-icon")))))))
-                   (.setId "ai-project-home")
-                   (.setMaxWidth Double/MAX_VALUE)
-                   (-> .getStyleClass (.add "ai-overview-home"))
-                   (.setOnAction (reify javafx.event.EventHandler (handle [_ _] (open! {:overview true})))))]
+                                                (coll/any? #(when-let [state (ui/user-data (:tab %) :editor.ai-workbench/state)] (:connected @state)) (coll/vals @documents))))]
         (apply-styles! (:root overview))
         (.setGraphic overview-tab (doto (SVGPath.) (.setContent "M1 8 H4 V16 H1 Z M7 2 H10 V16 H7 Z M13 5 H16 V16 H13 Z")
                                         (-> .getStyleClass (.add "ai-workspace-tab-icon"))))
         (.setContent overview-tab (:root overview))
         (swap! documents assoc ::overview (assoc overview :tab overview-tab :dispose! (:close! overview)))
         (.add (.getTabs tabs) overview-tab)
-        (.add (.getChildren ^VBox (:root @browser)) 1 home)
-        (configure-sidebar-selection! home (.lookup ^Parent (:root @browser) "#ai-project-tree") tabs overview-tab)
-        (.add (.getChildren ^VBox (:root @browser))
-              (doto (Label. "●  资料保存在本地")
-                (.setId "ai-project-storage")
-                (-> .getStyleClass (.add "ai-project-storage")))))
+        (reset! shell (make-studio-shell! root @browser overview tabs overview-tab open!)))
       (ui/user-data! tabs ::project-root root)
       (ui/user-data! tabs ::file-error! #(.setText status %))
       (configure-tabs! tabs (:root @browser))
       (.setId parent "ai-workspace")
       (.add (.getStyleClass parent) "ai-workbench")
       (apply-styles! parent)
-      (.addAll (.getItems split) ^java.util.Collection (identity [(:root @browser) tabs]))
+      (.addAll (.getItems split) ^java.util.Collection (identity [(:root @browser) (:root @shell)]))
       (SplitPane/setResizableWithParent (:root @browser) false)
-      (.setDividerPositions split (double-array [0.13]))
+      (.setDividerPositions split (double-array [0.15]))
       (.addAll (.getChildren pane) ^java.util.Collection (identity [split status]))
       (VBox/setVgrow split Priority/ALWAYS)
       (doseq [setter [#(AnchorPane/setTopAnchor pane %) #(AnchorPane/setRightAnchor pane %) #(AnchorPane/setBottomAnchor pane %) #(AnchorPane/setLeftAnchor pane %)]] (setter 0.0))

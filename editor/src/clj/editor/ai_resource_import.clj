@@ -18,13 +18,14 @@
             [clojure.java.io :as io]
             [clojure.string :as string]
             [editor.ai-production :as production]
+            [editor.ai-publication :as publication]
             [editor.craft-project :as craft-project]
             [editor.protobuf :as protobuf]
             [util.coll :as coll]
             [util.digest :as digest])
   (:import [com.dynamo.gamesys.proto AtlasProto$Atlas Gui$SceneDesc]
            [java.io File]
-           [java.nio.channels FileChannel]
+           [java.nio.channels FileChannel OverlappingFileLockException]
            [java.nio.file Files StandardCopyOption StandardOpenOption]
            [java.util UUID]))
 
@@ -71,7 +72,7 @@
     (throw (ex-info "正式资源路径无效，不能写入暂存区、构建目录或内置资源" {:path path})))
   (craft-project/resource-file root path))
 
-(defn- validate-rules! [root config]
+(defn validate-rules! [root config]
   (let [rule (:gui config)]
     (when-not (and (= 1 (:version config))
                    (coll/every? #(and (integer? %) (<= 1 % 8192)) [(:maxImageSize rule) (:maxAtlasSize rule)])
@@ -208,7 +209,7 @@
 
 (defn plan-text [plan]
   (str "# 资源入库方案 · " (:module plan)
-       "\n\n确认后由负责人队列执行；原始产物保留。可以修改下面 JSON 中的 target；重名文件必须将 operation 从 conflict 明确改为 replace。"
+       "\n\n确认后由负责人队列执行：源文件/目标检查 → 隔离候选工程编译 → 基线复核 → 正式写入 → 收据。候选失败不写正式目录；编译通过仍需运行与人工验收。原始产物保留。可以修改下面 JSON 中的 target；重名文件必须将 operation 从 conflict 明确改为 replace。"
        (when-let [source (:sourceGui plan)]
          (str "\n\n完整布局来源：`" source "`。保留其节点、模板和控制器绑定，仅重定向已列出的资源引用；不使用素材拆图预览作为页面布局。"))
        "\n\n| 类型 | 正式资源 | 操作 |\n| --- | --- | --- |\n"
@@ -284,9 +285,22 @@
                             bytes (content root files entry rule)]
                         (assoc entry :bytes bytes :hash (bytes-hash bytes)))) expected))))))
 
+(defn inspect-plan! [root plan]
+  (when-not (and (string? (:id plan)) (re-matches #"[a-f0-9-]{36}" (:id plan)))
+    (throw (ex-info "入库事务编号无效" {})))
+  (let [report (publication/new-report plan)
+        check {:title "源文件、路径、重名与引用检查" :status "passed"}]
+    (try
+      (let [prepared (prepare! root plan)]
+        (publication/save-report! root (assoc report :status "review-ready" :checks [check]
+                                              :changes (publication/changes root prepared))))
+      (catch Exception e
+        (publication/save-report! root (assoc report :status "failed" :checks [(assoc check :status "failed")]
+                                              :error (.getMessage e) :details (pr-str (ex-data e))))))))
+
 (defn- transaction-directory [root id]
   (let [boundary (.toPath (.getCanonicalFile (io/file root)))
-        directory (io/file root ".internal" "ai-resource-import" id)]
+        directory (io/file (.getCanonicalFile (io/file root)) ".internal" "ai-resource-import" id)]
     (loop [^File candidate directory]
       (when (and candidate (not= boundary (.toPath candidate)))
         (when (or (Files/isSymbolicLink (.toPath candidate))
@@ -318,54 +332,82 @@
         journal-file (io/file directory "journal.json")
         lock-file (io/file (.getParentFile directory) "admission.lock")]
     (io/make-parents lock-file)
+    (when (Files/isSymbolicLink (.toPath lock-file)) (throw (ex-info "入库锁文件不能是符号链接" {})))
     (with-open [channel (FileChannel/open (.toPath lock-file) (into-array java.nio.file.OpenOption [StandardOpenOption/CREATE StandardOpenOption/WRITE]))
-                ^java.nio.channels.FileLock _lock (or (.tryLock channel) (throw (ex-info "另一个入库事务正在执行，请稍后重试" {})))]
+                ^java.nio.channels.FileLock _lock (try (or (.tryLock channel) (throw (ex-info "另一个入库事务正在执行，请稍后重试" {})))
+                                                       (catch OverlappingFileLockException e (throw (ex-info "另一个入库事务正在执行，请稍后重试" {} e))))]
       (let [previous (when (.isFile journal-file) (read-json journal-file))
             fingerprint (digest/string->sha256-hex (pr-str plan))]
         (when (and previous (not= fingerprint (:fingerprint previous)))
           (throw (ex-info "入库方案已执行过；修改后请重新生成方案，不能复用事务编号" {})))
         (if (= "imported" (:status previous))
           (do
+            (when-let [expected (:final-baseline-hash previous)]
+              (when-not (= expected (publication/baseline-hash (publication/inventory root)))
+                (throw (ex-info "已入库工程基线已变化，请重新生成入库方案" {}))))
             (doseq [entry (:entries previous)]
               (when-not (= (:hash entry) (file-hash (craft-project/resource-file root (:target entry))))
                 (throw (ex-info "已入库文件被修改，请重新生成入库方案" {:path (:target entry)}))))
             (:output previous))
           (do
             (when (contains? #{"applying" "recovery-conflict"} (:status previous)) (rollback! root directory previous))
-            (let [prepared (prepare! root plan)
-                  entries (mapv (fn backup-file [index entry]
-                                  (let [backup (str index ".backup")
-                                        target (craft-project/resource-file root (:target entry))]
-                                    (when (:targetHash entry) (write-atomic! (io/file directory backup) (Files/readAllBytes (.toPath target))))
-                                    (assoc (dissoc entry :bytes) :backup backup))) (range (count prepared)) prepared)
-                  journal {:status "applying" :fingerprint fingerprint :entries entries}]
-              (save-journal! directory journal)
+            (let [report (atom (publication/new-report plan))
+                  check! (fn publication-check [title]
+                           (swap! report update :checks #(conj (mapv (fn pass-check [item] (assoc item :status "passed")) %) {:title title :status "running"}))
+                           (publication/save-report! root @report))]
               (try
-                (doseq [entry prepared :when (not= "reuse" (:operation entry))]
-                  (let [target (destination! root (:target entry) (case (:kind entry) "image" ".png" "atlas" ".atlas" "gui" ".gui" "reference" ""))]
-                    (when-not (= (:targetHash entry) (file-hash target)) (throw (ex-info "写入前目标已变化，入库已停止" {:path (:target entry)})))
-                    (write-atomic! target (:bytes entry))))
-                (let [gui (:target (coll/first-where #(= "gui" (:kind %)) prepared))
+                (check! "源文件、路径、重名与引用检查")
+                (let [prepared (prepare! root plan)
+                      baseline (publication/inventory root)
+                      _ (swap! report assoc :changes (publication/changes root prepared) :baseline-hash (publication/baseline-hash baseline))
+                      _ (check! "隔离候选工程编译")
+                      gui (:target (coll/first-where #(= "gui" (:kind %)) prepared))
                       atlas (:target (coll/first-where #(= "atlas" (:kind %)) prepared))
-                      validation (validate! {:gui gui :atlas atlas :paths (set (mapv :target prepared)) :rules (:rules plan)
-                                             :source-paths (mapv :source prepared)
-                                             :reference-paths (mapv :target (filterv #(= "reference" (:kind %)) prepared))
-                                             :build-directory (io/file directory "build")})
-                      _ (when-not (= "passed" (:status validation)) (throw (ex-info "引擎资源编译校验未通过" {:validation validation})))
-                      output {:gui gui :atlas atlas :paths (set (mapv :target prepared)) :count (count (filterv #(= "image" (:kind %)) prepared))
-                              :status "imported" :import-id (:id plan) :source-manifest (:sourceManifest plan) :validation validation
-                              :file-hashes (mapv #(hash-map :path (:target %) :sha256 (:hash %)) prepared)}]
-                  (doseq [entry prepared]
-                    (when-not (and (= (:hash entry) (file-hash (craft-project/resource-file root (:target entry))))
-                                   (or (= "reference" (:kind entry))
-                                       ;; Sources can be updated references too.
-                                       ;; Require our exact pinned write hash.
-                                       (= (or (:hash (coll/first-where #(= (:source entry) (:target %)) prepared)) (:sourceHash entry))
-                                          (file-hash (craft-project/resource-file root (:source entry))))))
-                      (throw (ex-info "校验期间资源被外部修改，入库已停止" {:path (:target entry)}))))
-                  (save-journal! directory (assoc journal :status "imported" :output (update output :paths vec)))
-                  output)
+                      validation (publication/candidate! root directory baseline prepared
+                                                         {:gui gui :atlas atlas :paths (set (mapv :target prepared)) :rules (:rules plan)
+                                                          :source-paths (into ["/game.project"] (mapv :source prepared))
+                                                          :reference-paths (mapv :target (filterv #(= "reference" (:kind %)) prepared))} validate!)
+                      _ (swap! report assoc :validation validation)
+                      _ (check! "正式写入前基线复核")
+                      _ (prepare! root plan)
+                      _ (publication/assert-baseline! root baseline)
+                      entries (mapv (fn backup-file [index entry]
+                                      (let [backup (str index ".backup")
+                                            target (craft-project/resource-file root (:target entry))]
+                                        (when (:targetHash entry) (write-atomic! (io/file directory backup) (Files/readAllBytes (.toPath target))))
+                                        (assoc (dissoc entry :bytes) :backup backup))) (range (count prepared)) prepared)
+                      journal {:status "applying" :fingerprint fingerprint :entries entries
+                               :final-baseline-hash (:final-baseline-hash validation)}]
+                  (check! "受控写入与最终基线校验")
+                  (save-journal! directory journal)
+                  (try
+                    (doseq [entry prepared :when (not= "reuse" (:operation entry))]
+                      (let [target (destination! root (:target entry) (case (:kind entry) "image" ".png" "atlas" ".atlas" "gui" ".gui" "reference" ""))]
+                        (when-not (= (:targetHash entry) (file-hash target)) (throw (ex-info "写入前目标已变化，入库已停止" {:path (:target entry)})))
+                        (write-atomic! target (:bytes entry))))
+                    (let [output {:gui gui :atlas atlas :paths (set (mapv :target prepared)) :count (count (filterv #(= "image" (:kind %)) prepared))
+                                  :status "imported" :import-id (:id plan) :source-manifest (:sourceManifest plan) :validation validation
+                                  :file-hashes (mapv #(hash-map :path (:target %) :sha256 (:hash %)) prepared)}]
+                      (doseq [entry prepared]
+                        (when-not (and (= (:hash entry) (file-hash (craft-project/resource-file root (:target entry))))
+                                       (or (= "reference" (:kind entry))
+                                           ;; Match changed reference sources.
+                                           (= (or (:hash (coll/first-where #(= (:source entry) (:target %)) prepared)) (:sourceHash entry))
+                                              (file-hash (craft-project/resource-file root (:source entry))))))
+                          (throw (ex-info "校验期间资源被外部修改，入库已停止" {:path (:target entry)}))))
+                      (publication/assert-baseline! root (publication/final-baseline baseline prepared))
+                      (swap! report assoc :status "imported" :checks (mapv #(assoc % :status "passed") (:checks @report)))
+                      (let [path (publication/save-report! root @report)
+                            output (assoc output :publication-report path :publication-report-id (:attempt-id @report))]
+                        (save-journal! directory (assoc journal :status "imported" :output (update output :paths vec)))
+                        output))
+                    (catch Exception e
+                      (try (rollback! root directory journal)
+                           (catch Exception recovery (throw (ex-info (str (.getMessage e) "；" (.getMessage recovery)) (ex-data recovery) e))))
+                      (throw e))))
                 (catch Exception e
-                  (try (rollback! root directory journal)
-                       (catch Exception recovery (throw (ex-info (str (.getMessage e) "；" (.getMessage recovery)) (ex-data recovery) e))))
-                  (throw e))))))))))
+                  (swap! report assoc :status "failed" :error (.getMessage e) :details (pr-str (ex-data e))
+                         :checks (mapv #(cond-> % (= "running" (:status %)) (assoc :status "failed")) (:checks @report)))
+                  (let [path (publication/save-report! root @report)]
+                    (throw (ex-info (str (.getMessage e) "；可在入库卡片查看检查报告")
+                                    (assoc (ex-data e) :publication-report path) e))))))))))))

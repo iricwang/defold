@@ -95,8 +95,16 @@
                                    (not= (:confirmed-revision card) (results/revision card)))
                               {:id (:id card) :title (:title card) :label "方案待选择" :path (:path card) :card-id (:id card) :revision (results/revision card)}))))
                   (concat
-                    (mapv #(hash-map :id (:id %) :title (:title %) :label "成果版本待批准" :path (:source-path %) :card-id (:source-card-id %) :revision (:revision %) :staff-id (:staff-id %))
+                    (coll/into-> cards []
+                      (filter #(= "pm" (:kind %)))
+                      (mapcat (fn planning-reviews [card]
+                                (mapv #(hash-map :id (:id %) :title (get-in % [:after :title]) :label "重规划变更待确认"
+                                                 :path (:path card) :card-id (:id card))
+                                      (filterv #(= "review" (:status %)) (:plan-changes card))))))
+                    (mapv #(hash-map :id (:id %) :title (:title %) :label "成果版本待批准" :path (:source-path %) :card-id (:source-card-id %) :review-artifact (:id %) :revision (:revision %) :staff-id (:staff-id %))
                           (filterv #(= "待审核" (:status %)) artifacts))
+                    (mapv #(assoc (select-keys % [:id :title :task-id :staff-id]) :label "返修待确认")
+                          (filterv #(= "review" (:status %)) (:rework data)))
                     (mapv #(hash-map :id (:id %) :title (:title %) :label "任务待验收" :path (:source-path %) :card-id (:id %))
                           (filterv #(= "待验收" (:status %)) tasks))))
         running (mapv (fn running-job [job]
@@ -119,7 +127,7 @@
     {:tasks tasks :stages stages :jobs jobs :running running
      :reviews (coll/into-> reviews []
                 (keep (fn scoped-review [review]
-                        (let [task (coll/first-where #(or (= (:id %) (:id review)) (= (:canvas-path %) (:path review))) tasks)]
+                        (let [task (coll/first-where #(or (= (:id %) (:task-id review)) (= (:id %) (:id review)) (and (:path review) (= (:canvas-path %) (:path review)))) tasks)]
                           (when-not (and (:accepted task) (= "方案待选择" (:label review)))
                             (assoc review :task-id (:id task) :staff-id (or (:staff-id review) (:staff-id task) (owner-staff documents (:path review) (:card-id review)))))))))
      :issues issues

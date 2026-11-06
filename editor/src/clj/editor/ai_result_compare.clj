@@ -125,7 +125,7 @@
                                                                               :root-props {:style-class "ai-markdown-page"} :style-class "ai-markdown-scroll"})]}})
               (reset! cleanup (fn close-markdown [] (ui/advance-ui-user-data-component! preview ::markdown nil)))
               preview))
-          (doto (Label. (case (:content-kind entry) :absent "此方案没有对应内容" :missing "资源尚未同步到本地，请同步后刷新。" "此格式可在完整详情中打开原文件。"))
+          (doto (Label. (case (:content-kind entry) :absent "此侧没有对应内容" :missing "本地资源缺失，请恢复文件后刷新。" "此格式可在完整详情中打开原文件。"))
             (.setWrapText true) (-> .getStyleClass (.add "ai-compare-empty"))))]
     (file-reveal/install! node nil (constantly file) report!)
     {:root node :dispose! (fn dispose-preview [] (@cleanup))
@@ -166,6 +166,8 @@
 (defn open! [^Window owner root action-title cards! opts]
   (when (< (count (cards!)) 2) (throw (ex-info "至少需要两个已产出的 Result 才能对比" {})))
   (let [stage (Stage.) pane (BorderPane.)
+        version-mode (= :versions (:comparison-kind opts))
+        unit (if version-mode "版本" "方案")
         left (doto (ComboBox.) (.setId "ai-compare-left") (.setMaxWidth Double/MAX_VALUE))
         right (doto (ComboBox.) (.setId "ai-compare-right") (.setMaxWidth Double/MAX_VALUE))
         resource (doto (ComboBox.) (.setId "ai-compare-resource") (.setPrefWidth 300.0))
@@ -225,21 +227,24 @@
             (refresh! []
               (reset! updating true)
               (try
-                (let [values (mapv (fn numbered-card [index card] (assoc card :compare-name (str "方案 " (inc index) " · " (:title card)))) (range) (cards!))
+                (let [values (mapv (fn numbered-card [index card] (assoc card :compare-name (str unit " " (inc index) " · " (:title card)))) (range) (cards!))
                       a (or (coll/first-where #(= (:left @selected) (:id %)) values) (first values))
                       b (or (coll/first-where #(and (= (:right @selected) (:id %)) (not= (:id a) (:id %))) values)
                             (coll/first-where #(not= (:id a) (:id %)) values))]
                   (swap! selected assoc :left (:id a) :right (:id b))
                   (.setAll (.getItems left) ^java.util.Collection values) (.setAll (.getItems right) ^java.util.Collection values)
                   (.setValue left a) (.setValue right b)
-                  (.setText notice (str (count values) " 个方案 · " (if b "比较已保存版本；完整内容可在详情中修改。" "当前不足两个方案，可打开详情查看剩余方案。")))
+                  (.setText notice (str (count values) " 个" unit " · " (if version-mode "同一方案的固定版本；修改需创建工作副本。"
+                                                                           (if b "不同 Result 方案；每个方案可分别采用。" "当前不足两个方案，可打开详情查看剩余方案。"))))
                   (.clear (.getChildren headers))
                   (doseq [[side card] [[:left a] [:right b]]]
-                    (let [box (VBox. 6.0) title (Label. (or (:compare-name card) "没有第二个方案"))
+                    (let [box (VBox. 6.0) title (Label. (or (:compare-name card) (str "没有第二个" unit)))
                           body (:text (results/candidate card))
                           summary (Label. (str (count body) " 字 · " (count (:files (results/candidate card))) " 个附件 · "
-                                               (if (:manually-edited card) "人工修改" "原始产出") " · "
-                                               (if (and (:confirmed-revision card) (= (:confirmed-revision card) (results/revision card))) "已选定" "未选定")))
+                                               (if version-mode
+                                                 (if (:parent-id card) "派生版本" "初始版本")
+                                                 (str (if (:manually-edited card) "人工修改" "原始产出") " · "
+                                                      (if (and (:confirmed-revision card) (= (:confirmed-revision card) (results/revision card))) "已选定" "未选定")))))
                           open (doto (Button. "打开完整详情") (.setId (str "ai-compare-inspect-" (name side))) (.setDisable (nil? card)))]
                       (.add (.getStyleClass title) "ai-compare-title") (.add (.getStyleClass summary) "ai-compare-muted")
                       (.setOnAction open (ui/event-handler _ ((:on-inspect! opts) (:id card))))
@@ -260,7 +265,7 @@
       (.setConverter resource (proxy [StringConverter] [] (toString [pair] (or (:label pair) "")) (fromString [_] nil)))
       (.setAll (.getItems mode) ^java.util.Collection (identity ["阅读预览" "文本差异"])) (.setValue mode "阅读预览")
       (doseq [[^ComboBox box side] [[left :left] [right :right]]]
-        (.setAccessibleText box (if (= side :left) "左侧方案" "右侧方案"))
+        (.setAccessibleText box (str (if (= side :left) "左侧" "右侧") unit))
         (.addListener (.valueProperty box) (reify ChangeListener (changed [_ _ _ value] (choose! side value)))))
       (.setAccessibleText resource "对比内容") (.setAccessibleText mode "显示方式")
       (.addListener (.valueProperty resource)
@@ -282,7 +287,7 @@
       (StackPane/setMargin (:root notifications) (Insets. 12.0))
       (.setCenter pane overlay) (.setId pane "ai-result-compare")
       (ui/apply-css! pane) (ai-workspace/apply-styles! pane)
-      (.initOwner stage owner) (.setTitle stage (str action-title " · 方案对比"))
+      (.initOwner stage owner) (.setTitle stage (str action-title " · " unit "对比"))
       (.setScene stage (Scene. pane 1440.0 900.0)) (.setMinWidth stage 1050.0) (.setMinHeight stage 650.0)
       (.setOnHidden stage (ui/event-handler _ (dispose-content!) ((:dispose! notifications))))
       (refresh!) (.show stage)
