@@ -1,0 +1,66 @@
+11月 07, 2026 3:20:31 上午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @5432050b'
+
+Testing editor.skeletal-animation-atlas-test
+
+Testing editor.skeletal-animation-attachments-test
+
+Testing editor.skeletal-animation-clipping-test
+
+Testing editor.skeletal-animation-constraints-test
+
+Testing editor.skeletal-animation-curve-view-test
+
+Testing editor.skeletal-animation-data-test
+
+Testing editor.skeletal-animation-deform-review-test
+
+Testing editor.skeletal-animation-events-test
+
+Testing editor.skeletal-animation-geometry-test
+
+Testing editor.skeletal-animation-gpu-test
+
+Testing editor.skeletal-animation-io-review-test
+
+Testing editor.skeletal-animation-io-test
+
+Testing editor.skeletal-animation-mesh-reset-test
+
+Testing editor.skeletal-animation-mesh-test
+
+Testing editor.skeletal-animation-mixing-test
+
+Testing editor.skeletal-animation-native-test
+
+Testing editor.skeletal-animation-physics-test
+
+Testing editor.skeletal-animation-playback-test
+
+Testing editor.skeletal-animation-render-test
+
+Testing editor.skeletal-animation-skin-test
+
+Testing editor.skeletal-animation-slot-view-test
+
+Testing editor.skeletal-animation-slots-test
+
+Testing editor.skeletal-animation-spine-test
+
+Testing editor.skeletal-animation-timeline-test
+
+Testing editor.skeletal-animation-tools-test
+
+Testing editor.skeletal-animation-view-review-test
+
+Testing editor.skeletal-animation-view-test
+
+Testing editor.skeletal-animation-view-workflow-test
+
+Testing editor.skeletal-animation-workflow-test
+
+Testing editor.skeletal-animation-workspace-view-test
+
+Ran 376 tests containing 7586 assertions.
+0 failures, 0 errors.
+{:test 376, :pass 7586, :fail 0, :error 0, :type :summary}

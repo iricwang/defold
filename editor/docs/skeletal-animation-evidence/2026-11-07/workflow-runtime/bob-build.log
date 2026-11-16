@@ -1,0 +1,26 @@
+env DM_BOB_ROOTFOLDER=/tmp/defold-spine-workflow-runtime/bob-tools
+INFO:TEXC: Selected NEON
+ 33% Working
+ 33% Reading classes
+2026-11-07 03:00:18 INFO    
+Found plugins: 
+2026-11-07 03:00:18 INFO    Set jna.library.path to '/private/tmp/defold-spine-workflow-runtime/project/build/plugins/defold-spine/plugins/lib/arm64-osx' 
+2026-11-07 03:00:18 INFO    Set java.library.path to '/Users/applemima1111/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:.:/private/tmp/defold-spine-workflow-runtime/project/build/plugins/defold-spine/plugins/lib/arm64-osx' 
+2026-11-07 03:00:18 INFO      build/plugins/defold-spine/plugins/share/pluginSpineExt.jar 
+2026-11-07 03:00:18 INFO     
+ 56% Reading classes
+ 56% Cleaning
+ 60% Cleaning
+ 65% Cleaning
+ 70% Cleaning
+ 75% Cleaning
+ 80% Cleaning
+ 80% Cleaning engine
+ 82% Reading tasks
+ 88% Reading tasks
+ 88% Building
+2026-11-07 03:00:19 INFO    Creating task builder with a fixed thread pool executor using 6 threads 
+2026-11-07 03:00:19 INFO    Build tasks 
+ 90% Building
+2026-11-07 03:00:20 INFO    Build tasks took 0.605000 s 
+100% Building

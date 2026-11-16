@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-mesh-transform/build/editor.jar",
+  "sha256": "1fd4c087fb3f31899e2b3e599a13a3c7a0c153a897575a491cab1e2148b709bf",
+  "project_source": "tmp/background-skeletal-final/project",
+  "project_copy": "/private/tmp/spine-mesh-transform/background/project",
+  "scenario": "/private/tmp/spine-mesh-transform/headless.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

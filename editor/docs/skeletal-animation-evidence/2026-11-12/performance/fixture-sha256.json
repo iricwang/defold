@@ -1,0 +1,22 @@
+{
+  ".editor_settings": "945f73ae0951f9ffa796074668aa3c3288b4b4325997720c088565ab5535671d",
+  ".internal/lua-annotations/builtins/scripts/debugger.lua": "4cb5b83ebe034d9dfbb6c81972753f1fb599874d210f1bcfa46ec507d49ed97d",
+  ".internal/lua-annotations/builtins/scripts/edn.lua": "66e05752c15e9e17aec28768e60f729cf2e78cae0f8f0837c8d505fd294fea54",
+  ".internal/lua-annotations/builtins/scripts/mobdebug.lua": "8b30ce74227016d8fc046d9479517e3afebfb17a0f574f8904d9abe347369e7d",
+  ".internal/lua-annotations/builtins/scripts/socket.lua": "7ff011e5cde7f9a946ee3e479999c9fff1d78cc5d8a0171aaff1e509bd3b9415",
+  ".internal/photocraft/editor-adapter.json": "eec457abb648a4c64b6ebfc823a0dc978eb47abe912e1226224421df6ba6a787",
+  "docs/source/spine_smart_mesh_validation/imported_images/01_head.png": "3ee637f3de6745a6ca6fc5e22bc1cd02d8fb66b4883bd884c596b777a5a7fdbb",
+  "docs/source/spine_smart_mesh_validation/imported_images/01a_eye_near.png": "04b6e3caf5ebd772005b5e382b57cca9f06a8ec7837c0c37e09efcc0c3f0a574",
+  "docs/source/spine_smart_mesh_validation/imported_images/01b_eye_far.png": "f1b10a86db107aeff1d75bb94d015d8e0813334dfb29cc939efc5734f9e7a462",
+  "docs/source/spine_smart_mesh_validation/imported_images/01c_jaw.png": "01f172e9650e6b3536b91304015b15098cc1a7cfdf4331bb9a4940f584f98d88",
+  "docs/source/spine_smart_mesh_validation/imported_images/01d_whiskers_near.png": "5da75725ab5dc7c5a84e6660b3bc69f3850fd554dcc4e095e3b72bcf99549513",
+  "docs/source/spine_smart_mesh_validation/imported_images/01e_whiskers_far.png": "790506e040b9416c678b4a015f807e39fe2d1488a5a00d5ce87a2520a63cb434",
+  "docs/source/spine_smart_mesh_validation/imported_images/02_front_right.png": "d35b965ca0fbf89dda2b7b2d57fac6b09e32fc0efcf50cb77c0ef77940f3244a",
+  "docs/source/spine_smart_mesh_validation/imported_images/03_front_left.png": "841c514a1fa3ed4ff9e7c5d2c1882ce4a5d853a9df5ed3a1bf1e3f1de3a6bc43",
+  "docs/source/spine_smart_mesh_validation/imported_images/04_hind_left.png": "89e0fa74169a20e1d9a8c3a6ea196406154776474d12a131b6dbdddc0adbc32b",
+  "docs/source/spine_smart_mesh_validation/imported_images/05_tail.png": "353a9fce79c7c45c5a743580bab68876849dc97c793690cde56f3f950fd0aa42",
+  "docs/source/spine_smart_mesh_validation/imported_images/06_body.png": "5100d41ca7ac99fbfbecc457b722ee40732bc22c7c4817bd6d317ff388a94c7d",
+  "game.project": "caad76b2e622d2d07164bf80b0f00be1d7b89db905601a70b1660c41112b4d2b",
+  "main.collection": "0e1e5246cdb2306ffd11bb779b2674b5ba2d50141f1193c7cf7d73348971f93c",
+  "tail.skeleton": "c5db7851fba192d2b20cd4361c208f6cffefe56118ef22797040ee563ef9d832"
+}

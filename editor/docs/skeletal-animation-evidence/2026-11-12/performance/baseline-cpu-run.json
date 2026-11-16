@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-perf/build-baseline/editor.jar",
+  "sha256": "13afd764050f0f7ccdd9c955932c535accd85ffcb5f542299f0c1a1443048b4d",
+  "project_source": "tmp/background-skeletal-final/project",
+  "project_copy": "/private/tmp/spine-perf/baseline-controlled/project",
+  "scenario": "/private/tmp/spine-perf/open.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

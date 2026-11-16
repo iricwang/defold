@@ -78,6 +78,8 @@ def run(manifest, extension=None):
             if all(p['state']=='running' for p in ps):break
             time.sleep(.25)
         check('two independent games running without editor',all(p['state']=='running' for p in ps))
+        check('builds use original project directories', all(Path(p['build']) == Path(p['root']) for p in ps))
+        check('no Remote project snapshots', not (work/'state/builds').exists())
         for pid in projects:
             c,r=request(f'/games/{pid}/claim',token,{});claim=json.loads(r.read());c.close();control=claim['token']
             c,r=request(f'/games/{pid}/thumbnail',token);image=r.read();c.close();check('real GPU thumbnail '+pid,r.status==200 and image[:2]==b'\xff\xd8');(work/(pid+'.jpg')).write_bytes(image)
@@ -119,11 +121,14 @@ def run(manifest, extension=None):
                     if remote['state']=='error' and expected!='error':raise AssertionError(remote['error'])
                     time.sleep(.2)
                 raise AssertionError('Timed out: '+expected)
+            import hashlib
+            native_engine = Path(next(p for p in ps if p['id']==native)['engine'])
+            original_engine_hash = hashlib.sha256(native_engine.read_bytes()).hexdigest()
             rpc('stop',id=native)
             with (work/'game-0/main.gui_script').open('a',encoding='utf-8') as out:out.write('\nprint("LUA_ONLY_UPDATE")\n')
             c,r=request(f'/games/{native}/start',token,b'');r.read();c.close();await_project('running')
-            native_logs=list((work/'state/builds').glob('*/native-jobs/*/build.log'))
-            check('Lua-only change reuses native engine cache',any('REMOTE_NATIVE_CACHE_HIT' in f.read_text(encoding='utf-8',errors='replace') for f in native_logs))
+            check('Lua-only change reuses identical native engine',hashlib.sha256(native_engine.read_bytes()).hexdigest()==original_engine_hash)
+            check('native job scratch directories reclaimed',not any((work/'game-0/.internal/remote-manager/native-jobs').iterdir()))
             rpc('stop',id=native)
             source=next((work/'game-0'/Path(extension).name/'src').glob('*.cpp'));original=source.read_bytes();source.write_bytes(original+b'\n#error REMOTE_EXPECTED_NATIVE_FAILURE\n')
             c,r=request(f'/games/{native}/start',token,b'');r.read();c.close();failure=await_project('error')

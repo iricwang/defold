@@ -477,7 +477,7 @@ def create_patch(jdk, platform, options):
             shutil.copy('bundle-resources/Info.plist', payload / 'Contents/Info.plist')
         config = configparser.ConfigParser()
         config.read('bundle-resources/config')
-        for key, value in {'editor_sha1': options.editor_sha1, 'engine_sha1': options.engine_sha1 or '',
+        for key, value in {'editor_sha1': options.editor_sha1, 'engine_sha1': options.engine_sha1 or options.editor_sha1,
                            'version': metadata['version'], 'time': datetime.datetime.now().isoformat(),
                            'archive_domain': options.archive_domain, 'channel': options.channel or ''}.items():
             config.set('build', key, value)
@@ -563,7 +563,7 @@ def create_bundle(jdk, platform, options):
     config = configparser.ConfigParser()
     config.read('bundle-resources/config')
     config.set('build', 'editor_sha1', options.editor_sha1)
-    config.set('build', 'engine_sha1', options.engine_sha1 or '')
+    config.set('build', 'engine_sha1', options.engine_sha1 or options.editor_sha1)
     config.set('build', 'version', options.version)
     config.set('build', 'time', datetime.datetime.now().isoformat())
     config.set('build', 'archive_domain', options.archive_domain)

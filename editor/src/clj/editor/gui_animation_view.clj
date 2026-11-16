@@ -1403,6 +1403,10 @@
                          (catch Exception error
                            (stop-preview!)
                            (.setText status (.getMessage error))))))]
+      ;; Start GUI editing in layout mode; use the regular toggle path so the
+      ;; registered dock slots and divider state match a user-collapsed panel.
+      (when-not collection
+        (.fire editor-toggle))
       {:refresh-fn refresh!
        :visible? (:visible? (second floating-panels))
        :dispose-fn #(do (when layout-tools ((:dispose! layout-tools)))

@@ -27,7 +27,7 @@
             [editor.ui :as ui])
   (:import [java.nio.file Files]
            [javafx.scene Scene]
-           [javafx.scene.control Button CheckBox TextArea]))
+           [javafx.scene.control Button CheckBox ComboBox TextArea]))
 
 (defn fixture []
   (.toFile (Files/createTempDirectory "ai-delivery-" (make-array java.nio.file.attribute.FileAttribute 0))))
@@ -42,7 +42,7 @@
 (defn publish! [root task kind]
   (let [record (delivery/snapshot! root {:kind kind :bundle-id (str task "/bundle") :title "交付成果"
                                          :task-id task :task-spec-revision "spec1" :text "固定方案" :files []})]
-    (delivery/approve! root (:id record) "人工批准") record))
+    (delivery/approve! root (:id record) "人工批准" :human) record))
 
 ;; Approval freezes bytes and content, is idempotent, and never approves later
 ;; edits or loses the original decision. Corrupt archives block further use.
@@ -50,8 +50,8 @@
   (let [root (fixture) file (io/file root "design.md") _ (spit file "v1")
         input {:kind "proposal" :bundle-id "b" :text "方案" :files [{:path "/design.md"}]}
         original (delivery/snapshot! root input)]
-    (delivery/approve! root (:id original) "已核对")
-    (delivery/approve! root (:id original) "重复点击")
+    (delivery/approve! root (:id original) "已核对" :human)
+    (delivery/approve! root (:id original) "重复点击" :human)
     (is (= 1 (count (:approvals (work/read-work root)))))
     (spit file "v2")
     (let [second (delivery/snapshot! root input) data (work/read-work root)]
@@ -83,7 +83,7 @@
         record (publish! root "design" "proposal")
         job (first (work/enqueue! root [{:task-id "art" :staff-id "s" :action-id "art"}]))]
     (is (string? (delivery/admission-error (work/read-work root) "art" {} job)))
-    (delivery/decide-task! root "design" "accepted" [(:id record)] nil "设计验收通过")
+    (delivery/decide-task! root "design" "accepted" [(:id record)] nil "设计验收通过" :human)
     (is (= "已验收" (work/task-status (work/read-work root) "design")))
     (is (= [(:id record)] (mapv :id (delivery/admit! root "art" {} (:id job)))))
     (let [admitted (delivery/admit! root "art" {} (:id job))
@@ -140,20 +140,21 @@
         output {:import-id "import1" :validation {:status "passed" :build-id "build1" :engine-sha1 (System/getProperty "defold.engine.sha1")}}
         receipt (delivery/record-delivery! root state card output)
         artifact (:artifact-id receipt)]
-    (is (thrown? Exception (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "尚未批准")))
-    (delivery/approve! root artifact "人工批准工程产物")
-    (is (thrown-with-msg? Exception #"检查" (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "缺运行证据")))
+    (is (thrown? Exception (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "尚未批准" :human)))
+    (delivery/approve! root artifact "人工批准工程产物" :human)
+    (is (thrown-with-msg? Exception #"检查" (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "缺运行证据" :human)))
+    (is (thrown-with-msg? Exception #"检查" (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "自动化也必须有运行证据" :automation)))
     (is (thrown? Exception (delivery/record-check! root (:id receipt) "build" "passed" "不能人工伪造编译" [{:path "/screen.gui"}])))
     (delivery/record-automated-check! root (:id receipt) "runtime" "passed" "后台自动化运行证据" [{:path "/screen.gui"}])
     (is (= "automation" (:actor (last (:checks (delivery/delivery (work/read-work root) (:id receipt)))))))
     (is (nil? (delivery/accepted (work/read-work root) "integrate")))
     (delivery/record-check! root (:id receipt) "visual" "passed" "已核对截图及运行日志" [{:path "/screen.gui"}])
     (is (= "local-human" (:actor (last (:checks (delivery/delivery (work/read-work root) (:id receipt)))))))
-    (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "工程交付验收通过")
+    (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "工程交付验收通过" :human)
     (is (delivery/accepted (work/read-work root) "integrate"))
     (spit file "changed-after-build")
-    (is (thrown-with-msg? Exception #"构建后变更" (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "应阻止过期构建")))
-    (delivery/decide-task! root "integrate" "rejected" [] nil "工程修改后需要重验")
+    (is (thrown-with-msg? Exception #"构建后变更" (delivery/decide-task! root "integrate" "accepted" [artifact] (:id receipt) "应阻止过期构建" :human)))
+    (delivery/decide-task! root "integrate" "rejected" [] nil "工程修改后需要重验" :human)
     (is (nil? (delivery/accepted (work/read-work root) "integrate")))))
 
 ;; Native inspector controls dispatch structured decisions and preserve drafts;
@@ -174,3 +175,72 @@
         (is (= :accept-delivery (ffirst @calls)))
         (is (= [(:id record)] (:artifact-ids (nth (first @calls) 2))))
         (is (= "人工验收记录" (:notes (nth (first @calls) 2))))))))
+
+;; Automation must retain explicit identity and pending user visual approval,
+;; without skipping execution gates or overwriting later human review.
+(deftest automated-approval-and-acceptance-test
+  (let [root (fixture)
+        _ (register! root "design" "document" [])
+        _ (register! root "art" "assets" ["design"])
+        artifact (delivery/snapshot! root {:kind "proposal" :bundle-id "design/review" :task-id "design"
+                                           :task-spec-revision "spec1" :text "设计范围" :files []})
+        id (:id artifact)
+        approved (delivery/approve! root id "结构与来源已核对" :automation)]
+    (is (= "automation" (:actor approved)))
+    (is (= "automation-verification" (:trigger approved)))
+    (is (= "pending" (:user-visual-approval approved)))
+    (is (string/includes? (:notes approved) "用户最终视觉验收未完成"))
+    (delivery/approve! root id "重复自动化核验" :automation)
+    (is (= 1 (count (:approvals (work/read-work root)))))
+    (is (thrown-with-msg? Exception #"未完成" (delivery/decide-task! root "design" "accepted" [id] nil "已核对" :automation)))
+    (is (string? (delivery/admission-error (work/read-work root) "art" {} {})))
+    (completed! root "design")
+    (is (thrown-with-msg? Exception #"请填写" (delivery/decide-task! root "design" "accepted" [id] nil "" :automation)))
+    (let [accepted (delivery/decide-task! root "design" "accepted" [id] nil "自动化验证采纳；未做最终用户视觉验收" :automation)]
+      (is (= "automation" (:actor accepted)))
+      (is (= "automation-verification" (:trigger accepted)))
+      (is (= "pending" (:user-visual-approval accepted)))
+      (is (nil? (delivery/admission-error (work/read-work root) "art" {} {})))
+      (let [input (delivery/admit! root "art" {} nil)]
+        (is (= "automation" (get-in input [0 :admission :actor])))
+        (is (string/includes? (delivery/input-text input) "用户最终视觉验收未完成"))))
+    (let [human (delivery/approve! root id "最终人工核对" :human)
+          approvals (filterv #(= "artifact" (:kind %)) (:approvals (work/read-work root)))]
+      (is (not= (:id approved) (:id human)))
+      (is (= ["automation" "local-human"] (mapv :actor approvals)))
+      (is (nil? (:user-visual-approval human)))
+      (work/transact! root #(update % :approvals
+                                    (fn legacy-human [records]
+                                      (mapv (fn remove-old-identity [record]
+                                              (if (= (:id human) (:id record))
+                                                (dissoc record :actor :trigger) record)) records))))
+      (is (= (:id human) (:id (delivery/approve! root id "旧人工记录无需重复" nil))))
+      (is (= 2 (count (filterv #(= "artifact" (:kind %)) (:approvals (work/read-work root)))))))
+    (is (thrown-with-msg? Exception #"无效审查身份" (delivery/approve! root id "不能传任意身份" :unknown)))))
+
+;; The review selector defaults to human, is local to its Canvas state, and
+;; dispatches the selected automation identity with Task/Assets actions.
+(deftest review-mode-inspector-test
+  (ui/run-now
+    (let [state (atom {:project-work {} :sessions {}})
+          calls (atom [])
+          command (fn review-command [op id fields] (swap! calls conj [op id fields]))
+          panel (view/details state {:id "assets" :kind :assets} command (fn report [_]))
+          _ (Scene. panel)
+          picker ^ComboBox (.lookup panel "#delivery-review-mode")]
+      (is (= :human (.getValue picker)))
+      (is (= :human (:review-mode @state)))
+      (.setValue picker :automation)
+      (is (= :automation (:review-mode @state)))
+      (is (string/includes? (.getText ^javafx.scene.control.Label (.lookup panel "#delivery-review-notice")) "用户最终视觉验收未完成"))
+      (.fire ^Button (.lookup panel "#delivery-approve-assets"))
+      (is (= [[:approve-assets "assets" {:review-mode :automation}]] @calls))
+      (let [task (view/details state {:id "t" :kind :task :status "allocated"} command (fn report-task [_]))]
+        (Scene. task)
+        (.setText ^TextArea (.lookup task "#delivery-notes") "自动化采纳")
+        (.fire ^Button (.lookup task "#delivery-accept-task"))
+        (is (= :automation (:review-mode (nth (last @calls) 2)))))
+      (let [other (atom {})
+            control (view/review-controls other false)]
+        (Scene. control)
+        (is (= :human (:review-mode @other)))))))

@@ -91,6 +91,8 @@
         queue (get-in state [:sessions person :queue])]
     (cond
       (and (= (:revision confirmation) (:revision previous))
+           (= (:actor confirmation "local-human") (:actor previous "local-human"))
+           (= (:trigger confirmation "user-action") (:trigger previous "user-action"))
            (or (confirmation-locked? state id) (= "completed" execution))) state
       (confirmation-locked? state id)
       (throw (ex-info "此方案正在队列中，请等待完成后再修改或确认新版本" {}))

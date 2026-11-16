@@ -1,0 +1,18 @@
+{
+  "artifact-report.json": "1c62e231b9b66716dc96178c1ee55096586b34d07de4ad84cef70b3c776575d8",
+  "fractional-runtime.json": "105f4714d8863f1b3959b9708044cb799c2e229abc1216b84f9d2a55ea556c32",
+  "fractional-runtime.png": "99da73d4cee4af5d6b50694d1f72ad2de79a847c691c79eecbb8d81d01617425",
+  "full-runtime.json": "ab87012f19419e20005c44747bc6bfc34a43e7f8250b4f8935aee6be5eb8a7eb",
+  "full-runtime.png": "4e4c01f3e728064fd4e3ea2f76f341f1337363a7e263427c681ef877fa5ad133",
+  "half-runtime.json": "6f056bcfbc44f523d973d801701dfb81e38e9867017876c2c94d4220bf5a6340",
+  "half-runtime.png": "7d3f86c869334e0b4b6de5d1b1ea9133ea41d41b132ddf9ff5d07f2de0d9c8f9",
+  "hotload-report.edn": "4b108fbcdad3717d9aff73d1be93ccb1497a9a65d0a910cc9c3c0932e0b215b1",
+  "interaction-report.json": "71dba5424e2e95beb0302636a538b2aba97ffcbcc609bb9920f6e50578aaf5cd",
+  "interaction.edn": "d3e503c48725c2f9bb31ff271cf804e9940c986d146e62e134e74572da9b3ffc",
+  "kondo-final.json": "8492739aceb479205e08979f0ab2a8b5661f4888cd3c5d400da542ffcda2d175",
+  "live-panel.png": "04db86e63194d61aa4d8ebb145d1b77a15029891421172d5bc73d3a7b7c91b98",
+  "project-audit.json": "88f5787eb16d55eb04c4b99895b31d0188980b5a545b79e4596b49ab079f92c2",
+  "runtime-bounds.json": "453b673439a4fd3d2ef8e1d0899f1d2b8134cb2d4d1052c36bbbec849f90afd9",
+  "source-integrity.json": "7845953eb4a1eb6b5a3929e5988b0af877c9eeb1cb0e58f47dd7495a2b4f1c14",
+  "tests-final.log": "1c232482042f53a0556c8c8f23df15d2055965e55796fab48305352f025007ac"
+}

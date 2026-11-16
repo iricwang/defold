@@ -1,0 +1,4 @@
+{"id": "update-check", "ns": "user", "session": "9be3cba6-8107-454a-bd74-80b48596a5b9", "value": "#'editor.skeletal-animation/register-resource-types"}
+{"id": "update-check", "out": ":session-cleaned :removed-own-history 6 :resource-type \"skeleton\" :view-factory \"#'editor.skeletal-animation-view/make-view\"\n", "session": "9be3cba6-8107-454a-bd74-80b48596a5b9"}
+{"id": "update-check", "ns": "user", "session": "9be3cba6-8107-454a-bd74-80b48596a5b9", "value": "nil"}
+{"id": "update-check", "session": "9be3cba6-8107-454a-bd74-80b48596a5b9", "status": ["done"]}

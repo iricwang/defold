@@ -1,0 +1,48 @@
+page-001.png
+size: 24, 24
+format: RGBA8888
+filter: Linear, Linear
+repeat: none
+pma: false
+hero/walk01
+  rotate: false
+  xy: 2, 2
+  size: 8, 8
+  orig: 8, 8
+  offset: 0, 0
+  index: -1
+hero/walk02
+  rotate: false
+  xy: 14, 2
+  size: 8, 8
+  orig: 8, 8
+  offset: 0, 0
+  index: -1
+hero/walk03
+  rotate: false
+  xy: 2, 14
+  size: 8, 8
+  orig: 8, 8
+  offset: 0, 0
+  index: -1
+ui/face
+  rotate: false
+  xy: 14, 14
+  size: 8, 8
+  orig: 8, 8
+  offset: 0, 0
+  index: -1
+
+page-002.png
+size: 12, 12
+format: RGBA8888
+filter: Linear, Linear
+repeat: none
+pma: false
+ui/mesh
+  rotate: false
+  xy: 2, 2
+  size: 8, 8
+  orig: 8, 8
+  offset: 0, 0
+  index: -1

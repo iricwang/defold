@@ -1,0 +1,19 @@
+{
+  "schema": "ogs.skin-surface/1",
+  "traceSHA256": "d0fed3c321c71a65bcd10f09809ef959cdf252fbfeedaae94ea6bde5d69d37d9",
+  "scope": null,
+  "meshes": {
+    "05_tail": {
+      "minimumPrincipalScale": 0.9804884356162455,
+      "maximumPrincipalScale": 1.0195143965833184,
+      "visiblePixelWeightedP05Compression": 0.9859789974934291,
+      "visiblePixelWeightedP95Stretch": 1.013653736008515,
+      "minimumSignedAreaRatio": 0.9821800085204107,
+      "maximumSignedAreaRatio": 1.0176252970002126,
+      "sourceSHA256": "353a9fce79c7c45c5a743580bab68876849dc97c793690cde56f3f950fd0aa42"
+    }
+  },
+  "characterAccepted": false,
+  "status": "MEASURED-NOT-ACCEPTED",
+  "limitations": "Source-visible local surface scales, not bone scales. Overlapping UV triangle raster samples are weighted independently. Numeric data cannot approve anatomy or imply universal allowed deformation."
+}

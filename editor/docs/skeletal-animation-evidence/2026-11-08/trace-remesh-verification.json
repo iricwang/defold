@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-08",
+  "delivery": "session hot reload, no package",
+  "runtime_changed": false,
+  "clojure_tests": 108,
+  "assertions": 774,
+  "python_tests": 4,
+  "live_editor": {
+    "asset": "rat.skeleton",
+    "alpha_fixture": "05_tail.png",
+    "reported_settings": {
+      "detail": 100,
+      "concavity": 15,
+      "refinement": 46,
+      "uniform": 0.18,
+      "alpha": 8,
+      "padding": 6
+    },
+    "generated_vertices": 271,
+    "generated_triangles": 269,
+    "clipped_retained_pixels": 0,
+    "ignored_noise_pixels": 7,
+    "layer_hover": "03_front_left",
+    "layer_click_from_mesh_mode": "03_front_left / move",
+    "preview_hover_and_selection": 10,
+    "preview_vertex_drag_undo_exact": true,
+    "preview_did_not_change_document": true,
+    "confirm_undo_redo_exact": true,
+    "json_roundtrip": true
+  },
+  "notes": [
+    "Automatic graph undo/redo was verified before later user adjustments; final inspection left the game document unchanged from the captured latest baseline.",
+    "Counts in parameter previews vary with user-selected settings.",
+    "Spine-like interface and open-source contour algorithm, not a copy of Spine proprietary algorithms."
+  ]
+}

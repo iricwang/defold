@@ -45,7 +45,7 @@
   (let [{:keys [root record]} (fixture)
         frozen (craft/resource-file root (get-in record [:files 0 :path]))
         original (slurp frozen :encoding "UTF-8")
-        _ (delivery/approve! root (:id record) "已批准")
+        _ (delivery/approve! root (:id record) "已批准" :human)
         draft (review/create-draft! root (:id record))
         path (get-in draft [:files 0 :path])]
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"固定成果" (card-view/save-markdown! root frozen original "破坏")))

@@ -1,0 +1,31 @@
+11月 09, 2026 11:01:04 下午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @4d847d32'
+
+Testing editor.skeletal-animation-constraints-test
+
+Testing editor.skeletal-animation-geometry-test
+
+Testing editor.skeletal-animation-data-test
+
+Testing editor.skeletal-animation-navigation-test
+
+Testing editor.skeletal-animation-toolbar-test
+
+Testing editor.skeletal-animation-curve-view-test
+
+Testing editor.skeletal-animation-selection-test
+
+Testing editor.skeletal-animation-trace-view-test
+
+Testing editor.skeletal-animation-mesh-test
+
+Testing editor.skeletal-animation-slot-view-test
+
+Testing editor.skeletal-animation-view-test
+
+Testing editor.skeletal-animation-attachments-test
+
+Testing editor.skeletal-animation-smart-mesh-test
+
+Ran 244 tests containing 3048 assertions.
+0 failures, 0 errors.

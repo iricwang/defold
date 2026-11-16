@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-length-controls/build/editor.jar",
+  "sha256": "f89e1d96a37e0321fac5146b234c0a209df98eb3030ae3160d66a493bfa48182",
+  "project_source": "/tmp/spine-tail-path/project",
+  "project_copy": "/private/tmp/spine-length-controls/background-final/project",
+  "scenario": "/private/tmp/spine-length-controls/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

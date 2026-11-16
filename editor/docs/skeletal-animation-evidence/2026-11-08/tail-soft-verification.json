@@ -1,0 +1,22 @@
+{
+  "animation": "idle_soft_tail",
+  "document": "/Users/applemima1111/Documents/Game/Dragon/GameCopy/pok_analysis/defold_game/docs/source/spine_smart_mesh_validation/rat.skeleton",
+  "vertices": 26,
+  "deform_keys": 29,
+  "seconds": 1.4,
+  "setup_mesh_unchanged": true,
+  "original_animations_unchanged": true,
+  "roundtrip_max_vertex_error": 0,
+  "native_skeleton_readback_equal": true,
+  "manual_drag_pending_only": true,
+  "manual_key_committed": true,
+  "undo_restored_authored_animation": true,
+  "tests": {
+    "tests": 114,
+    "assertions": 800,
+    "failures": 0,
+    "errors": 0
+  },
+  "delivery": "Saved sample document; editor changes hot-loaded only; runtime unchanged",
+  "renderer": "Defold editor skeletal preview; no gameplay/runtime build claimed"
+}

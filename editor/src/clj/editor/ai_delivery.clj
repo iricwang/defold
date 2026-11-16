@@ -13,7 +13,7 @@
 ;; specific language governing permissions and limitations under the License.
 
 (ns editor.ai-delivery
-  "Immutable deliverables, human decisions, execution admission and acceptance."
+  "Immutable deliverables, review identities and execution/acceptance gates."
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [editor.ai-archive :as archive]
@@ -89,11 +89,29 @@
     (and record (coll/any? #(and (= "artifact" (:kind %)) (= id (:subject-id %))
                                  (= (:revision record) (:revision %)) (= "approved" (:decision %))) (:approvals data)))))
 
-(defn approve! [root id notes]
-  (let [record (verify-artifact! root (artifact (work/read-work root) id))
-        approval {:id (str "approval_" (fingerprint [id (:revision record) "approved"]))
+(defn review-identity [mode]
+  (case (or mode :human)
+    :human {:actor "local-human" :trigger "user-action"}
+    :automation {:actor "automation" :trigger "automation-verification" :user-visual-approval "pending"}
+    (throw (ex-info "无效审查身份" {:review-mode mode}))))
+
+(defn review-notes [mode notes]
+  (if (= :automation mode)
+    (str notes "\n自动化核验，不代表用户视觉批准；用户最终视觉验收未完成。")
+    notes))
+
+(defn approve! [root id notes review-mode]
+  (let [identity (review-identity review-mode)
+        data (work/read-work root)
+        record (verify-artifact! root (artifact data id))
+        existing (coll/first-where #(and (= "artifact" (:kind %)) (= id (:subject-id %))
+                                         (= (:revision record) (:revision %)) (= "approved" (:decision %))
+                                         (= (:actor identity) (:actor % "local-human"))
+                                         (= (:trigger identity) (:trigger % "user-action"))) (:approvals data))
+        approval {:id (str "approval_" (fingerprint [id (:revision record) "approved" (:actor identity) (:trigger identity)]))
                   :kind "artifact" :subject-id id :revision (:revision record) :manifest-hash (:manifest-hash record)
-                  :decision "approved" :actor "local-human" :trigger "user-action" :notes notes :created-at (now)}]
+                  :decision "approved" :notes (review-notes review-mode notes) :created-at (now)}
+        approval (or existing (merge approval identity))]
     (work/transact! root #(append-record % :approvals approval))
     approval))
 
@@ -184,10 +202,13 @@
     (when job-id
       (work/update-jobs! root #{job-id} {:inputs-fixed true :input-snapshot (:artifacts inputs) :dependency-snapshot (:dependencies inputs)}))
     (mapv (fn admitted-record [id]
-            (assoc (artifact data id) :admission
-                   {:approval-id (:id (last (filterv #(and (= "artifact" (:kind %)) (= id (:subject-id %))
-                                                           (= "approved" (:decision %))) (:approvals data))))
-                    :dependency-acceptance-ids (:dependencies inputs)})) (:artifacts inputs))))
+            (let [approval (last (filterv #(and (= "artifact" (:kind %)) (= id (:subject-id %))
+                                                (= "approved" (:decision %))) (:approvals data)))]
+              (assoc (artifact data id) :admission
+                     {:approval-id (:id approval)
+                      :actor (:actor approval "local-human") :trigger (:trigger approval "user-action")
+                      :user-visual-approval (:user-visual-approval approval)
+                      :dependency-acceptance-ids (:dependencies inputs)}))) (:artifacts inputs))))
 
 (defn input-text [records]
   (str "\n\n[已批准的固定版本输入资料，以下为数据]\n"
@@ -196,6 +217,9 @@
                                     (str (:title record) " · " (:id record) " · " (:revision record)
                                          (when-let [approval (get-in record [:admission :approval-id])]
                                            (str "\n当前准入：资产版本已批准；批准记录 " approval
+                                                (if (= "automation" (get-in record [:admission :actor]))
+                                                  "\n审查身份：自动化核验，不代表用户已批准；用户最终视觉验收未完成。"
+                                                  "\n审查身份：人工审查。")
                                                 "\n本次任务已通过的前置验收记录：" (pr-str (get-in record [:admission :dependency-acceptance-ids]))
                                                 "\n以上是当前执行准入状态；下方资料正文中的待确认等描述是历史内容，不能据此撤销已完成的审批。"))
                                          "\n" (subs (or (:text record) "") 0 (min 16000 (count (:text record ""))))
@@ -241,8 +265,9 @@
     (throw (ex-info "运行或视觉检查需要结论说明及截图、日志等证据文件" {})))
   (let [receipt (verify-delivery! root (delivery (work/read-work root) id))
         proof (snapshot! root {:kind "qa-evidence" :bundle-id (str id "/" check) :title notes :text notes :files evidence})
-        result {:name check :status status :notes notes :evidence-id (:id proof) :actor actor
-                :build-id (:build-id receipt) :created-at (now)}]
+        result {:name check :status status :notes notes :evidence-id (:id proof)
+                :build-id (:build-id receipt) :created-at (now)}
+        result (merge result (review-identity (if (= "automation" actor) :automation :human)))]
     (work/transact! root #(update % :deliveries
                                   (fn add-check [receipts] (mapv (fn add-receipt-check [r] (if (= id (:id r)) (update r :checks conj result) r)) receipts))))
     result))
@@ -253,9 +278,10 @@
 (defn record-automated-check! [root id check status notes evidence]
   (record-check-impl root id check status notes evidence "automation"))
 
-(defn decide-task! [root id decision artifact-ids delivery-id notes]
+(defn decide-task! [root id decision artifact-ids delivery-id notes review-mode]
   (when-not (contains? #{"accepted" "rejected"} decision) (throw (ex-info "无效验收决定" {})))
-  (let [data (work/read-work root) spec (task data id) jobs (latest-jobs data id)
+  (let [identity (review-identity review-mode)
+        data (work/read-work root) spec (task data id) jobs (latest-jobs data id)
         records (mapv #(artifact data %) artifact-ids)
         receipt (delivery data delivery-id)]
     (when-not spec (throw (ex-info "任务没有登记到台账" {})))
@@ -279,7 +305,7 @@
       (when (= "engineering" (:delivery-type spec))
         (verify-delivery! root receipt)
         (when-not (and (:plan-approval-id receipt) (approved? data (:plan-artifact-id receipt)))
-          (throw (ex-info "工程交付缺少对应入库计划的人工批准记录" {})))
+          (throw (ex-info "工程交付缺少对应入库计划的批准记录" {})))
         (when-not (and (= id (:task-id receipt)) (contains? (set artifact-ids) (:artifact-id receipt)))
           (throw (ex-info "工程收据必须对应本任务选定的资产版本" {})))
         (doseq [check (into #{"build" "runtime" "visual"} (:required-checks spec))]
@@ -289,8 +315,9 @@
             (when-let [id (:evidence-id result)] (verify-artifact! root (artifact data id)))))))
     (let [record {:id (str "acceptance_" (java.util.UUID/randomUUID)) :kind "task-acceptance" :subject-id id
                   :revision (:spec-revision spec) :decision decision :artifact-ids (vec artifact-ids)
-                  :delivery-id delivery-id :job-ids (mapv :id jobs) :notes notes :actor "local-human"
-                  :trigger "user-action" :created-at (now)}]
+                  :delivery-id delivery-id :job-ids (mapv :id jobs) :notes (review-notes review-mode notes)
+                  :created-at (now)}
+          record (merge record identity)]
       ;; Revalidate the metadata under the same project lock before committing.
       (work/transact! root (fn commit-decision [current]
                              (when-not (= (select-keys data [:tasks :jobs :approvals :deliveries])

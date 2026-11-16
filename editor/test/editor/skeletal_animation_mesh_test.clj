@@ -75,7 +75,7 @@
 ;; points. Crossed outlines are rejected instead of generating corrupt faces.
 (deftest triangulation-test
   (let [concave (assoc square :vertices [0.0 0.0 4.0 0.0 4.0 4.0 2.0 2.0 0.0 4.0]
-                             :uvs [0.0 0.0 1.0 0.0 1.0 1.0 0.5 0.5 0.0 1.0] :triangles [])
+                       :uvs [0.0 0.0 1.0 0.0 1.0 1.0 0.5 0.5 0.0 1.0] :triangles [])
         a (:mesh (mesh/triangulate concave [0 1 2 3 4]))
         b (:mesh (mesh/triangulate concave [4 3 2 1 0]))
         interior (assoc square :vertices (conj (:vertices square) 5.0 5.0) :uvs (conj (:uvs square) 0.5 0.5) :triangles [])
@@ -164,7 +164,7 @@
     (is (= 20 (count migrated)))
     (is (coordinates-close? [1.8 2.8 6.2 7.2] (subvec migrated 16)))
     (doseq [transforms [(:bone-transforms context)
-                       {"a" [0.0 1.0 -1.0 0.0 3.0 5.0] "b" [-2.0 0.0 0.0 0.5 20.0 -4.0]}]]
+                        {"a" [0.0 1.0 -1.0 0.0 3.0 5.0] "b" [-2.0 0.0 0.0 0.5 20.0 -4.0]}]]
       (let [original (geometry/mesh-world-vertices before geometry/identity-transform transforms offsets)
             updated (geometry/mesh-world-vertices after geometry/identity-transform transforms migrated)]
         (is (coordinates-close? [(* 0.5 (+ (original 0) (original 4))) (* 0.5 (+ (original 1) (original 5)))] (subvec updated 8)))))
@@ -183,8 +183,8 @@
 ;; and refuses constraints that cannot be satisfied without unlocking a bone.
 (deftest normalize-locked-test
   (let [raw (assoc-in (weighted-square [0.2 0.2 0.2 0.2]) [:weights 0] [{:bone "a" :weight 0.2 :x 0.0 :y 0.0}
-                                                                                  {:bone "b" :weight 0.4 :x -10.0 :y 0.0}
-                                                                                  {:bone "c" :weight 0.6 :x 0.0 :y -20.0}])
+                                                                        {:bone "b" :weight 0.4 :x -10.0 :y 0.0}
+                                                                        {:bone "c" :weight 0.6 :x 0.0 :y -20.0}])
         after (:mesh (mesh/normalize-weights raw #{0} #{"a"}))]
     (is (= (get-in raw [:weights 0 0]) (get-in after [:weights 0 0])))
     (is (coordinates-close? [0.2 0.32 0.48] (mapv :weight (get (:weights after) 0))))
@@ -440,9 +440,9 @@
 ;; UVs map top-left pixels into the requested local Y-up image rectangle.
 (deftest trace-concave-test
   (let [image {:width 4 :height 4 :alpha [255 255 255 255
-                                        255 255 0 0
-                                        255 255 0 0
-                                        255 255 0 0]}
+                                          255 255 0 0
+                                          255 255 0 0
+                                          255 255 0 0]}
         edit (mesh/trace-alpha square image {:simplify 0.0 :bounds [0.0 0.0 4.0 4.0]})
         traced (:mesh edit)
         points (into #{} (partition-all 2) (:vertices traced))]
@@ -499,3 +499,165 @@
     (is (thrown? clojure.lang.ExceptionInfo (mesh/trace-alpha square (assoc islands :alpha [255]) {})))
     (is (thrown? clojure.lang.ExceptionInfo (mesh/trace-alpha square islands {:threshold 256})))
     (is (thrown? clojure.lang.ExceptionInfo (mesh/trace-alpha square islands {:padding -1})))))
+
+;; Generated interior vertices preserve the old animated surface under arbitrary
+;; bone transforms, with interpolated weights and per-bone deform offsets.
+(deftest remesh-weighted-surface-test
+  (let [before (weighted-square [0.8 0.75 0.2 0.5])
+        offsets [1.0 2.0 3.0 4.0 0.0 0.0 0.0 0.0 5.0 6.0 7.0 8.0 0.0 0.0 0.0 0.0]
+        edit (mesh/transfer-topology before (conj (:uvs before) 0.5 0.5)
+                                     [0 1 4 1 2 4 2 3 4 3 0 4] [] context)
+        after (:mesh edit)
+        migrated (mesh/remap-deform before after (:vertex-map edit) offsets)]
+    (is (= 0 (:outside-vertices edit)))
+    (is (= {"a" 0.5 "b" 0.5} (weights-by-bone after 4)))
+    (doseq [transforms [(:bone-transforms context)
+                        {"a" [0.0 1.0 -1.0 0.0 3.0 5.0] "b" [-2.0 0.0 0.0 0.5 20.0 -4.0]}]]
+      (let [original (geometry/mesh-world-vertices before geometry/identity-transform transforms offsets)
+            updated (geometry/mesh-world-vertices after geometry/identity-transform transforms migrated)]
+        (is (coordinates-close? (subvec original 0 8) (subvec updated 0 8)))
+        (is (coordinates-close? [(* 0.5 (+ (original 0) (original 4))) (* 0.5 (+ (original 1) (original 5)))] (subvec updated 8)))))))
+
+;; New alpha-outline vertices outside the original UV hull extrapolate geometry
+;; without collapsing faces, use normalized edge weights and report approximation.
+(deftest remesh-expanded-boundary-test
+  (doseq [before [square (weighted-square [0.8 0.75 0.2 0.5])]]
+    (let [edit (mesh/transfer-topology before [-0.1 1.1 1.1 1.1 1.1 -0.1 -0.1 -0.1] (:triangles before) [] context)
+          after (:mesh edit)]
+      (is (= 4 (:outside-vertices edit)))
+      (is (coordinates-close? [-1 -1 11 -1 11 11 -1 11] (:vertices after)))
+      (is (close? 144.0 (triangle-area after)))
+      (when (:weights after)
+        (is (coordinates-close? (:vertices after) (geometry/mesh-world-vertices after geometry/identity-transform (:bone-transforms context) [])))
+        (doseq [influences (:weights after)]
+          (is (close? 1.0 (transduce (map :weight) + influences)))))))
+  (is (thrown? clojure.lang.ExceptionInfo
+               (mesh/transfer-topology (assoc square :uvs [0 0 0 0 0 0 0 0]) (:uvs square) (:triangles square) [] context))))
+
+;; A real rigidly weighted triangle produced 1.0000000000000002 during
+;; interpolation. Normalization must satisfy the editor's closed [0,1] range.
+(deftest remesh-floating-weight-boundary-test
+  (let [uvs [0.0447172159733777 0.8225679808370043 0.16927740083194676 0.8349484188325991 0.026012660732113144 0.9050136538546255]
+        before {:type "mesh" :uvs uvs :vertices uvs :triangles [0 1 2]
+                :weights (mapv (fn [[x y]] [{:bone "a" :x x :y y :weight 1.0}]) (partitionv 2 uvs))}
+        edit (mesh/transfer-topology before (conj uvs 0.1221297836938436 0.8334801762114536) [0 1 3 1 2 3 2 0 3] [] context)]
+    (is (coll/every? #(<= 0.0 (:weight %) 1.0) (coll/into-> (:weights (:mesh edit)) [] cat)))
+    (is (= 1.0 (get-in edit [:mesh :weights 3 0 :weight])))))
+
+;; Initial binding auto-weights; editing the bone list must retain painted
+;; influences, preserve setup geometry and allow removing the final bone.
+(deftest interactive-binding-test
+  (let [bound (:mesh (mesh/change-binding square ["a" "b"] context))
+        painted (weighted-square [0.8 0.4 0.6 1.0])
+        added (:mesh (mesh/change-binding painted ["a" "b" "c"] context))
+        removed (:mesh (mesh/change-binding added ["a" "c"] context))
+        unbound (:mesh (mesh/change-binding removed [] context))]
+    (is (= ["a" "b"] (mesh/binding-bones bound)))
+    (is (= ["a" "b" "c"] (mesh/binding-bones added)))
+    (doseq [i (range 4)]
+      (is (= (get (:weights painted) i) (subvec (get (:weights added) i) 0 2)))
+      (is (= 0.0 (:weight (last (get (:weights added) i)))))
+      (is (close? 1.0 (reduce + (mapv :weight (get (:weights removed) i))))))
+    (is (nil? (:weights unbound)))
+    (is (coordinates-close? (:vertices square) (:vertices unbound)))
+    (is (thrown? clojure.lang.ExceptionInfo (mesh/change-binding square ["missing"] context)))))
+
+;; Topological distance follows a U-shaped mesh instead of crossing its empty
+;; center. Scaling the rig must not change the resulting normalized weights.
+(deftest automatic-weights-follow-surface-test
+  (let [u {:vertices [0.0 0.0 1.0 0.0 0.0 10.0 1.0 10.0 0.0 20.0 1.0 19.0
+                      4.0 20.0 3.0 19.0 4.0 10.0 3.0 10.0 4.0 0.0 3.0 0.0]
+           :uvs (vec (repeat 24 0.0))
+           :triangles [0 1 2 1 3 2 2 3 4 3 5 4 4 5 6 5 7 6 6 7 8 7 9 8 8 9 10 9 11 10]}
+        rig {:slot-transform geometry/identity-transform
+             :bones [{:id "a" :length 0.0} {:id "b" :length 0.0}]
+             :bone-transforms {"a" geometry/identity-transform "b" [1.0 0.0 0.0 1.0 4.0 20.0]}}
+        result (:mesh (mesh/bind-weights u ["a" "b"] rig {}))
+        scaled (:mesh (mesh/bind-weights u ["a" "b"]
+                                         (assoc rig :slot-transform [10.0 0.0 0.0 10.0 0.0 0.0]
+                                                :bone-transforms {"a" [10.0 0.0 0.0 10.0 0.0 0.0]
+                                                                  "b" [10.0 0.0 0.0 10.0 40.0 200.0]}) {}))]
+    (is (> (get (weights-by-bone result 10) "b") 0.75))
+    (doseq [index (range 12)]
+      (is (close? 1.0 (reduce + 0.0 (coll/vals (weights-by-bone result index)))))
+      (is (coordinates-close? (mapv :weight (get (:weights result) index))
+                              (mapv :weight (get (:weights scaled) index)))))
+    (is (coordinates-close? (:vertices u)
+                            (geometry/mesh-world-vertices result (:slot-transform rig) (:bone-transforms rig) nil)))))
+
+;; Bone/vertex subsets and locks must not erase unrelated painting or replace
+;; retained binding coordinates when automatic weighting is run again.
+(deftest automatic-weights-preserve-subsets-test
+  (let [before (weighted-square [0.2 0.4 0.6 0.8])
+        moved (assoc-in before [:weights 0 0 :x] 5.0)
+        after (:mesh (mesh/bind-weights moved ["a" "b"] context {:selection #{0}}))
+        subset (:mesh (mesh/bind-weights before ["a" "b"] context {:selected-bones #{"b"}}))]
+    (is (= 5.0 (get-in after [:weights 0 0 :x])))
+    (is (= (subvec (:weights moved) 1) (subvec (:weights after) 1)))
+    (is (= before subset))))
+
+;; Smooth follows cyan hull and explicit manual edges, not an automatically
+;; chosen diagonal that would make results depend on triangulation.
+(deftest smooth-hull-and-manual-edges-test
+  (let [before (weighted-square [0.0 1.0 1.0 0.0])
+        hull (:mesh (mesh/smooth-weights before #{0} 1.0 context #{}))
+        manual (:mesh (mesh/smooth-weights (assoc before :constrained-edges [[0 2]]) #{0} 1.0 context #{}))]
+    (is (close? 0.5 (get (weights-by-bone hull 0) "a")))
+    (is (close? (/ 2.0 3.0) (get (weights-by-bone manual 0) "a")))))
+
+;; Brush feather has a constant-strength core, and selected vertices restrict
+;; paint even when other vertices lie inside the brush radius.
+(deftest brush-feather-and-selection-test
+  (let [before (weighted-square [0.0 0.0 0.0 0.0])
+        opts {:mode :add :center [0.0 0.0] :radius 20.0 :strength 0.4 :bone-id "a" :feather 0.5 :selection #{0 1}}
+        after (:mesh (mesh/brush-weights before opts context))]
+    (is (close? 0.4 (get (weights-by-bone after 0) "a")))
+    (is (close? 0.4 (get (weights-by-bone after 1) "a")))
+    (is (= (subvec (:weights before) 2) (subvec (:weights after) 2)))
+    (is (thrown? clojure.lang.ExceptionInfo (mesh/brush-weights before (assoc opts :feather -1.0) context)))))
+
+;; Updating bindings retains the currently posed mesh; subsequent weight
+;; changes no longer make it jump between the old bone-relative positions.
+(deftest update-bindings-preserves-pose-test
+  (let [before (weighted-square [0.2 0.4 0.6 0.8])
+        rig (assoc-in context [:bone-transforms "b"] [1.0 0.0 0.0 1.0 30.0 10.0])
+        world (geometry/mesh-world-vertices before (:slot-transform rig) (:bone-transforms rig) nil)
+        updated (:mesh (mesh/update-bindings before rig))
+        painted (:mesh (mesh/set-weights updated #{0 1 2 3} "a" 1.0 rig #{}))]
+    (is (coordinates-close? world (geometry/mesh-world-vertices updated (:slot-transform rig) (:bone-transforms rig) nil)))
+    (is (coordinates-close? world (geometry/mesh-world-vertices painted (:slot-transform rig) (:bone-transforms rig) nil)))))
+
+;; Selecting multiple bones edits their total without sequentially overwriting
+;; the first bone's newly assigned weight, including with the brush.
+(deftest grouped-weight-edit-test
+  (let [before (weighted-square [0.2 0.4 0.6 0.8])
+        direct (:mesh (mesh/set-weight-group before #{0} ["a" "b"] 0.7 context #{}))
+        brush (:mesh (mesh/brush-weights before {:mode :replace :bone-ids ["a" "b"] :center [0.0 0.0]
+                                                 :radius 1.0 :strength 0.7 :feather 0.5} context))]
+    (is (= before direct))
+    (is (= before brush))))
+
+;; Copy/paste is matched by vertex count and bound bone identity. Bind positions
+;; and locked influences remain untouched when transferring weight values.
+(deftest paste-weight-validation-test
+  (let [before (weighted-square [0.2 0.4 0.6 0.8])
+        copied [{"a" 0.7 "b" 0.3}]
+        after (:mesh (mesh/paste-weights before #{1} copied context #{}))]
+    (is (close? 0.7 (get (weights-by-bone after 1) "a")))
+    (is (= (dissoc (get-in before [:weights 1 1]) :weight) (dissoc (get-in after [:weights 1 1]) :weight)))
+    (is (= before (:mesh (mesh/paste-weights before #{1} copied context #{"a"}))))
+    (is (thrown? clojure.lang.ExceptionInfo (mesh/paste-weights before #{0 1} copied context #{})))
+    (is (thrown? clojure.lang.ExceptionInfo (mesh/paste-weights before #{0} [{"other" 1.0}] context #{})))))
+
+;; Weld transfers only overlapping vertices unless explicitly asked for all;
+;; it refuses a target without matching bone bindings.
+(deftest weld-weights-test
+  (let [before (weighted-square [0.2 0.4 0.6 0.8])
+        target (weighted-square [0.9 0.8 0.7 0.6])
+        welded (:mesh (mesh/weld-weights before #{0 1} target context context true))
+        remote (update context :bone-transforms (fn [transforms] (update-vals transforms #(update % 4 + 100.0))))]
+    (is (close? 0.9 (get (weights-by-bone welded 0) "a")))
+    (is (close? 0.8 (get (weights-by-bone welded 1) "a")))
+    (is (= (subvec (:weights before) 2) (subvec (:weights welded) 2)))
+    (is (= before (:mesh (mesh/weld-weights before #{0 1 2 3} target context remote true))))
+    (is (thrown? clojure.lang.ExceptionInfo (mesh/weld-weights before #{0} square context context false)))))

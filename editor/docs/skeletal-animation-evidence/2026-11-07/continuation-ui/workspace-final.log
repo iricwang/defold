@@ -1,0 +1,5 @@
+{"id": "update-check", "out": ":active \"companion\" :fixture-node 19257 :view-node 19258 :preview-mode \"setup\" :peer-names [\"hero\" \"companion\"] :status \"\" :screenshot \"/var/folders/gc/yc_pl9gn1yj8jxbk3txvg6tw0000gn/T/plorer-11790297507728059616.png\"\n", "session": "2fad54c3-1d75-4215-b6b3-88b870b14b0c"}
+{"id": "update-check", "ns": "user", "session": "2fad54c3-1d75-4215-b6b3-88b870b14b0c", "value": "nil"}
+{"id": "update-check", "out": ":history-types {\"class internal.transaction.AddNodesTXC\" 2, \"class internal.transaction.SetRawPropertyTXC\" 5}\n", "session": "2fad54c3-1d75-4215-b6b3-88b870b14b0c"}
+{"id": "update-check", "ns": "user", "session": "2fad54c3-1d75-4215-b6b3-88b870b14b0c", "value": "nil"}
+{"id": "update-check", "session": "2fad54c3-1d75-4215-b6b3-88b870b14b0c", "status": ["done"]}

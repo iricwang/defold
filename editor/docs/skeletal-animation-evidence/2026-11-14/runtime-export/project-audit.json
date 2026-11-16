@@ -1,0 +1,31 @@
+{
+  "summary": {
+    "project_root": "/private/tmp/spine-runtime-export/runtime/current-final",
+    "files_scanned": 52,
+    "file_counts": {
+      ".atlas": 1,
+      ".collection": 1,
+      ".dll": 1,
+      ".dylib": 2,
+      ".factory": 2,
+      ".fp": 1,
+      ".go": 2,
+      ".input_binding": 1,
+      ".jar": 1,
+      ".json": 1,
+      ".material": 1,
+      ".png": 27,
+      ".project": 1,
+      ".script": 1,
+      ".skeleton": 1,
+      ".so": 2,
+      ".spinejson": 1,
+      ".spinemodel": 2,
+      ".spinescene": 2,
+      ".vp": 1
+    },
+    "dependencies": [],
+    "finding_counts": {}
+  },
+  "findings": []
+}

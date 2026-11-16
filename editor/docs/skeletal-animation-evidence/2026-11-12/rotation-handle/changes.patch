@@ -1,0 +1,139 @@
+--- before/editor/src/clj/editor/skeletal_animation_view.clj
++++ after/editor/src/clj/editor/skeletal_animation_view.clj
+@@ -618,6 +618,18 @@
+           (.fillPolygon gc (double-array (mapv first coordinates)) (double-array (mapv second coordinates)) 3))))))
+ 
+ (def ^:private transform-handle-length 76.0)
++
++(defn- bone-rotation-handle [context doc]
++  (let [state @(:state context)]
++    (when (and (= "rotate" (:tool state)) (= :bone (:selected-kind state))
++               (not (:playing state)))
++      (when-let [bone (selected-bone context doc)]
++        (let [matrix (get (:transforms (evaluated-pose context doc)) (:id bone))]
++          {:center (screen context (point matrix [0.0 0.0])) :radius 48.0})))))
++
++(defn- rotation-handle-hit? [handle x y]
++  (when-let [{[px py] :center radius :radius} handle]
++    (<= (abs (- (Math/hypot (- x px) (- y py)) radius)) 10.0)))
+ 
+ (defn- draw! [context]
+   (let [doc (document context)
+@@ -817,6 +829,23 @@
+                 (.fillRect gc (- ex 5.0) (- ey 5.0) 10.0 10.0))
+               (.setFont gc (Font/font 13.0))
+               (.fillText gc (if (zero? index) "X" "Y") (+ ex 8.0) (- ey 8.0)))))))
++    (when-let [{[x y] :center radius :radius :as handle} (bone-rotation-handle context doc)]
++      (let [[px py] (:pointer state [0.0 0.0])
++            active (or (get-in state [:drag :rotation-handle]) (rotation-handle-hit? handle px py))]
++        ;; Screen-space dimensions keep tiny bones usable at any zoom.
++        (.setStroke gc (Color/web "#242424"))
++        (.setLineWidth gc 5.0)
++        (.strokeOval gc (- x radius) (- y radius) (* 2.0 radius) (* 2.0 radius))
++        (.setStroke gc (Color/web (if active "#ffb18f" "#ee6e59")))
++        (.setFill gc (Color/web (if active "#ffb18f" "#ee6e59")))
++        (.setLineWidth gc (if active 3.0 2.0))
++        (.strokeOval gc (- x radius) (- y radius) (* 2.0 radius) (* 2.0 radius))
++        (doseq [direction [-1.0 1.0]]
++          (let [ax (+ x (* direction radius))]
++            (.fillPolygon gc (double-array [ax (- ax 6.0) (+ ax 6.0)])
++                          (double-array [(+ y (* direction 10.0)) (- y (* direction 4.0)) (- y (* direction 4.0))]) 3)))
++        (.strokeLine gc (- x 5.0) y (+ x 5.0) y)
++        (.strokeLine gc x (- y 5.0) x (+ y 5.0))))
+     (when-let [frame (mesh-manipulator context doc)]
+       (let [[x y] (screen context (:pivot frame))]
+         (.setStroke gc (Color/web "#d7eeee"))
+@@ -2703,6 +2732,7 @@
+                                 primary (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
+                                 peer (when primary (workspace-view/hit-label (workspace-preview context doc) x y))
+                                 axis (when primary (gizmo-axis context doc x y))
++                                rotation-handle (and primary (rotation-handle-hit? (bone-rotation-handle context doc) x y))
+                                 create-bone (and primary (= "create" (:tool state)) (= "setup" (:mode state)))
+                                 slot (selected-slot context doc)
+                                 mesh-frame (mesh-manipulator context doc)
+@@ -2738,6 +2768,7 @@
+                                 (when primary (swap! (:state context) assoc :playing false))
+                                 (cond
+                                   pan nil
++                                  rotation-handle nil
+                                   pivot-drag nil
+                                   vertex-box (swap! (:state context) assoc :selection-box {:start [x y] :current [x y] :original (if additive (:vertices state #{}) #{})}
+                                                     :vertices (if additive (:vertices state #{}) #{}))
+@@ -2791,7 +2822,7 @@
+                                                  :selected-kind :slot :selected nil :selected-bones #{}))))))
+                                 (when-not (or create delete other-slot)
+                                   (swap! (:state context) assoc :drag {:document doc :start [x y] :world (world context x y)
+-                                                                       :last-point [x y] :brush brush :axis axis
++                                                                       :last-point [x y] :brush brush :axis axis :rotation-handle rotation-handle
+                                                                        :pivot-drag pivot-drag :mesh-frame (when (or mesh-transform pivot-drag) mesh-frame)
+                                                                        :create-id (when create-bone (unique-id (:bones doc) "bone"))
+                                                                        :keep-parent (.isShiftDown ^MouseEvent event)
+--- before/editor/test/editor/skeletal_animation_drag_test.clj
++++ after/editor/test/editor/skeletal_animation_drag_test.clj
+@@ -223,3 +223,66 @@
+           (is (= 10 @samples))
+           (p/mouse-release! scene (p/point canvas 0.4 0.3) :primary))
+         (finally (.hide window))))))
++
++;; Rotation rings must keep the current bone selected in empty space and over
++;; another bone, including zero-length bones at different zoom levels.
++(deftest bone-rotation-ring-canvas-drag-test
++  (doseq [mode ["setup" "animate"] zoom [0.5 1.0 2.0] length [0.0 5.0]]
++    (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++      (ui/run-now
++        (let [doc (-> (rig)
++                      (data/update-bone "lower" {:length length})
++                      (data/add-bone {:id "overlap" :parent "root" :x (+ 100.0 (/ 48.0 zoom)) :length 0.0}))
++              context (context doc {:mode mode :tool "rotate" :zoom zoom})
++              radius (/ 48.0 zoom)]
++          (drag! context [(+ 100.0 radius) 0.0] [100.0 radius])
++          (let [after (g/node-value (:resource-node context) :document)
++                bone (coll/first-where #(= "lower" (:id %)) (if (= mode "animate") (:bones (pose after)) (:bones after)))]
++            (is (= "lower" (:selected @(:state context))))
++            (is (< (abs (- 90.0 (:rotation bone))) 1.0e-4))
++            (when (= mode "animate") (is (= (:bones doc) (:bones after))))
++            (g/undo! :undo/global)
++            (is (= doc (g/node-value (:resource-node context) :document)))
++            (g/redo! :undo/global)
++            (is (= after (g/node-value (:resource-node context) :document)))))))))
++
++;; The ring's hit band is in screen pixels and does not swallow the origin,
++;; distant selection clicks, playback, or mesh-vertex editing.
++(deftest bone-rotation-ring-hit-test
++  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++    (ui/run-now
++      (let [context (context (rig) {:tool "rotate"})
++            doc (rig)
++            handle (#'view/bone-rotation-handle context doc)
++            [x y] (:center handle)]
++        (is (#'view/rotation-handle-hit? handle (+ x 56.0) y))
++        (is (not (#'view/rotation-handle-hit? handle (+ x 64.0) y)))
++        (is (not (#'view/rotation-handle-hit? handle x y)))
++        (swap! (:state context) assoc :playing true)
++        (is (nil? (#'view/bone-rotation-handle context doc)))
++        (swap! (:state context) assoc :playing false :selected-kind :slot)
++        (is (nil? (#'view/bone-rotation-handle context doc)))))))
++
++;; Shift on the ring snaps rotation without changing a multi-selection;
++;; selected descendants inherit the rotation once, not twice.
++(deftest bone-rotation-ring-snap-group-test
++  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++    (ui/run-now
++      (let [doc (rig)
++            context (context doc {:mode "setup" :tool "rotate" :selected "upper" :selected-bones #{"upper" "lower"}})
++            scene (:scene context)
++            window (doto (javafx.stage.Stage.) (.setScene scene) (.show))
++            angle (Math/toRadians 38.0)]
++        (try
++          (.requestFocus (:canvas context))
++          (p/key-press! scene :shift)
++          (p/mouse-press! scene (mouse-point context [48.0 0.0]) :primary)
++          (p/mouse-move! scene (mouse-point context [(* 48.0 (Math/cos angle)) (* 48.0 (Math/sin angle))]))
++          (p/mouse-release! scene (mouse-point context [(* 48.0 (Math/cos angle)) (* 48.0 (Math/sin angle))]) :primary)
++          (let [after (g/node-value (:resource-node context) :document)]
++            (is (= #{"upper" "lower"} (:selected-bones @(:state context))))
++            (is (< (abs (- 45.0 (:rotation (coll/first-where #(= "upper" (:id %)) (:bones after))))) 1.0e-4))
++            (is (= 0.0 (:rotation (coll/first-where #(= "lower" (:id %)) (:bones after)))))
++            (g/undo! :undo/global)
++            (is (= doc (g/node-value (:resource-node context) :document))))
++          (finally (p/key-release! scene :shift) (.hide window)))))))

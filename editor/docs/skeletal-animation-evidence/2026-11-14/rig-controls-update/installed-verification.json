@@ -1,0 +1,46 @@
+{
+  "compiled-class": "jar:file:/Applications/Defold.app/Contents/Resources/packages/defold-871d419fe7ad8f81d5d988f58afa153df5ca818f.jar!/editor/skeletal_animation_view$control_at.class",
+  "rig-role": [
+    "当前骨骼：由约束驱动"
+  ],
+  "create-ik": true,
+  "workspace": true,
+  "tabs": [
+    [
+      "combatˍhud.gui",
+      "adventure.gui",
+      "*tailˍpathˍexample.skeleton"
+    ],
+    [
+      "图表",
+      "摄影表",
+      "事件记录"
+    ],
+    [
+      "控制台",
+      "曲线编辑",
+      "构建错误",
+      "查找结果",
+      "断点"
+    ]
+  ],
+  "dirty-count": 1,
+  "title": "Lastlight District - Defold 1.14.2-patch.131",
+  "stopped-timers": 0,
+  "create-path": true,
+  "disabled-handlers": 0,
+  "from_revision": 130,
+  "revision": 131,
+  "installed_files": 169,
+  "inventory_mismatches": [],
+  "verified_feed": "http://127.0.0.1:18831/manifest.json",
+  "published_to_github": false,
+  "tested_and_installed_jar_sha256": "7fe34d093398d2672e6964eb17227aecc16aed05c2f6e6cc92bfbd7c0f5977e5",
+  "native_entries_unchanged": 61,
+  "jdk_unchanged": true,
+  "backup_app": "/Applications/Defold.app.patch-backup-019c00ee-2598-4102-bed6-9aa5839368db",
+  "project_saved_before_restart": true,
+  "saved_files_unchanged_after_restart": true,
+  "background_steps": 89,
+  "background_status": "passed"
+}

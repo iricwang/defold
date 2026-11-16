@@ -1,0 +1,9 @@
+{
+  "version": "1.14.2-patch.130",
+  "runtime_entries_byte_identical": 47917,
+  "changed_entries": 3832,
+  "tested_code_byte_identical": true,
+  "jar_sha256": "496eecdb20b3d31b67b6a357f96338541e23d875159f5b0cddf7987414f15f36",
+  "patch": "/Users/applemima1111/Documents/Dev/Defold/tmp/spine-runtime-update/Defold-arm64-macos-patch-129-to-130.zip",
+  "bytes": 217383799
+}

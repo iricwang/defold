@@ -1,0 +1,10 @@
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': "#'user/weight-contexts"}
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': "#'user/weights-before"}
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': "#'editor.skeletal-animation-view/register-view-types"}
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': 'nil'}
+{'id': 'patch', 'out': ':weight-hotload {:documents-preserved [true], :selections-preserved [true], :undo-preserved true, :failed-handlers 0, :stopped-timers 0}\n', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0'}
+{'id': 'patch', 'ns': 'user', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'value': 'nil'}
+{'id': 'patch', 'session': 'd2242e13-48ea-4215-9087-c1ebd94f8bd0', 'status': ['done']}

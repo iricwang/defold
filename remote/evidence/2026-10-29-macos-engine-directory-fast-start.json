@@ -1,0 +1,64 @@
+{
+  "outcome": "passed",
+  "runtimeRevision": "6f0926ca3273e4c7",
+  "passed": [
+    "real game uses the selected packaged engine",
+    "compiler and build inputs are pinned separately from Manager revision",
+    "same installation contents retain running session",
+    "invalid selection leaves active session and directory unchanged",
+    "repeat start reuses original build and timestamp",
+    "owned Manager exits normally",
+    "chosen engine directory survives restart",
+    "restart restores the cached project as ready",
+    "restart launches cached resources without compiling",
+    "all three starts created only one build directory",
+    "engine identity remains unchanged after restart",
+    "owned Manager exits normally",
+    "Manager-only revision update preserves compatible cache",
+    "Manager-only upgrade runs without another build"
+  ],
+  "scope": "Actual macOS Manager, resource compilation and GPU frames; no APK build or phone test",
+  "first-frame": {
+    "width": 320,
+    "height": 240,
+    "centerDistinctColors": 1902,
+    "centerStddev": 57.140257353220356
+  },
+  "firstBuildAndFrameSeconds": 15.814,
+  "cached-frame": {
+    "width": 320,
+    "height": 240,
+    "centerDistinctColors": 1902,
+    "centerStddev": 57.140257353220356
+  },
+  "cachedStartAndFrameSeconds": 0.826,
+  "restart-frame": {
+    "width": 320,
+    "height": 240,
+    "centerDistinctColors": 1902,
+    "centerStddev": 57.140257353220356
+  },
+  "restartCachedStartAndFrameSeconds": 0.826,
+  "upgrade-frame": {
+    "width": 320,
+    "height": 240,
+    "centerDistinctColors": 1902,
+    "centerStddev": 57.140257353220356
+  },
+  "forcedCleanup": false,
+  "sourceCommit": "310b9977424d5fdf7e64cf1d7221201ec5ada86d",
+  "appVersion": "0.2.6",
+  "installedApp": "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-manager-delivery/Defold Remote Manager.app",
+  "installation": {
+    "hostIdentityPreserved": true,
+    "projectListPreserved": true,
+    "pairedDevicesPreserved": true,
+    "engineDirectory": "/Applications/Defold.app"
+  },
+  "nativePickerVerified": true,
+  "iconSource": "/Users/applemima1111/Downloads/湖蓝色立体互锁图标.png",
+  "apkBuilt": false,
+  "artifactUnitTests": 4,
+  "packageFileHashesVerified": 196,
+  "signatureVerified": true
+}

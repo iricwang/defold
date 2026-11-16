@@ -1,0 +1,19 @@
+{
+  "fixture": "output-224006-1127/basement_rat_smart_mesh.spine",
+  "spine_version": "4.3.26",
+  "bones": 10,
+  "slots": 11,
+  "animations": 6,
+  "selected_slot": "02_front_right",
+  "mesh_vertices": 108,
+  "mesh_triangles": 157,
+  "unchanged_bones_animations_other_slots": true,
+  "ui_import_mesh_undo_redo_play_save_reopen": true,
+  "native_save_roundtrip": true,
+  "unit_tests": 75,
+  "assertions": 548,
+  "failures": 0,
+  "errors": 0,
+  "delivery": "session hot reload; no package built",
+  "runtime_modified": false
+}

@@ -1,0 +1,18 @@
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': "#'user/weight-contexts"}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': "#'user/weights-before"}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': "#'editor.skeletal-animation-geometry/mesh-to-region"}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': "#'editor.skeletal-animation-attachments/restore-image"}
+{'err': "Reflection warning, /Users/applemima1111/Documents/Dev/Defold/editor/src/clj/editor/skeletal_animation_properties.clj:76:18 - call to method updateItem can't be resolved (target class is unknown).\n", 'id': 'patch', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': "#'editor.skeletal-animation-properties/action-grid"}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': "#'editor.skeletal-animation-slot-view/skin-inspector"}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': "#'editor.skeletal-animation-view/register-view-types"}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': '#object[clojure.lang.Agent 0x3641320e {:status :ready, :val #object[editor.localization.LocalizationState 0x42a0c17c "editor.localization.LocalizationState@42a0c17c"]}]'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': 'nil'}
+{'id': 'patch', 'out': ':property-structure-hotload {:documents-preserved [true], :selections-preserved [true], :undo-preserved true, :failed-handlers 0, :stopped-timers 0}\n', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a'}
+{'id': 'patch', 'ns': 'user', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'value': 'nil'}
+{'id': 'patch', 'session': '664ce66f-4110-438b-a709-20c6d5ae3f0a', 'status': ['done']}

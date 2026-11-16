@@ -1,0 +1,16 @@
+{
+  "jar": "/Users/applemima1111/Documents/Dev/Defold/tmp/skeletal-local-update/packaged-editor.jar",
+  "sha256": "8e758c1237f772bd3c6ab58153ae78864c668a343578a959798548dc737afbdc",
+  "project_source": "tmp/headless-skeletal-fixture",
+  "project_copy": "/Users/applemima1111/Documents/Dev/Defold/tmp/background-skeletal-final/project",
+  "scenario": "/Users/applemima1111/Documents/Dev/Defold/editor/test/headless/skeletal.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

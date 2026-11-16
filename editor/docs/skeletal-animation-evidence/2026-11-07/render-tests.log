@@ -1,0 +1,11 @@
+
+Testing editor.skeletal-animation-clipping-test
+
+Testing editor.skeletal-animation-gpu-test
+
+Testing editor.skeletal-animation-render-test
+
+Ran 14 tests containing 264 assertions.
+0 failures, 0 errors.
+Nov 07, 2026 2:20:44 AM com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @6e57b5e9'

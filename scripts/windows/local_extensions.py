@@ -191,13 +191,27 @@ def make_config(source, output):
     output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
+def configured_cmake(build_dir):
+    # Ninja records CMAKE_COMMAND in generated-header commands. Switching between
+    # a Homebrew symlink and its Cellar path rebuilds SDK core objects as well.
+    cache = build_dir / 'CMakeCache.txt'
+    if cache.is_file():
+        for line in cache.read_text(encoding='utf-8').splitlines():
+            if line.startswith('CMAKE_COMMAND:INTERNAL='):
+                command = line.split('=', 1)[1]
+                if not Path(command).is_file():
+                    raise ValueError('Configured SDK CMake is missing; reconfigure and rebuild SDK: ' + command)
+                return command
+    return shutil.which('cmake') or ('C:/Program Files/CMake/bin/cmake.exe' if windows() else 'cmake')
+
+
 class Builder:
     def __init__(self, engine_home, work, cache=None):
         self.home = engine_home.resolve()
         self.work = work.resolve()
         self.work.mkdir(parents=True, exist_ok=True)
         self.build_dir = ROOT / 'engine/build' / PLATFORM
-        self.cmake = shutil.which('cmake') or ('C:/Program Files/CMake/bin/cmake.exe' if windows() else 'cmake')
+        self.cmake = configured_cmake(self.build_dir)
         self.sdk = sdk_revision(self.home)
         self.engine_hash = file_hash(self.home / 'bin' / PLATFORM / engine_filename())
         self.bob_hash = file_hash(self.home / 'share/java/bob.jar')

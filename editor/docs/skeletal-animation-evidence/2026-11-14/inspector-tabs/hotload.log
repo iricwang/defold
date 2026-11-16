@@ -1,0 +1,15 @@
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': "#'user/inspector-contexts"}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': "#'user/inspector-before"}
+{'err': "Reflection warning, /Users/applemima1111/Documents/Dev/Defold/editor/src/clj/editor/skeletal_animation_properties.clj:75:18 - call to method updateItem can't be resolved (target class is unknown).\n", 'id': 'patch', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231'}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': "#'editor.skeletal-animation-properties/key-button!"}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': "#'editor.skeletal-animation-slot-view/skin-inspector"}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': "#'editor.skeletal-animation-view/register-view-types"}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': '#object[clojure.lang.Agent 0x3641320e {:status :ready, :val #object[editor.localization.LocalizationState 0xc096866 "editor.localization.LocalizationState@c096866"]}]'}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': 'nil'}
+{'id': 'patch', 'out': ':hotloaded {:documents-preserved [true], :selections-preserved [true], :undo-preserved true, :failed-handlers 0, :stopped-timers 0}\n', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231'}
+{'id': 'patch', 'ns': 'user', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'value': 'nil'}
+{'id': 'patch', 'session': 'c0ef71f6-4d57-403e-8c3e-69df4f7ae231', 'status': ['done']}

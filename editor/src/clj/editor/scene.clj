@@ -1305,7 +1305,20 @@
           ^Vector4d p (c/camera-unproject camera viewport (Point3d. (double x) (double y) 0.0))]
       (format "Position: %.0f, %.0f" (.x p) (.y p)))))
 
-(g/defnk produce-overlay-anchor-pane-props [cursor-pos scene ^:try tool-info-text active-updatable-ids updatables camera viewport localization keymap camera-inset-data]
+(defn selection-info-text [selected-node-properties]
+  (when-not (g/error? selected-node-properties)
+    (let [names (coll/into-> selected-node-properties []
+                  (keep (fn [{:keys [properties]}]
+                          (coll/first-where
+                            #(and (string? %) (not (string/blank? %)))
+                            [(get-in properties [:id :value])
+                             (get-in properties [:name :value])]))))]
+      (when (pos? (count names))
+        (str (coll/join-to-string ", " (subvec names 0 (min 3 (count names))))
+             (when (> (count names) 3)
+               (str " … (+" (- (count names) 3) ")")))))))
+
+(g/defnk produce-overlay-anchor-pane-props [cursor-pos scene ^:try tool-info-text ^:try selected-node-properties active-updatable-ids updatables camera viewport localization keymap camera-inset-data]
   (if-let [error (:error scene)]
     {:children [{:fx/type error-overlay
                  :anchor-pane/bottom 0
@@ -1338,7 +1351,14 @@
             camera-inset-image (:image camera-inset-data)
             camera-inset-width (:width camera-inset-data)
             camera-inset-height (:height camera-inset-data)
+            selection-text (selection-info-text selected-node-properties)
             children (cond-> []
+                       selection-text (conj (-> (info-label selection-text)
+                                                (dissoc :anchor-pane/left)
+                                                (assoc :id "scene-selection-label"
+                                                       :anchor-pane/top 55
+                                                       :anchor-pane/right 15
+                                                       :max-width (max 0.0 (* 0.5 (- (:right viewport) (:left viewport)))))))
                        info-text (conj (info-label info-text))
                        close-button (conj close-button)
                        camera-inset-image (conj (camera-inset-image-view camera-inset-image camera-inset-width camera-inset-height)))]
@@ -1371,21 +1391,29 @@
                                                 (vals renderables))
               buf (int-array (* picking-drawable-size picking-drawable-size))]
           (reset! last-picking-rect picking-rect)
-          (doseq [pass [pass/opaque-selection pass/selection]]
-            (let [pass-render-args (picking-render-args (pass->render-args pass) viewport picking-rect)
-                  pass-renderables (vec (render-sort (get renderables pass)))]
-              (setup-pass gl pass)
-              (batch-render gl pass-render-args pass-renderables :select-batch-key)))
-          (.glFlush gl)
-          (.glFinish gl)
-          ;; Pixels read back are like 0xAARRGGBB
-          (.glReadPixels ^GL3 gl 0 0 ^int picking-drawable-size ^int picking-drawable-size
-                         GL3/GL_BGRA GL3/GL_UNSIGNED_BYTE (IntBuffer/wrap buf))
-          (transduce (comp (map scene-picking/argb->picking-id)
-                           (keep picking-id->picking-node-id)
-                           (take 1))
-                     conj
-                     (picking-buf->spiral-seq buf)))))))
+          ;; One GPU read per click, with one retry when wrapping to the top.
+          ;; Never traverse every overlapping object in a single UI event.
+          (loop [excluded (set (:excluded-node-ids picking-rect))]
+            (gl/gl-clear gl 0.0 0.0 0.0 1.0)
+            (doseq [pass [pass/opaque-selection pass/selection]]
+              (let [pass-render-args (picking-render-args (pass->render-args pass) viewport picking-rect)
+                    pass-renderables (coll/into-> (render-sort (get renderables pass)) []
+                                       (remove #(contains? excluded (:picking-node-id %))))]
+                (setup-pass gl pass)
+                (batch-render gl pass-render-args pass-renderables :select-batch-key)))
+            (.glFlush gl)
+            (.glFinish gl)
+            (.glReadPixels ^GL3 gl 0 0 ^int picking-drawable-size ^int picking-drawable-size
+                           GL3/GL_BGRA GL3/GL_UNSIGNED_BYTE (IntBuffer/wrap buf))
+            (if-let [hit (first (coll/into-> (picking-buf->spiral-seq buf) []
+                                  (map scene-picking/argb->picking-id)
+                                  (keep picking-id->picking-node-id)
+                                  (remove excluded)
+                                  (take 1)))]
+              [hit]
+              (if (pos? (count excluded))
+                (recur #{})
+                []))))))))
 
 (g/defnk produce-tool-renderables [tool-renderables]
   ;; tool-renderables input is a [{pass [renderables]}]

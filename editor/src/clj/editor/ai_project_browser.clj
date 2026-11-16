@@ -110,7 +110,7 @@
          vec)))
 
 (defn import-files! [root relative files]
-  (when-not (string/starts-with? relative "ai-workspace/library/")
+  (when-not (and (string? relative) (string/starts-with? relative "ai-workspace/library/"))
     (throw (ex-info "请选择创作资料中的分类目录" {})))
   (let [directory (directory-file root relative)]
     (when-not (.isDirectory directory)
@@ -231,6 +231,11 @@
     (.addAll (.getChildren pane) ^java.util.Collection (identity [bar tree]))
     (VBox/setVgrow tree Priority/ALWAYS)))
 
+(defn- creative-directory? [entry]
+  (and (:directory entry)
+       (string? (:path entry))
+       (string/starts-with? (:path entry) "ai-workspace/library/")))
+
 (defn make-browser [root current-path open! changed! show! resource-types]
   (ensure-library! root)
   (document/ensure-roles-document! root)
@@ -249,6 +254,18 @@
         manage (doto (MenuItem. "模板与文件管理…") (.setId "ai-project-governance"))
         import (doto (MenuItem. "导入资料…") (.setId "ai-project-import") (.setDisable true))
         pane (VBox.)
+        menu-target (atom nil)
+        target! (fn take-creation-directory []
+                  (let [entry (if-let [snapshot @menu-target]
+                                (:entry snapshot)
+                                (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue))]
+                    (reset! menu-target nil)
+                    (try
+                      (when-not (and (creative-directory? entry)
+                                     (.isDirectory (directory-file root (:path entry))))
+                        (throw (ex-info "请选择创作资料中的分类目录" {})))
+                      entry
+                      (catch Exception e (show! (.getMessage e)) nil))))
         refresh! (fn refresh-project-tree []
                    (let [previous (.getRoot tree)
                          items (if previous (loaded-items previous) [])
@@ -256,15 +273,18 @@
                                     (filter #(.isExpanded ^TreeItem %))
                                     (map #(:path (.getValue ^TreeItem %))))
                          selection (or (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue :path)
-                                       (when current-path (string/replace-first current-path #"^/" "")))
+                                       (when (and (not previous) current-path) (string/replace-first current-path #"^/" "")))
                          next-root (or previous (tree-item root {:path "ai-workspace" :title "AI 工程" :directory true} expanded show!))]
                      (if previous
                        (refresh-item! root previous expanded show!)
-                       (do
-                         (.setRoot tree next-root)
-                         (when-let [item (coll/first-where #(= selection (:path (.getValue ^TreeItem %))) (loaded-items next-root))]
-                           (.select (.getSelectionModel tree) ^TreeItem item)
-                           (.scrollTo tree (.getRow tree item)))))
+                       (.setRoot tree next-root))
+                     ;; Replacing siblings can clear TreeView's selection even
+                     ;; when the same TreeItem survives reconciliation.
+                     (when-let [item (coll/first-where #(= selection (:path (.getValue ^TreeItem %))) (loaded-items next-root))]
+                       (let [row (.getRow tree item)]
+                         (when (not (neg? row))
+                           (.select (.getSelectionModel tree) (int row))
+                           (when-not previous (.scrollTo tree row)))))
                      (Platform/runLater fit-scroll!)))
         open-selected! (fn open-selected-file []
                          (when-let [entry (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue)]
@@ -282,8 +302,8 @@
                   (reify ChangeListener
                     (changed [_ _ _ item]
                       (let [entry (when item (.getValue ^TreeItem item))]
-                        (.setDisable import (not (and (:directory entry)
-                                                      (string/starts-with? (:path entry) "ai-workspace/library/"))))))))
+                        (when-not (.isShowing menu)
+                          (.setDisable import (not (creative-directory? entry))))))))
     (.setOnMouseClicked tree
                         (reify EventHandler
                           (handle [_ event]
@@ -304,26 +324,29 @@
     (.setOnShowing menu
                    (reify EventHandler
                      (handle [_ _]
-                       (let [entry (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue)]
-                         (doseq [^MenuItem create creates] (.setDisable create (not (and (:directory entry) (string/starts-with? (:path entry) "ai-workspace/library/")))))))))
+                       (let [entry (some-> ^TreeItem (.getSelectedItem (.getSelectionModel tree)) .getValue)
+                             enabled (creative-directory? entry)]
+                         (reset! menu-target {:entry (when enabled entry)})
+                         (.setDisable import (not enabled))
+                         (doseq [^MenuItem create creates] (.setDisable create (not enabled)))))))
     (doseq [[^MenuItem create template] (mapv vector creates canvas/templates)]
       (.setOnAction create
                     (reify EventHandler
                       (handle [_ _]
-                        (let [dialog (TextInputDialog. (:default-name template))
-                              entry (.getValue ^TreeItem (.getSelectedItem (.getSelectionModel tree)))]
-                          (.setTitle dialog "新建 Canvas")
-                          (.setHeaderText dialog (str (:title entry) " · " (:title template)))
-                          (.setContentText dialog "名称")
-                          (.initOwner dialog (.getWindow (.getScene pane)))
-                          (.addAll (.getStylesheets (.getDialogPane dialog)) ^java.util.Collection (.getStylesheets (.getScene pane)))
-                          (let [answer (.showAndWait dialog)]
-                            (when (.isPresent answer)
-                              (try
-                                (let [path (document/create-document! root (:path entry) (.get answer) (:id template))]
-                                  (refresh!) (changed!) (open! path))
-                                (catch java.nio.file.FileAlreadyExistsException _ (show! "同名 Canvas 已存在，请换一个名称"))
-                                (catch Exception e (show! (.getMessage e)))))))))))
+                        (when-let [entry (target!)]
+                          (let [dialog (TextInputDialog. (:default-name template))]
+                            (.setTitle dialog "新建 Canvas")
+                            (.setHeaderText dialog (str (:title entry) " · " (:title template)))
+                            (.setContentText dialog "名称")
+                            (.initOwner dialog (.getWindow (.getScene pane)))
+                            (.addAll (.getStylesheets (.getDialogPane dialog)) ^java.util.Collection (.getStylesheets (.getScene pane)))
+                            (let [answer (.showAndWait dialog)]
+                              (when (.isPresent answer)
+                                (try
+                                  (let [path (document/create-document! root (:path entry) (.get answer) (:id template))]
+                                    (refresh!) (changed!) (open! path))
+                                  (catch java.nio.file.FileAlreadyExistsException _ (show! "同名 Canvas 已存在，请换一个名称"))
+                                  (catch Exception e (show! (.getMessage e))))))))))))
     (.setOnAction refresh (reify EventHandler (handle [_ _] (refresh!))))
     (.setOnAction manage
                   (ui/event-handler _
@@ -333,12 +356,12 @@
     (.setOnAction import
                   (reify EventHandler
                     (handle [_ _]
-                      (when-let [files (.showOpenMultipleDialog (FileChooser.) (.getWindow (.getScene pane)))]
-                        (try
-                          (let [entry (.getValue ^TreeItem (.getSelectedItem (.getSelectionModel tree)))]
+                      (when-let [entry (target!)]
+                        (when-let [files (.showOpenMultipleDialog (FileChooser.) (.getWindow (.getScene pane)))]
+                          (try
                             (import-files! root (:path entry) files)
                             (refresh!)
-                            (changed!))
-                          (catch Exception e (show! (.getMessage e))))))))
+                            (changed!)
+                            (catch Exception e (show! (.getMessage e)))))))))
     (refresh!)
     {:root pane :refresh! refresh!}))

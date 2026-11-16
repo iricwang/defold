@@ -60,7 +60,7 @@
     (when constrained-edges
       (require-value! (and (vector? constrained-edges)
                            (coll/every? #(and (vector? %) (= 2 (count %)) (not= (% 0) (% 1))
-                                             (coll/every? (fn [index] (and (integer? index) (<= 0 index (dec n)))) %)) constrained-edges))
+                                              (coll/every? (fn [index] (and (integer? index) (<= 0 index (dec n)))) %)) constrained-edges))
                       "Constrained edges need two existing, distinct vertex indices." {}))
     (when weights
       (require-value! (and (vector? weights) (= n (count weights)))
@@ -236,10 +236,10 @@
     (into []
           (keep (fn [bone]
                   (let [[weight x y] (reduce (fn [[weight x y] [index coefficient]]
-                                              (let [influence (coll/first-where #(= bone (:bone %)) (weights index))
-                                                    contribution (* coefficient (:weight influence 0.0))]
-                                                [(+ weight contribution) (+ x (* contribution (:x influence 0.0))) (+ y (* contribution (:y influence 0.0)))]))
-                                            [0.0 0.0 0.0] sources)]
+                                               (let [influence (coll/first-where #(= bone (:bone %)) (weights index))
+                                                     contribution (* coefficient (:weight influence 0.0))]
+                                                 [(+ weight contribution) (+ x (* contribution (:x influence 0.0))) (+ y (* contribution (:y influence 0.0)))]))
+                                             [0.0 0.0 0.0] sources)]
                     (when (pos? weight) {:bone bone :weight weight :x (/ x weight) :y (/ y weight)})))) bones)))
 
 (defn- interpolate-pair [points sources]
@@ -249,8 +249,8 @@
 (defn- append-vertex [mesh sources triangles]
   (let [index (quot (count (:vertices mesh)) 2)
         updated (cond-> (assoc mesh :vertices (into (:vertices mesh) (interpolate-pair (pairs (:vertices mesh)) sources))
-                                   :uvs (into (:uvs mesh) (interpolate-pair (pairs (:uvs mesh)) sources))
-                                   :triangles (into [] cat triangles))
+                               :uvs (into (:uvs mesh) (interpolate-pair (pairs (:uvs mesh)) sources))
+                               :triangles (into [] cat triangles))
                   (:weights mesh) (update :weights conj (interpolate-influences (:weights mesh) sources))
                   (and (:constrained-edges mesh) (= 2 (count sources)))
                   (update :constrained-edges (fn [edges]
@@ -295,19 +295,19 @@
         n (quot (count (:vertices mesh)) 2)]
     (require-value! (>= (- n (count selection)) 3) "A mesh must retain at least three vertices." {})
     (let [triangles (reduce (fn [triangles index]
-                             (let [incident (filterv #(contains? (set %) index) triangles)
-                                   boundary (when (pos? (count incident)) (neighbor-boundary incident index))
-                                   replacements (if (< (count boundary) 3) [] (into [] (partition-all 3) (triangulate-polygon (pairs (:vertices mesh)) boundary)))]
-                               (into (filterv #(not (contains? (set %) index)) triangles) replacements)))
-                           (faces mesh) (sort > selection))
+                              (let [incident (filterv #(contains? (set %) index) triangles)
+                                    boundary (when (pos? (count incident)) (neighbor-boundary incident index))
+                                    replacements (if (< (count boundary) 3) [] (into [] (partition-all 3) (triangulate-polygon (pairs (:vertices mesh)) boundary)))]
+                                (into (filterv #(not (contains? (set %) index)) triangles) replacements)))
+                            (faces mesh) (sort > selection))
           retained (into [] (remove selection) (range n))
           indices (into {} (map-indexed (fn [index original] [original index])) retained)
           updated (cond-> (assoc mesh :vertices (into [] (mapcat #(subvec (:vertices mesh) (* 2 %) (+ 2 (* 2 %)))) retained)
-                                     :uvs (into [] (mapcat #(subvec (:uvs mesh) (* 2 %) (+ 2 (* 2 %)))) retained)
-                                     :triangles (into [] (comp cat (map indices)) triangles))
+                                 :uvs (into [] (mapcat #(subvec (:uvs mesh) (* 2 %) (+ 2 (* 2 %)))) retained)
+                                 :triangles (into [] (comp cat (map indices)) triangles))
                     (:weights mesh) (assoc :weights (mapv (:weights mesh) retained))
                     (:constrained-edges mesh) (update :constrained-edges (fn [edges]
-                                                                          (into [] (comp (remove #(coll/any? selection %)) (map #(mapv indices %))) edges))))]
+                                                                           (into [] (comp (remove #(coll/any? selection %)) (map #(mapv indices %))) edges))))]
       (result updated #{} (mapv #(hash-map % 1.0) retained) :barycentric))))
 
 (defn rebuild-uvs
@@ -317,12 +317,12 @@
   (validate-mesh! mesh)
   (let [points (pairs (:vertices mesh))
         [min-x min-y max-x max-y :as bounds] (or bounds [(reduce min (mapv first points)) (reduce min (mapv second points))
-                                                       (reduce max (mapv first points)) (reduce max (mapv second points))])]
+                                                         (reduce max (mapv first points)) (reduce max (mapv second points))])]
     (require-value! (and (= 4 (count bounds)) (coll/every? geometry/finite-number? bounds) (< min-x max-x) (< min-y max-y))
                     "UV projection needs nonzero finite image bounds." {})
     (result (assoc mesh :uvs (into [] (mapcat (fn [[x y]]
-                                               (let [v (/ (- y min-y) (- max-y min-y))]
-                                                 [(/ (- x min-x) (- max-x min-x)) (if-not flip-y v (- 1.0 v))]))) points))
+                                                (let [v (/ (- y min-y) (- max-y min-y))]
+                                                  [(/ (- x min-x) (- max-x min-x)) (if-not flip-y v (- 1.0 v))]))) points))
             #{} (identity-map mesh) :identity)))
 
 (defn remap-deform
@@ -348,7 +348,7 @@
       (let [old-offsets (:values (reduce (fn [{:keys [cursor values]} influences]
                                            {:cursor (+ cursor (* 2 (count influences)))
                                             :values (conj values (into {} (map-indexed (fn [index influence]
-                                                                                       [(:bone influence) (subvec offsets (+ cursor (* 2 index)) (+ cursor (* 2 index) 2))])) influences))})
+                                                                                         [(:bone influence) (subvec offsets (+ cursor (* 2 index)) (+ cursor (* 2 index) 2))])) influences))})
                                          {:cursor 0 :values []} (:weights before)))]
         (into []
               (mapcat (fn [[new-index sources]]
@@ -387,6 +387,64 @@
     (require-value! (and (= 2 (count local)) (coll/every? geometry/finite-number? local)) "Binding coordinates overflowed or use a missing/singular bone." {:bone bone})
     local))
 
+(defn- uv-transfer [uv points triangles]
+  (if-let [face (coll/first-where (fn [[a b c]] (inside-triangle? uv (points a) (points b) (points c))) triangles)]
+    (let [coefficients (mapv #(max 0.0 %) (apply barycentric uv (mapv points face)))
+          total (reduce + coefficients)]
+      {:sources (coll/into-> (mapv vector face coefficients) {} (keep (fn [[index weight]] (when (pos? weight) [index (/ weight total)]))))
+       :position (zipmap face (mapv #(/ % total) coefficients)) :outside false})
+    (let [{:keys [face sources]}
+          (reduce (fn [nearest [a b c :as face]]
+                    (reduce (fn [nearest [i j]]
+                              (let [start (points i) end (points j) edge (mapv - end start)
+                                    length-squared (reduce + (mapv * edge edge))
+                                    t (max 0.0 (min 1.0 (/ (reduce + (mapv * (mapv - uv start) edge)) length-squared)))
+                                    projected (mapv + start (mapv #(* t %) edge))
+                                    d (distance uv projected)]
+                                (if (and nearest (<= (:distance nearest) d))
+                                  nearest
+                                  {:distance d :face face :sources (coll/into-> [[i (- 1.0 t)] [j t]] {} (filter (fn [[_ coefficient]] (pos? coefficient))))})))
+                            nearest [[a b] [b c] [c a]])) nil triangles)]
+      {:sources sources :position (zipmap face (apply barycentric uv (mapv points face))) :outside true})))
+
+(defn transfer-topology
+  "Transfer a generated UV topology to an existing mesh. Interior vertices
+  retain barycentrically interpolated bind positions, weights and FFD. Outside
+  vertices extrapolate geometry from the nearest UV triangle and use its edge
+  weights/FFD; the result reports these approximate boundary transfers."
+  [before uvs triangles edges context]
+  (validate-topology! before)
+  (validate-mesh! {:vertices uvs :uvs uvs :triangles triangles})
+  (let [uv-points (pairs (:uvs before))
+        valid-faces (filterv (fn [[a b c]] (> (abs (double (cross (uv-points a) (uv-points b) (uv-points c)))) 1.0e-10)) (faces before))]
+    (require-value! (pos? (count valid-faces)) "旧网格的 UV 没有可用于迁移的有效三角形。" {})
+    (when (:weights before)
+      (validate-context! context (coll/into-> (:weights before) #{} cat (map :bone))))
+    (let [transfers (mapv #(uv-transfer % uv-points valid-faces) (pairs uvs))
+          mapping (mapv :sources transfers)
+          points (pairs (:vertices before))
+          positions (mapv #(interpolate-pair points (:position %)) transfers)
+          weights (when (:weights before)
+                    (mapv (fn [{:keys [sources]} position]
+                            (let [influences (interpolate-influences (:weights before) sources)
+                                  total (transduce (map :weight) + 0.0 influences)
+                                  origin (interpolate-pair points sources)
+                                  delta (mapv - (geometry/transform-point (:slot-transform context) position)
+                                              (geometry/transform-point (:slot-transform context) origin))]
+                              (mapv (fn [{:keys [bone x y weight] :as influence}]
+                                      (let [transform (get (:bone-transforms context) bone)
+                                            world (geometry/transform-point transform [x y])
+                                            [x y] (geometry/inverse-transform-point transform (mapv + world delta))]
+                                        (assoc influence :x x :y y :weight (min 1.0 (/ weight total)))))
+                                    influences))) transfers positions))
+          updated (assoc before :vertices (coll/into-> positions [] cat) :uvs uvs :triangles triangles
+                         :weights weights :constrained-edges edges)
+          _ (validate-topology! updated)
+          _ (require-value! (coll/every? (fn [[a b c]] (> (abs (double (cross (positions a) (positions b) (positions c)))) 1.0e-10)) (faces updated))
+                            "迁移后的网格存在退化三角形，原网格未修改。" {})]
+      (assoc (result updated #{} mapping :barycentric)
+        :outside-vertices (count (filterv :outside transfers))))))
+
 (defn transform-selected
   "Apply a mesh-local affine transform to selected vertices. Weighted bind
   points receive the equivalent setup-world displacement, preserving weights
@@ -402,16 +460,16 @@
     (let [updated (cond-> (assoc mesh :vertices (into [] cat updated-points))
                     (:weights mesh)
                     (assoc :weights (mapv (fn [index influences]
-                                           (if-not (contains? selection index)
-                                             influences
-                                             (let [[ox oy] (geometry/transform-point (:slot-transform context) (points index))
-                                                   [nx ny] (geometry/transform-point (:slot-transform context) (updated-points index))]
-                                               (mapv (fn [{:keys [bone x y] :as influence}]
-                                                       (let [world (get (:bone-transforms context) bone)
-                                                             [wx wy] (geometry/transform-point world [x y])
-                                                             [x y] (geometry/inverse-transform-point world [(+ wx (- nx ox)) (+ wy (- ny oy))])]
-                                                         (assoc influence :x x :y y))) influences))))
-                                         (range (count points)) (:weights mesh))))]
+                                            (if-not (contains? selection index)
+                                              influences
+                                              (let [[ox oy] (geometry/transform-point (:slot-transform context) (points index))
+                                                    [nx ny] (geometry/transform-point (:slot-transform context) (updated-points index))]
+                                                (mapv (fn [{:keys [bone x y] :as influence}]
+                                                        (let [world (get (:bone-transforms context) bone)
+                                                              [wx wy] (geometry/transform-point world [x y])
+                                                              [x y] (geometry/inverse-transform-point world [(+ wx (- nx ox)) (+ wy (- ny oy))])]
+                                                          (assoc influence :x x :y y))) influences))))
+                                          (range (count points)) (:weights mesh))))]
       (result updated selection (identity-map mesh) :identity))))
 
 (defn- normalize-locked [influences locked-bones]
@@ -436,8 +494,8 @@
   (require-weighted! mesh)
   (let [selection (validate-selection! mesh selection)]
     (result (update mesh :weights (fn [weights] (mapv (fn [index influences]
-                                                       (if-not (contains? selection index) influences (normalize-locked influences locked-bones)))
-                                                     (range (count weights)) weights)))
+                                                        (if-not (contains? selection index) influences (normalize-locked influences locked-bones)))
+                                                      (range (count weights)) weights)))
             selection (identity-map mesh) :bone-identity)))
 
 (defn- segment-distance [point a b]
@@ -446,39 +504,161 @@
         t (if (< length-squared 1.0e-12) 0.0 (max 0.0 (min 1.0 (/ (+ (* (- px ax) dx) (* (- py ay) dy)) length-squared))))]
     (distance point [(+ ax (* t dx)) (+ ay (* t dy))])))
 
+(defn- closest-segment-point [[px py] [ax ay] [bx by]]
+  (let [dx (- bx ax) dy (- by ay) size (+ (* dx dx) (* dy dy))
+        t (if (< size 1.0e-20) 0.0 (max 0.0 (min 1.0 (/ (+ (* (- px ax) dx) (* (- py ay) dy)) size))))]
+    [(+ ax (* t dx)) (+ ay (* t dy))]))
+
+(defn- closest-face-point [point [a b c]]
+  (let [signs [(cross a b point) (cross b c point) (cross c a point)]]
+    (if (and (> (abs (double (cross a b c))) 1.0e-12)
+             (or (coll/every? #(>= % 0.0) signs) (coll/every? #(<= % 0.0) signs)))
+      point
+      (apply min-key #(distance point %)
+             (mapv (fn [[a b]] (closest-segment-point point a b)) [[a b] [b c] [c a]])))))
+
+(defn- mesh-distance-graph [mesh points]
+  (reduce (fn [graph [a b]]
+            (let [length (distance (points a) (points b))]
+              (-> graph (assoc-in [a b] length) (assoc-in [b a] length))))
+          (vec (repeat (count points) {})) (coll/into-> (faces mesh) #{} (mapcat face-edges))))
+
+(defn- graph-components [graph]
+  (loop [remaining (set (range (count graph))) components []]
+    (if (zero? (count remaining))
+      components
+      (let [component (loop [pending [(reduce min remaining)] visited #{}]
+                        (if (zero? (count pending)) visited
+                            (let [v (peek pending) unseen (coll/into-> (coll/keys (graph v)) [] (remove visited))]
+                              (recur (into (pop pending) unseen) (into (conj visited v) unseen)))))]
+        (recur (set/difference remaining component) (conj components component))))))
+
+(defn- surface-distances [points graph components triangles samples]
+  ;; Seed on the nearest surface of each island, then travel only along mesh
+  ;; edges. Concave gaps cannot become shortcuts between nearby limbs.
+  (let [distances (double-array (count points) Double/POSITIVE_INFINITY)
+        queue (java.util.PriorityQueue. 11
+                                        (reify java.util.Comparator
+                                          (compare [_ a b] (compare a b))))]
+    (doseq [component components
+            :let [component-faces (filterv #(contains? component (first %)) triangles)]
+            sample samples]
+      (let [[indices point] (if (zero? (count component-faces))
+                              (let [v (reduce min component)] [[v] (points v)])
+                              (apply min-key #(distance sample (second %))
+                                     (mapv (fn [face] [face (closest-face-point sample (mapv points face))]) component-faces)))
+            outside (distance sample point)]
+        (doseq [v indices
+                :let [d (+ outside (distance point (points v)))]]
+          (when (< d (aget distances v))
+            (aset-double distances v d)
+            (.add queue [d v])))))
+    (while (not (.isEmpty queue))
+      (let [[d v] (.poll queue)]
+        (when (<= d (aget distances v))
+          (doseq [[neighbor length] (graph v)
+                  :let [next-distance (+ d length)]]
+            (when (< next-distance (aget distances neighbor))
+              (aset-double distances neighbor next-distance)
+              (.add queue [next-distance neighbor]))))))
+    (vec distances)))
+
 (defn bind-weights
-  "Distance-to-bone-segment binding. Locked existing influences retain their
-  exact weights/coordinates; max-influences includes these protected entries."
-  [mesh bone-ids context {:keys [falloff max-influences locked-bones selection]
-                        :or {falloff 2.0 max-influences 4 locked-bones #{}}}]
+  "Topology-aware surface-distance binding, not Spine's proprietary solver.
+  Existing bind coordinates and locked weights survive recalculation.
+  A bone
+  subset preserves other bones' weights; a vertex subset leaves others intact."
+  [mesh bone-ids context {:keys [falloff max-influences locked-bones selection selected-bones]
+                          :or {falloff 2.0 max-influences 4 locked-bones #{}}}]
   (validate-mesh! mesh)
   (require-value! (and (pos? (count bone-ids)) (= (count bone-ids) (count (set bone-ids)))
                        (geometry/finite-number? falloff) (< 0.0 falloff 16.0)
-                       (integer? max-influences) (<= 1 max-influences 64)) "Invalid automatic binding options." {})
+                       (integer? max-influences) (<= 1 max-influences 64)
+                       (coll/every? (set bone-ids) selected-bones)) "Invalid automatic binding options." {})
   (validate-context! context bone-ids)
-  (let [points (pairs (:vertices mesh)) selection (validate-selection! mesh (or selection (range (count points))))
-        lengths (into {} (map (fn [bone] [(:id bone) (:length bone 0.0)])) (:bones context))
+  (let [points (pairs (:vertices mesh))
+        world-points (mapv #(geometry/transform-point (:slot-transform context) %) points)
+        _ (require-value! (coll/every? geometry/finite-number? (coll/into-> world-points [] cat)) "Invalid mesh world coordinates." {})
+        graph (mesh-distance-graph mesh world-points)
+        components (graph-components graph)
+        triangles (faces mesh)
+        lengths (coll/into-> (:bones context) {} (map (juxt :id #(get % :length 0.0))))
+        edge-lengths (coll/into-> graph [] (mapcat coll/vals) (filter pos?))
+        scale (if (zero? (count edge-lengths)) 1.0 (/ (reduce + edge-lengths) (count edge-lengths)))
+        locked-bones (into locked-bones (when (pos? (count selected-bones)) (remove (set selected-bones) bone-ids)))
         candidates (filterv #(not (contains? locked-bones %)) bone-ids)
+        distances (coll/into-> candidates {} (map (fn [bone]
+                                                    (let [transform (get (:bone-transforms context) bone)
+                                                          length (get lengths bone 0.0)
+                                                          _ (require-value! (and (geometry/finite-number? length) (not (neg? length))) "A binding bone has invalid length." {:bone bone})
+                                                          a (geometry/transform-point transform [0.0 0.0])
+                                                          b (geometry/transform-point transform [length 0.0])
+                                                          steps (max 1 (min 64 (long (Math/ceil (/ (distance a b) scale)))))
+                                                          samples (mapv (fn [i] (mapv #(+ %1 (* (/ i steps) (- %2 %1))) a b)) (range (inc steps)))]
+                                                      [bone (surface-distances world-points graph components triangles samples)]))))
+        selection (validate-selection! mesh (or selection (range (count points))))
         weights (mapv (fn [index point]
                         (let [original (get (:weights mesh) index)]
                           (if-not (contains? selection index)
                             (or original (throw (ex-info "An unbound mesh must initially bind all vertices." {})))
                             (let [locked (filterv #(contains? locked-bones (:bone %)) original)
                                   _ (require-value! (<= (count locked) max-influences) "The influence limit cannot remove locked bones." {:vertex index})
-                                  world-point (geometry/transform-point (:slot-transform context) point)
-                                  distances (mapv (fn [bone]
-                                                    (let [transform (get (:bone-transforms context) bone)
-                                                          length (get lengths bone 0.0)]
-                                                      (require-value! (and (geometry/finite-number? length) (not (neg? length))) "A binding bone has invalid length." {:bone bone})
-                                                      [bone (segment-distance world-point (geometry/transform-point transform [0.0 0.0])
-                                                                              (geometry/transform-point transform [length 0.0]))])) candidates)
-                                  nearest (into [] (take (- max-influences (count locked))) (sort-by (juxt second first) distances))
+                                  nearest (coll/into-> (sort-by (juxt second first) (mapv (fn [bone] [bone (get-in distances [bone index])]) candidates)) []
+                                            (take (- max-influences (count locked))))
                                   influences (mapv (fn [[bone d]]
-                                                      (let [[x y] (bind-point point bone context)]
-                                                        {:bone bone :x x :y y :weight (/ 1.0 (Math/pow (max 1.0e-6 d) falloff))})) nearest)]
-                              (normalize-locked (into locked influences) locked-bones)))))
+                                                     (let [previous (coll/first-where #(= bone (:bone %)) original)
+                                                           [x y] (if previous [(:x previous) (:y previous)] (bind-point point bone context))]
+                                                       {:bone bone :x x :y y :weight (/ 1.0 (Math/pow (max (* scale 1.0e-6) d) falloff))})) nearest)
+                                  by-bone (coll/into-> (normalize-locked (into locked influences) locked-bones) {} (map (juxt :bone identity)))]
+                              (coll/into-> (coll/into-> locked bone-ids (map :bone)) [] (distinct) (keep by-bone))))))
                       (range (count points)) points)]
     (result (assoc mesh :weights weights) selection (identity-map mesh) :bone-identity)))
+
+(defn binding-bones
+  "Bound bones in influence order, including zero-weight editable influences."
+  [mesh]
+  (coll/into-> (:weights mesh) [] cat (map :bone) (distinct)))
+
+(defn change-binding
+  "First bind computes weights. Later changes preserve retained influences;
+  new bones start at zero. Removing the last bone restores slot-local geometry."
+  [mesh bone-ids context]
+  (validate-mesh! mesh)
+  (require-value! (= (count bone-ids) (count (set bone-ids))) "Duplicate binding bone." {})
+  (validate-context! context bone-ids)
+  (cond
+    (zero? (count bone-ids))
+    (let [world (geometry/mesh-world-vertices mesh (:slot-transform context) (:bone-transforms context) nil)
+          inverse (or (geometry/inverse-transform (:slot-transform context))
+                      (throw (ex-info "Cannot unbind a collapsed slot transform." {})))
+          vertices (coll/into-> (partitionv 2 world) [] (mapcat #(geometry/transform-point inverse %)))]
+      (result (assoc mesh :weights nil :vertices vertices) #{} (identity-map mesh) :bone-identity))
+
+    (nil? (:weights mesh))
+    (bind-weights mesh bone-ids context {:max-influences (min 64 (count bone-ids)) :falloff 2.0})
+
+    :else
+    (result (update mesh :weights
+                    (fn preserve-influences [weights]
+                      (mapv (fn [point influences]
+                              (normalize-locked
+                                (mapv (fn [bone]
+                                        (or (coll/first-where #(= bone (:bone %)) influences)
+                                            (let [[x y] (bind-point point bone context)]
+                                              {:bone bone :weight 0.0 :x x :y y}))) bone-ids) #{}))
+                            (pairs (:vertices mesh)) weights)))
+            #{} (identity-map mesh) :bone-identity)))
+
+(defn update-bindings [mesh context]
+  (require-weighted! mesh)
+  (validate-context! context (binding-bones mesh))
+  (let [world (pairs (geometry/mesh-world-vertices mesh (:slot-transform context) (:bone-transforms context) nil))
+        local (mapv #(geometry/inverse-transform-point (:slot-transform context) %) world)
+        weights (mapv (fn [point influences]
+                        (mapv (fn [influence]
+                                (let [[x y] (bind-point point (:bone influence) context)]
+                                  (assoc influence :x x :y y))) influences)) local (:weights mesh))]
+    (result (assoc mesh :vertices (coll/into-> local [] cat) :weights weights) #{} (identity-map mesh) :bone-identity)))
 
 (defn- paint-vertex [influences point bone amount replace-weight context locked-bones]
   (if (contains? locked-bones bone)
@@ -501,9 +681,45 @@
                                                  (* (- available desired) (/ (:weight influence) others-total))
                                                  (if (= first-other (:bone influence)) (- available desired) 0.0))))) normalized))))
 
+(defn- paint-group [influences point bones amount target context locked-bones]
+  (let [editable (coll/into-> bones #{} (remove locked-bones))
+        selected-total (transduce (comp (filter #(contains? editable (:bone %))) (map :weight)) + 0.0 influences)
+        locked-total (transduce (comp (filter #(contains? locked-bones (:bone %))) (map :weight)) + 0.0 influences)
+        others (filterv #(not (or (contains? editable (:bone %)) (contains? locked-bones (:bone %)))) influences)
+        other-total (transduce (map :weight) + 0.0 others)
+        desired (if (zero? (count others)) (- 1.0 locked-total)
+                    (max 0.0 (min (- 1.0 locked-total) (or target (+ selected-total amount)))))
+        existing (coll/into-> influences #{} (map :bone))
+        influences (coll/into-> (when (pos? desired) (sort (set/difference editable existing))) influences
+                     (map (fn [bone]
+                            (let [[x y] (bind-point point bone context)] {:bone bone :x x :y y :weight 0.0}))))]
+    (if (zero? (count editable)) influences
+        (mapv (fn [influence]
+                (let [bone (:bone influence)]
+                  (cond
+                    (contains? locked-bones bone) influence
+                    (contains? editable bone) (assoc influence :weight (* desired (if (pos? selected-total) (/ (:weight influence) selected-total) (/ 1.0 (count editable)))))
+                    :else (assoc influence :weight (* (- 1.0 locked-total desired)
+                                                      (if (pos? other-total) (/ (:weight influence) other-total)
+                                                          (if (= bone (:bone (first others))) 1.0 0.0))))))) influences))))
+
+(defn set-weight-group [mesh selection bone-ids weight context locked-bones]
+  (require-weighted! mesh)
+  (require-value! (and (pos? (count bone-ids)) (geometry/finite-number? weight) (<= 0.0 weight 1.0)) "Invalid group weight." {})
+  (validate-context! context bone-ids)
+  (let [selection (validate-selection! mesh selection) points (pairs (:vertices mesh))]
+    (result (update mesh :weights (fn [weights]
+                                    (mapv (fn [index influences]
+                                            (if-not (contains? selection index) influences
+                                                    (paint-group influences (points index) bone-ids 0.0 weight context locked-bones)))
+                                          (range (count weights)) weights)))
+            selection (identity-map mesh) :bone-identity)))
+
 (defn- adjacency [mesh]
-  (reduce (fn [neighbors [a b c]]
-            (-> neighbors (update a (fnil into #{}) [b c]) (update b (fnil into #{}) [a c]) (update c (fnil into #{}) [a b]))) {} (faces mesh)))
+  (let [counts (frequencies (coll/into-> (faces mesh) [] (mapcat face-edges)))
+        edges (coll/into-> counts (set (:constrained-edges mesh)) (keep (fn [[edge n]] (when (= 1 n) edge))))]
+    (reduce (fn [neighbors [a b]]
+              (-> neighbors (update a (fnil conj #{}) b) (update b (fnil conj #{}) a))) {} edges)))
 
 (defn set-weights
   "Assign an absolute normalized weight to a bone on selected vertices while
@@ -514,10 +730,10 @@
   (validate-context! context [bone-id])
   (let [selection (validate-selection! mesh selection) points (pairs (:vertices mesh))]
     (result (update mesh :weights (fn [weights]
-                                   (mapv (fn [index influences]
-                                           (if-not (contains? selection index) influences
-                                                   (paint-vertex influences (points index) bone-id 0.0 weight context locked-bones)))
-                                         (range (count weights)) weights)))
+                                    (mapv (fn [index influences]
+                                            (if-not (contains? selection index) influences
+                                                    (paint-vertex influences (points index) bone-id 0.0 weight context locked-bones)))
+                                          (range (count weights)) weights)))
             selection (identity-map mesh) :bone-identity)))
 
 (defn- smooth-vertex [weights neighbors index point amount context locked-bones]
@@ -525,16 +741,16 @@
     (if (or (zero? amount) (zero? (count adjacent)))
       original
       (let [averages (reduce (fn [totals neighbor]
-                              (reduce (fn [totals {:keys [bone weight]}] (update totals bone (fnil + 0.0) (/ weight (count adjacent)))) totals (weights neighbor))) {} adjacent)
+                               (reduce (fn [totals {:keys [bone weight]}] (update totals bone (fnil + 0.0) (/ weight (count adjacent)))) totals (weights neighbor))) {} adjacent)
             original-by-bone (into {} (map (juxt :bone identity)) original)
             bones (into (mapv :bone original) (remove #(or (contains? original-by-bone %) (contains? locked-bones %) (zero? (get averages %)))) (sort (into [] (coll/keys averages))))
             influences (mapv (fn [bone]
-                                (let [previous (get original-by-bone bone)]
-                                  (if (contains? locked-bones bone)
-                                    previous
-                                    (let [weight (+ (* (- 1.0 amount) (:weight previous 0.0)) (* amount (get averages bone 0.0)))
-                                          [x y] (if previous [(:x previous) (:y previous)] (bind-point point bone context))]
-                                      (assoc (or previous {:bone bone :x x :y y}) :weight weight))))) bones)]
+                               (let [previous (get original-by-bone bone)]
+                                 (if (contains? locked-bones bone)
+                                   previous
+                                   (let [weight (+ (* (- 1.0 amount) (:weight previous 0.0)) (* amount (get averages bone 0.0)))
+                                         [x y] (if previous [(:x previous) (:y previous)] (bind-point point bone context))]
+                                     (assoc (or previous {:bone bone :x x :y y}) :weight weight))))) bones)]
         (normalize-locked influences locked-bones)))))
 
 (defn smooth-weights [mesh selection amount context locked-bones]
@@ -543,42 +759,48 @@
   (let [selection (validate-selection! mesh selection) points (pairs (:vertices mesh)) neighbors (adjacency mesh) weights (:weights mesh)]
     (validate-context! context (into #{} (comp cat (map :bone)) weights))
     (result (assoc mesh :weights (mapv (fn [index point]
-                                        (if-not (contains? selection index) (weights index)
-                                                (smooth-vertex weights neighbors index point amount context locked-bones)))
-                                      (range (count points)) points))
+                                         (if-not (contains? selection index) (weights index)
+                                                 (smooth-vertex weights neighbors index point amount context locked-bones)))
+                                       (range (count points)) points))
             selection (identity-map mesh) :bone-identity)))
 
 (defn brush-weights
   "Setup-world radial brush, with :add/:subtract/:replace/:smooth. Strength is
   0..1; falloff controls radial softness. Replace blends toward strength."
-  [mesh {:keys [mode center radius strength bone-id falloff locked-bones]
+  [mesh {:keys [mode center radius strength bone-id bone-ids falloff feather selection locked-bones]
          :or {mode :add falloff 2.0 locked-bones #{}}} context]
   (require-weighted! mesh)
   (require-value! (and (contains? #{:add :subtract :replace :smooth} mode)
                        (= 2 (count center)) (coll/every? geometry/finite-number? center)
                        (geometry/finite-number? radius) (pos? radius)
                        (geometry/finite-number? strength) (<= 0.0 strength 1.0)
-                       (geometry/finite-number? falloff) (<= 0.0 falloff 16.0)) "Invalid weight brush options." {})
-  (validate-context! context (if (= :smooth mode) (into #{} (comp cat (map :bone)) (:weights mesh)) [bone-id]))
+                       (geometry/finite-number? falloff) (<= 0.0 falloff 16.0)
+                       (or (nil? feather) (and (geometry/finite-number? feather) (<= 0.0 feather 1.0)))) "Invalid weight brush options." {})
+  (validate-context! context (if (= :smooth mode) (coll/into-> (:weights mesh) #{} cat (map :bone)) (or bone-ids [bone-id])))
   (let [points (pairs (:vertices mesh)) weights (:weights mesh) neighbors (adjacency mesh)
+        eligible (when (pos? (count selection)) (validate-selection! mesh selection))
         factors (mapv (fn [point]
                         (let [d (distance center (geometry/transform-point (:slot-transform context) point))]
-                          (if (>= d radius) 0.0 (Math/pow (- 1.0 (/ d radius)) falloff)))) points)
-        selection (into #{} (keep-indexed (fn [index factor] (when (and (pos? strength) (pos? factor)) index))) factors)
+                          (cond (>= d radius) 0.0
+                                (nil? feather) (Math/pow (- 1.0 (/ d radius)) falloff)
+                                (zero? feather) 1.0
+                                :else (min 1.0 (/ (- 1.0 (/ d radius)) feather))))) points)
+        selection (coll/into-> factors #{} (keep-indexed (fn [index factor] (when (and (or (nil? eligible) (contains? eligible index)) (pos? strength) (pos? factor)) index))))
         updated (mapv (fn [index point]
                         (if-not (contains? selection index)
                           (weights index)
                           (let [amount (* strength (factors index))]
                             (if (= :smooth mode)
                               (smooth-vertex weights neighbors index point amount context locked-bones)
-                              (let [previous (:weight (coll/first-where #(= bone-id (:bone %)) (weights index)) 0.0)]
-                                (paint-vertex (weights index) point bone-id (if (= :subtract mode) (- amount) amount)
-                                              (when (= :replace mode) (+ previous (* (factors index) (- strength previous)))) context locked-bones))))))
+                              (let [bones (or bone-ids [bone-id])
+                                    previous (transduce (comp (filter #(contains? (set bones) (:bone %))) (map :weight)) + 0.0 (weights index))]
+                                (paint-group (weights index) point bones (if (= :subtract mode) (- amount) amount)
+                                             (when (= :replace mode) (+ previous (* (factors index) (- strength previous)))) context locked-bones))))))
                       (range (count points)) points)]
     (result (assoc mesh :weights updated) selection (identity-map mesh) :bone-identity)))
 
 (defn prune-weights [mesh selection {:keys [threshold max-influences locked-bones]
-                                    :or {threshold 0.01 max-influences 4 locked-bones #{}}}]
+                                     :or {threshold 0.01 max-influences 4 locked-bones #{}}}]
   (require-weighted! mesh)
   (require-value! (and (geometry/finite-number? threshold) (<= 0.0 threshold 1.0)
                        (integer? max-influences) (<= 1 max-influences 64)) "Invalid pruning options." {})
@@ -594,6 +816,47 @@
                             (normalize-locked (into locked retained) locked-bones))))
                       (range (count (:weights mesh))) (:weights mesh))]
     (result (assoc mesh :weights weights) selection (identity-map mesh) :bone-identity)))
+
+(defn paste-weights [mesh selection copied context locked-bones]
+  (require-weighted! mesh)
+  (let [indices (vec (sort (validate-selection! mesh selection)))
+        ids (set (binding-bones mesh))
+        points (pairs (:vertices mesh))]
+    (require-value! (= (count indices) (count copied)) "Select the same number of vertices as the copied weights." {})
+    (require-value! (coll/every? #(and (coll/every? ids (coll/keys %))
+                                       (coll/every? (fn [v] (and (geometry/finite-number? v) (<= 0.0 v 1.0))) (coll/vals %))) copied)
+                    "Copied weights refer to unbound bones or invalid values." {})
+    (validate-context! context ids)
+    (result (update mesh :weights
+                    (fn [weights]
+                      (reduce (fn [weights [index values]]
+                                (let [original (weights index)]
+                                  (assoc weights index
+                                         (normalize-locked
+                                           (mapv (fn [bone]
+                                                   (let [previous (coll/first-where #(= bone (:bone %)) original)
+                                                         [x y] (if previous [(:x previous) (:y previous)] (bind-point (points index) bone context))]
+                                                     (if (and previous (contains? locked-bones bone)) previous
+                                                         {:bone bone :x x :y y :weight (if (contains? locked-bones bone) 0.0 (get values bone 0.0))})))
+                                                 (vec (distinct (into (mapv :bone original) (coll/keys values))))) locked-bones))))
+                              weights (mapv vector indices copied))))
+            (set indices) (identity-map mesh) :bone-identity)))
+
+(defn weld-weights [mesh selection target context target-context overlapping]
+  (require-weighted! mesh)
+  (require-weighted! target)
+  (let [ids (set (binding-bones mesh))
+        target-ids (set (binding-bones target))
+        _ (require-value! (and (>= (count target-ids) 2) (set/subset? target-ids ids))
+                          "Welding needs at least two matching bound bones." {})
+        points (pairs (geometry/mesh-world-vertices mesh (:slot-transform context) (:bone-transforms context) nil))
+        target-points (pairs (geometry/mesh-world-vertices target (:slot-transform target-context) (:bone-transforms target-context) nil))
+        indices (vec (sort (validate-selection! mesh selection)))
+        matches (mapv (fn [index]
+                        [index (apply min-key #(distance (points index) (target-points %)) (range (count target-points)))]) indices)
+        matches (if overlapping (filterv (fn [[a b]] (< (distance (points a) (target-points b)) 1.0e-4)) matches) matches)
+        copied (mapv (fn [[_ index]] (coll/into-> (get (:weights target) index) {} (map (juxt :bone :weight)))) matches)]
+    (paste-weights mesh (mapv first matches) copied context #{})))
 
 (defn- edge-table [triangles]
   (reduce-kv (fn [table index triangle]
@@ -668,7 +931,7 @@
   (result (update mesh :constrained-edges (fn [edges] (filterv #(not= (canonical-edge edge) (canonical-edge %)) edges)))
           (set edge) (identity-map mesh) :identity))
 
-(defn spine-export-layout
+(defn- spine-export-layout-impl
   "Return a hull-first vertex permutation for a temporary export document.
   :hull is the boundary vertex count. :edges contains encoded XY indices for
   boundary and explicit constrained edges. The caller must apply :vertex-map
@@ -692,9 +955,9 @@
           uv-points (pairs (:uvs mesh))
           boundary-pairs (mapv vector boundary (conj (subvec boundary 1) (first boundary)))
           area (transduce (map (fn [[a b]]
-                                (let [[ax ay] (uv-points a)
-                                      [bx by] (uv-points b)]
-                                  (- (* ax by) (* bx ay))))) + 0.0 boundary-pairs)]
+                                 (let [[ax ay] (uv-points a)
+                                       [bx by] (uv-points b)]
+                                   (- (* ax by) (* bx ay))))) + 0.0 boundary-pairs)]
       (require-value! (and (geometry/finite-number? area) (not (zero? area)))
                       "The exported mesh needs a nonzero UV boundary." {})
       (doseq [[a b] boundary-pairs
@@ -708,14 +971,26 @@
             remap-flat (fn [values] (into [] (mapcat (pairs values)) order))
             remap-edge (fn [edge] (canonical-edge (mapv indices edge)))
             updated (cond-> (assoc mesh :vertices (remap-flat (:vertices mesh))
-                                        :uvs (remap-flat (:uvs mesh))
-                                        :triangles (mapv indices (:triangles mesh)))
+                                   :uvs (remap-flat (:uvs mesh))
+                                   :triangles (mapv indices (:triangles mesh)))
                       (:weights mesh) (assoc :weights (mapv (:weights mesh) order))
                       (:constrained-edges mesh) (assoc :constrained-edges (into [] (sort (mapv remap-edge (:constrained-edges mesh))))))
             edges (into #{} (map remap-edge) (into constraints boundary-edges))]
         (assoc (result updated #{} (mapv #(hash-map % 1.0) order) :identity)
-               :hull (count boundary)
-               :edges (into [] (comp cat (map #(* 2 %))) (sort edges)))))))
+          :hull (count boundary)
+          :edges (into [] (comp cat (map #(* 2 %))) (sort edges)))))))
+
+(def ^:private export-layout-cache (atom []))
+
+(defn spine-export-layout
+  "Validate and order an immutable mesh for Spine export. Reuse only the exact
+  mesh object, so topology, UV or weight edits always repeat validation."
+  [mesh]
+  (if-let [entry (coll/first-where #(identical? mesh (:mesh %)) @export-layout-cache)]
+    (:layout entry)
+    (let [layout (spine-export-layout-impl mesh)]
+      (swap! export-layout-cache #(coll/into-> % [{:mesh mesh :layout layout}] (take 31)))
+      layout)))
 
 (defn mirror-weights
   "Mirror selected source weights onto unique existing symmetric vertices.
@@ -747,8 +1022,8 @@
                                 updated (if (>= (transduce (map :weight) + 0.0 locked) (- 1.0 1.0e-9))
                                           target
                                           (normalize-locked (into locked (map (fn [influence]
-                                                                               (let [[x y] (bind-point (points target-index) (:bone influence) context)]
-                                                                                 (assoc influence :x x :y y)))) free) locked-bones))]
+                                                                                (let [[x y] (bind-point (points target-index) (:bone influence) context)]
+                                                                                  (assoc influence :x x :y y)))) free) locked-bones))]
                             (assoc weights target-index updated))) (:weights mesh) transfers)]
     (result (assoc mesh :weights weights) (into #{} (map second) transfers) (identity-map mesh) :bone-identity)))
 
@@ -756,7 +1031,7 @@
   (assoc (result (-> mesh
                      (dissoc :weights :spine-export-hull :spine-export-edges)
                      (assoc :spine-topology-edited true)) #{} [] :reset)
-         :clear-weights true :clear-deforms true))
+    :clear-weights true :clear-deforms true))
 
 (defn- validate-bounds! [[x0 y0 x1 y1 :as bounds]]
   (require-value! (and (= 4 (count bounds)) (coll/every? geometry/finite-number? bounds) (< x0 x1) (< y0 y1))
@@ -768,8 +1043,8 @@
   [attachment [x0 y0 x1 y1 :as bounds]]
   (validate-bounds! bounds)
   (reset-result (assoc attachment :type "mesh" :vertices [x0 y0 x1 y0 x1 y1 x0 y1]
-                                 :uvs [0.0 1.0 1.0 1.0 1.0 0.0 0.0 0.0]
-                                 :triangles [0 1 2 0 2 3] :constrained-edges [])))
+                       :uvs [0.0 1.0 1.0 1.0 1.0 0.0 0.0 0.0]
+                       :triangles [0 1 2 0 2 3] :constrained-edges [])))
 
 (defn generate
   "Subdivide every face into four, sharing edge midpoints. Repeated calls
@@ -794,12 +1069,12 @@
                     (require-value! (coll/every? #(contains? indices (canonical-edge %)) (:constrained-edges mesh))
                                     "A constrained edge is missing from the mesh." {})
                     (assoc mesh
-                           :vertices (into (:vertices mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (points a) (points b)))) edges)
-                           :uvs (into (:uvs mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (uvs a) (uvs b)))) edges)
-                           :triangles (into [] (mapcat (fn [[a b c]]
-                                                        (let [ab (indices (canonical-edge [a b])) bc (indices (canonical-edge [b c])) ca (indices (canonical-edge [c a]))]
-                                                          [a ab ca ab b bc ca bc c ab bc ca]))) triangles)
-                           :constrained-edges (into [] (mapcat (fn [[a b :as edge]] (let [mid (indices (canonical-edge edge))] [[a mid] [mid b]]))) (:constrained-edges mesh)))))
+                      :vertices (into (:vertices mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (points a) (points b)))) edges)
+                      :uvs (into (:uvs mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (uvs a) (uvs b)))) edges)
+                      :triangles (into [] (mapcat (fn [[a b c]]
+                                                    (let [ab (indices (canonical-edge [a b])) bc (indices (canonical-edge [b c])) ca (indices (canonical-edge [c a]))]
+                                                      [a ab ca ab b bc ca bc c ab bc ca]))) triangles)
+                      :constrained-edges (into [] (mapcat (fn [[a b :as edge]] (let [mid (indices (canonical-edge edge))] [[a mid] [mid b]]))) (:constrained-edges mesh)))))
                 (dissoc mesh :weights) (range iterations))]
     (reset-result updated)))
 
@@ -812,15 +1087,15 @@
           (when (< x width)
             (aset-boolean horizontal (+ x (* y width)) (pos? count))
             (recur (inc x) (long (+ count
-                                   (if (and (< (+ x padding 1) width) (aget mask (+ x padding 1 (* y width)))) 1 0)
-                                   (if (and (>= (- x padding) 0) (aget mask (+ (- x padding) (* y width)))) -1 0)))))))
+                                    (if (and (< (+ x padding 1) width) (aget mask (+ x padding 1 (* y width)))) 1 0)
+                                    (if (and (>= (- x padding) 0) (aget mask (+ (- x padding) (* y width)))) -1 0)))))))
       (dotimes [x width]
         (loop [y 0 count (long (transduce (map #(if (aget horizontal (+ x (* % width))) 1 0)) + 0 (range (min height (inc padding)))))]
           (when (< y height)
             (aset-boolean result (+ x (* y width)) (pos? count))
             (recur (inc y) (long (+ count
-                                   (if (and (< (+ y padding 1) height) (aget horizontal (+ x (* (+ y padding 1) width)))) 1 0)
-                                   (if (and (>= (- y padding) 0) (aget horizontal (+ x (* (- y padding) width)))) -1 0)))))))
+                                    (if (and (< (+ y padding 1) height) (aget horizontal (+ x (* (+ y padding 1) width)))) 1 0)
+                                    (if (and (>= (- y padding) 0) (aget horizontal (+ x (* (- y padding) width)))) -1 0)))))))
       result)))
 
 (defn- mask-outline [^booleans mask width height]
@@ -860,8 +1135,8 @@
       (require-value! (zero? (count holes)) "A single Spine mesh cannot contain holes. Split this image into separate attachments before tracing." {:kind :holes :holes (count holes)})
       (let [points (first outer) n (count points)]
         (into [] (keep (fn [index]
-                        (when-not (zero? (cross (points (mod (dec index) n)) (points index) (points (mod (inc index) n))))
-                          (points index)))) (range n))))))
+                         (when-not (zero? (cross (points (mod (dec index) n)) (points index) (points (mod (inc index) n))))
+                           (points index)))) (range n))))))
 
 (defn- simplify-outline [points tolerance]
   (let [n (count points)
@@ -920,5 +1195,5 @@
         uvs (mapv (fn [[x y]] [(/ (double x) width) (/ (double y) height)]) outline)
         points (mapv (fn [[u v]] [(+ x0 (* u (- x1 x0))) (- y1 (* v (- y1 y0)))]) uvs)
         mesh (assoc attachment :type "mesh" :vertices (into [] cat points) :uvs (into [] cat uvs)
-                               :triangles (triangulate-polygon points (vec (range (count points)))) :constrained-edges [])]
+                    :triangles (triangulate-polygon points (vec (range (count points)))) :constrained-edges [])]
     (assoc (reset-result mesh) :trace {:threshold threshold :simplify simplify :padding padding :components 1 :holes 0})))

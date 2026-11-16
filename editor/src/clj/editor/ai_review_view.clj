@@ -264,7 +264,7 @@
                                                                                      (throw (ex-info "请从原 Result 卡片采用此方案" {})))
                                                                                    (if (= "proposal" (:kind @selected))
                                                                                      ((:adopt! opts) @selected)
-                                                                                     (delivery/approve! root (:id @selected) (.getText feedback)))
+                                                                                     (delivery/approve! root (:id @selected) (.getText feedback) :human))
                                                                                    (refresh!)))
                                                                          (button "打开工作副本" "ai-review-open-file"
                                                                                  (fn open-file [] (guard!)

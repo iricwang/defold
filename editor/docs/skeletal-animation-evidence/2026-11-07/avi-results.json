@@ -1,0 +1,107 @@
+{
+  "decoder": "ffmpeg 7.1 imageio_ffmpeg macOS arm64",
+  "passed": 15,
+  "checks": [
+    "standard: decodes without errors",
+    "standard: dimensions",
+    "standard: frame count",
+    "standard: timebase",
+    "standard: pixel orientation/order/alpha",
+    "odd-fractional: decodes without errors",
+    "odd-fractional: dimensions",
+    "odd-fractional: frame count",
+    "odd-fractional: timebase",
+    "odd-fractional: pixel orientation/order/alpha",
+    "single-alpha: decodes without errors",
+    "single-alpha: dimensions",
+    "single-alpha: frame count",
+    "single-alpha: timebase",
+    "single-alpha: pixel orientation/order/alpha"
+  ],
+  "cases": [
+    {
+      "name": "standard",
+      "dimensions": [
+        32,
+        24
+      ],
+      "frames": 5,
+      "fps": 10.0,
+      "timebase": "1/10",
+      "first_frame_pixels": [
+        [
+          254,
+          1,
+          0
+        ],
+        [
+          1,
+          255,
+          0
+        ],
+        [
+          0,
+          1,
+          254
+        ],
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "bytes": 4050
+    },
+    {
+      "name": "odd-fractional",
+      "dimensions": [
+        17,
+        13
+      ],
+      "frames": 3,
+      "fps": 29.970000000000002,
+      "timebase": "100/2997",
+      "first_frame_pixels": [
+        [
+          255,
+          2,
+          0
+        ],
+        [
+          0,
+          255,
+          0
+        ],
+        [
+          2,
+          0,
+          254
+        ],
+        [
+          5,
+          0,
+          0
+        ]
+      ],
+      "bytes": 2520
+    },
+    {
+      "name": "single-alpha",
+      "dimensions": [
+        1,
+        1
+      ],
+      "frames": 1,
+      "fps": 1.0,
+      "timebase": "1",
+      "first_frame_pixels": [
+        [
+          128,
+          0,
+          0
+        ]
+      ],
+      "bytes": 890
+    }
+  ]
+}

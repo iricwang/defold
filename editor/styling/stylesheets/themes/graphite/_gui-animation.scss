@@ -91,37 +91,119 @@
   }
 }
 
-// Skeleton authoring uses the same native controls and neutral collapsed choices.
-#skeletal-workspace {
+// Skeleton authoring: reference-style gray panels, readable native controls.
+#skeletal-workspace, .skeletal-settings-content {
+  -fx-font-size: 13px;
+  -df-background: #505155;
+  -df-background-light: #5a5b5f;
+  -df-background-lightish: #45464a;
+  -df-background-input: #414246;
+  -df-text: #dedede;
+  -df-text-selected: #ffffff;
+  -df-ui-selection: #518bb9;
+  -df-ui-accent: #6eaccb;
   -fx-background-color: -df-background;
-  .combo-box > .list-cell { -fx-background-color: -df-background-input; }
-  .tool-bar { -fx-padding: 3px; -fx-spacing: 4px; -fx-background-color: -df-background-lightish; }
-  .button { -fx-min-width: 24px; -fx-min-height: 24px; -fx-padding: 2px 7px; }
-  .text-field { -fx-min-width: 40px; -fx-pref-height: 24px; -fx-max-height: 26px; }
-  #skeletal-duration, #skeletal-fps { -fx-pref-width: 65px; }
-  #skeletal-clip-name { -fx-pref-width: 130px; }
-  #skeletal-animation { -fx-pref-width: 110px; }
-  #skeletal-status { -fx-padding: 2px 5px; }
+  .tool-bar { -fx-background-color: #393a3d; -fx-padding: 4px; -fx-spacing: 5px; }
+  .button, .toggle-button, .menu-button {
+    -fx-font-size: 13px; -fx-min-height: 28px; -fx-pref-height: 28px;
+    -fx-padding: 3px 8px; -fx-background-color: #626367; -fx-text-fill: #dedede;
+    -fx-background-radius: 3px; -fx-border-radius: 3px;
+  }
+  .button:hover, .toggle-button:hover, .menu-button:hover { -fx-background-color: #727377; }
+  .toggle-button:selected { -fx-background-color: #518bb9; -fx-text-fill: white; }
+  .combo-box, .text-field {
+    -fx-font-size: 13px; -fx-min-height: 28px; -fx-pref-height: 28px; -fx-max-height: 28px;
+    -fx-background-color: #414246; -fx-text-fill: #dedede;
+  }
+  .combo-box { -fx-min-width: 90px; }
+  .combo-box > .list-cell { -fx-background-color: #414246; -fx-text-fill: #dedede; -fx-padding: 3px 8px; }
+  .combo-box > .arrow-button { -fx-padding: 0px 9px; }
+  .text-field { -fx-min-width: 54px; }
+  .label, .check-box { -fx-text-fill: #dedede; }
+  .scroll-pane, .scroll-pane > .viewport { -fx-background-color: #57585c; }
+  .tree-view { -fx-background-color: #5c5d61; -fx-padding: 2px; }
+  .tree-cell { -fx-background-color: transparent; -fx-cell-size: 26px; -fx-text-fill: #dedede; -fx-padding: 2px 4px; }
+  .tree-cell:filled:selected { -fx-background-color: #518bb9; -fx-text-fill: white; }
+  .split-pane { -fx-padding: 0px; -fx-background-color: #353639; }
+  .split-pane-divider { -fx-padding: 0px 2px; -fx-background-color: #353639; }
+  .skeletal-icon { -fx-fill: transparent; -fx-stroke: #d0d1d3; -fx-stroke-width: 1.3px; }
+  .skeletal-icon-slot, .skeletal-icon-mesh { -fx-stroke: #86c4ce; }
+  .skeletal-icon-bone, .skeletal-icon-pose { -fx-stroke: #c6cdb7; }
+  .skeletal-icon-create, .skeletal-icon-animation { -fx-stroke: #accc81; }
+}
+#skeletal-workspace {
+  #skeletal-mode { -fx-min-width: 108px; -fx-pref-width: 120px; -fx-pref-height: 32px; -fx-max-height: 32px; }
+  #skeletal-mode-overlay { -fx-background-color: transparent; }
+  #skeletal-tool-palette {
+    -fx-background-color: transparent; -fx-padding: 0px; -fx-spacing: 5px;
+    .toggle-button { -fx-alignment: center-left; -fx-min-width: 64px; -fx-padding: 2px 6px; }
+  }
+  .skeletal-tool-group {
+    -fx-background-color: #46474a; -fx-background-radius: 4px; -fx-padding: 4px;
+    -fx-border-color: #3c3d40; -fx-border-radius: 4px;
+    .check-box { -fx-min-height: 28px; -fx-pref-height: 28px; -fx-padding: 2px 5px; }
+  }
+  #skeletal-tool-palette .skeletal-key-button { -fx-min-width: 22px; -fx-pref-width: 22px; -fx-max-width: 22px; -fx-padding: 2px; }
+  #skeletal-tool-palette .text-field { -fx-background-radius: 2px; -fx-padding: 2px 5px; }
+  #skeletal-auto-key:selected { -fx-background-color: #626367; }
+  #skeletal-auto-key:selected .skeletal-icon { -fx-stroke: #82c4c9; }
+  .skeletal-icon-key { -fx-stroke: #afcc86; }
+  .skeletal-icon-rotate, .skeletal-icon-pose { -fx-stroke: #b9d283; }
+  .skeletal-icon-move, .skeletal-icon-local, .skeletal-icon-parent, .skeletal-icon-world { -fx-stroke: #8ed4d8; }
+  .skeletal-icon-scale { -fx-stroke: #e7a29b; }
+  .skeletal-icon-shear, .skeletal-icon-create { -fx-stroke: #dcc984; }
+  #skeletal-selection-path { -fx-background-color: #343538; -fx-padding: 3px 10px; -fx-background-radius: 3px; }
+  #skeletal-details, #skeletal-details:selected { -fx-background-color: #393a3d; -fx-text-fill: #dedede; }
+  #skeletal-duration, #skeletal-fps { -fx-pref-width: 74px; }
+  #skeletal-clip-name { -fx-pref-width: 150px; }
+  #skeletal-animation { -fx-pref-width: 140px; }
+  #skeletal-timeline-tabs { -fx-tab-min-height: 28px; -fx-tab-max-height: 28px; }
+  #skeletal-timeline-tabs > .tab-header-area { -fx-padding: 0px; }
+  #skeletal-timeline-tabs > .tab-header-area .tab { -fx-padding: 3px 9px; }
+  #skeletal-status { -fx-padding: 3px 8px; -fx-background-color: #393a3d; }
+}
+// Embedded form panels must never inherit the focused menu row's blue fill.
+.context-menu .menu-item.skeletal-settings-item,
+.context-menu .menu-item.skeletal-settings-item:focused,
+.context-menu .menu-item.skeletal-settings-item:hover {
+  -fx-background-color: #393a3d; -fx-padding: 6px;
+}
+.skeletal-settings-scroll { -fx-background-color: #393a3d; -fx-padding: 0px; }
+.skeletal-settings-content { -fx-padding: 8px; -fx-spacing: 8px; }
+
+.context-menu .skeletal-settings-item .skeletal-settings-content .button {
+  -fx-background-color: #626367; -fx-text-fill: #dedede;
+}
+.context-menu .skeletal-settings-item .skeletal-settings-content .button:hover {
+  -fx-background-color: #727377;
 }
 
-// Compact skeleton workspace: canvas tools, hierarchy and full-width animation dock.
+
+#skeletal-multichannel-curves {
+  .tool-bar { -fx-padding: 3px 5px; -fx-spacing: 4px; }
+  .toggle-button { -fx-min-width: 30px; -fx-padding: 3px 6px; }
+  #skeletal-curve-rows { -fx-padding: 5px; -fx-background-color: #343434; }
+  #skeletal-curve-rows .label { -fx-background-color: #587377; -fx-padding: 3px 6px; -fx-max-width: infinity; }
+  #skeletal-curve-rows .check-box { -fx-padding: 4px 6px; -fx-min-height: 25px; -fx-pref-height: 25px; }
+  .scroll-pane, .scroll-pane > .viewport { -fx-background-color: #343434; }
+}
+#skeletal-current-frame { -fx-pref-width: 70px; -fx-max-width: 70px; }
+
+
 #skeletal-workspace {
-  -fx-font-size: 11px;
-  #skeletal-tool-palette {
-    -fx-background-color: #454548;
-    -fx-background-radius: 4px;
-    -fx-padding: 4px;
-    -fx-border-color: #373739;
-    -fx-border-radius: 4px;
-    .toggle-button { -fx-alignment: center-left; -fx-min-width: 82px; -fx-min-height: 20px; -fx-pref-height: 20px; -fx-padding: 1px 5px; }
+  #skeletal-properties-pane { -fx-background-color: #45464a; }
+  #skeletal-details { -fx-padding: 6px 9px; -fx-min-height: 30px; -fx-pref-height: 30px; }
+  #skeletal-inspector-scroll, #skeletal-inspector-scroll > .viewport { -fx-background-color: #45464a; }
+  .skeletal-command-bar { -fx-min-height: 30px; -fx-pref-height: 30px; -fx-max-height: 30px; -fx-padding: 2px 4px; -fx-spacing: 3px; }
+  .skeletal-command-menu {
+    -fx-min-width: 34px; -fx-pref-width: 34px; -fx-max-width: 34px;
+    -fx-min-height: 26px; -fx-pref-height: 26px; -fx-max-height: 26px;
+    -fx-padding: 2px 4px; -fx-background-color: transparent; -fx-background-radius: 3px;
+    -fx-border-color: transparent; -fx-border-radius: 3px;
   }
-  #skeletal-mode-overlay { -fx-background-color: transparent; }
-  .button, .menu-button { -fx-min-height: 20px; -fx-pref-height: 22px; -fx-padding: 1px 5px; }
-  .combo-box, .text-field { -fx-min-height: 20px; -fx-pref-height: 22px; -fx-max-height: 22px; }
-  .tree-cell { -fx-cell-size: 22px; }
-  #skeletal-timeline-tabs { -fx-tab-min-height: 21px; -fx-tab-max-height: 21px; }
-  #skeletal-timeline-tabs > .tab-header-area { -fx-padding: 0px; }
-  #skeletal-timeline-tabs > .tab-header-area .tab { -fx-padding: 1px 7px; }
-  #skeletal-details > .title { -fx-padding: 3px 6px; }
-  .split-pane { -fx-padding: 0px; }
+  .skeletal-command-menu > .label { -fx-padding: 0px; }
+  .skeletal-command-menu > .arrow-button { -fx-padding: 0px 0px 0px 3px; }
+  .skeletal-command-menu > .arrow-button > .arrow { -fx-padding: 2px; -fx-background-color: #a9abad; }
+  .skeletal-command-menu:hover { -fx-background-color: #535559; }
+  .skeletal-command-menu:showing { -fx-background-color: #444b50; -fx-border-color: #7c969f; }
 }

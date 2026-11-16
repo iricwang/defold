@@ -1,0 +1,38 @@
+{
+  "skeletal_animation_view": {
+    "existingWarnings": 27,
+    "changedLineFindings": []
+  },
+  "skeletal_animation_mesh": {
+    "existingWarnings": 73,
+    "changedLineFindings": []
+  },
+  "skeletal_animation_io": {
+    "existingWarnings": 4,
+    "changedLineFindings": []
+  },
+  "test/editor/skeletal_animation_performance_test.clj": {
+    "error": 0,
+    "warning": 0,
+    "info": 0,
+    "type": "summary",
+    "duration": 23,
+    "files": 1
+  },
+  "scripts/skeletal_animation_benchmark.clj": {
+    "error": 0,
+    "warning": 0,
+    "info": 0,
+    "type": "summary",
+    "duration": 24,
+    "files": 1
+  },
+  "scripts/skeletal_animation_pulse_benchmark.clj": {
+    "error": 0,
+    "warning": 0,
+    "info": 0,
+    "type": "summary",
+    "duration": 19,
+    "files": 1
+  }
+}

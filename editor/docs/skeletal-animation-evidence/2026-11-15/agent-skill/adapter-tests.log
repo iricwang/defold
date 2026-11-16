@@ -1,0 +1,8 @@
+11月 15, 2026 7:28:43 下午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @25c5e994'
+Reflection warning, editor/skeletal_animation_properties.clj:76:18 - call to method updateItem can't be resolved (target class is unknown).
+
+Testing defold-spine-agent-test
+
+Ran 4 tests containing 25 assertions.
+0 failures, 0 errors.

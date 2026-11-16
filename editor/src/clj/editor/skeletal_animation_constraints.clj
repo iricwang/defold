@@ -86,7 +86,10 @@
 (defn world-transforms [bones]
   (let [{:keys [ordered by-id]} (hierarchy bones)]
     (reduce (fn [result id]
-              (let [bone (by-id id)] (assoc result id (bone-world bone (get result (:parent bone)))))) {} ordered)))
+              (let [bone (by-id id)]
+                (assoc result id (if (false? (:active bone))
+                                   geometry/identity-transform
+                                   (bone-world bone (get result (:parent bone))))))) {} ordered)))
 
 (defn pose [bones]
   (let [{:keys [bones ordered]} (hierarchy bones)]
@@ -98,7 +101,7 @@
                            :mix-y (get constraint :mix-x 1.0) :mix-scale-x 1.0
                            :mix-scale-y (get constraint :mix-scale-x 1.0) :mix-shear-y 1.0} constraint)]
     (when-not (and (boolean? (:local constraint)) (boolean? (:relative constraint))
-                  (coll/every? geometry/finite-number? (mapv constraint [:order :rotation :x :y :scale-x :scale-y :shear-y :mix-rotate :mix-x :mix-y :mix-scale-x :mix-scale-y :mix-shear-y])))
+                   (coll/every? geometry/finite-number? (mapv constraint [:order :rotation :x :y :scale-x :scale-y :shear-y :mix-rotate :mix-x :mix-y :mix-scale-x :mix-scale-y :mix-shear-y])))
       (throw (ex-info "Transform constraint flags and numeric values are invalid." {:constraint (:id constraint)})))
     constraint))
 
@@ -151,9 +154,9 @@
                              "normal" (assoc parent 4 0.0 5 0.0)
                              "onlyTranslation" geometry/identity-transform
                              "noRotationOrReflection" (let [[[a b] _] (axes parent)
-                                                             sx (Math/hypot a b)
-                                                             sy (if (> sx 1.0e-8) (/ (abs (determinant parent)) sx) 0.0)]
-                                                         (geometry/compose-transforms (rotation-matrix (angle a b)) [sx 0.0 0.0 sy 0.0 0.0]))
+                                                            sx (Math/hypot a b)
+                                                            sy (if (> sx 1.0e-8) (/ (abs (determinant parent)) sx) 0.0)]
+                                                        (geometry/compose-transforms (rotation-matrix (angle a b)) [sx 0.0 0.0 sy 0.0 0.0]))
                              (no-scale-basis bone parent)))
         local (if-let [inverse (when basis (geometry/inverse-transform basis))]
                 (geometry/compose-transforms
@@ -171,9 +174,12 @@
 (defn compensate-bone
   "Preserve the full affine transform, including shear and reflections."
   [bone world parent]
-  (if (and parent (= "normal" (:inherit bone "normal")))
-    (let [inverse (or (geometry/inverse-transform parent) (throw (ex-info "Cannot compensate a collapsed parent" {})))
-          [a b c d x y] (geometry/compose-transforms inverse world)
+  (if (and parent (contains? #{"normal" "noRotationOrReflection"} (:inherit bone "normal")))
+    (let [inverse-parent (or (geometry/inverse-transform parent) (throw (ex-info "Cannot compensate a collapsed parent" {})))
+          basis (if (= "noRotationOrReflection" (:inherit bone)) (stretch-basis parent) parent)
+          inverse (or (geometry/inverse-transform basis) (throw (ex-info "Cannot compensate a collapsed basis" {})))
+          [a b c d] (geometry/compose-transforms inverse world)
+          [x y] (geometry/transform-point inverse-parent (subvec world 4 6))
           rotation (angle a b)]
       (assoc bone :x x :y y :rotation rotation :scale-x (Math/hypot a b) :scale-y (Math/hypot c d)
              :shear-x 0.0 :shear-y (- (angle c d) rotation 90.0)))
@@ -197,23 +203,23 @@
     (if (coll/every? zero? (mapv constraint (mapv keyword transform-properties)))
       state
       (let [target-matrix (get-in state [:transforms (:target constraint)])
-          updated (reduce (fn [result id]
-                            (let [bone (get by-id id)
-                                  parent (get-in result [:transforms (:parent bone)])
-                                  changed-bone (if (:local constraint) (local-constraint bone target constraint) bone)
-                                  matrix (if (:local constraint) (bone-world changed-bone parent)
-                                             (world-constraint (get-in state [:transforms id]) target-matrix constraint))
-                                  changed-bone (if (:local constraint) changed-bone (applied-bone bone matrix parent))]
-                              (-> result (assoc-in [:bones (indices id)] changed-bone) (assoc-in [:transforms id] matrix)))) state (:bones constraint))
-          applied (into {} (map (juxt :id identity)) (:bones updated))]
-      (reduce (fn [result id]
-                (let [bone (applied id)
-                      changed (or (contains? constrained (:parent bone)) (contains? (:changed-descendants result) (:parent bone)))]
-                  (if (or (contains? constrained id) (not changed)) result
-                      (-> result
-                          (assoc-in [:transforms id] (bone-world bone (get-in result [:transforms (:parent bone)])))
-                          (update :changed-descendants (fnil conj #{}) id)))))
-              (assoc updated :changed-descendants #{}) (:order state))))))
+            updated (reduce (fn [result id]
+                              (let [bone (get by-id id)
+                                    parent (get-in result [:transforms (:parent bone)])
+                                    changed-bone (if (:local constraint) (local-constraint bone target constraint) bone)
+                                    matrix (if (:local constraint) (bone-world changed-bone parent)
+                                               (world-constraint (get-in state [:transforms id]) target-matrix constraint))
+                                    changed-bone (if (:local constraint) changed-bone (applied-bone bone matrix parent))]
+                                (-> result (assoc-in [:bones (indices id)] changed-bone) (assoc-in [:transforms id] matrix)))) state (:bones constraint))
+            applied (into {} (map (juxt :id identity)) (:bones updated))]
+        (reduce (fn [result id]
+                  (let [bone (applied id)
+                        changed (or (contains? constrained (:parent bone)) (contains? (:changed-descendants result) (:parent bone)))]
+                    (if (or (contains? constrained id) (false? (:active bone)) (not changed)) result
+                        (-> result
+                            (assoc-in [:transforms id] (bone-world bone (get-in result [:transforms (:parent bone)])))
+                            (update :changed-descendants (fnil conj #{}) id)))))
+                (assoc updated :changed-descendants #{}) (:order state))))))
 
 (defn evaluate [bones constraints]
   (reduce apply-transform-constraint (pose bones) (vec (sort-by #(get % :order 0) constraints))))
@@ -302,9 +308,9 @@
             factor (if (and uniform-scale (:stretch constraint) (> radius maximum-reach) (> maximum-reach 0.0001))
                      (+ 1.0 (* (:mix constraint) (- (/ radius maximum-reach) 1.0))) 1.0)
             parent (cond-> (-> parent
-                                (update :rotation + (* (:mix constraint) (wrap-angle (- parent-goal (:rotation parent)))))
-                                (update :scale-x * factor)
-                                (assoc :shear-x 0.0 :shear-y 0.0))
+                               (update :rotation + (* (:mix constraint) (wrap-angle (- parent-goal (:rotation parent)))))
+                               (update :scale-x * factor)
+                               (assoc :shear-x 0.0 :shear-y 0.0))
                      (:uniform constraint) (update :scale-y * factor))
             child (-> child (assoc :y child-y)
                       (update :rotation + (* (:mix constraint) (wrap-angle (- child-goal (:rotation child))))))]
@@ -321,10 +327,10 @@
     (when-not (and (<= 1 (count chain) 2) (coll/every? identity chain) target
                    (:parent (first chain))
                    (or (= 1 (count chain))
-                       (and (= (:id (first chain)) (:parent (second chain)))
-                            (coll/every? #(= "normal" (:inherit %)) chain))))
-      (throw (ex-info "IK requires a parented bone, or a normal-inheritance parent-child pair, and a target." {:ik (:id constraint)})))
-    (if (zero? (:mix constraint)) state
+                       (= (:id (first chain)) (:parent (second chain)))))
+      (throw (ex-info "IK requires a parented bone or parent-child pair, and a target." {:ik (:id constraint)})))
+    (if (or (zero? (:mix constraint))
+            (and (= 2 (count chain)) (coll/any? #(not= "normal" (:inherit %)) chain))) state
         (let [parent (first chain)
               grandparent (get-in state [:transforms (:parent parent)])
               world (get-in state [:transforms (:id parent)])
@@ -336,7 +342,9 @@
               by-id (into {} (map (juxt :id identity)) bones)]
           (reduce (fn [result id]
                     (let [bone (by-id id)]
-                      (if (or (contains? solved-map id) (contains? (:changed-descendants result) (:parent bone)))
+                      (if (or (contains? solved-map id)
+                              (and (not (false? (:active bone)))
+                                   (contains? (:changed-descendants result) (:parent bone))))
                         (-> result (assoc-in [:transforms id] (bone-world bone (get-in result [:transforms (:parent bone)])))
                             (update :changed-descendants conj id)) result)))
                   (assoc state :bones bones :changed-descendants #{}) (:order state))))))
@@ -377,10 +385,10 @@
 
 (defn- cumulative-lengths [curve divisions]
   (:lengths (reduce (fn [{:keys [point distance lengths]} index]
-                     (let [next-point (bezier-point curve (/ (double index) divisions))
-                           distance (+ distance (length (mapv - next-point point)))]
-                       {:point next-point :distance distance :lengths (conj lengths distance)}))
-                   {:point (first curve) :distance 0.0 :lengths [0.0]} (range 1 (inc divisions)))))
+                      (let [next-point (bezier-point curve (/ (double index) divisions))
+                            distance (+ distance (length (mapv - next-point point)))]
+                        {:point next-point :distance distance :lengths (conj lengths distance)}))
+                    {:point (first curve) :distance 0.0 :lengths [0.0]} (range 1 (inc divisions)))))
 
 (defn path-lengths
   "Cumulative setup lengths suitable for exporting non-constant-speed paths."
@@ -490,7 +498,7 @@
         (reduce (fn [result id]
                   (let [bone (applied id)
                         changed (or (contains? constrained (:parent bone)) (contains? (:changed-descendants result) (:parent bone)))]
-                    (if (or (contains? constrained id) (not changed)) result
+                    (if (or (contains? constrained id) (false? (:active bone)) (not changed)) result
                         (-> result (assoc-in [:transforms id] (bone-world bone (get-in result [:transforms (:parent bone)])))
                             (update :changed-descendants conj id)))))
                 (assoc updated :changed-descendants #{}) (:order state))))))
@@ -509,7 +517,8 @@
           by-id (into {} (map (juxt :id identity)) (:bones state))]
       (reduce (fn [result id]
                 (let [bone (by-id id)]
-                  (if-not (contains? (:changed-descendants result) (:parent bone)) result
+                  (if (or (false? (:active bone))
+                          (not (contains? (:changed-descendants result) (:parent bone)))) result
                       (-> result (assoc-in [:transforms id] (bone-world bone (get-in result [:transforms (:parent bone)])))
                           (update :changed-descendants conj id)))))
               (assoc state :changed-descendants #{bone-id}) (:order state)))))

@@ -1,0 +1,2 @@
+name: "benchmark"
+embedded_instances { id: "controller" data: "components { id: \"script\" component: \"/bench.script\" }\ncomponents { id: \"rat\" component: \"/rat.factory\" }\ncomponents { id: \"rat_go\" component: \"/rat_go.factory\" }\n" }

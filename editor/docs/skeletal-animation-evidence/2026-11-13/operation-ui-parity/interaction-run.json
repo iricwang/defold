@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-operation-parity/build/editor.jar",
+  "sha256": "e44ce171d185a4c8bce0b65ee21acbb657ec27e0be1bdbf3335a617c33779aae",
+  "project_source": "editor/test/resources/skeletal-animation/performance-project",
+  "project_copy": "/private/tmp/spine-operation-parity/interaction-final/project",
+  "scenario": "/private/tmp/spine-operation-parity/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

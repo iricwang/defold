@@ -1,0 +1,29 @@
+{
+  :code {
+    :breakpoints [
+    ]
+  }
+  :scene {
+    :resource-settings {
+    }
+  }
+  :window {
+    :floating-layout "{:version 1, :docked {:layout {:left [:assets], :right [:outline :inspector :preview], :bottom [:tools], :center [:game]}, :trees {:left {:tabs [:assets]}, :right {:axis :vertical, :children [{:tabs [:outline]} {:tabs [:inspector]} {:tabs [:preview]}], :dividers [0.33278008298755185 0.6672199170124481]}, :bottom {:tabs [:tools]}, :center {:tabs [:game]}}, :positions {\"main-split\" [0.09166666666666666], \"workbench-split\" [0.8975770925110133], \"center-split\" [0.7443983402489627], \"scene-game-split\" [0.5261865793780688]}, :hidden #{}}, :windows []}"
+  }
+  :workflow {
+    :open-tabs [
+      [
+        [
+          "/tail.skeleton"
+          :skeletal-animation
+        ]
+      ]
+    ]
+    :recent-files [
+      [
+        "/tail.skeleton"
+        :skeletal-animation
+      ]
+    ]
+  }
+}

@@ -160,6 +160,9 @@ final class RemoteGateway implements AutoCloseable {
                 synchronized(p){if(p.worker==null){denied(e,409,"游戏未运行");return;}if(!Objects.toString(p.worker.status.get("device_revision"),"").equals(revision)){denied(e,409,"画面尺寸已变化，请重新连接");return;}}
                 proxy(e,p,"/input","POST",input,false);return;
             }
+            if(action.equals("audio")&&method.equals("GET")){
+                proxy(e,p,"/audio","GET",null,true);return;
+            }
             if((action.equals("video")||action.equals("stream"))&&method.equals("GET")){
                 String query=e.getRequestURI().getRawQuery();if(query!=null&&!query.matches("resolution=(540p|720p|1080p|original)"))throw new IllegalArgumentException("画质参数错误");
                 proxy(e,p,"/"+action+(query==null?"":"?"+query),"GET",null,true);return;

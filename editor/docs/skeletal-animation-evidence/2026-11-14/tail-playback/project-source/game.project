@@ -1,0 +1,17 @@
+[project]
+title = Tail playback benchmark
+[bootstrap]
+main_collection = /main.collectionc
+[display]
+width = 1280
+height = 720
+vsync = 1
+update_frequency = 60
+[engine]
+run_while_iconified = 1
+[collection]
+max_instances = 4096
+[spine]
+max_count = 256
+[profiler]
+track_cpu = 1

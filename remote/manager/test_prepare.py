@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from remote.manager.prepare import validate_native_engine
+from remote.manager.prepare import validate_native_engine, has_extensions
 
 
 class NativeEngineArtifactsTest(unittest.TestCase):
@@ -13,6 +13,19 @@ class NativeEngineArtifactsTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(dir=work)
         self.addCleanup(self.temporary.cleanup)
         self.engine = Path(self.temporary.name) / 'dmengine.exe'
+
+    # Build scratch files must never be detected as user extension sources.
+    def test_extension_scan_ignores_outputs_and_remote_scratch(self):
+        root = Path(self.temporary.name)
+        for name in ('build/old', '.internal/remote-manager/native-jobs/old'):
+            folder = root/name
+            folder.mkdir(parents=True)
+            (folder/'ext.manifest').write_text('name: stale')
+        self.assertFalse(has_extensions(root))
+        folder = root/'event'
+        folder.mkdir()
+        (folder/'ext.manifest').write_text('name: Event')
+        self.assertTrue(has_extensions(root))
 
     def test_missing_engine_rejected(self):
         with self.assertRaisesRegex(RuntimeError, '没有生成'):

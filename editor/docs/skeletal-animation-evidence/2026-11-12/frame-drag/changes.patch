@@ -1,0 +1,560 @@
+--- before/editor/src/clj/editor/skeletal_animation_view.clj
++++ after/editor/src/clj/editor/skeletal_animation_view.clj
+@@ -1055,57 +1055,99 @@
+   (attempt! context #(edit-mesh! context (fn [attachment _]
+                                            (mesh/delete-vertices attachment (:vertices @(:state context)))))))
+ 
++(defn- transform-animation-vertices [context doc selection transform]
++  (let [slot (selected-slot context doc)
++        state @(:state context)
++        transforms (:transforms (evaluated-pose context doc))
++        sampled (sampled-slots context doc)
++        animation-id (:id (animation context doc))
++        frame (preview-value context :deform-buffer doc
++                             [slot transforms selection animation-id (:time state) (:deforms sampled)]
++                             (fn prepare-deform-buffer []
++                               (let [attachment (:attachment slot)
++                                     points (vec (partitionv 2 (attachment-points context doc slot transforms)))
++                                     influences (or (coll/not-empty (:weights attachment))
++                                                    (mapv (fn [_] [{:bone (:bone slot) :weight 1.0}]) points))
++                                     base (double-array (or (get (:deforms sampled) (:id slot))
++                                                            (data/deform-size attachment)))
++                                     plan (loop [index 0 offset 0 result []]
++                                            (if (= index (count points))
++                                              result
++                                              (let [bindings (influences index)
++                                                    total (transduce (map :weight) + 0.0 bindings)
++                                                    selected (contains? selection index)]
++                                                (when (and selected (< (abs total) 1.0e-12))
++                                                  (throw (ex-info "A vertex with zero total weight cannot be deformed. Bind it to a bone first." {:vertex index})))
++                                                (recur (inc index) (+ offset (* 2 (count bindings)))
++                                                       (reduce-kv
++                                                         (fn [result binding-index {:keys [bone weight]}]
++                                                           (if (or (not selected) (zero? weight))
++                                                             result
++                                                             (let [matrix (get transforms bone)
++                                                                   origin (inverse-point matrix [0.0 0.0])
++                                                                   x (inverse-point matrix [1.0 0.0])
++                                                                   y (inverse-point matrix [0.0 1.0])]
++                                                               (when-not (and origin x y) (throw (ex-info (tr context "singular-bone") {})))
++                                                               (conj result [(+ offset (* 2 binding-index)) (points index)
++                                                                             (mapv #(/ % total) (mapv - x origin))
++                                                                             (mapv #(/ % total) (mapv - y origin))])))) result bindings)))))
++                                     track (slots/deform-track doc animation-id (:id slot) (:time state))]
++                                 {:base base :buffer (aclone base) :plan plan :track track})))
++        ^doubles base (:base frame)
++        ^doubles buffer (:buffer frame)]
++    ;; The mutable scratch belongs to this view, never to an undo document.
++    (System/arraycopy base 0 buffer 0 (alength base))
++    (doseq [[offset [x y] [ax ay] [bx by]] (:plan frame)]
++      (let [[tx ty] (point transform [x y])
++            dx (- tx x) dy (- ty y)
++            offset (long offset)]
++        (aset-double buffer offset (+ (aget base offset) (* ax dx) (* bx dy)))
++        (aset-double buffer (inc offset) (+ (aget base (inc offset)) (* ay dx) (* by dy)))))
++    (slots/set-deform-track-keyframe doc animation-id (:track frame) (:time state) (vec buffer)
++                                     (interpolation-at (:keys (:track frame)) (:time state) (:interpolation state)))))
++
+ (defn- transform-vertices [context doc selection transform]
+   (when-not (editable-preview-attachment context doc)
+     (throw (ex-info (tr context "preview-attachment-readonly") {})))
+-  (let [slot (selected-slot context doc)
+-        attachment (:attachment slot)
+-        state @(:state context)
+-        transforms (:transforms (evaluated-pose context doc))
+-        points (vec (partitionv 2 (attachment-points context doc slot transforms)))
+-        deltas (mapv #(mapv - (point transform %) %) points)
+-        influences (or (coll/not-empty (:weights attachment))
+-                       (mapv (fn [_] [{:bone (:bone slot) :weight 1.0}]) points))
+-        local-delta (fn local-delta [matrix delta]
+-                      (let [origin (inverse-point matrix [0.0 0.0]) end (inverse-point matrix delta)]
+-                        (when-not (and origin end) (throw (ex-info (tr context "singular-bone") {})))
+-                        (mapv - end origin)))
+-        offsets (mapv (fn [index bindings]
+-                        (if-not (contains? selection index)
+-                          (mapv (fn [_] [0.0 0.0]) bindings)
+-                          (let [total (transduce (map :weight) + 0.0 bindings)]
+-                            (when (< (abs total) 1.0e-12)
+-                              (throw (ex-info "A vertex with zero total weight cannot be deformed. Bind it to a bone first." {:vertex index})))
+-                            (mapv (fn [{:keys [bone weight]}]
+-                                    (if (zero? weight) [0.0 0.0]
+-                                        (local-delta (get transforms bone) (mapv #(/ % total) (deltas index))))) bindings))))
+-                      (range (count points)) influences)]
+-    (if (= "setup" (:mode state))
+-      (let [updated (assoc attachment :vertices
+-                           (coll/into-> (mapv (fn [index position]
+-                                                (if-not (contains? selection index) position
+-                                                        (mapv + position (local-delta (get transforms (:bone slot)) (deltas index)))))
+-                                              (range (count points)) (partitionv 2 (:vertices attachment))) [] cat))
+-            updated (cond-> updated
+-                      (:weights attachment)
+-                      (assoc :weights (mapv (fn [bindings changes]
+-                                              (mapv (fn [binding [dx dy]]
+-                                                      (-> binding (update :x + dx) (update :y + dy))) bindings changes))
+-                                            (:weights attachment) offsets)))]
+-        (if (= "mesh" (:type attachment))
+-          (data/apply-mesh-edit doc (:id slot)
+-                                {:mesh updated :selection selection
+-                                 :vertex-map (mapv #(hash-map % 1.0) (range (count points))) :deform-policy :identity})
+-          (data/update-slot doc (:id slot) {:attachment updated})))
+-      (let [values (or (get (:deforms (sampled-slots context doc)) (:id slot))
+-                       (vec (repeat (data/deform-size attachment) 0.0)))
+-            deltas (coll/into-> offsets [] (mapcat #(coll/into-> % [] cat)))
+-            values (mapv + values deltas)
+-            animation-id (:id (animation context doc))
+-            track (preview-value context :deform-track doc [animation-id (:id slot) (:time state)]
+-                                 (fn selected-deform-track [] (slots/deform-track doc animation-id (:id slot) (:time state))))]
+-        (slots/set-deform-track-keyframe doc animation-id track (:time state) values
+-                                         (interpolation-at (:keys track) (:time state) (:interpolation state)))))))
++  (if (= "animate" (:mode @(:state context)))
++    (transform-animation-vertices context doc selection transform)
++    (let [slot (selected-slot context doc)
++          attachment (:attachment slot)
++          transforms (:transforms (evaluated-pose context doc))
++          points (vec (partitionv 2 (attachment-points context doc slot transforms)))
++          deltas (mapv #(mapv - (point transform %) %) points)
++          influences (or (coll/not-empty (:weights attachment))
++                         (mapv (fn [_] [{:bone (:bone slot) :weight 1.0}]) points))
++          local-delta (fn local-delta [matrix delta]
++                        (let [origin (inverse-point matrix [0.0 0.0]) end (inverse-point matrix delta)]
++                          (when-not (and origin end) (throw (ex-info (tr context "singular-bone") {})))
++                          (mapv - end origin)))
++          offsets (mapv (fn [index bindings]
++                          (if-not (contains? selection index)
++                            (mapv (fn [_] [0.0 0.0]) bindings)
++                            (let [total (transduce (map :weight) + 0.0 bindings)]
++                              (when (< (abs total) 1.0e-12)
++                                (throw (ex-info "A vertex with zero total weight cannot be deformed. Bind it to a bone first." {:vertex index})))
++                              (mapv (fn [{:keys [bone weight]}]
++                                      (if (zero? weight) [0.0 0.0]
++                                          (local-delta (get transforms bone) (mapv #(/ % total) (deltas index))))) bindings))))
++                        (range (count points)) influences)
++          updated (assoc attachment :vertices
++                         (coll/into-> (mapv (fn [index position]
++                                              (if-not (contains? selection index) position
++                                                      (mapv + position (local-delta (get transforms (:bone slot)) (deltas index)))))
++                                            (range (count points)) (partitionv 2 (:vertices attachment))) [] cat))
++          updated (cond-> updated
++                    (:weights attachment)
++                    (assoc :weights (mapv (fn [bindings changes]
++                                            (mapv (fn [binding [dx dy]]
++                                                    (-> binding (update :x + dx) (update :y + dy))) bindings changes))
++                                          (:weights attachment) offsets)))]
++      (if (= "mesh" (:type attachment))
++        (data/apply-mesh-edit doc (:id slot)
++                              {:mesh updated :selection selection
++                               :vertex-map (mapv #(hash-map % 1.0) (range (count points))) :deform-policy :identity})
++        (data/update-slot doc (:id slot) {:attachment updated})))))
+ 
+ (defn- drag-vertices [context doc selection start target]
+   (let [[dx dy] (mapv - target start)]
+@@ -1959,6 +2001,13 @@
+     (when (pos? (count children)) (.setExpanded item true))
+     (or matches (pos? (count children)))))
+ 
++(defn- tree-structure [context doc]
++  [(:name doc) (:tree-search @(:state context))
++   (mapv #(select-keys % [:id :parent]) (:bones doc))
++   (mapv #(select-keys % [:id :bone]) (:slots doc))
++   (mapv #(mapv :id (get doc %)) [:ik :transform :path :physics :animations])
++   (data/skin-names doc) (mapv :name (events/definitions doc))])
++
+ (defn- refresh-tree! [context doc]
+   (let [previous (loop [pending (if-let [root (.getRoot ^TreeView (:tree context))] [root] []) result {}]
+                    (if-let [^TreeItem item (peek pending)]
+@@ -2587,6 +2636,46 @@
+                      root (conj [root javafx.scene.input.KeyEvent/KEY_PRESSED escaped]))]
+       (doseq [[^Node node type handler] handlers] (.addEventFilter node type handler))
+       (ui/user-data! canvas ::rigging-handlers handlers))))
++
++(defn- flush-drag-input! [context]
++  (when-let [pending (ui/user-data (:canvas context) ::drag-input)]
++    (when-let [{:keys [event handler]} @pending]
++      (reset! pending nil)
++      (when (:drag @(:state context))
++        (.handle ^javafx.event.EventHandler handler event)))))
++
++(defn- coalesce-drag-events! [context]
++  (let [^Canvas canvas (:canvas context)
++        pending (atom nil)
++        moved (volatile! false)
++        press (.getOnMousePressed canvas)
++        drag (.getOnMouseDragged canvas)
++        release (.getOnMouseReleased canvas)]
++    (ui/user-data! canvas ::drag-input pending)
++    (.setOnMousePressed canvas
++                        (ui/event-handler event
++                          (reset! pending nil)
++                          (vreset! moved false)
++                          (.handle press event)))
++    (.setOnMouseDragged canvas
++                        (ui/event-handler event
++                          (let [gesture (:drag @(:state context))]
++                            ;; Retain all brush and creation samples.
++                            (if (and gesture (not (:brush gesture)) (not (:create-id gesture))
++                                     (#{"move" "rotate" "scale" "shear" "mesh" "path" "pose"} (:tool gesture)))
++                              (do (vreset! moved true)
++                                  (reset! pending {:event event :handler drag})
++                                  (.consume ^MouseEvent event))
++                              (.handle drag event)))))
++    (.setOnMouseReleased canvas
++                         (ui/event-handler event
++                           (when-let [gesture (:drag @(:state context))]
++                             (when (and @moved
++                                        (or @pending (not= (:last-point gesture) [(.getX ^MouseEvent event) (.getY ^MouseEvent event)])))
++                               (reset! pending {:event (.copyFor ^MouseEvent event (.getSource ^MouseEvent event) (.getTarget ^MouseEvent event) MouseEvent/MOUSE_DRAGGED)
++                                                :handler drag})))
++                           (flush-drag-input! context)
++                           (.handle release event)))))
+ 
+ (defn- canvas-events! [context]
+   (let [^Canvas canvas (:canvas context)]
+@@ -2858,7 +2947,8 @@
+                             :else nil)))))
+   (creation-events! context)
+   (rigging-events! context)
+-  (ik-events! context))
++  (ik-events! context)
++  (coalesce-drag-events! context))
+ 
+ (defn- timeline-events! [context]
+   (let [^Canvas canvas (:timeline context)]
+@@ -3541,6 +3631,7 @@
+               (ui/user-data! root ::weight-dock-token token))))))))
+ 
+ (defn- refresh! [context elapsed]
++  (flush-drag-input! context)
+   (refresh-mode-layout! context)
+   (refresh-weight-dock! context)
+   (let [state @(:state context)
+@@ -3597,8 +3688,11 @@
+                      (reverse (:event-log @(:state context)))))
+       (swap! (:state context) assoc :displayed-event-log (:event-log @(:state context))))
+     (when (and (or doc-changed animation-changed (not= doc (:tree-document state))) (nil? (:drag state)))
+-      (refresh-tree! context doc)
+-      (swap! (:state context) assoc :tree-document doc :tree-selection-token nil)
++      (let [structure (tree-structure context doc)]
++        (when (not= structure (:tree-structure state))
++          (refresh-tree! context doc)
++          (swap! (:state context) assoc :tree-structure structure :tree-selection-token nil)))
++      (swap! (:state context) assoc :tree-document doc)
+       (let [^ComboBox combo (:animation-choice context) ids (mapv :id (:animations doc))]
+         (swap! (:state context) assoc :refreshing true)
+         (.setAll (.getItems combo) ^java.util.Collection ids)
+--- before/editor/src/clj/editor/skeletal_animation_render.clj
++++ after/editor/src/clj/editor/skeletal_animation_render.clj
+@@ -77,6 +77,36 @@
+                (.setDepthTest DepthTest/DISABLE) (.setMouseTransparent true))]
+     {:mesh mesh :material material :view view :last-image ::unset}))
+ 
++(defn- update-point-buffer! [entry points]
++  ;; Validate before mutating the reusable scratch, including failed updates.
++  (doseq [xy points]
++    (when-not (= 2 (count xy)) (throw (ex-info "Mesh vertices need two coordinates." {})))
++    (checked-float (xy 0))
++    (checked-float (xy 1)))
++  (let [size (* 3 (count points))
++        ^floats previous (:point-buffer entry)
++        resized (or (nil? previous) (not= size (alength previous)))
++        ^floats buffer (if resized (float-array size) previous)
++        changed (loop [index 0 first-changed size last-changed 0]
++                  (if (= index (count points))
++                    [first-changed last-changed]
++                    (let [xy (points index)
++                          x (float (xy 0)) y (float (xy 1))
++                          offset (* 3 index)
++                          different (or (not= x (aget buffer offset)) (not= y (aget buffer (inc offset))))]
++                      (aset-float buffer offset x)
++                      (aset-float buffer (inc offset) y)
++                      (recur (inc index) (if different (min first-changed offset) first-changed)
++                             (if different (+ offset 2) last-changed)))))
++        [from to] changed
++        ^TriangleMesh mesh (:mesh entry)]
++    ;; Publish only after every coordinate passed validation. Size changes
++    ;; replace the array; fixed topology uploads the smallest changed interval.
++    (if resized
++      (.setAll (.getPoints mesh) buffer)
++      (when (< from to) (.set (.getPoints mesh) (int from) buffer (int from) (int (- to from)))))
++    (assoc entry :point-buffer buffer)))
++
+ (defn- update-slot! [{:keys [^TriangleMesh mesh ^PhongMaterial material] :as entry}
+                      {:keys [points uvs triangles ^Image image opacity tint] :or {tint [1.0 1.0 1.0]} :as slot}]
+   (when-not (= (count points) (count uvs))
+@@ -85,19 +115,18 @@
+     (throw (ex-info "Mesh opacity must be between zero and one." {:slot (:id slot)})))
+   (when-not (and (= 3 (count tint)) (coll/every? #(and (number? %) (Double/isFinite (double %)) (<= 0.0 (double %) 1.0)) tint))
+     (throw (ex-info "Mesh tint needs three finite channels between zero and one." {:slot (:id slot)})))
+-  (when (not= points (:last-points entry))
+-    (.setAll (.getPoints mesh) (point-buffer points)))
+-  (when (not= uvs (:last-uvs entry))
+-    (.setAll (.getTexCoords mesh) (uv-buffer uvs)))
+-  (when (or (not= triangles (:last-triangles entry)) (not= (count points) (count (:last-points entry))))
+-    (.setAll (.getFaces mesh) (face-buffer triangles (count points))))
+-  (when (not (identical? image (:last-image entry)))
+-    (.setDiffuseMap material image))
+-  (when (or (not (identical? image (:last-image entry))) (not= opacity (:last-opacity entry)) (not= tint (:last-tint entry)))
+-    ;; Material alpha multiplies texture alpha directly on the GPU. Node opacity
+-    ;; can create an intermediate surface, defeating the batched mesh renderer.
+-    (.setDiffuseColor material (if image (Color/color (tint 0) (tint 1) (tint 2) opacity) (Color/web "#584455" opacity))))
+-  (assoc entry :last-points points :last-uvs uvs :last-triangles triangles :last-image image :last-opacity opacity :last-tint tint))
++  (let [entry (if (= points (:last-points entry)) entry (update-point-buffer! entry points))]
++    (when (not= uvs (:last-uvs entry))
++      (.setAll (.getTexCoords mesh) (uv-buffer uvs)))
++    (when (or (not= triangles (:last-triangles entry)) (not= (count points) (count (:last-points entry))))
++      (.setAll (.getFaces mesh) (face-buffer triangles (count points))))
++    (when (not (identical? image (:last-image entry)))
++      (.setDiffuseMap material image))
++    (when (or (not (identical? image (:last-image entry))) (not= opacity (:last-opacity entry)) (not= tint (:last-tint entry)))
++      ;; Material alpha multiplies texture alpha directly on the GPU. Node opacity
++      ;; can create an intermediate surface, defeating the batched mesh renderer.
++      (.setDiffuseColor material (if image (Color/color (tint 0) (tint 1) (tint 2) opacity) (Color/web "#584455" opacity))))
++    (assoc entry :last-points points :last-uvs uvs :last-triangles triangles :last-image image :last-opacity opacity :last-tint tint)))
+ 
+ (defn render-plan
+   "Return validated, draw-ordered texture meshes with Spine clipping applied.
+--- before/editor/src/clj/editor/skeletal_animation_slot_view.clj
++++ after/editor/src/clj/editor/skeletal_animation_slot_view.clj
+@@ -166,7 +166,7 @@
+                                   (fn delete-draw-order-key []
+                                     (change! #(slots/remove-draw-order-keyframe % animation-id (current-time)))))])])]))
+ 
+-(defn management-inspector
++(defn- management-inspector-impl
+   "Setup attachment authoring and mode-specific sequence controls."
+   [{:keys [document animation-id slot-id time current-time tr change! pose-change! sections mode]}]
+   (let [group (fn group [id expanded nodes] (properties/section (merge {:tr tr} sections) id expanded nodes))
+@@ -306,6 +306,17 @@
+                                                                   (fn delete-sequence-key []
+                                                                     (change! #(attachments/remove-sequence-keyframe % animation-id skin slot-id name (current-time)))))]))] [] (remove nil?))))] [] (remove nil?))))
+ 
++(defn management-inspector
++  "Skip setup-only controls and source export when Animate has no sequence."
++  [{:keys [document animation-id slot-id time mode] :as context}]
++  (if (not= "animate" mode)
++    (management-inspector-impl context)
++    (let [slot (coll/first-where #(= slot-id (:id %)) (:slots (slots/sample-slots document animation-id time)))]
++      (when-not slot (throw (ex-info "Unknown animation slot." {:slot slot-id})))
++      (if (pos? (get-in slot [:attachment :sequence :count] 0))
++        (management-inspector-impl context)
++        []))))
++
+ (defn skin-inspector
+   "Skeleton-wide skin controls, separate from per-attachment properties."
+   [{:keys [document tr change! mode]}]
+--- before/editor/test/editor/skeletal_animation_performance_test.clj
++++ after/editor/test/editor/skeletal_animation_performance_test.clj
+@@ -238,3 +238,35 @@
+         (is (= 4 (count @@#'slots/parsed-source-cache)))
+         (is (thrown? Exception (#'slots/parsed-source "{")))
+         (is (= 4 (count @@#'slots/parsed-source-cache)))))))
++
++;; Mutable preview storage must never escape into committed FFD or undo
++;; snapshots; changing selection invalidates the cached influence plan.
++(deftest reusable-deform-buffer-test
++  (let [attachment {:type "mesh" :path "/mesh.png" :width 10.0 :height 10.0
++                    :vertices [0.0 0.0 10.0 0.0 0.0 10.0] :uvs [0.0 0.0 1.0 0.0 0.0 1.0] :triangles [0 1 2]}
++        doc (data/add-slot (data/new-document "buffer") {:id "mesh" :bone "root" :attachment attachment})
++        context {:state (atom {:mode "animate" :animation "default" :time 0.5 :interpolation "linear" :selected-kind :slot :selected "mesh"})
++                 :preview-cache (atom {}) :pose-cache (atom nil)}
++        first-doc (#'view/transform-vertices context doc #{1} [1.0 0.0 0.0 1.0 2.0 3.0])
++        buffer (get-in @(:preview-cache context) [:deform-buffer 0 :value :buffer])
++        saved-values (mapv double (get-in first-doc [:animations 0 :deforms 0 :keys 0 :vertices]))
++        second-doc (#'view/transform-vertices context doc #{1} [1.0 0.0 0.0 1.0 4.0 5.0])]
++    (is (identical? buffer (get-in @(:preview-cache context) [:deform-buffer 0 :value :buffer])))
++    (is (= saved-values (get-in first-doc [:animations 0 :deforms 0 :keys 0 :vertices])))
++    (is (< (abs (- 2.0 (saved-values 2))) 1.0e-10))
++    (is (< (abs (- 4.0 (get-in second-doc [:animations 0 :deforms 0 :keys 0 :vertices 2]))) 1.0e-10))
++    (let [third (#'view/transform-vertices context doc #{2} [1.0 0.0 0.0 1.0 6.0 7.0])]
++      (is (= [0.0 0.0 0.0 0.0 6.0 7.0] (get-in third [:animations 0 :deforms 0 :keys 0 :vertices]))))
++    (is (nil? (:deforms (first (:animations doc)))))))
++
++;; Hierarchy refresh keys ignore geometric/animation values while preserving
++;; parent changes, naming, draw order and search invalidation.
++(deftest hierarchy-structure-invalidation-test
++  (let [doc (data/add-bone (data/new-document "tree") {:id "child" :parent "root"})
++        context {:state (atom {})}
++        token (#'view/tree-structure context doc)]
++    (is (= token (#'view/tree-structure context (data/update-bone doc "child" {:x 20.0}))))
++    (is (= token (#'view/tree-structure context (data/set-keyframe doc "default" "child" "x" 0.5 30.0 "linear"))))
++    (is (not= token (#'view/tree-structure context (data/add-bone doc {:id "new" :parent "child"}))))
++    (swap! (:state context) assoc :tree-search "child")
++    (is (not= token (#'view/tree-structure context doc)))))
+--- before/editor/test/editor/skeletal_animation_drag_test.clj
++++ after/editor/test/editor/skeletal_animation_drag_test.clj
+@@ -155,3 +155,71 @@
+           (is (= 0.0 (:mix (first (data/sample-ik after "default" 0.5)))))
+           (g/undo! :undo/global)
+           (is (= doc (g/node-value (:resource-node context) :document))))))))
++
++;; Bursts must wait for a pulse, keep the last target, flush a newer release
++;; position, and create exactly one undoable document operation.
++(deftest coalesced-drag-release-test
++  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++    (ui/run-now
++      (let [doc (rig) context (context doc {})
++            window (doto (javafx.stage.Stage.) (.setScene (:scene context)) (.show))]
++        (try
++          (p/mouse-press! (:scene context) (mouse-point context [100.0 0.0]) :primary)
++          (doseq [x (range 101 151)] (p/mouse-move! (:scene context) (mouse-point context [x 20.0])))
++          (is (nil? (:draft @(:state context))))
++          (is (= doc (g/node-value (:resource-node context) :document)))
++          (#'view/flush-drag-input! context)
++          (let [draft (:draft @(:state context))]
++            (is (near? [150.0 20.0] (subvec (get-in (pose draft) [:transforms "lower"]) 4 6)))
++            (#'view/flush-drag-input! context)
++            (is (identical? draft (:draft @(:state context)))))
++          (p/mouse-move! (:scene context) (mouse-point context [160.0 30.0]))
++          (p/mouse-release! (:scene context) (mouse-point context [170.0 40.0]) :primary)
++          (let [after (g/node-value (:resource-node context) :document)]
++            (is (near? [170.0 40.0] (subvec (get-in (pose after) [:transforms "lower"]) 4 6)))
++            (g/undo! :undo/global)
++            (is (= doc (g/node-value (:resource-node context) :document)))
++            (g/redo! :undo/global)
++            (is (= after (g/node-value (:resource-node context) :document))))
++          (finally (.hide window)))))))
++
++;; Cancellation must discard a queued sample; it cannot resurrect a draft
++;; during the next editor pulse or affect the next gesture.
++(deftest cancelled-coalesced-drag-test
++  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++    (ui/run-now
++      (let [doc (rig) context (context doc {})
++            window (doto (javafx.stage.Stage.) (.setScene (:scene context)) (.show))]
++        (try
++          (p/mouse-press! (:scene context) (mouse-point context [100.0 0.0]) :primary)
++          (p/mouse-move! (:scene context) (mouse-point context [150.0 20.0]))
++          (swap! (:state context) dissoc :drag :draft)
++          (#'view/flush-drag-input! context)
++          (is (nil? (:draft @(:state context))))
++          (is (= doc (g/node-value (:resource-node context) :document)))
++          (p/mouse-release! (:scene context) (mouse-point context [150.0 20.0]) :primary)
++          (finally (.hide window)))))))
++
++;; Coalescing must never discard brush path samples or bone-creation samples.
++(deftest path-sensitive-drag-bypass-test
++  (ui/run-now
++    (let [canvas (Canvas. 400.0 300.0)
++          scene (Scene. (Group. (into-array javafx.scene.Node [canvas])))
++          window (doto (javafx.stage.Stage.) (.setScene scene) (.show))
++          samples (atom 0)
++          context {:canvas canvas :state (atom {})}]
++      (try
++        (.setOnMousePressed canvas (ui/event-handler _ nil))
++        (.setOnMouseDragged canvas (ui/event-handler _ (swap! samples inc)))
++        (.setOnMouseReleased canvas (ui/event-handler _ nil))
++        (#'view/coalesce-drag-events! context)
++        (doseq [gesture [{:tool "weights" :brush true} {:tool "create" :create-id "new"}]]
++          (swap! (:state context) assoc :drag gesture)
++          (reset! samples 0)
++          (p/mouse-press! scene (p/point canvas 0.2 0.2) :primary)
++          (dotimes [i 10] (p/mouse-move! scene (p/point canvas (+ 0.3 (* i 0.01)) 0.3)))
++          (is (= 10 @samples))
++          (#'view/flush-drag-input! context)
++          (is (= 10 @samples))
++          (p/mouse-release! scene (p/point canvas 0.4 0.3) :primary))
++        (finally (.hide window))))))
+--- before/editor/test/editor/skeletal_animation_render_test.clj
++++ after/editor/test/editor/skeletal_animation_render_test.clj
+@@ -132,3 +132,27 @@
+           ;; ui/run-now rethrows Throwable return values, including the result
+           ;; returned by a successful thrown? assertion.
+           nil)))))
++
++;; Fixed topology reuses CPU storage and notifies only the changed vertex
++;; interval. Invalid input must leave both the mesh and scratch reusable.
++(deftest partial-point-buffer-update-test
++  (ui/run-now
++    (let [mesh (TriangleMesh.)
++          before [[1.0 2.0] [3.0 4.0] [5.0 6.0]]
++          entry (#'render/update-point-buffer! {:mesh mesh} before)
++          changes (atom [])
++          listener (reify ArrayChangeListener
++                     (onChanged [_ _ resized from to] (swap! changes conj [resized from to])))]
++      (.addListener (.getPoints mesh) listener)
++      (let [moved (#'render/update-point-buffer! entry (assoc before 1 [7.0 8.0]))]
++        (is (identical? (:point-buffer entry) (:point-buffer moved)))
++        (is (= [[false 3 5]] @changes))
++        (is (= [1.0 2.0 0.0 7.0 8.0 0.0 5.0 6.0 0.0] (vec (.toArray (.getPoints mesh) (float-array 0)))))
++        (is (thrown? clojure.lang.ExceptionInfo (#'render/update-point-buffer! moved [[9.0 9.0] [##NaN 8.0] [5.0 6.0]])))
++        (is (= [1.0 2.0 0.0 7.0 8.0 0.0 5.0 6.0 0.0] (vec (:point-buffer moved))))
++        (reset! changes [])
++        (#'render/update-point-buffer! moved (assoc before 1 [7.0 8.0]))
++        (is (= [] @changes))
++        (let [resized (#'render/update-point-buffer! moved [[9.0 9.0]])]
++          (is (not (identical? (:point-buffer moved) (:point-buffer resized))))
++          (is (= [9.0 9.0 0.0] (vec (.toArray (.getPoints mesh) (float-array 0))))))))))
+--- before/editor/test/editor/skeletal_animation_slot_view_test.clj
++++ after/editor/test/editor/skeletal_animation_slot_view_test.clj
+@@ -213,3 +213,17 @@
+         (is (= "default" (:active-skin @document))))
+       (is (.isDisabled (.lookup (skin-pane document "animate") "#skeletal-skin-new")))
+       (is (nil? (.lookup (management-pane document (atom 0.0)) "#skeletal-skin-compose"))))))
++
++;; Animate with no image sequence has no management controls. In-progress UVs
++;; need not be exportable merely to rebuild the property pane after an FFD edit.
++(deftest animated-management-without-export-test
++  (ui/run-now
++    (let [doc (data/add-slot (data/new-document "editing")
++                             {:id "mesh" :bone "root"
++                              :attachment {:type "mesh" :path "/mesh.png" :width 10.0 :height 10.0
++                                           :vertices [0.0 0.0 10.0 0.0 10.0 10.0 0.0 10.0]
++                                           :uvs [0.0 0.0 1.0 1.0 1.0 0.0 0.0 1.0] :triangles [0 1 2 0 2 3]}})]
++      (is (thrown? clojure.lang.ExceptionInfo (data/export-spine-json doc)))
++      (is (= [] (slot-view/management-inspector {:document doc :animation-id "default" :slot-id "mesh" :time 0.0 :mode "animate" :tr identity})))
++      (is (thrown? clojure.lang.ExceptionInfo (slot-view/management-inspector {:document doc :animation-id "default" :slot-id "missing" :time 0.0 :mode "animate" :tr identity})))
++      nil)))
+--- before/editor/scripts/skeletal_animation_benchmark.clj
++++ after/editor/scripts/skeletal_animation_benchmark.clj
+@@ -22,6 +22,7 @@
+          '[editor.ui :as ui]
+          '[util.coll :as coll])
+ (def perf-results (atom []))
++(def perf-drag-events (Integer/getInteger "defold.benchmark.drag-events" 1))
+ (def perf-textured-grid (Boolean/getBoolean "defold.benchmark.textured-grid"))
+ (def perf-bean (java.lang.management.ManagementFactory/getThreadMXBean))
+ (defn perf-measure [name n f]
+@@ -76,10 +77,15 @@
+                           (assert (identical? canvas hit) (str "Drag hit " (.getId hit) " instead of canvas: " name " dims=" [(.getWidth canvas) (.getHeight canvas)] " origin=" origin " screen=" (#'view/screen ctx origin) " state=" (select-keys @state [:pan-x :pan-y :zoom])))
+                           (assert (:drag @state) (str "No drag: " name)))
+                         (perf-measure (str label "/" name) 90
+-                                      (fn [i] (p/mouse-move! scene (mouse-point (mapv + origin [(* 18.0 (Math/sin (* i 0.09))) (* 12.0 (Math/cos (* i 0.09)))]))) (refresh)))
++                                      (fn [i]
++                                        (dotimes [event perf-drag-events]
++                                          (let [t (+ i (/ (inc event) (double perf-drag-events)))]
++                                            (p/mouse-move! scene (mouse-point (mapv + origin [(* 18.0 (Math/sin (* t 0.09))) (* 12.0 (Math/cos (* t 0.09)))])))))
++                                        (refresh)))
+                         (assert (:draft @state) (str "No draft: " name " " (select-keys @state [:selected :selected-kind :drag])))
+                         (let [started (System/nanoTime)]
+-                          (p/mouse-release! scene (mouse-point origin) :primary)
++                          (let [[x y] (get-in @state [:drag :last-point])]
++                            (p/mouse-release! scene (p/point canvas (/ x (.getWidth canvas)) (/ y (.getHeight canvas))) :primary))
+                           (refresh)
+                           (swap! perf-results update (dec (count @perf-results)) assoc :release-ms (/ (- (System/nanoTime) started) 1.0e6)))
+                         (when (contains? @state :compatibility-document) (assert (= (#'view/document ctx) (:compatibility-document @state)) "Release did not refresh compatibility status")))]
+@@ -114,4 +120,4 @@
+           (perf-measure (str label "/weight-brush") 30 (fn [_] (#'view/brush-document ctx doc (vec point) 0.1))))))
+     (g/transact {:undoable false} (g/set-property (:resource-node ctx) :document original))
+     (reset! state baseline-state)
+-    (spit "OUTPUT_PATH" (json/write-str {:measurement "FX thread CPU wall time incl event handling, refresh, CSS/layout; excludes GPU presentation" :textured-grid perf-textured-grid :results @perf-results :disabled-handlers (count @@#'handler/throwing-handlers) :stopped-timers (count @@#'ui/stopped-timers)}))))
++    (spit "OUTPUT_PATH" (json/write-str {:measurement "FX thread CPU wall time incl event handling, refresh, CSS/layout; excludes GPU presentation" :textured-grid perf-textured-grid :drag-events-per-frame perf-drag-events :results @perf-results :disabled-handlers (count @@#'handler/throwing-handlers) :stopped-timers (count @@#'ui/stopped-timers)}))))
+--- before/editor/scripts/skeletal_animation_benchmark.py
++++ after/editor/scripts/skeletal_animation_benchmark.py
+@@ -33,7 +33,10 @@
+     parser.add_argument('--measure', choices=['cpu', 'pulse'], default='cpu')
+     parser.add_argument('--jfr', action='store_true')
+     parser.add_argument('--textured-grid', action='store_true', help='Render the stress mesh using the tail fixture texture')
++    parser.add_argument('--drag-events-per-frame', type=int, default=1)
+     args, remaining = parser.parse_known_args()
++    if not 1 <= args.drag_events_per_frame <= 100:
++        parser.error('--drag-events-per-frame must be between 1 and 100')
+     fixture = args.fixture_edn.resolve(strict=True)
+     if '--output' not in remaining:
+         parser.error('--output is required')
+@@ -57,6 +60,7 @@
+         return result
+ 
+     def recorded_popen(command, **kwargs):
++        command = command[:1] + [f'-Ddefold.benchmark.drag-events={args.drag_events_per_frame}'] + command[1:]
+         if args.textured_grid:
+             command = command[:1] + ['-Ddefold.benchmark.textured-grid=true'] + command[1:]
+         if args.jfr:

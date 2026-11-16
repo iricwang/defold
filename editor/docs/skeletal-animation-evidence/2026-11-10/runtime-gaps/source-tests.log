@@ -1,0 +1,56 @@
+11月 10, 2026 2:40:47 下午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @4d847d32'
+Reflection warning, /Users/applemima1111/Documents/Dev/Defold/editor/src/clj/editor/skeletal_animation_properties.clj:72:18 - call to method updateItem can't be resolved (target class is unknown).
+
+Testing editor.skeletal-animation-native-test
+
+Testing editor.skeletal-animation-io-test
+
+Testing editor.skeletal-animation-runtime-gap-test
+
+Testing editor.skeletal-animation-parity-edit-test
+
+Testing editor.skeletal-animation-timeline-test
+
+Testing editor.skeletal-animation-mixing-test
+
+Testing editor.skeletal-animation-physics-test
+
+Testing editor.skeletal-animation-slots-test
+
+Testing editor.skeletal-animation-playback-test
+
+Testing editor.skeletal-animation-view-workflow-test
+
+Testing editor.skeletal-animation-deform-review-test
+
+Testing editor.skeletal-animation-graph-edit-test
+
+Testing editor.skeletal-animation-constraints-test
+
+Testing editor.skeletal-animation-geometry-test
+
+Testing editor.skeletal-animation-data-test
+
+Testing editor.skeletal-animation-navigation-test
+
+Testing editor.skeletal-animation-toolbar-test
+
+Testing editor.skeletal-animation-curve-view-test
+
+Testing editor.skeletal-animation-selection-test
+
+Testing editor.skeletal-animation-trace-view-test
+
+Testing editor.skeletal-animation-mesh-test
+
+Testing editor.skeletal-animation-slot-view-test
+
+Testing editor.skeletal-animation-view-test
+
+Testing editor.skeletal-animation-attachments-test
+
+Testing editor.skeletal-animation-smart-mesh-test
+
+Ran 398 tests containing 13126 assertions.
+0 failures, 0 errors.

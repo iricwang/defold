@@ -1,0 +1,27 @@
+{:viewport [3000 1500]
+ :steps [{:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail.skeleton"}}
+         {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-mode"}
+         {:op :keys :window-index 1 :keys [:down]}
+         {:op :keys :window-index 1 :keys [:enter]}
+         {:op :assert :selector "#skeletal-mode" :property :value :equals "animate"}
+         {:op :click :selector "#skeletal-canvas" :at [0.9 0.1]}
+         {:op :remember :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pan-x] :as :pan}
+         {:op :remember :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :zoom] :as :zoom}
+         {:op :drag :button :secondary :path [{:selector "#skeletal-canvas" :at [0.2 0.12]}
+                                             {:selector "#skeletal-canvas" :at [0.3 0.14]}
+                                             {:selector "#skeletal-canvas" :at [0.4 0.16]}]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pan-x] :differs-from :pan}
+         {:op :scroll :selector "#skeletal-canvas" :delta [0 80]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :zoom] :differs-from :zoom}
+         {:op :click :selector "#skeletal-clip-controls"}
+         {:op :click :window-index 1 :selector "#skeletal-animation"}
+         {:op :click :window-index 2 :selector {:fx.plorer/style-classes #{"list-cell"} :text "idle_soft_tail"}}
+         {:op :assert :window-index 1 :selector "#skeletal-animation" :property :value :equals "idle_soft_tail"}
+         {:op :keys :keys [:escape]}
+         {:op :click :selector "#skeletal-canvas" :at [0.9 0.1]}
+         {:op :keys :keys [:space]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals true}
+         {:op :keys :keys [:space]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals false}]}

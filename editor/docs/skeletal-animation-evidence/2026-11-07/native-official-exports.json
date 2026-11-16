@@ -1,0 +1,2542 @@
+{
+  "blend-additive": {
+    "fixture": {
+      "skeleton": {
+        "hash": "/f7jw8QK7C0",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item",
+          "blend": "additive"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "blend-multiply": {
+    "fixture": {
+      "skeleton": {
+        "hash": "xhhNsIM6e24",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item",
+          "blend": "multiply"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "blend-screen": {
+    "fixture": {
+      "skeleton": {
+        "hash": "ERWIxyaMG94",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item",
+          "blend": "screen"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "boundingbox-weighted-deform": {
+    "fixture": {
+      "skeleton": {
+        "hash": "LS04Xwei5/g",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "boundingbox",
+                "vertexCount": 3,
+                "vertices": [
+                  2,
+                  0,
+                  0,
+                  0,
+                  0.7,
+                  1,
+                  0,
+                  0,
+                  0.3,
+                  1,
+                  0,
+                  32,
+                  0,
+                  1,
+                  1,
+                  1,
+                  0,
+                  24,
+                  1
+                ],
+                "color": "60ef00ff"
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "deform": {
+          "attachments": {
+            "default": {
+              "slot": {
+                "item": {
+                  "deform": [
+                    {
+                      "vertices": [
+                        3,
+                        -2
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "boundingbox-weighted": {
+    "fixture": {
+      "skeleton": {
+        "hash": "jOkEandzzjo",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "boundingbox",
+                "vertexCount": 3,
+                "vertices": [
+                  2,
+                  0,
+                  0,
+                  0,
+                  0.7,
+                  1,
+                  0,
+                  0,
+                  0.3,
+                  1,
+                  0,
+                  32,
+                  0,
+                  1,
+                  1,
+                  1,
+                  0,
+                  24,
+                  1
+                ],
+                "color": "60ef00ff"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "boundingbox": {
+    "fixture": {
+      "skeleton": {
+        "hash": "bgZjY0IHF0U",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "boundingbox",
+                "vertexCount": 4,
+                "vertices": [
+                  0,
+                  0,
+                  32,
+                  0,
+                  32,
+                  24,
+                  0,
+                  24
+                ],
+                "color": "60ef00ff"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "clipping-weighted-deform": {
+    "fixture": {
+      "skeleton": {
+        "hash": "4VImRba6tRQ",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "clipping",
+                "end": "end",
+                "vertexCount": 3,
+                "vertices": [
+                  2,
+                  0,
+                  0,
+                  0,
+                  0.7,
+                  1,
+                  0,
+                  0,
+                  0.3,
+                  1,
+                  0,
+                  32,
+                  0,
+                  1,
+                  1,
+                  1,
+                  0,
+                  24,
+                  1
+                ],
+                "color": "3a3acdff"
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "deform": {
+          "attachments": {
+            "default": {
+              "slot": {
+                "item": {
+                  "deform": [
+                    {
+                      "vertices": [
+                        3,
+                        -2
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "clipping-weighted": {
+    "fixture": {
+      "skeleton": {
+        "hash": "hsV1erCJDjQ",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "clipping",
+                "end": "end",
+                "vertexCount": 3,
+                "vertices": [
+                  2,
+                  0,
+                  0,
+                  0,
+                  0.7,
+                  1,
+                  0,
+                  0,
+                  0.3,
+                  1,
+                  0,
+                  32,
+                  0,
+                  1,
+                  1,
+                  1,
+                  0,
+                  24,
+                  1
+                ],
+                "color": "3a3acdff"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "clipping": {
+    "fixture": {
+      "skeleton": {
+        "hash": "2EpndZyBoRk",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "clipping",
+                "end": "end",
+                "vertexCount": 4,
+                "vertices": [
+                  0,
+                  0,
+                  32,
+                  0,
+                  32,
+                  24,
+                  0,
+                  24
+                ],
+                "color": "3a3acdff"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "draw-order": {
+    "fixture": {
+      "skeleton": {
+        "hash": "YbzYfEZy+WI",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "drawOrder": [
+            {
+              "offsets": [
+                {
+                  "slot": "slot",
+                  "offset": 1
+                }
+              ]
+            },
+            {
+              "time": 0.5
+            }
+          ]
+        }
+      }
+    }
+  },
+  "linkedmesh-timelines-false-deform": {
+    "fixture": {
+      "skeleton": {
+        "hash": "CFb06fPweO0",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "linked"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "mesh",
+                "path": "image",
+                "uvs": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  0,
+                  1
+                ],
+                "triangles": [
+                  0,
+                  1,
+                  2,
+                  0,
+                  2,
+                  3
+                ],
+                "vertices": [
+                  0,
+                  0,
+                  32,
+                  0,
+                  32,
+                  24,
+                  0,
+                  24
+                ],
+                "hull": 4,
+                "edges": [
+                  0,
+                  6,
+                  0,
+                  2,
+                  2,
+                  4,
+                  4,
+                  6
+                ],
+                "width": 32,
+                "height": 24
+              },
+              "linked": {
+                "type": "linkedmesh",
+                "path": "other",
+                "parent": "item",
+                "timelines": false,
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "deform": {
+          "attachments": {
+            "default": {
+              "slot": {
+                "linked": {
+                  "deform": [
+                    {
+                      "vertices": [
+                        3,
+                        -2
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "linkedmesh-timelines-false": {
+    "fixture": {
+      "skeleton": {
+        "hash": "ysoz8eYKw38",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "linked"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "mesh",
+                "path": "image",
+                "uvs": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  0,
+                  1
+                ],
+                "triangles": [
+                  0,
+                  1,
+                  2,
+                  0,
+                  2,
+                  3
+                ],
+                "vertices": [
+                  0,
+                  0,
+                  32,
+                  0,
+                  32,
+                  24,
+                  0,
+                  24
+                ],
+                "hull": 4,
+                "edges": [
+                  0,
+                  6,
+                  0,
+                  2,
+                  2,
+                  4,
+                  4,
+                  6
+                ],
+                "width": 32,
+                "height": 24
+              },
+              "linked": {
+                "type": "linkedmesh",
+                "path": "other",
+                "parent": "item",
+                "timelines": false,
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "linkedmesh": {
+    "fixture": {
+      "skeleton": {
+        "hash": "NXeTi5MtbXA",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "linked"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "mesh",
+                "path": "image",
+                "uvs": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  0,
+                  1
+                ],
+                "triangles": [
+                  0,
+                  1,
+                  2,
+                  0,
+                  2,
+                  3
+                ],
+                "vertices": [
+                  0,
+                  0,
+                  32,
+                  0,
+                  32,
+                  24,
+                  0,
+                  24
+                ],
+                "hull": 4,
+                "edges": [
+                  0,
+                  6,
+                  0,
+                  2,
+                  2,
+                  4,
+                  4,
+                  6
+                ],
+                "width": 32,
+                "height": 24
+              },
+              "linked": {
+                "type": "linkedmesh",
+                "path": "other",
+                "parent": "item",
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "point-fields": {
+    "fixture": {
+      "skeleton": {
+        "hash": "Y8z9R3dIR24",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "point",
+                "color": "12345678",
+                "x": 17,
+                "y": -23,
+                "rotation": 41
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "same-events-consistent": {
+    "fixture": {
+      "skeleton": {
+        "hash": "DAs67f0ILEw",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "events": {
+        "first": {
+          "int": 1
+        },
+        "second": {
+          "int": 2
+        }
+      },
+      "animations": {
+        "a": {
+          "events": [
+            {
+              "name": "first"
+            },
+            {
+              "name": "second"
+            },
+            {
+              "time": 0.5,
+              "name": "first"
+            },
+            {
+              "time": 0.5,
+              "name": "second"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "sequence-mesh": {
+    "fixture": {
+      "skeleton": {
+        "hash": "IAIOEC/Gwh0",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "mesh",
+                "path": "image",
+                "uvs": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  0,
+                  1
+                ],
+                "triangles": [
+                  0,
+                  1,
+                  2,
+                  0,
+                  2,
+                  3
+                ],
+                "vertices": [
+                  0,
+                  0,
+                  32,
+                  0,
+                  32,
+                  24,
+                  0,
+                  24
+                ],
+                "hull": 4,
+                "sequence": {
+                  "count": 3,
+                  "digits": 2,
+                  "setup": 1
+                },
+                "edges": [
+                  0,
+                  6,
+                  0,
+                  2,
+                  2,
+                  4,
+                  4,
+                  6
+                ],
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "sequence-region": {
+    "fixture": {
+      "skeleton": {
+        "hash": "FkVBt405WO4",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "path": "frame",
+                "width": 32,
+                "height": 24,
+                "sequence": {
+                  "count": 3,
+                  "digits": 2
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "sequence-timeline": {
+    "fixture": {
+      "skeleton": {
+        "hash": "ecqf8PBqxYQ",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "path": "frame",
+                "width": 32,
+                "height": 24,
+                "sequence": {
+                  "count": 7,
+                  "start": -2,
+                  "digits": 3,
+                  "setup": 2
+                }
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "run": {
+          "attachments": {
+            "default": {
+              "slot": {
+                "item": {
+                  "sequence": [
+                    {
+                      "mode": "loop",
+                      "index": 1,
+                      "delay": 0.1
+                    },
+                    {
+                      "time": 0.5,
+                      "mode": "pingpongReverse",
+                      "index": 2,
+                      "delay": 0.2
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "skin-ik": {
+    "fixture": {
+      "skeleton": {
+        "hash": "h8y8CLQyLF0",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root",
+          "color": "ff3f00ff"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "ik": [
+        {
+          "name": "ik",
+          "skin": true,
+          "bones": [
+            "child"
+          ],
+          "target": "root"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        },
+        {
+          "name": "alt",
+          "ik": [
+            "ik"
+          ]
+        }
+      ]
+    }
+  },
+  "skin-membership-true": {
+    "fixture": {
+      "skeleton": {
+        "hash": "zWtLU2Si86Q",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10,
+          "skin": true
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        },
+        {
+          "name": "alt",
+          "bones": [
+            "child"
+          ]
+        }
+      ]
+    }
+  },
+  "skin-path": {
+    "fixture": {
+      "skeleton": {
+        "hash": "LjYcK6igRrY",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "path": [
+        {
+          "name": "path",
+          "skin": true,
+          "bones": [
+            "child"
+          ],
+          "target": "slot"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "path",
+                "lengths": [
+                  30,
+                  60
+                ],
+                "vertexCount": 6,
+                "vertices": [
+                  -10,
+                  0,
+                  0,
+                  0,
+                  10,
+                  0,
+                  20,
+                  0,
+                  30,
+                  0,
+                  40,
+                  0
+                ]
+              }
+            }
+          }
+        },
+        {
+          "name": "alt",
+          "path": [
+            "path"
+          ]
+        }
+      ]
+    }
+  },
+  "skin-physics": {
+    "fixture": {
+      "skeleton": {
+        "hash": "LdswTFf9nZc",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "physics": [
+        {
+          "name": "physics",
+          "skin": true,
+          "bone": "child",
+          "x": 1
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        },
+        {
+          "name": "alt",
+          "physics": [
+            "physics"
+          ]
+        }
+      ]
+    }
+  },
+  "skin-transform": {
+    "fixture": {
+      "skeleton": {
+        "hash": "mw1lgGOUgrM",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "transform": [
+        {
+          "name": "transform",
+          "skin": true,
+          "bones": [
+            "child"
+          ],
+          "target": "root"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        },
+        {
+          "name": "alt",
+          "transform": [
+            "transform"
+          ]
+        }
+      ]
+    }
+  },
+  "slot-alpha-bezier": {
+    "fixture": {
+      "skeleton": {
+        "hash": "QiAqxkmzdTQ",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "alpha": [
+                {
+                  "value": 0.2,
+                  "curve": [
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75
+                  ]
+                },
+                {
+                  "time": 0.5,
+                  "value": 0.8
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-alpha": {
+    "fixture": {
+      "skeleton": {
+        "hash": "N9xfbQIrhCU",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "alpha": [
+                {
+                  "value": 0.2
+                },
+                {
+                  "time": 0.5,
+                  "value": 0.8
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgb-light-bezier": {
+    "fixture": {
+      "skeleton": {
+        "hash": "W+2h7N13IeY",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgb": [
+                {
+                  "color": "123456",
+                  "curve": [
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75
+                  ]
+                },
+                {
+                  "time": 0.5,
+                  "color": "fedcba"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgb-light-only": {
+    "fixture": {
+      "skeleton": {
+        "hash": "PKULvtwJL20",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgb": [
+                {
+                  "color": "123456"
+                },
+                {
+                  "time": 0.5,
+                  "color": "fedcba"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgb": {
+    "fixture": {
+      "skeleton": {
+        "hash": "2UUqy8d0oPQ",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgb2": [
+                {
+                  "light": "123456",
+                  "dark": "000000"
+                },
+                {
+                  "time": 0.5,
+                  "light": "fedcba",
+                  "dark": "000000"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgb2-bezier": {
+    "fixture": {
+      "skeleton": {
+        "hash": "UWUMNt697sw",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgb2": [
+                {
+                  "light": "123456",
+                  "dark": "234567",
+                  "curve": [
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75
+                  ]
+                },
+                {
+                  "time": 0.5,
+                  "light": "fedcba",
+                  "dark": "edcba9"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgb2": {
+    "fixture": {
+      "skeleton": {
+        "hash": "cxQhnq8E5jA",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgb2": [
+                {
+                  "light": "123456",
+                  "dark": "234567"
+                },
+                {
+                  "time": 0.5,
+                  "light": "fedcba",
+                  "dark": "edcba9"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgba-light-bezier": {
+    "fixture": {
+      "skeleton": {
+        "hash": "sho7F+MM6YY",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgba": [
+                {
+                  "color": "12345678",
+                  "curve": [
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75
+                  ]
+                },
+                {
+                  "time": 0.5,
+                  "color": "fedcba98"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgba-light-only": {
+    "fixture": {
+      "skeleton": {
+        "hash": "aR6udw5jgoU",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgba": [
+                {
+                  "color": "12345678"
+                },
+                {
+                  "time": 0.5,
+                  "color": "fedcba98"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgba": {
+    "fixture": {
+      "skeleton": {
+        "hash": "WMy+M9qemCE",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgba2": [
+                {
+                  "light": "12345678",
+                  "dark": "000000"
+                },
+                {
+                  "time": 0.5,
+                  "light": "fedcba98",
+                  "dark": "000000"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgba2-bezier": {
+    "fixture": {
+      "skeleton": {
+        "hash": "gClDpIbHI5U",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgba2": [
+                {
+                  "light": "12345678",
+                  "dark": "234567",
+                  "curve": [
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75,
+                    0.1,
+                    0.25,
+                    0.4,
+                    0.75
+                  ]
+                },
+                {
+                  "time": 0.5,
+                  "light": "fedcba98",
+                  "dark": "edcba9"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "slot-rgba2": {
+    "fixture": {
+      "skeleton": {
+        "hash": "Qbq3XWHYLas",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "dark": "112233",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ],
+      "animations": {
+        "a": {
+          "slots": {
+            "slot": {
+              "rgba2": [
+                {
+                  "light": "12345678",
+                  "dark": "234567"
+                },
+                {
+                  "time": 0.5,
+                  "light": "fedcba98",
+                  "dark": "edcba9"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "workspace": {
+    "new": {
+      "skeleton": {
+        "hash": "IAIOEC/Gwh0",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "mesh",
+                "path": "image",
+                "uvs": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  0,
+                  1
+                ],
+                "triangles": [
+                  0,
+                  1,
+                  2,
+                  0,
+                  2,
+                  3
+                ],
+                "vertices": [
+                  0,
+                  0,
+                  32,
+                  0,
+                  32,
+                  24,
+                  0,
+                  24
+                ],
+                "hull": 4,
+                "sequence": {
+                  "count": 3,
+                  "digits": 2,
+                  "setup": 1
+                },
+                "edges": [
+                  0,
+                  6,
+                  0,
+                  2,
+                  2,
+                  4,
+                  4,
+                  6
+                ],
+                "width": 32,
+                "height": 24
+              }
+            }
+          }
+        }
+      ]
+    },
+    "renamed": {
+      "skeleton": {
+        "hash": "Y8z9R3dIR24",
+        "spine": "4.2.43",
+        "images": "./images",
+        "audio": "./audio"
+      },
+      "bones": [
+        {
+          "name": "root"
+        },
+        {
+          "name": "child",
+          "parent": "root",
+          "x": 10
+        }
+      ],
+      "slots": [
+        {
+          "name": "slot",
+          "bone": "root",
+          "attachment": "item"
+        },
+        {
+          "name": "end",
+          "bone": "child"
+        }
+      ],
+      "skins": [
+        {
+          "name": "default",
+          "attachments": {
+            "slot": {
+              "item": {
+                "type": "point",
+                "color": "12345678",
+                "x": 17,
+                "y": -23,
+                "rotation": 41
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

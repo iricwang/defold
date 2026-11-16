@@ -14,8 +14,8 @@
 
 (ns editor.skeletal-animation-native
   "Independent Spine 4.2.43 project support for a verified authoring subset.
-  The graph codec covers bones, regions, meshes, weights, supported timelines,
-  IK, transform, path and physics constraints. Unknown graph structures fail explicitly.
+  The graph codec covers attachments, weights, animation, skin dependencies,
+  IK, transform, path and physics. Unknown graph structures fail explicitly.
   A separate preservation API retains opaque streams for limited bone edits."
   (:require [clojure.string :as string]
             [util.coll :as coll])
@@ -169,7 +169,7 @@
         (unsupported! "The native bone auxiliary collection uses an unsupported class." {:class class}))
       (let [reference (read-varint input)]
         (when (and (= 1 reference) (not (zero? (read-varint input))))
-          (unsupported! "Nonempty native bone auxiliary collections are not yet supported." {}))
+          (unsupported! "Skin-linked bones require the complete native graph decoder." {:full-graph-required true}))
         {:class class :reference reference}))))
 
 (defn- read-bone-impl [^ByteBuffer input depth]
@@ -214,9 +214,10 @@
 
 (defn decode
   "Inspect an exact supported native project without invoking Spine. Returns an
-  opaque preservation container plus typed bone transforms. Bone indexes refer
-  to records, not a solved hierarchy. Unresolved cross-object references remain
-  explicit. This result cannot be used as a complete editor document."
+  opaque preservation container, plus typed bone transforms where safe. Skin
+  dependencies require the complete graph decoder; those containers expose only
+  opaque round-trip. Bone indexes refer to records, not a solved hierarchy.
+  This result cannot be used as a complete editor document."
   [packed]
   (when-not (and (bytes? packed) (pos? (alength ^bytes packed)) (<= (alength ^bytes packed) max-packed-size))
     (unsupported! "Expected a nonempty native project byte array within 32 MiB." {}))
@@ -228,14 +229,16 @@
       (when-not (= ["40" " 0" " 4.2.43"] header)
         (unsupported! "Independent native bone editing supports only the verified Spine 4.2.43 project schema 40." {:header header}))
       (let [skeleton-count-candidate (read-varint input)
-            bones (scan-bones payload)]
-        (when (or (zero? (count bones)) (coll/any? #(or (not (string? (:name %))) (string/blank? (:name %))) bones))
+            bones (try (scan-bones payload)
+                       (catch clojure.lang.ExceptionInfo error
+                         (when-not (:full-graph-required (ex-data error)) (throw error))))]
+        (when (and bones (or (zero? (count bones)) (coll/any? #(or (not (string? (:name %))) (string/blank? (:name %))) bones)))
           (unsupported! "The native project has no fully decoded, uniquely addressable bone records." {}))
         {::schema schema ::original original ::payload payload ::patches (sorted-map)
          :header header :skeleton-count-candidate skeleton-count-candidate
          :complete false :opaque-data-preserved true
-         :capabilities #{:bone-transform-inspection :bone-transform-editing :opaque-roundtrip}
-         :bones bones}))
+         :capabilities (if bones #{:bone-transform-inspection :bone-transform-editing :opaque-roundtrip} #{:opaque-roundtrip})
+         :bones (or bones [])}))
     (catch clojure.lang.ExceptionInfo error (throw error))
     (catch Exception error
       (throw (ex-info "The native project is corrupt or uses an unsupported encoding." {:type ::unsupported} error)))))
@@ -248,10 +251,10 @@
                  (int? bone-index) (<= 0 bone-index) (< bone-index (count (:bones project)))
                  (map? changes)
                  (coll/every? (fn [[property value]]
-                               (and (contains? editable-properties property) (number? value)
-                                    (Double/isFinite (double value))
-                                    (<= (- Float/MAX_VALUE) (double value) Float/MAX_VALUE)))
-                             changes))
+                                (and (contains? editable-properties property) (number? value)
+                                     (Double/isFinite (double value))
+                                     (<= (- Float/MAX_VALUE) (double value) Float/MAX_VALUE)))
+                              changes))
     (unsupported! "Native editing requires a valid bone index and finite supported transform values." {:bone-index bone-index}))
   (let [bone (get-in project [:bones bone-index])
         property-tags (into {} (map (fn [[tag property]] [property tag])) float-field-names)]
@@ -315,22 +318,34 @@
    :slot [17 [[3 :boolean] [4 :dynamic] [5 :dynamic] [14 :enum] [2 :bone] [10 :dynamic]
               [12 :boolean] [8 :boolean] [15 :float] [11 :dynamic] [7 :slot-name]
               [9 :dynamic] [16 :dynamic] [0 :skeleton] [13 :boolean] [126 :boolean]]]
-   :region [17 [[15 :boolean] [11 :float] [9 :float] [12 :float] [14 :dynamic]
+   :region [17 [[15 :dynamic] [11 :float] [9 :float] [12 :float] [14 :dynamic]
                 [6 :float] [10 :float] [13 :string] [7 :float] [8 :float]
                 [4 :placeholder] [5 :name-path] [32 :skin] [35 :boolean] [33 :boolean] [0 :slot]]]
    :placeholder [8 [[125 :boolean] [4 :placeholder] [5 :name-path] [32 :skin]
-                     [35 :boolean] [33 :boolean] [0 :slot]]]
+                    [35 :boolean] [33 :boolean] [0 :slot]]]
    :skin [9 [[7 :dynamic] [1 :string] [8 :dynamic] [4 :boolean] [6 :dynamic]
              [0 :skeleton] [2 :dynamic] [5 :dynamic] [126 :boolean]]]
    :animation [9 [[8 :dynamic] [0 :skeleton] [1 :string] [6 :boolean] [3 :boolean]
                   [7 :dynamic] [2 :dynamic] [9 :boolean] [5 :boolean]]]
    :bone-track [5 [[4 :boolean] [6 :dynamic] [1 :bone] [0 :animation] [2 :dynamic]]]
-   :mesh [28 [[26 :boolean] [16 :float] [12 :dynamic] [27 :boolean] [14 :string]
-              [17 :float] [36 :boolean] [34 :boolean] [13 :dynamic] [19 :float]
+   :mesh [28 [[26 :dynamic] [16 :float] [12 :dynamic] [27 :boolean] [14 :string]
+              [17 :float] [36 :dynamic] [34 :boolean] [13 :dynamic] [19 :float]
               [31 :dynamic] [21 :float] [28 :dynamic] [9 :float] [30 :boolean]
               [8 :dynamic] [11 :float] [10 :float] [7 :integer] [20 :float]
               [18 :dynamic] [4 :placeholder] [5 :name-path] [32 :skin]
               [35 :boolean] [33 :boolean] [0 :slot]]]
+   :point [11 [[6 :float] [8 :float] [9 :dynamic] [7 :float]
+               [4 :placeholder] [5 :name-path] [32 :skin] [35 :boolean] [33 :boolean] [0 :slot]]]
+   :boundingbox [19 [[19 :float] [31 :dynamic] [21 :float] [28 :dynamic] [9 :float]
+                     [30 :boolean] [8 :dynamic] [11 :float] [10 :float] [7 :integer]
+                     [20 :float] [18 :dynamic] [4 :placeholder] [5 :name-path]
+                     [32 :skin] [35 :boolean] [33 :boolean] [0 :slot]]]
+   :clipping [20 [[12 :slot] [19 :float] [31 :dynamic] [21 :float] [28 :dynamic] [9 :float]
+                  [30 :boolean] [8 :dynamic] [11 :float] [10 :float] [7 :integer]
+                  [20 :float] [18 :dynamic] [4 :placeholder] [5 :name-path]
+                  [32 :skin] [35 :boolean] [33 :boolean] [0 :slot]]]
+   :draw-offset [2 [[0 :slot] [1 :integer]]]
+   :sequence [4 [[4 :integer] [2 :integer] [3 :integer] [1 :integer]]]
    :mesh-vertices [4 [[0 :dynamic] [2 :dynamic] [1 :dynamic] [3 :dynamic]]]
    :influence [2 [[1 :dynamic] [0 :dynamic]]]
    :ik [18 [[16 :boolean] [13 :boolean] [10 :boolean] [11 :boolean] [2 :dynamic]
@@ -344,12 +359,12 @@
                    [14 :float] [10 :float] [7 :float] [0 :skeleton] [32 :dynamic]
                    [1 :string] [34 :boolean] [22 :dynamic]]]
    :physics [34 [[28 :boolean] [3 :bone] [7 :physics-rotation] [20 :float] [9 :float]
-                  [5 :float] [27 :boolean] [21 :float] [12 :float] [30 :boolean]
-                  [33 :float] [19 :float] [23 :float] [26 :boolean] [8 :float]
-                  [17 :float] [10 :float] [16 :float] [18 :float] [31 :boolean]
-                  [4 :float] [29 :boolean] [25 :boolean] [24 :float] [6 :float]
-                  [13 :float] [14 :float] [15 :float] [11 :float] [0 :skeleton]
-                  [32 :dynamic] [1 :string] [34 :boolean] [22 :dynamic]]]
+                 [5 :float] [27 :boolean] [21 :float] [12 :float] [30 :boolean]
+                 [33 :float] [19 :float] [23 :float] [26 :boolean] [8 :float]
+                 [17 :float] [10 :float] [16 :float] [18 :float] [31 :boolean]
+                 [4 :float] [29 :boolean] [25 :boolean] [24 :float] [6 :float]
+                 [13 :float] [14 :float] [15 :float] [11 :float] [0 :skeleton]
+                 [32 :dynamic] [1 :string] [34 :boolean] [22 :dynamic]]]
    :path-attachment [22 [[12 :boolean] [15 :path-lengths] [13 :boolean] [19 :float]
                          [31 :dynamic] [21 :float] [28 :dynamic] [9 :float] [30 :boolean]
                          [8 :dynamic] [11 :float] [10 :float] [7 :integer] [20 :float]
@@ -366,9 +381,9 @@
 
 (def ^:private graph-classes
   {11 :skeleton 12 :bone 13 :slot 15 :array 18 :animation 19 :bone-track
-   30 :color 34 :skin 38 :empty-38 41 :vector 43 :region 44 :placeholder
+   30 :color 34 :skin 38 :empty-38 39 :draw-offset 41 :vector 43 :region 44 :placeholder
    16 :ints 17 :floats 35 :event 46 :mesh 47 :shorts 54 :influence 56 :ik 65 :transform 71 :mesh-vertices
-   53 :path-vertices 69 :path-attachment 72 :path-constraint
+   52 :boundingbox 53 :path-vertices 69 :path-attachment 72 :path-constraint 83 :point 84 :clipping 123 :sequence
    80 :empty-map 108 :folder 112 :timeline-category 116 :empty-116 121 :physics 132 :timeline 133 :keyframe})
 
 (def ^:private model-kinds
@@ -376,18 +391,19 @@
 
 (def ^:private timeline-names
   {0 "rotate" 1 "translate" 2 "scale" 3 "shear"
-   14 "translatex" 15 "translatey" 16 "scalex" 17 "scaley" 18 "shearx" 19 "sheary"})
+   14 "translatex" 15 "translatey" 16 "scalex" 17 "scaley" 18 "shearx" 19 "sheary" 39 "inherit"})
 
 (def ^:private timeline-layouts
-  {0 [1 1 nil] 1 [2 2 nil] 2 [2 2 nil] 3 [2 2 nil]
+  {0 [1 1 nil] 1 [2 2 nil] 2 [2 2 nil] 3 [2 2 nil] 4 [7 7 :slot]
    5 [0 0 :slot] 6 [0 1 :dynamic] 7 [5 2 :ik] 8 [6 6 :transform]
    9 [1 1 :path-constraint] 10 [1 1 :path-constraint] 11 [3 3 :path-constraint]
-   12 [0 0 :event] 14 [1 1 nil] 15 [1 1 nil] 16 [1 1 nil]
+   12 [0 0 :event] 13 [0 0 nil] 14 [1 1 nil] 15 [1 1 nil] 16 [1 1 nil]
    17 [1 1 nil] 18 [1 1 nil] 19 [1 1 nil]
+   20 [6 6 :slot] 21 [1 1 :slot] 22 [3 0 :dynamic]
    23 [1 1 :physics] 24 [1 1 :physics] 25 [1 1 :physics] 26 [1 1 :physics]
    27 [1 1 :physics] 28 [1 1 :physics] 29 [1 1 :physics] 30 [0 0 :physics]
    31 [0 0 nil] 32 [1 1 nil] 33 [1 1 nil] 34 [1 1 nil] 35 [1 1 nil]
-   36 [1 1 nil] 37 [1 1 nil] 38 [1 1 nil]})
+   36 [1 1 nil] 37 [1 1 nil] 38 [1 1 nil] 39 [3 0 nil]})
 
 (def ^:private physics-timeline-names
   {23 "inertia" 24 "strength" 25 "damping" 26 "mass" 27 "wind" 28 "gravity" 29 "mix" 30 "reset"
@@ -430,10 +446,10 @@
         (when-not (= marker (read-varint input))
           (unsupported! "Unsupported native model schema marker." {:kind kind :offset (.position input)}))
         (into {} (map (fn [[expected-tag type]]
-                       (let [tag (read-varint input)]
-                         (when-not (= expected-tag tag)
-                           (unsupported! "Unsupported native model field order." {:kind kind :tag tag :expected expected-tag :offset (.position input)}))
-                         [tag (read-graph-value context type)])))
+                        (let [tag (read-varint input)]
+                          (when-not (= expected-tag tag)
+                            (unsupported! "Unsupported native model field order." {:kind kind :tag tag :expected expected-tag :offset (.position input)}))
+                          [tag (read-graph-value context type)])))
               fields))
       (case kind
         :string (read-native-string input)
@@ -467,7 +483,10 @@
         (mapv (fn [_]
                 (let [bone (read-graph-value context :dynamic)
                       flags (read-varint input)]
-                  (when-not (<= 1 flags 7)
+                  (when-not (case (get-in @(:models context) [(:id bone) :kind])
+                              :bone (<= 1 flags 7)
+                              :slot (= 8 flags)
+                              false)
                     (unsupported! "Unsupported native split-channel flags." {:flags flags}))
                   [bone flags]))
               (range (read-graph-count input)))
@@ -486,12 +505,16 @@
               property (read-varint input)
               data {:track track :property property}]
           (when-not (contains? timeline-layouts property)
-            (unsupported! "Only native bone transform timelines are supported." {:property property}))
+            (unsupported! "Unsupported native animation timeline property." {:property property}))
           ;; Keyframes refer back to their owning timeline while it is read.
           (swap! (:models context) assoc-in [(:id reference) :data] data)
           (let [data (assoc data :keys (read-graph-value context :array))
-                target-type (nth (get timeline-layouts property) 2)]
-            (cond-> data target-type (assoc :target (read-graph-value context target-type)))))
+                target-type (nth (get timeline-layouts property) 2)
+                slot (when (= 22 property) (read-graph-value context :slot))
+                target (when target-type (read-graph-value context target-type))]
+            (when (and slot (not= slot (get-in @(:models context) [(:id target) :data 0])))
+              (unsupported! "Native sequence target does not belong to its slot." {}))
+            (cond-> data target-type (assoc :target target))))
         :keyframe
         (let [track (read-graph-value context :bone-track)
               timeline (read-graph-value context :timeline)
@@ -508,6 +531,7 @@
             5 (assoc result :attachment (read-graph-value context :dynamic))
             6 (assoc result :deform (read-graph-value context :deform-values))
             12 (assoc result :event (read-graph-value context :event-key))
+            13 (assoc result :offsets (read-graph-value context :array))
             result))))))
 
 (defn- read-graph-reference [context kind]
@@ -699,7 +723,10 @@
         (do
           (write-varint! output (count data))
           (run! (fn [[bone flags]]
-                  (when-not (and (= :bone (:kind (graph-node (:graph context) bone))) (<= 1 flags 7))
+                  (when-not (case (:kind (graph-node (:graph context) bone))
+                              :bone (<= 1 flags 7)
+                              :slot (= 8 flags)
+                              false)
                     (unsupported! "Unsupported native split-channel entry." {}))
                   (write-graph-value! context :dynamic bone)
                   (write-varint! output flags)) data))
@@ -713,10 +740,12 @@
         :timeline
         (do
           (when-not (contains? timeline-layouts (:property data))
-            (unsupported! "Only native bone transform timelines are supported." {}))
+            (unsupported! "Unsupported native animation timeline property." {}))
           (write-graph-value! context :bone-track (:track data))
           (write-varint! output (:property data))
           (write-graph-value! context :array (:keys data))
+          (when (= 22 (:property data))
+            (write-graph-value! context :slot (get-in (graph-node (:graph context) (:target data)) [:data 0])))
           (when-let [target-type (nth (get timeline-layouts (:property data)) 2)]
             (write-graph-value! context target-type (:target data))))
         :keyframe
@@ -737,6 +766,7 @@
             5 (write-graph-value! context :dynamic (:attachment data))
             6 (write-graph-value! context :deform-values (:deform data))
             12 (write-graph-value! context :event-key (:event data))
+            13 (write-graph-value! context :array (:offsets data))
             nil))))))
 
 (defn- write-graph-reference! [context kind reference]
@@ -839,28 +869,35 @@
     (when-not (<= 1 inherit 5)
       (unsupported! "Unsupported native bone inheritance mode." {:inherit inherit}))
     (cond-> (assoc result "inherit" (nth ["normal" "onlyTranslation" "noRotationOrReflection" "noScale" "noScaleOrReflection"] (dec inherit)))
-      parent (assoc "parent" (graph-data graph (get (graph-data graph parent) 1))))))
+      parent (assoc "parent" (graph-data graph (get (graph-data graph parent) 1)))
+      (pos? (count (graph-data graph (get fields 31)))) (assoc "skin" true))))
 
 (defn- graph-attachment-name [graph reference]
   (graph-name graph (get (graph-data graph reference) 5)))
 
 (defn- graph-slot-name [graph reference]
   (let [data (get (graph-data graph reference) 7)]
-    (when-not (= 1 (graph-data graph (:prefix data)))
-      (unsupported! "Unsupported native slot name prefix." {}))
     (graph-name graph (:parts data))))
 
 (defn- graph-slot-json [graph reference]
   (let [fields (graph-data graph reference)
-        blend (graph-data graph (get fields 14))
+        blend (get {1 "normal" 2 "additive" 3 "multiply" 4 "screen"} (graph-data graph (:prefix (get fields 7))))
         attachment (get fields 9)]
-    (when-not (= 3 blend)
-      (unsupported! "Only the verified normal native slot blend mode is supported." {:blend blend}))
+    (when-not blend
+      (unsupported! "Unknown native slot blend mode." {}))
     (cond-> {"name" (graph-slot-name graph reference)
              "bone" (graph-data graph (get (graph-data graph (get fields 2)) 1))
+             "blend" blend
              "color" (format "%08x" (long (graph-data graph (get fields 5))))}
       (get fields 12) (assoc "dark" (subs (format "%08x" (long (graph-data graph (get fields 11)))) 0 6))
       attachment (assoc "attachment" (graph-attachment-name graph attachment)))))
+
+(defn- graph-sequence-json [graph reference]
+  (when reference
+    (let [fields (graph-data graph reference)]
+      (coll/into-> {2 "count" 1 "start" 3 "digits" 4 "setup"} {} (map (fn [[tag name]]
+                                                                        (let [value (get fields tag)]
+                                                                          [name (bit-xor (unsigned-bit-shift-right value 1) (- (bit-and value 1)))])))))))
 
 (defn- graph-region-json [graph reference]
   (when-not (= :region (:kind (graph-node graph reference)))
@@ -868,11 +905,12 @@
   (let [fields (graph-data graph reference)
         name (graph-attachment-name graph reference)
         path (graph-data graph (get fields 13))]
-    {"name" name "type" "region" "path" (if (string/blank? path) name path)
-     "width" (get fields 11) "height" (get fields 12)
-     "x" (get fields 6) "y" (get fields 7) "rotation" (get fields 10)
-     "scaleX" (get fields 8) "scaleY" (get fields 9)
-     "color" (format "%08x" (long (graph-data graph (get fields 14))))}))
+    (cond-> {"name" name "type" "region" "path" (if (string/blank? path) name path)
+             "width" (get fields 11) "height" (get fields 12)
+             "x" (get fields 6) "y" (get fields 7) "rotation" (get fields 10)
+             "scaleX" (get fields 8) "scaleY" (get fields 9)
+             "color" (format "%08x" (long (graph-data graph (get fields 14))))}
+      (get fields 15) (assoc "sequence" (graph-sequence-json graph (get fields 15))))))
 
 (defn- graph-object-name [graph reference]
   (graph-data graph (get (graph-data graph reference) 1)))
@@ -910,24 +948,31 @@
         influences (when weighted (graph-mesh-influences graph reference))
         vertices (if weighted
                    (into [] (mapcat (fn [vertex]
-                                     (let [active (filterv #(not (zero? (:weight %))) vertex)]
-                                       (when (zero? (count active))
-                                         (unsupported! "Native weighted mesh contains an unbound vertex." {}))
-                                       (into [(count active)]
-                                             (mapcat (fn [{:keys [bone x y weight]}]
-                                                       (let [index (get bone-indices bone)]
-                                                         (when (nil? index)
-                                                           (unsupported! "Native mesh influence references a different skeleton." {}))
-                                                         [index x y weight]))) active)))) influences)
+                                      (let [active (filterv #(not (zero? (:weight %))) vertex)]
+                                        (when (zero? (count active))
+                                          (unsupported! "Native weighted mesh contains an unbound vertex." {}))
+                                        (into [(count active)]
+                                              (mapcat (fn [{:keys [bone x y weight]}]
+                                                        (let [index (get bone-indices bone)]
+                                                          (when (nil? index)
+                                                            (unsupported! "Native mesh influence references a different skeleton." {}))
+                                                          [index x y weight]))) active)))) influences)
                    (graph-data graph (get fields 18)))]
     (when-not (and (even? (count uvs)) (zero? (mod (get fields 7) 4))
                    (= (quot (count uvs) 2) (if weighted (count influences) (quot (count vertices) 2))))
       (unsupported! "Native mesh UVs, hull or vertices have incompatible lengths." {}))
-    {"type" "mesh" "name" name "path" (if (string/blank? path) name path)
-     "width" (get fields 16) "height" (get fields 17)
-     "color" (format "%08x" (long (graph-data graph (get fields 31))))
-     "uvs" uvs "triangles" (graph-data graph (get fields 13)) "vertices" vertices
-     "hull" (quot (get fields 7) 4) "edges" (graph-data graph (get fields 8))}))
+    (cond-> (if-let [parent (get fields 26)]
+              (let [[skin _ parent-name] (graph-attachment-location graph parent)]
+                {"type" "linkedmesh" "name" name "path" (if (string/blank? path) name path)
+                 "parent" parent-name "skin" skin "timelines" (get fields 27)
+                 "width" (get fields 16) "height" (get fields 17)
+                 "color" (format "%08x" (long (graph-data graph (get fields 31))))})
+              {"type" "mesh" "name" name "path" (if (string/blank? path) name path)
+               "width" (get fields 16) "height" (get fields 17)
+               "color" (format "%08x" (long (graph-data graph (get fields 31))))
+               "uvs" uvs "triangles" (graph-data graph (get fields 13)) "vertices" vertices
+               "hull" (quot (get fields 7) 4) "edges" (graph-data graph (get fields 8))})
+      (get fields 36) (assoc "sequence" (graph-sequence-json graph (get fields 36))))))
 
 (defn- graph-deform-values [graph reference attachment]
   (let [{:keys [size chunks]} (graph-data graph reference)
@@ -941,12 +986,12 @@
         (when-not (= size (* 2 palette-size (count influences)))
           (unsupported! "Native weighted deformation does not match its dense influence layout." {:size size}))
         (into [] cat (mapv (fn [vertex-index vertex]
-                          (into [] (comp (map-indexed (fn [bone-index influence]
-                                                      (when-not (zero? (:weight influence))
-                                                        (let [offset (* 2 (+ (* vertex-index palette-size) bone-index))]
-                                                          [(nth dense offset) (nth dense (inc offset))]))))
-                                         (keep identity) cat) vertex))
-              (range (count influences)) influences)))
+                             (into [] (comp (map-indexed (fn [bone-index influence]
+                                                           (when-not (zero? (:weight influence))
+                                                             (let [offset (* 2 (+ (* vertex-index palette-size) bone-index))]
+                                                               [(nth dense offset) (nth dense (inc offset))]))))
+                                            (keep identity) cat) vertex))
+                           (range (count influences)) influences)))
       (do
         (when-not (= size (count (graph-data graph (get fields 18))))
           (unsupported! "Native unweighted deformation does not match its vertex layout." {:size size}))
@@ -963,23 +1008,48 @@
           (when-not (and next-frame (= (count curves) (count (:curves next-frame))))
             (unsupported! "Native Bezier handles require a matching following keyframe." {}))
           {"curve" (into [] cat (mapv (fn [curve next-curve]
-                                       [(/ (nth curve 2) fps) (nth curve 3)
-                                        (/ (nth next-curve 0) fps) (nth next-curve 1)]) curves (:curves next-frame)))})
+                                        [(/ (nth curve 2) fps) (nth curve 3)
+                                         (/ (nth next-curve 0) fps) (nth next-curve 1)]) curves (:curves next-frame)))})
       (unsupported! "Unsupported native keyframe interpolation." {:flag flag}))))
 
 (defn- graph-timeline-json [graph reference fps]
   (let [{:keys [property keys target]} (graph-data graph reference)
         frames (mapv #(graph-data graph %) (graph-data graph keys))]
-    (mapv (fn [index {:keys [time values attachment event deform]}]
+    (mapv (fn [index {:keys [time values attachment event deform offsets]}]
             (let [base {"time" (/ time fps)}
                   result (case (int property)
+                           39 (let [mode (get {[1.0 1.0 1.0] "normal" [0.0 0.0 0.0] "onlyTranslation"
+                                               [0.0 1.0 0.0] "noRotationOrReflection" [1.0 0.0 1.0] "noScale"
+                                               [1.0 0.0 0.0] "noScaleOrReflection"} values)]
+                                (when-not mode (unsupported! "Unsupported native inheritance flags." {:values values}))
+                                (assoc base "inherit" mode))
                            (30 31) base
+                           22 (let [[mode index delay] values
+                                    mode (get ["hold" "once" "loop" "pingpong" "onceReverse" "loopReverse" "pingpongReverse"] (int mode))]
+                                (when-not mode (unsupported! "Unknown native sequence playback mode." {}))
+                                (assoc base "mode" mode "index" (int index) "delay" delay))
+                           (4 20) (let [light-size (if (= 4 property) 4 3)
+                                        encode-color (fn encode-color [channels]
+                                                       (apply str (mapv #(format "%02x" (Math/round (* 255.0 (min 1.0 (max 0.0 %))))) channels)))
+                                        light (encode-color (subvec values 0 light-size))
+                                        dark (encode-color (subvec values light-size))]
+                                    (if (get (graph-data graph target) 12)
+                                      (assoc base "light" light "dark" dark)
+                                      (assoc base "color" light)))
+                           13 (cond-> base
+                                (pos? (count (graph-data graph offsets)))
+                                (assoc "offsets" (mapv (fn [reference]
+                                                         (let [fields (graph-data graph reference)
+                                                               value (get fields 1)]
+                                                           {"slot" (graph-slot-name graph (get fields 0))
+                                                            "offset" (bit-xor (unsigned-bit-shift-right value 1) (- (bit-and value 1)))}))
+                                                       (graph-data graph offsets))))
                            (1 2 3) (assoc base "x" (first values) "y" (second values))
                            5 (assoc base "name" (when attachment (last (graph-attachment-location graph attachment))))
                            6 (assoc base "vertices" (graph-deform-values graph deform target))
                            7 (assoc base "mix" (nth values 0) "softness" (nth values 1)
-                                         "stretch" (not (zero? (nth values 2))) "compress" (not (zero? (nth values 3)))
-                                         "bendPositive" (not (zero? (nth values 4))))
+                                    "stretch" (not (zero? (nth values 2))) "compress" (not (zero? (nth values 3)))
+                                    "bendPositive" (not (zero? (nth values 4))))
                            8 (merge base (zipmap ["mixRotate" "mixX" "mixY" "mixScaleX" "mixScaleY" "mixShearY"] values))
                            11 (merge base (zipmap ["mixRotate" "mixX" "mixY"] values))
                            12 (let [fields (graph-data graph event)
@@ -987,38 +1057,48 @@
                                     audio (graph-data graph (get source 6))
                                     integer (get fields 2)]
                                 (cond-> (assoc base "name" (graph-data graph (get source 2))
-                                                    "int" (bit-xor (unsigned-bit-shift-right integer 1) (- (bit-and integer 1)))
-                                                    "float" (get fields 3) "string" (graph-data graph (get fields 4)))
+                                               "int" (bit-xor (unsigned-bit-shift-right integer 1) (- (bit-and integer 1)))
+                                               "float" (get fields 3) "string" (graph-data graph (get fields 4)))
                                   (not (string/blank? audio)) (assoc "volume" (get fields 5) "balance" (get fields 6))))
                            (assoc base "value" (first values)))]
-              (if (contains? #{5 12} property) result
-                  (merge result (graph-key-curve frames index fps)))))
+              (if (contains? #{5 12 13 22 39} property) result
+                  (let [curve (graph-key-curve frames index fps)
+                        curve (if (and (contains? #{4 20} property) (not (get (graph-data graph target) 12)) (vector? (get curve "curve")))
+                                (update curve "curve" subvec 0 (* 4 (if (= 4 property) 4 3))) curve)]
+                    (merge result curve)))))
           (range (count frames)) frames)))
 
 (defn- graph-animation-json [graph reference fps]
   (let [fields (graph-data graph reference)
         tracks (graph-data graph (get fields 2))
         animation (reduce (fn [animation track-reference]
-              (let [track (graph-data graph track-reference)
-                    bone (get track 1)]
-                (reduce (fn [animation timeline-reference]
-                          (let [{:keys [property target]} (graph-data graph timeline-reference)
-                                frames (graph-timeline-json graph timeline-reference fps)]
-                            (case (int property)
-                              (23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38)
-                              (assoc-in animation ["physics" (if target (graph-object-name graph target) "") (get physics-timeline-names property)] frames)
-                              (9 10 11) (assoc-in animation ["path" (graph-object-name graph target) (get {9 "position" 10 "spacing" 11 "mix"} property)] frames)
-                              5 (assoc-in animation ["slots" (graph-slot-name graph target) "attachment"] frames)
-                              6 (assoc-in animation (into ["attachments"] (conj (graph-attachment-location graph target) "deform")) frames)
-                              7 (assoc-in animation ["ik" (graph-object-name graph target)] frames)
-                              8 (assoc-in animation ["transform" (graph-object-name graph target)] frames)
-                              12 (update animation "events" (fnil into []) frames)
-                              (let [timeline-name (get timeline-names property)]
-                                (when-not (and bone timeline-name)
-                                  (unsupported! "Unsupported native timeline target or property." {:property property}))
-                                (assoc-in animation ["bones" (graph-object-name graph bone) timeline-name] frames)))))
-                        animation (graph-data graph (get track 2)))))
-            {} tracks)]
+                            (let [track (graph-data graph track-reference)
+                                  bone (get track 1)]
+                              (reduce (fn [animation timeline-reference]
+                                        (let [{:keys [property target]} (graph-data graph timeline-reference)
+                                              frames (graph-timeline-json graph timeline-reference fps)]
+                                          (case (int property)
+                                            (23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38)
+                                            (assoc-in animation ["physics" (if target (graph-object-name graph target) "") (get physics-timeline-names property)] frames)
+                                            (9 10 11) (assoc-in animation ["path" (graph-object-name graph target) (get {9 "position" 10 "spacing" 11 "mix"} property)] frames)
+                                            (4 20 21) (assoc-in animation ["slots" (graph-slot-name graph target)
+                                                                           (if (= 21 property) "alpha"
+                                                                               (if (= 4 property)
+                                                                                 (if (get (graph-data graph target) 12) "rgba2" "rgba")
+                                                                                 (if (get (graph-data graph target) 12) "rgb2" "rgb")))] frames)
+                                            13 (assoc animation "drawOrder" frames)
+                                            5 (assoc-in animation ["slots" (graph-slot-name graph target) "attachment"] frames)
+                                            22 (assoc-in animation (into ["attachments"] (conj (graph-attachment-location graph target) "sequence")) frames)
+                                            6 (assoc-in animation (into ["attachments"] (conj (graph-attachment-location graph target) "deform")) frames)
+                                            7 (assoc-in animation ["ik" (graph-object-name graph target)] frames)
+                                            8 (assoc-in animation ["transform" (graph-object-name graph target)] frames)
+                                            12 (update animation "events" (fnil into []) frames)
+                                            (let [timeline-name (get timeline-names property)]
+                                              (when-not (and bone timeline-name)
+                                                (unsupported! "Unsupported native timeline target or property." {:property property}))
+                                              (assoc-in animation ["bones" (graph-object-name graph bone) timeline-name] frames)))))
+                                      animation (graph-data graph (get track 2)))))
+                          {} tracks)]
     (cond-> animation (get animation "events") (update "events" #(vec (sort-by (fn [event] (get event "time" 0.0)) %))))))
 
 (defn- graph-constraint-orders [graph fields]
@@ -1030,8 +1110,6 @@
       (unsupported! "Native constraint folders with nested or unsupported objects cannot yet be projected." {}))
     (doseq [reference supported
             :let [constraint (graph-data graph reference)]]
-      (when (pos? (count (graph-data graph (get constraint 22))))
-        (unsupported! "Native constraint skin dependencies are not yet supported for editor conversion." {}))
       (when-not (true? (get constraint 34))
         (unsupported! "Native constraint activation state is not yet verified for editor conversion." {})))
     (into {} (map-indexed (fn [index reference] [reference index])) (rseq (vec children)))))
@@ -1091,15 +1169,15 @@
         vertices (if-not weighted
                    (graph-data graph (get fields 18))
                    (into [] (mapcat (fn [vertex]
-                                     (let [active (filterv #(not (zero? (:weight %))) vertex)]
-                                       (when (zero? (count active))
-                                         (unsupported! "Native weighted path contains an unbound vertex." {}))
-                                       (into [(count active)]
-                                             (mapcat (fn [{:keys [bone x y weight]}]
-                                                       (let [index (get bone-indices bone)]
-                                                         (when (nil? index)
-                                                           (unsupported! "Native path influence references a different skeleton." {}))
-                                                         [index x y weight]))) active)))) influences))
+                                      (let [active (filterv #(not (zero? (:weight %))) vertex)]
+                                        (when (zero? (count active))
+                                          (unsupported! "Native weighted path contains an unbound vertex." {}))
+                                        (into [(count active)]
+                                              (mapcat (fn [{:keys [bone x y weight]}]
+                                                        (let [index (get bone-indices bone)]
+                                                          (when (nil? index)
+                                                            (unsupported! "Native path influence references a different skeleton." {}))
+                                                          [index x y weight]))) active)))) influences))
         vertex-count (if weighted (count influences) (quot (count vertices) 2))
         closed (get fields 12)]
     (when-not (and (zero? (mod (get fields 7) 4)) (= (* 4 vertex-count) (get fields 7))
@@ -1110,6 +1188,39 @@
      "vertexCount" vertex-count "vertices" vertices "closed" closed
      "constantSpeed" (get fields 13) "lengths" (graph-data graph (get fields 15))
      "color" (format "%08x" (long (graph-data graph (get fields 31))))}))
+
+(defn- graph-polygon-json [graph reference bone-indices]
+  (let [fields (graph-data graph reference)
+        weighted (get fields 30)
+        influences (when weighted (graph-mesh-influences graph reference))
+        vertices (if-not weighted
+                   (graph-data graph (get fields 18))
+                   (coll/into-> influences [] (mapcat (fn [vertex]
+                                                        (let [active (filterv #(not (zero? (:weight %))) vertex)]
+                                                          (when (zero? (count active))
+                                                            (unsupported! "Native weighted path contains an unbound vertex." {}))
+                                                          (coll/into-> active [(count active)]
+                                                            (mapcat (fn [{:keys [bone x y weight]}]
+                                                                      (let [index (get bone-indices bone)]
+                                                                        (when (nil? index)
+                                                                          (unsupported! "Native path influence references a different skeleton." {}))
+                                                                        [index x y weight])))))))))
+        vertex-count (if weighted (count influences) (quot (count vertices) 2))
+        kind (:kind (graph-node graph reference))]
+    (when-not (and (zero? (mod (get fields 7) 4)) (= (* 4 vertex-count) (get fields 7))
+                   (<= 3 vertex-count)
+                   (or weighted (even? (count vertices))))
+      (unsupported! "Native path vertices have an incompatible control point layout." {}))
+    (cond-> {"type" (name kind) "name" (graph-attachment-name graph reference)
+             "vertexCount" vertex-count "vertices" vertices
+             "color" (format "%08x" (long (graph-data graph (get fields 31))))}
+      (and (= :clipping kind) (get fields 12)) (assoc "end" (graph-slot-name graph (get fields 12))))))
+
+(defn- graph-point-json [graph reference]
+  (let [fields (graph-data graph reference)]
+    {"type" "point" "name" (graph-attachment-name graph reference)
+     "x" (get fields 6) "y" (get fields 7) "rotation" (get fields 8)
+     "color" (format "%08x" (long (graph-data graph (get fields 9))))}))
 
 (defn- graph-path-constraint-json [graph reference orders]
   (let [fields (graph-data graph reference)
@@ -1127,8 +1238,9 @@
 
 (defn to-spine-json
   "Project a fully decoded native skeleton, retaining the graph separately for
-  native round-trip. Supports region/mesh, dense weights/FFD, bone animation,
-  IK/Transform/Path/Physics, events and attachment keys; unverified objects fail explicitly."
+  native round-trip. Supports attachments, weights/FFD, bone and slot keys,
+  draw order, skin dependencies, constraints, sequences and events.
+  Unverified objects fail explicitly."
   [graph skeleton-index]
   (let [skeletons (graph-skeletons graph)
         reference (:reference (get skeletons skeleton-index))]
@@ -1151,6 +1263,8 @@
                                                        :region (graph-region-json graph attachment-reference)
                                                        :mesh (graph-mesh-json graph attachment-reference bone-indices)
                                                        :path-attachment (graph-path-json graph attachment-reference bone-indices)
+                                                       (:boundingbox :clipping) (graph-polygon-json graph attachment-reference bone-indices)
+                                                       :point (graph-point-json graph attachment-reference)
                                                        (unsupported! "Unsupported native attachment." {:kind kind})))))) {} attachments)
           skin-names (into ["default"] (map #(graph-object-name graph %)) skins)]
       (when-not (and (number? fps) (pos? fps))
@@ -1158,21 +1272,46 @@
       (doseq [tag [14 36]]
         (when (pos? (count (graph-data graph (get fields tag))))
           (unsupported! "This native skeleton contains unsupported auxiliary objects." {:field tag})))
-      (doseq [bone bones]
-        (when (pos? (count (graph-data graph (get (graph-data graph bone) 31))))
-          (unsupported! "Native bone auxiliary objects are not yet supported for editor conversion." {})))
-      (doseq [skin skins tag [7 6]]
-        (when (pos? (count (graph-data graph (get (graph-data graph skin) tag))))
-          (unsupported! "Native skin dependencies are not yet supported for editor conversion." {:field tag})))
+      (doseq [[objects owner-tag skin-tag] [[bones 31 6] [(vec (coll/keys orders)) 22 7]]
+              object objects
+              skin (graph-data graph (get (graph-data graph object) owner-tag))]
+        (when-not (and (contains? (set skins) skin)
+                       (coll/any? #(= object %) (graph-data graph (get (graph-data graph skin) skin-tag))))
+          (unsupported! "Native skin dependencies are inconsistent or refer to another skeleton." {})))
+      (doseq [skin skins
+              [tag kinds owner-tag] [[6 #{:bone} 31] [7 #{:ik :transform :path-constraint :physics} 22]]
+              object (graph-data graph (get (graph-data graph skin) tag))]
+        (when-not (and (contains? kinds (:kind (graph-node graph object)))
+                       (contains? (if (= 6 tag) (set bones) (set (coll/keys orders))) object)
+                       (coll/any? #(= skin %) (graph-data graph (get (graph-data graph object) owner-tag))))
+          (unsupported! "Native skin contains an unsupported or inconsistent dependency." {})))
       {"skeleton" {"spine" "4.2.43" "fps" fps "images" (graph-data graph (get fields 3))
                    "audio" (graph-data graph (get fields 34)) "referenceScale" (get fields 46)}
        "bones" (mapv #(graph-bone-json graph %) bones)
        "slots" (mapv #(graph-slot-json graph %) slots)
-       "skins" (mapv (fn [name] {"name" name "attachments" (get skin-attachments name {})}) skin-names)
-       "ik" (mapv #(graph-ik-json graph % orders) (graph-data graph (get fields 16)))
-       "transform" (mapv #(graph-transform-json graph % orders) (graph-data graph (get fields 22)))
-       "physics" (mapv #(graph-physics-json graph % orders) (graph-data graph (get fields 41)))
-       "path" (mapv #(graph-path-constraint-json graph % orders) (graph-data graph (get fields 23)))
+       "skins" (mapv (fn [name]
+                       (let [skin (coll/first-where #(= name (graph-object-name graph %)) skins)
+                             data (graph-data graph skin)
+                             members (graph-data graph (get data 6))
+                             constraints (graph-data graph (get data 7))
+                             result (cond-> {"name" name "attachments" (get skin-attachments name {})}
+                                      (pos? (count members)) (assoc "bones" (mapv #(graph-object-name graph %) members)))]
+                         (reduce (fn [result reference]
+                                   (let [kind (get {:ik "ik" :transform "transform" :path-constraint "path" :physics "physics"}
+                                                   (:kind (graph-node graph reference)))]
+                                     (update result kind (fnil conj []) (graph-object-name graph reference)))) result constraints))) skin-names)
+       "ik" (mapv #(cond-> (graph-ik-json graph % orders)
+                     (pos? (count (graph-data graph (get (graph-data graph %) 22)))) (assoc "skin" true))
+                  (graph-data graph (get fields 16)))
+       "transform" (mapv #(cond-> (graph-transform-json graph % orders)
+                            (pos? (count (graph-data graph (get (graph-data graph %) 22)))) (assoc "skin" true))
+                         (graph-data graph (get fields 22)))
+       "physics" (mapv #(cond-> (graph-physics-json graph % orders)
+                          (pos? (count (graph-data graph (get (graph-data graph %) 22)))) (assoc "skin" true))
+                       (graph-data graph (get fields 41)))
+       "path" (mapv #(cond-> (graph-path-constraint-json graph % orders)
+                       (pos? (count (graph-data graph (get (graph-data graph %) 22)))) (assoc "skin" true))
+                    (graph-data graph (get fields 23)))
        "events" (into {} (map #(graph-event-json graph %)) (graph-data graph (get fields 10)))
        "animations" (into {} (map (fn [animation-reference]
                                     [(graph-object-name graph animation-reference)
@@ -1236,7 +1375,7 @@
     (when (zero? (count bones))
       (unsupported! "A native skeleton requires at least one bone." {}))
     (reduce (fn [seen bone]
-              (source-fields! bone #{"name" "parent" "length" "x" "y" "rotation" "scaleX" "scaleY" "shearX" "shearY" "inherit" "color" "icon" "visible"} :bone)
+              (source-fields! bone #{"name" "parent" "length" "x" "y" "rotation" "scaleX" "scaleY" "shearX" "shearY" "inherit" "color" "icon" "visible" "skin"} :bone)
               (when-let [parent (get bone "parent")]
                 (when-not (contains? seen parent)
                   (unsupported! "Native bones must follow their parents, without cycles or missing references." {:bone (get bone "name")})))
@@ -1245,28 +1384,45 @@
               (conj seen (get bone "name"))) #{} bones)
     (doseq [slot slots]
       (source-fields! slot #{"name" "bone" "attachment" "color" "dark" "blend"} :slot)
-      (when-not (and (contains? bone-set (get slot "bone")) (= "normal" (get slot "blend" "normal")))
-        (unsupported! "A native slot requires an existing bone and a verified normal blend mode." {:slot (get slot "name")})))
+      (when-not (and (contains? bone-set (get slot "bone")) (contains? #{"normal" "additive" "multiply" "screen"} (get slot "blend" "normal")))
+        (unsupported! "A native slot requires an existing bone and a supported blend mode." {:slot (get slot "name")})))
     (doseq [skin skins]
-      (source-fields! skin #{"name" "attachments"} :skin)
+      (source-fields! skin #{"name" "attachments" "bones" "ik" "transform" "path" "physics"} :skin)
+      (doseq [kind ["bones" "ik" "transform" "path" "physics"]]
+        (let [members (get skin kind [])
+              known (set (mapv #(get % "name") (get source kind [])))]
+          (when-not (and (vector? members) (= (count members) (count (set members)))
+                         (coll/every? known members)
+                         (or (not= "default" (get skin "name")) (zero? (count members))))
+            (unsupported! "Native skin dependencies must be unique existing members of a named skin." {:skin (get skin "name") :kind kind}))))
       (doseq [[slot attachments] (get skin "attachments")]
         (when-not (contains? slot-set slot)
           (unsupported! "A native attachment refers to a missing slot." {:slot slot}))
         (doseq [[name attachment] attachments]
           (source-name! name :attachment)
-          (source-fields! attachment #{"name" "type" "path" "x" "y" "rotation" "scaleX" "scaleY" "width" "height" "color" "uvs" "triangles" "vertices" "hull" "edges" "vertexCount" "closed" "constantSpeed" "lengths"} :attachment)
-          (when-not (contains? #{"region" "mesh" "path"} (get attachment "type" "region"))
-            (unsupported! "Native saving currently supports region, mesh and path attachments." {:type (get attachment "type")}))
+          (source-fields! attachment #{"name" "type" "path" "x" "y" "rotation" "scaleX" "scaleY" "width" "height" "color" "uvs" "triangles" "vertices" "hull" "edges" "vertexCount" "closed" "constantSpeed" "lengths" "end" "sequence" "parent" "skin" "timelines"} :attachment)
+          (when-not (contains? #{"region" "mesh" "linkedmesh" "path" "point" "boundingbox" "clipping"} (get attachment "type" "region"))
+            (unsupported! "Unsupported native attachment type." {:type (get attachment "type")}))
           (when (and (= "default" (get skin "name")) (not= name (get attachment "name" name)))
             (unsupported! "Default-skin native region names must match their attachment keys." {:attachment name})))))
+    (doseq [kind ["bones" "ik" "transform" "path" "physics"]
+            item (get source kind [])]
+      (let [name (get item "name")
+            member (coll/any? (fn [skin] (coll/any? #(= name %) (get skin kind []))) skins)]
+        (when-not (= (true? (get item "skin")) (boolean member))
+          (unsupported! "Native skin-required state is derived from membership; required objects need a named skin and skin members must be required." {:kind kind :name name}))))
     (doseq [[name animation] (get source "animations")]
       (source-name! name :animation)
-      (source-fields! animation #{"bones" "slots" "attachments" "ik" "transform" "physics" "path" "events"} :animation)
+      (source-fields! animation #{"bones" "slots" "attachments" "ik" "transform" "physics" "path" "events" "drawOrder"} :animation)
       (reduce (fn [previous frame]
                 (let [time (get frame "time" 0.0)]
-                  (when-not (and (number? time) (Double/isFinite (double time)) (< previous time))
-                    (unsupported! "Native events must have unique increasing times; simultaneous event order cannot be preserved." {:animation name}))
+                  (when-not (and (number? time) (Double/isFinite (double time)) (<= previous time))
+                    (unsupported! "Native events must have nonnegative increasing times." {:animation name}))
                   time)) -1.0 (get animation "events" []))
+      (doseq [[_ frames] (group-by #(get % "time" 0.0) (get animation "events" []))]
+        (let [names (mapv #(get % "name") frames)]
+          (when-not (and (= (count names) (count (set names))) (= names (vec (sort names))))
+            (unsupported! "Native simultaneous event order must follow event names, as in Spine; duplicate names at one time cannot be preserved." {:animation name}))))
       (doseq [[bone timelines] (get animation "bones")]
         (when-not (contains? bone-set bone)
           (unsupported! "A native animation refers to a missing bone." {:bone bone}))
@@ -1279,7 +1435,11 @@
             (unsupported! "Native timeline keys must be a vector." {:property property}))
           (let [combined (contains? #{"translate" "scale" "shear"} property)]
             (reduce (fn [previous frame]
-                      (source-fields! frame (if combined #{"time" "x" "y" "curve"} #{"time" "value" "curve"}) :keyframe)
+                      (source-fields! frame (cond (= "inherit" property) #{"time" "inherit"}
+                                                  combined #{"time" "x" "y" "curve"}
+                                                  :else #{"time" "value" "curve"}) :keyframe)
+                      (when (and (= "inherit" property) (not (contains? #{"normal" "onlyTranslation" "noRotationOrReflection" "noScale" "noScaleOrReflection"} (get frame "inherit" "normal"))))
+                        (unsupported! "Unsupported animated inheritance mode." {:bone bone}))
                       (let [time (get frame "time" 0.0)
                             curve (get frame "curve")]
                         (when-not (and (number? time) (Double/isFinite (double time)) (<= 0.0 time) (> time previous))
@@ -1295,14 +1455,18 @@
 (defn- source-timeline! [graph track property frames fps]
   (let [timeline (append-node! graph :timeline {:track track :property property})
         combined (<= 1 property 3)
-        dimensions (if combined 2 1)
+        dimensions (if (= 39 property) 0 (if combined 2 1))
         default (if (contains? #{2 16 17} property) 1.0 0.0)
         sentinel 2147483648.0
         keys (mapv (fn [index frame]
                      (let [curve (get frame "curve")
                            previous-curve (get (get frames (dec index)) "curve")
                            data {:track track :timeline timeline :time (* fps (get frame "time" 0.0))
-                                 :values (if combined [(get frame "x" default) (get frame "y" default)] [(get frame "value" default)])
+                                 :values (cond (= 39 property) (get {"normal" [1.0 1.0 1.0] "onlyTranslation" [0.0 0.0 0.0]
+                                                                     "noRotationOrReflection" [0.0 1.0 0.0] "noScale" [1.0 0.0 1.0]
+                                                                     "noScaleOrReflection" [1.0 0.0 0.0]} (get frame "inherit" "normal"))
+                                               combined [(get frame "x" default) (get frame "y" default)]
+                                               :else [(get frame "value" default)])
                                  :curves (mapv (fn [channel]
                                                  (let [offset (* channel 4)]
                                                    [(if (vector? previous-curve) (* fps (nth previous-curve (+ offset 2))) sentinel)
@@ -1359,7 +1523,7 @@
     (let [influences
           (if-not weighted
             (mapv (fn [index] [{:bone (get (graph-data @graph slot-reference) 2)
-                               :x (nth vertices (* index 2)) :y (nth vertices (inc (* index 2))) :weight 1.0}]) (range size))
+                                :x (nth vertices (* index 2)) :y (nth vertices (inc (* index 2))) :weight 1.0}]) (range size))
             (loop [vertex 0 offset 0 result []]
               (if (= vertex size)
                 (do (when-not (= offset (count vertices)) (unsupported! "Native mesh weight data contains trailing values." {})) result)
@@ -1386,7 +1550,7 @@
                          (append-node! graph :influence
                                        {0 (append-node! graph :floats (mapv #(get-in weights [% :weight] 0.0) palette))
                                         1 (append-node! graph :floats (into [] (mapcat #(let [v (get weights %)] [(get v :x 0.0) (get v :y 0.0)])) palette))}))) influences)
-          fields (merge (or base {26 false 27 false 36 false 34 false 19 0.0 21 1.0 9 0.0 11 1.0 10 1.0 20 1.0 35 false 33 true})
+          fields (merge (or base {26 nil 27 false 36 nil 34 false 19 0.0 21 1.0 9 0.0 11 1.0 10 1.0 20 1.0 35 false 33 true})
                         {0 slot-reference 4 placeholder 5 [(append-node! graph :string (get attachment "name" name))] 32 skin-reference
                          16 (get attachment "width" 0.0) 17 (get attachment "height" 0.0)
                          12 (append-node! graph :floats uvs) 13 (append-node! graph :shorts triangles)
@@ -1395,7 +1559,7 @@
                          28 container 30 weighted 7 (* 4 hull) 8 (append-node! graph :ints edges)
                          18 (append-node! graph :floats (if weighted (vec (repeat (* size 2) 0.0)) vertices))})]
       (replace-node! graph container {0 target 1 (append-node! graph :array palette)
-                                     2 (append-node! graph :array rows) 3 (append-node! graph :floats [])})
+                                      2 (append-node! graph :array rows) 3 (append-node! graph :floats [])})
       (replace-node! graph target fields))))
 
 (defn- source-path-attachment! [graph target base slot-reference skin-reference placeholder name attachment bones bone-order]
@@ -1421,12 +1585,42 @@
       (replace-node! graph container (assoc (graph-data @graph container) 3 (append-node! graph :path-vertex-options [])))
       (replace-node! graph target
                      (merge (select-keys mesh fields)
-                             {12 closed 13 (get attachment "constantSpeed" true) 15 (append-node! graph :path-lengths (into lengths (map (constantly 0.0)) (range (max 0 (- (quot size 3) (count lengths))))))
+                            {12 closed 13 (get attachment "constantSpeed" true) 15 (append-node! graph :path-lengths (into lengths (map (constantly 0.0)) (range (max 0 (- (quot size 3) (count lengths))))))
                              8 (append-node! graph :ints edges)})))))
+
+(defn- source-polygon! [graph target base slot skin placeholder name attachment bones bone-order slots]
+  (let [size (get attachment "vertexCount")
+        kind (:kind (graph-node @graph target))
+        end-name (get attachment "end")]
+    (when-not (and (int? size) (<= 3 size) (or (nil? end-name) (contains? slots end-name)))
+      (unsupported! "A native polygon needs at least three vertices and an existing end slot." {:attachment name}))
+    (source-mesh! graph target base slot skin placeholder name
+                  (merge attachment {"uvs" (vec (repeat (* 2 size) 0.0)) "triangles" [] "hull" size "edges" []
+                                     "color" (get attachment "color" (if (= kind :clipping) "3a3acdff" "60ef00ff"))}) bones bone-order)
+    (let [mesh (graph-data @graph target)
+          container (get mesh 28)
+          tags (coll/into-> (second (get graph-schemas kind)) #{} (map first))
+          edges (coll/into-> (range size) [] (mapcat (fn [index] [(* 2 index) (* 2 (mod (inc index) size))])))]
+      (swap! graph assoc-in [(:space container) (:id container) :kind] :path-vertices)
+      (replace-node! graph container (assoc (graph-data @graph container) 3 (append-node! graph :path-vertex-options [])))
+      (replace-node! graph target
+                     (cond-> (assoc (select-keys mesh tags) 8 (append-node! graph :ints edges))
+                       (= :clipping kind) (assoc 12 (get slots end-name)))))))
+
+(defn- source-sequence! [graph sequence]
+  (when sequence
+    (source-fields! sequence #{"count" "start" "digits" "setup"} :sequence)
+    (let [values {2 (get sequence "count" 0) 1 (get sequence "start" 1)
+                  3 (get sequence "digits" 0) 4 (get sequence "setup" 0)}]
+      (when-not (and (coll/every? int? (coll/vals values)) (pos? (get values 2))
+                     (<= 0 (get values 3) 20) (<= 0 (get values 4) (dec (get values 2))))
+        (unsupported! "Native sequence settings contain invalid count, digits or setup index." {}))
+      (append-node! graph :sequence
+                    (coll/into-> values {} (map (fn [[tag value]] [tag (bit-xor (bit-shift-left value 1) (bit-shift-right value 63))])))))))
 
 (defn- source-path-constraint! [graph original owner fields bones slots existing item]
   (source-fields! item #{"name" "order" "bones" "target" "positionMode" "spacingMode" "rotateMode" "position" "spacing"
-                        "rotation" "mixRotate" "mixX" "mixY" "skin"} :path)
+                         "rotation" "mixRotate" "mixX" "mixY" "skin"} :path)
   (let [name (get item "name")
         target (or existing (append-node! graph :path-constraint {}))
         position-mode (get {"fixed" 1 "percent" 2} (get item "positionMode" "percent"))
@@ -1435,7 +1629,7 @@
         bone-names (get item "bones")
         slot (get slots (get item "target"))]
     (source-name! name :path)
-    (when-not (and slot position-mode spacing-mode rotate-mode (not (get item "skin" false))
+    (when-not (and slot position-mode spacing-mode rotate-mode
                    (vector? bone-names) (pos? (count bone-names)) (coll/every? #(contains? bones %) bone-names))
       (unsupported! "Native path constraint needs existing bones/target and supported modes." {:path name}))
     (replace-node! graph target
@@ -1458,12 +1652,12 @@
         defaults {5 0.0 6 0.0 8 0.0 33 5000.0 10 1.0 12 100.0 14 1.0 16 1.0 18 0.0 20 0.0 23 1.0
                   25 false 26 false 27 false 28 false 29 false 30 false 31 false}
         data (merge (or (graph-data original existing)
-                         {21 0.0 19 0.0 17 0.0 24 0.0 13 0.0 15 0.0 11 0.0 34 true 22 (append-node! graph :array [])})
+                        {21 0.0 19 0.0 17 0.0 24 0.0 13 0.0 15 0.0 11 0.0 34 true 22 (append-node! graph :array [])})
                     (into {} (map (fn [[tag field]] [tag (get item field (get defaults tag))])) physics-source-tags))
         maximum (max rotate shear)
         factor (if (zero? maximum) 0.0 (/ (+ rotate shear) maximum))]
     (source-name! name :physics)
-    (when-not (and bone (not (get item "skin" false)) (number? fps) (<= 1.0 fps 1000.0) (= (double fps) (Math/rint (double fps)))
+    (when-not (and bone (number? fps) (<= 1.0 fps 1000.0) (= (double fps) (Math/rint (double fps)))
                    (Double/isFinite rotate) (Double/isFinite shear) (<= 0.0 rotate 1.0) (<= 0.0 shear 1.0)
                    (coll/every? #(let [v (get data %)] (and (number? v) (Double/isFinite (double v)) (<= 0.0 v 1.0))) [5 6 8 14])
                    (pos? (get data 16)) (not (neg? (get data 33))) (not (neg? (get data 12))))
@@ -1496,11 +1690,11 @@
                 target-bone (get bones (get item "target"))]
             (source-name! name kind)
             (source-fields! item (if ik
-                                  #{"name" "order" "bones" "target" "mix" "softness" "bendPositive" "compress" "stretch" "uniform" "skin"}
-                                  #{"name" "order" "bones" "target" "rotation" "x" "y" "scaleX" "scaleY" "shearY" "local" "relative" "skin"
-                                    "mixRotate" "mixX" "mixY" "mixScaleX" "mixScaleY" "mixShearY"}) kind)
+                                   #{"name" "order" "bones" "target" "mix" "softness" "bendPositive" "compress" "stretch" "uniform" "skin"}
+                                   #{"name" "order" "bones" "target" "rotation" "x" "y" "scaleX" "scaleY" "shearY" "local" "relative" "skin"
+                                     "mixRotate" "mixX" "mixY" "mixScaleX" "mixScaleY" "mixShearY"}) kind)
             (when-not (and target-bone (vector? bone-names) (pos? (count bone-names))
-                           (coll/every? #(contains? bones %) bone-names) (not (get item "skin" false)))
+                           (coll/every? #(contains? bones %) bone-names))
               (unsupported! "Native constraint contains missing bones or unsupported skin dependencies." {:constraint name}))
             (when (and ik (not (<= 1 (count bone-names) 2)))
               (unsupported! "Native IK requires one or two bones." {:constraint name}))
@@ -1524,19 +1718,19 @@
         path (into {} (map #(source-path-constraint! graph original owner fields bones slots (get old-path-map (get % "name")) %)) (get source "path" []))
         physics (into {} (map #(source-physics! graph original owner fields bones (get old-physics-map (get % "name")) %)) (get source "physics" []))
         events (into {} (map (fn [[name event]]
-                              (source-name! name :event)
-                              (source-fields! event #{"int" "float" "string" "audio" "volume" "balance"} :event)
-                              (let [integer (get event "int" 0)
-                                    audio (get event "audio" "")
-                                    target (or (get old-event-map name) (append-node! graph :event {}))]
-                                (when-not (and (int? integer) (<= Integer/MIN_VALUE integer Integer/MAX_VALUE))
-                                  (unsupported! "Native event integer exceeds signed 32-bit range." {}))
-                                (replace-node! graph target
-                                               {0 owner 2 (append-node! graph :string name) 3 (bit-xor (bit-shift-left integer 1) (bit-shift-right integer 63))
-                                                4 (get event "float" 0.0) 5 (append-node! graph :string (get event "string" ""))
-                                                6 (append-node! graph :string audio) 8 (get event "volume" 1.0) 9 (get event "balance" 0.0)
-                                                7 (not (string/blank? audio)) 10 (get (graph-data original (get old-event-map name)) 10 (get fields 40))})
-                                [name target]))) (get source "events" {}))
+                               (source-name! name :event)
+                               (source-fields! event #{"int" "float" "string" "audio" "volume" "balance"} :event)
+                               (let [integer (get event "int" 0)
+                                     audio (get event "audio" "")
+                                     target (or (get old-event-map name) (append-node! graph :event {}))]
+                                 (when-not (and (int? integer) (<= Integer/MIN_VALUE integer Integer/MAX_VALUE))
+                                   (unsupported! "Native event integer exceeds signed 32-bit range." {}))
+                                 (replace-node! graph target
+                                                {0 owner 2 (append-node! graph :string name) 3 (bit-xor (bit-shift-left integer 1) (bit-shift-right integer 63))
+                                                 4 (get event "float" 0.0) 5 (append-node! graph :string (get event "string" ""))
+                                                 6 (append-node! graph :string audio) 8 (get event "volume" 1.0) 9 (get event "balance" 0.0)
+                                                 7 (not (string/blank? audio)) 10 (get (graph-data original (get old-event-map name)) 10 (get fields 40))})
+                                 [name target]))) (get source "events" {}))
         all-constraints (merge ik transform physics path)
         ordered (into [] (map #(get all-constraints (get % "name")))
                       (sort-by #(get % "order" 0) (into [] cat [(get source "ik" []) (get source "transform" []) (get source "physics" []) (get source "path" [])])))
@@ -1550,18 +1744,18 @@
     (replace-node! graph (get fields 44) (assoc folder 5 (append-node! graph :array (vec (rseq ordered)))))
     (replace-folder-children! graph (get fields 40) old-events (vec (coll/vals events)))
     (replace-node! graph owner (assoc (graph-data @graph owner)
-                                     16 (append-node! graph :array (mapv #(get ik (get % "name")) (get source "ik" [])))
-                                     22 (append-node! graph :array (mapv #(get transform (get % "name")) (get source "transform" [])))
-                                     10 (append-node! graph :array (vec (coll/vals events)))
-                                     41 (append-node! graph :array (mapv #(get physics (get % "name")) (get source "physics" [])))
-                                     23 (append-node! graph :array (mapv #(get path (get % "name")) (get source "path" [])))))
+                                 16 (append-node! graph :array (mapv #(get ik (get % "name")) (get source "ik" [])))
+                                 22 (append-node! graph :array (mapv #(get transform (get % "name")) (get source "transform" [])))
+                                 10 (append-node! graph :array (vec (coll/vals events)))
+                                 41 (append-node! graph :array (mapv #(get physics (get % "name")) (get source "physics" [])))
+                                 23 (append-node! graph :array (mapv #(get path (get % "name")) (get source "path" [])))))
     {:ik ik :transform transform :physics physics :path path :events events}))
 
 (defn- source-deform! [graph attachment-reference source-attachment frame bones bone-order]
   (let [mesh (graph-data @graph attachment-reference)
         container (graph-data @graph (get mesh 28))
         palette (graph-data @graph (get container 1))
-        size (if (= "path" (get source-attachment "type")) (get source-attachment "vertexCount") (quot (count (get source-attachment "uvs")) 2))
+        size (if (contains? #{"path" "boundingbox" "clipping"} (get source-attachment "type")) (get source-attachment "vertexCount") (quot (count (get source-attachment "uvs")) 2))
         weighted (get mesh 30)
         input (get source-attachment "vertices")
         indices (if-not weighted
@@ -1588,6 +1782,17 @@
                          {:nonzero nonzero :values (if (zero? nonzero) [] chunk)})) (range 0 dense-size 128))]
     (append-node! graph :deform-values {:size dense-size :chunks chunks})))
 
+(defn- source-slot-color-values [property frame context]
+  (let [light-size (if (= 4 property) 4 3)
+        paired (contains? #{"rgba2" "rgb2" "twoColor"} (:slot-timeline context))
+        light (get frame (if paired "light" "color"))
+        dark (if paired (get frame "dark") (or (:dark context) "000000"))
+        decode-color (fn decode-color [value size]
+                       (when-not (and (string? value) (= (* 2 size) (count value)) (re-matches #"[0-9a-fA-F]+" value))
+                         (unsupported! "Native slot keys require valid RGB or RGBA colors." {:color value}))
+                       (mapv (fn [index] (/ (Long/parseLong (subs value (* 2 index) (* 2 (inc index))) 16) 255.0)) (range size)))]
+    (into (decode-color light light-size) (decode-color dark 3))))
+
 (defn- source-extra-timeline! [graph track property frames fps target context]
   (let [[dimensions curve-dimensions] (get timeline-layouts property)
         timeline (append-node! graph :timeline {:track track :property property :target target})
@@ -1604,17 +1809,38 @@
                                    softness (get frame "softness" 0.0)
                                    next-softness (get next-frame "softness" 0.0)]
                                (assoc frame "curve" (into curve [(+ time (/ (- next-time time) 3.0))
-                                                                  (+ softness (/ (- next-softness softness) 3.0))
-                                                                  (- next-time (/ (- next-time time) 3.0))
-                                                                  (- next-softness (/ (- next-softness softness) 3.0))]))))))
+                                                                 (+ softness (/ (- next-softness softness) 3.0))
+                                                                 (- next-time (/ (- next-time time) 3.0))
+                                                                 (- next-softness (/ (- next-softness softness) 3.0))]))))))
+                       (range (count frames)) frames))
+        frames (if-not (contains? #{4 20} property)
+                 frames
+                 (mapv (fn [index frame]
+                         (let [curve (get frame "curve")
+                               light-size (if (= 4 property) 4 3)]
+                           (if-not (and (vector? curve) (= (* 4 light-size) (count curve)))
+                             frame
+                             (let [current (source-slot-color-values property frame context)
+                                   next-frame (get frames (inc index) frame)
+                                   next-values (source-slot-color-values property next-frame context)
+                                   time (get frame "time" 0.0)
+                                   duration (- (get next-frame "time" time) time)]
+                               (assoc frame "curve"
+                                      (coll/into-> (range light-size dimensions) curve
+                                        (mapcat (fn [channel]
+                                                  [(+ time (/ duration 3.0)) (nth current channel)
+                                                   (+ time (* duration (/ 2.0 3.0))) (nth next-values channel)]))))))))
                        (range (count frames)) frames))
         allowed (case (int property)
+                  (4 20) #{"time" "color" "light" "dark" "curve"}
+                  13 #{"time" "offsets"}
                   5 #{"time" "name"}
                   6 #{"time" "vertices" "offset" "curve"}
                   7 #{"time" "mix" "softness" "bendPositive" "compress" "stretch" "curve"}
                   8 #{"time" "mixRotate" "mixX" "mixY" "mixScaleX" "mixScaleY" "mixShearY" "curve"}
                   11 #{"time" "mixRotate" "mixX" "mixY" "curve"}
                   12 #{"time" "name" "int" "float" "string" "volume" "balance"}
+                  22 #{"time" "mode" "index" "delay"}
                   (30 31) #{"time"}
                   #{"time" "value" "curve"})]
     (when-not (vector? frames) (unsupported! "Native animation frames must be vectors." {}))
@@ -1641,11 +1867,20 @@
                   (let [curve (get frame "curve")
                         previous-curve (get (get frames (dec index)) "curve")
                         values (case (int property)
+                                 (4 20) (source-slot-color-values property frame context)
+                                 21 [(get frame "value" 1.0)]
                                  7 [(get frame "mix" 1.0) (get frame "softness" 0.0)
                                     (if (get frame "stretch" false) 1.0 0.0) (if (get frame "compress" false) 1.0 0.0)
                                     (if (get frame "bendPositive" true) 1.0 0.0)]
                                  8 [(get frame "mixRotate" 1.0) (get frame "mixX" 1.0) (get frame "mixY" (get frame "mixX" 1.0))
                                     (get frame "mixScaleX" 1.0) (get frame "mixScaleY" (get frame "mixScaleX" 1.0)) (get frame "mixShearY" 1.0)]
+                                 22 (let [mode (.indexOf ["hold" "once" "loop" "pingpong" "onceReverse" "loopReverse" "pingpongReverse"] (get frame "mode" "hold"))
+                                          index (get frame "index" 0)
+                                          delay (get frame "delay" 0.0)]
+                                      (when-not (and (<= 0 mode) (int? index) (<= 0 index)
+                                                     (number? delay) (Double/isFinite (double delay)) (<= 0.0 delay))
+                                        (unsupported! "Native sequence key has an invalid mode, index or delay." {}))
+                                      [(double mode) (double index) delay])
                                  11 [(get frame "mixRotate" 1.0) (get frame "mixX" 1.0) (get frame "mixY" (get frame "mixX" 1.0))]
                                  (9 10 23 24 25 26 27 28 29 32 33 34 35 36 37 38) [(get frame "value" 0.0)]
                                  [])
@@ -1662,6 +1897,27 @@
                                        reference (get-in context [:attachment-names name])]
                                    (when (and name (nil? reference)) (unsupported! "An attachment key refers to a missing native attachment." {:attachment name}))
                                    (assoc data :attachment reference))
+                               13 (let [offsets (get frame "offsets" [])
+                                        slots (:slots context)
+                                        order (:slot-order context)
+                                        indices (mapv #(.indexOf ^java.util.List order (get % "slot")) offsets)
+                                        destinations (mapv (fn [index offset]
+                                                             (source-fields! offset #{"slot" "offset"} :draw-order-offset)
+                                                             (let [value (get offset "offset" 0)]
+                                                               (when-not (int? value) (unsupported! "Native draw-order offset must be an integer." {}))
+                                                               (+ index value))) indices offsets)]
+                                    (when-not (and (vector? offsets) (coll/every? #(<= 0 % (dec (count order))) indices)
+                                                   (= indices (vec (sort (set indices))))
+                                                   (= (count destinations) (count (set destinations)))
+                                                   (coll/every? #(<= 0 % (dec (count order))) destinations))
+                                      (unsupported! "Native draw-order keys need ordered unique slots and valid destinations." {}))
+                                    (assoc data :offsets
+                                           (append-node! graph :array
+                                                         (mapv (fn [offset]
+                                                                 (let [value (get offset "offset" 0)]
+                                                                   (append-node! graph :draw-offset
+                                                                                 {0 (get slots (get offset "slot"))
+                                                                                  1 (bit-xor (bit-shift-left value 1) (bit-shift-right value 63))}))) offsets))))
                                6 (assoc data :deform (source-deform! graph target (:source-attachment context) frame (:bones context) (:bone-order context)))
                                12 (let [definition (graph-data @graph target)
                                         raw-default (get definition 3)
@@ -1679,6 +1935,20 @@
                     (append-node! graph :keyframe data))) (range (count frames)) frames)]
       (replace-node! graph timeline {:track track :property property :target target :keys (append-node! graph :array keys)}))))
 
+(defn- resolve-linked-source [source skin slot attachment seen]
+  (if-not (= "linkedmesh" (get attachment "type"))
+    attachment
+    (let [parent-skin (get attachment "skin" "default")
+          parent-name (get attachment "parent")
+          key [parent-skin slot parent-name]
+          parent (get-in (coll/first-where #(= parent-skin (get % "name")) (get source "skins")) ["attachments" slot parent-name])]
+      (when (or (contains? seen key) (not (contains? #{"mesh" "linkedmesh"} (get parent "type"))))
+        (unsupported! "Native linked mesh has a missing parent or a cycle." {:skin skin :parent key}))
+      (merge (select-keys (resolve-linked-source source parent-skin slot parent (conj seen key))
+                          ["uvs" "triangles" "vertices" "hull" "edges"])
+             (dissoc attachment "type" "parent" "skin" "timelines")
+             {"type" "mesh"}))))
+
 (defn- source-animation! [graph owner fields existing name animation fps bones slots regions placeholders objects source]
   (let [target (or existing (append-node! graph :animation {}))
         properties (into {} (map (fn [[code name]] [name code])) timeline-names)
@@ -1690,25 +1960,50 @@
             [property frames] timelines]
       (add! (get bones bone) (get properties property) frames nil nil))
     (doseq [[slot timelines] (get animation "slots")]
-      (source-fields! timelines #{"attachment"} :slot-timelines)
+      (source-fields! timelines #{"attachment" "rgba" "rgb" "alpha" "rgba2" "rgb2" "color" "twoColor"} :slot-timelines)
+      (let [combined (filterv #(contains? timelines %) ["rgba" "rgba2" "color" "twoColor"])
+            rgb (filterv #(contains? timelines %) ["rgb" "rgb2"])]
+        (when-not (and (<= (count combined) 1) (<= (count rgb) 1)
+                       (or (zero? (count combined)) (and (zero? (count rgb)) (not (contains? timelines "alpha")))))
+          (unsupported! "Native color timelines cannot overlap the same slot channels." {:slot slot})))
       (let [slot-reference (get slots slot)
             names (into {} (keep (fn [[[skin slot-name attachment-name] reference]]
-                                  (when (and (= "default" skin) (= slot slot-name)) [attachment-name reference]))) regions)
+                                   (when (and (= "default" skin) (= slot slot-name)) [attachment-name reference]))) regions)
             names (into names (keep (fn [[[slot-name attachment-name] reference]] (when (= slot slot-name) [attachment-name reference]))) placeholders)]
         (when-not slot-reference (unsupported! "A native animation refers to a missing slot." {:slot slot}))
         (when-let [frames (get timelines "attachment")]
-          (add! (get (graph-data @graph slot-reference) 2) 5 frames slot-reference {:attachment-names names}))))
+          (add! (get (graph-data @graph slot-reference) 2) 5 frames slot-reference {:attachment-names names}))
+        (doseq [[name property] [["rgba" 4] ["color" 4] ["rgba2" 4] ["twoColor" 4] ["rgb" 20] ["rgb2" 20] ["alpha" 21]]
+                :let [frames (get timelines name)]
+                :when frames]
+          (let [dark (when (get (graph-data @graph slot-reference) 12)
+                       (subs (format "%08x" (long (graph-data @graph (get (graph-data @graph slot-reference) 11)))) 0 6))]
+            (when (and (contains? #{"rgba2" "rgb2" "twoColor"} name) (nil? dark))
+              (unsupported! "Two-color native timelines require an enabled dark slot color." {:slot slot}))
+            (add! (get (graph-data @graph slot-reference) 2) property frames slot-reference {:slot-timeline name :dark dark})))))
+    (when-let [frames (get animation "drawOrder")]
+      (add! nil 13 frames nil {:slots slots :slot-order (mapv #(get % "name") (get source "slots"))}))
     (doseq [[skin slots-source] (get animation "attachments")
             [slot attachments] slots-source
             [attachment-name timelines] attachments]
-      (source-fields! timelines #{"deform"} :attachment-timelines)
+      (source-fields! timelines #{"deform" "sequence"} :attachment-timelines)
       (let [reference (get regions [skin slot attachment-name])
             source-skin (coll/first-where #(= skin (get % "name")) (get source "skins"))
             source-attachment (get-in source-skin ["attachments" slot attachment-name])]
-        (when-not (contains? #{:mesh :path-attachment} (:kind (graph-node @graph reference)))
-          (unsupported! "A native deformation refers to a missing or unsupported mesh." {:attachment attachment-name}))
-        (add! (get (graph-data @graph (get slots slot)) 2) 6 (get timelines "deform") reference
-              {:source-attachment source-attachment :bones bones :bone-order bone-order})))
+        (when-let [frames (get timelines "deform")]
+          (when-not (contains? #{:mesh :path-attachment :boundingbox :clipping} (:kind (graph-node @graph reference)))
+            (unsupported! "A native deformation refers to a missing or unsupported mesh." {:attachment attachment-name}))
+          (add! (get (graph-data @graph (get slots slot)) 2) 6 frames reference
+                {:source-attachment (resolve-linked-source source skin slot source-attachment #{[skin slot attachment-name]})
+                 :bones bones :bone-order bone-order}))
+        (when-let [frames (get timelines "sequence")]
+          (when-not (get source-attachment "sequence")
+            (unsupported! "A native sequence timeline needs a sequence attachment." {:attachment attachment-name}))
+          (add! (get (graph-data @graph (get slots slot)) 2) 22
+                (:frames (reduce (fn [{:keys [delay frames]} frame]
+                                   (let [delay (get frame "delay" delay)]
+                                     {:delay delay :frames (conj frames (assoc frame "delay" delay))}))
+                                 {:delay 0.0 :frames []} frames)) reference nil))))
     (doseq [[kind property] [["ik" 7] ["transform" 8]]
             [constraint-name frames] (get animation kind)]
       (let [reference (get-in objects [(keyword kind) constraint-name])]
@@ -1729,12 +2024,15 @@
         (when-not (and code (or global reference))
           (unsupported! "A native physics timeline refers to a missing constraint or unsupported property." {:physics constraint-name :property property}))
         (add! (when reference (get (graph-data @graph reference) 3)) (first code) frames reference nil)))
-    (doseq [[event-name frames] (group-by #(get % "name") (get animation "events" []))]
+    (doseq [[event-name frames] (sort-by key (group-by #(get % "name") (get animation "events" [])))]
       (let [reference (get-in objects [:events event-name])]
         (when-not reference (unsupported! "A native event frame refers to a missing definition." {:event event-name}))
         (add! nil 12 frames reference nil)))
     (let [groups (group-by (fn [{:keys [bone property]}] [bone (when-not bone property)]) @descriptors)
-          split-flags (atom [])
+          split-flags (atom (coll/into-> @descriptors []
+                              (filter #(contains? #{20 21} (:property %)))
+                              (map (fn [descriptor] [(:target descriptor) 8]))
+                              (distinct)))
           tracks (mapv (fn [[[bone category] descriptors]]
                          (let [track (append-node! graph :bone-track {})
                                flags (reduce (fn [flags {:keys [property]}] (bit-or flags (get {14 1 15 1 16 2 17 2 18 4 19 4} property 0))) 0 descriptors)
@@ -1744,11 +2042,11 @@
                                               (source-extra-timeline! graph track property frames fps target context))) descriptors)]
                            (when (pos? flags) (swap! split-flags conj [bone flags]))
                            (replace-node! graph track {0 target 1 bone 2 (append-node! graph :array refs)
-                                                      4 true 6 (when-not bone (append-node! graph :timeline-category category))}))) groups)
+                                                       4 true 6 (when-not bone (append-node! graph :timeline-category category))}))) groups)
           base (or (graph-data @graph existing) {6 true 3 false 9 false 5 true})]
       (replace-node! graph target (merge base {0 owner 1 (append-node! graph :string name)
-                                              2 (append-node! graph :array tracks) 8 (append-node! graph :empty-116 @split-flags)
-                                              7 (get base 7 (get fields 37))})))))
+                                               2 (append-node! graph :array tracks) 8 (append-node! graph :empty-116 @split-flags)
+                                               7 (get base 7 (get fields 37))})))))
 
 (defn update-skeleton
   "Apply a complete supported Spine JSON skeleton to one native graph skeleton.
@@ -1775,16 +2073,16 @@
         existing-skins (into {} (map (fn [ref] [(graph-data native-graph (get (graph-data native-graph ref) 1)) ref])) old-skins)
         existing-animations (into {} (map (fn [ref] [(graph-data native-graph (get (graph-data native-graph ref) 1)) ref])) old-animations)
         bones (into {} (map (fn [bone]
-                             (let [name (get bone "name")]
-                               [name (or (get existing-bones name) (append-node! graph :bone {}))]))) (get source "bones"))
+                              (let [name (get bone "name")]
+                                [name (or (get existing-bones name) (append-node! graph :bone {}))]))) (get source "bones"))
         slots (into {} (map (fn [slot]
-                             (let [name (get slot "name")]
-                               [name (or (get existing-slots name) (append-node! graph :slot {}))]))) (get source "slots"))
+                              (let [name (get slot "name")]
+                                [name (or (get existing-slots name) (append-node! graph :slot {}))]))) (get source "slots"))
         skins (into {} (comp (remove #(= "default" (get % "name")))
                              (map (fn [skin]
                                     (let [name (get skin "name")]
                                       [name (or (get existing-skins name) (append-node! graph :skin {}))])))) (get source "skins"))
-        existing-regions (into {} (comp (filter #(contains? #{:region :mesh :path-attachment} (:kind (graph-node native-graph %))))
+        existing-regions (into {} (comp (filter #(contains? #{:region :mesh :path-attachment :point :boundingbox :clipping} (:kind (graph-node native-graph %))))
                                         (map (fn [ref]
                                                (let [data (graph-data native-graph ref)
                                                      skin (get data 32)]
@@ -1820,7 +2118,7 @@
       (let [skin-name (get skin "name")
             default (= "default" skin-name)
             key [skin-name slot name]
-            kind (case (get attachment "type") "mesh" :mesh "path" :path-attachment :region)
+            kind (case (get attachment "type") ("mesh" "linkedmesh") :mesh "path" :path-attachment "point" :point "boundingbox" :boundingbox "clipping" :clipping :region)
             existing (get existing-regions key)
             existing (when (= kind (:kind (graph-node native-graph existing))) existing)
             target (or existing (append-node! graph kind {}))
@@ -1832,17 +2130,36 @@
                                 ref)))
             base (graph-data native-graph existing)]
         (case kind
-          :mesh (source-mesh! graph target base (get slots slot) (get skins skin-name) placeholder name attachment bones (mapv #(get % "name") (get source "bones")))
+          (:boundingbox :clipping) (source-polygon! graph target base (get slots slot) (get skins skin-name) placeholder name attachment bones (mapv #(get % "name") (get source "bones")) slots)
+          :point (replace-node! graph target
+                                {0 (get slots slot) 4 placeholder 5 [(append-node! graph :string (get attachment "name" name))]
+                                 32 (get skins skin-name) 35 false 33 true
+                                 6 (get attachment "x" 0.0) 7 (get attachment "y" 0.0) 8 (get attachment "rotation" 0.0)
+                                 9 (append-node! graph :color (source-color (get attachment "color") "f1f100ff"))})
+          :mesh (source-mesh! graph target base (get slots slot) (get skins skin-name) placeholder name (resolve-linked-source source skin-name slot attachment #{key}) bones (mapv #(get % "name") (get source "bones")))
           :path-attachment (source-path-attachment! graph target base (get slots slot) (get skins skin-name) placeholder name attachment bones (mapv #(get % "name") (get source "bones")))
           (replace-node! graph target
-                       (merge (or base {15 false 35 false 33 true}) {0 (get slots slot) 4 placeholder 5 [(append-node! graph :string (get attachment "name" name))]
-                                    32 (get skins skin-name) 6 (get attachment "x" 0.0) 7 (get attachment "y" 0.0)
-                                    8 (get attachment "scaleX" 1.0) 9 (get attachment "scaleY" 1.0) 10 (get attachment "rotation" 0.0)
-                                    11 (get attachment "width" 0.0) 12 (get attachment "height" 0.0)
-                                    13 (append-node! graph :string (or (get attachment "path") ""))
-                                    14 (append-node! graph :color (source-color (get attachment "color") "ffffffff"))})))
+                         (merge (or base {15 nil 35 false 33 true}) {0 (get slots slot) 4 placeholder 5 [(append-node! graph :string (get attachment "name" name))]
+                                                                     32 (get skins skin-name) 6 (get attachment "x" 0.0) 7 (get attachment "y" 0.0)
+                                                                     8 (get attachment "scaleX" 1.0) 9 (get attachment "scaleY" 1.0) 10 (get attachment "rotation" 0.0)
+                                                                     11 (get attachment "width" 0.0) 12 (get attachment "height" 0.0)
+                                                                     13 (append-node! graph :string (or (get attachment "path") ""))
+                                                                     14 (append-node! graph :color (source-color (get attachment "color") "ffffffff"))})))
+        (when (= :region kind)
+          (replace-node! graph target (assoc (graph-data @graph target) 15 (source-sequence! graph (get attachment "sequence")))))
+        (when (= :mesh kind)
+          (replace-node! graph target (assoc (graph-data @graph target) 36 (source-sequence! graph (get attachment "sequence")))))
+        (when (and (not (contains? #{:region :mesh} kind)) (get attachment "sequence"))
+          (unsupported! "Only region and mesh attachments support native image sequences." {:attachment name}))
         (swap! regions assoc key target)
         (swap! skin-region-refs update skin-name (fnil conj []) target)))
+    (doseq [skin (get source "skins")
+            [slot attachments] (get skin "attachments")
+            [name attachment] attachments
+            :when (= "linkedmesh" (get attachment "type"))]
+      (let [target (get @regions [(get skin "name") slot name])
+            parent (get @regions [(get attachment "skin" "default") slot (get attachment "parent")])]
+        (replace-node! graph target (assoc (graph-data @graph target) 26 parent 27 (get attachment "timelines" true)))))
     (doseq [slot (get source "slots")]
       (let [name (get slot "name")
             attachment-name (get slot "attachment")
@@ -1860,7 +2177,7 @@
                                     5 (append-node! graph :color (source-color (get slot "color") "ffffffff"))
                                     11 (append-node! graph :color (source-color (when dark (str dark "ff")) "000000ff"))
                                     12 (boolean dark) 14 (append-node! graph :enum 3)
-                                    7 {:prefix (append-node! graph :enum 1) :parts [(append-node! graph :string name)]}
+                                    7 {:prefix (append-node! graph :enum (get {"normal" 1 "additive" 2 "multiply" 3 "screen" 4} (get slot "blend" "normal"))) :parts [(append-node! graph :string name)]}
                                     9 attachment 16 (get base 16 (get fields 45))}))))
     (doseq [[name target] skins]
       (let [base (or (graph-data native-graph (get existing-skins name))
@@ -1878,17 +2195,37 @@
           bone-refs (mapv #(get bones (get % "name")) (get source "bones"))
           slot-refs (mapv #(get slots (get % "name")) (get source "slots"))
           skin-refs (into [] (keep #(get skins (get % "name"))) (get source "skins"))]
+      (doseq [skin (get source "skins")
+              :let [name (get skin "name") target (get skins name)]
+              :when target]
+        (replace-node! graph target
+                       (assoc (graph-data @graph target)
+                         6 (append-node! graph :array (mapv bones (get skin "bones" [])))
+                         7 (append-node! graph :array
+                                         (coll/into-> ["ik" "transform" "path" "physics"] []
+                                           (mapcat (fn [kind] (mapv (get objects (keyword kind)) (get skin kind [])))))))))
+      (doseq [[kind references tag] [["bones" bones 31] ["ik" (:ik objects) 22]
+                                     ["transform" (:transform objects) 22] ["path" (:path objects) 22]
+                                     ["physics" (:physics objects) 22]]
+              [name target] references]
+        (replace-node! graph target
+                       (assoc (graph-data @graph target) tag
+                              (append-node! graph :array
+                                            (coll/into-> (get source "skins") []
+                                              (keep (fn [skin]
+                                                      (when (coll/any? #(= name %) (get skin kind []))
+                                                        (get skins (get skin "name"))))))))))
       (replace-folder-children! graph (get fields 45) old-slots slot-refs)
       (replace-folder-children! graph (get fields 38) old-skins skin-refs)
       (replace-folder-children! graph (get fields 37) old-animations animations)
       (replace-node! graph reference
                      (assoc (graph-data @graph reference)
-                            3 (append-node! graph :string (get-in source ["skeleton" "images"] ""))
-                            34 (append-node! graph :string (get-in source ["skeleton" "audio"] (graph-data native-graph (get fields 34))))
-                            46 (get-in source ["skeleton" "referenceScale"] (get fields 46))
-                            4 (append-node! graph :array bone-refs) 13 (append-node! graph :array slot-refs)
-                            8 (append-node! graph :array skin-refs) 7 (append-node! graph :array animations)
-                            6 (append-node! graph :array (into (vec (coll/vals @regions)) (coll/vals @placeholders)))))
+                       3 (append-node! graph :string (get-in source ["skeleton" "images"] ""))
+                       34 (append-node! graph :string (get-in source ["skeleton" "audio"] (graph-data native-graph (get fields 34))))
+                       46 (get-in source ["skeleton" "referenceScale"] (get fields 46))
+                       4 (append-node! graph :array bone-refs) 13 (append-node! graph :array slot-refs)
+                       8 (append-node! graph :array skin-refs) 7 (append-node! graph :array animations)
+                       6 (append-node! graph :array (into (vec (coll/vals @regions)) (coll/vals @placeholders)))))
       ;; The complete writer validates references, field types and object limits.
       ;; Re-reading also drops unreachable old objects without altering peers.
       (decode-graph (decode (encode-graph @graph))))))
@@ -1925,7 +2262,7 @@
                                        fields [29 26 31 32 30 27 28])
                         fields (reduce (fn [fields tag]
                                          (assoc fields tag (append-node! graph :folder
-                                                                        {0 nil 3 nil 5 (append-node! graph :array []) 1 nil 2 reference})))
+                                                                         {0 nil 3 nil 5 (append-node! graph :array []) 1 nil 2 reference})))
                                        fields [40 45 44 37 38])]
                     (replace-node! graph reference fields))) skeletons)
           fields {0 (append-node! graph :array references) 19 0 8 1.0 38 false 42 false 2 fps
@@ -1954,5 +2291,62 @@
           fields (graph-data graph reference)]
       (replace-node! result reference
                      (assoc fields 3 (append-node! result :string images)
-                                   34 (append-node! result :string audio)))
+                            34 (append-node! result :string audio)))
       @result)))
+
+(defn update-skeletons
+  "Save named skeletons while preserving the original native project graph.
+  Entries contain :name, :source and optional :original-index. Missing indices
+  create new skeletons; omitted original skeletons are removed. Entry order is
+  the new project order. Editor metadata remains attached to its owner."
+  [native-graph entries]
+  (require-complete-document! native-graph)
+  (let [original-count (count (graph-skeletons native-graph))
+        indices (coll/into-> entries [] (keep :original-index))
+        names (mapv :name entries)
+        fps (get (graph-data native-graph (:root native-graph)) 2)]
+    (when-not (and (vector? entries) (<= 1 (count entries) 1000)
+                   (= (count names) (count (set names)))
+                   (= (count indices) (count (set indices)))
+                   (coll/every? #(and (int? %) (<= 0 % (dec original-count))) indices))
+      (unsupported! "Native project entries require unique names and valid original skeleton indices." {}))
+    (doseq [{:keys [name source]} entries]
+      (source-name! name :skeleton)
+      (validate-native-source! source fps))
+    (let [updated (reduce (fn [graph {:keys [original-index source]}]
+                            (if (nil? original-index) graph
+                                (update-skeleton graph original-index source))) native-graph entries)
+          graph (atom updated)
+          originals (graph-skeletons updated)
+          references
+          (mapv (fn [{:keys [name source original-index]}]
+                  (if-not (nil? original-index)
+                    (let [reference (:reference (get originals original-index))]
+                      (replace-node! graph reference
+                                     (assoc (graph-data @graph reference) 42 [(append-node! graph :string name)])))
+                    (let [created (from-skeletons [{:name name :source (assoc-in source ["skeleton" "fps"] fps)}])
+                          model-offset (count (:models @graph))
+                          value-offset (count (:values @graph))
+                          created-root (:root created)
+                          root-id (:id created-root)
+                          destination-root (:root @graph)]
+                      (letfn [(remap [value]
+                                (cond
+                                  (map? value)
+                                  (if (and (contains? #{:models :values} (:space value)) (int? (:id value)))
+                                    (if (= value created-root) destination-root
+                                        (update value :id + (if (= :values (:space value)) value-offset
+                                                                (- model-offset (if (> (:id value) root-id) 1 0)))))
+                                    (reduce-kv (fn [result key item] (assoc result key (remap item))) {} value))
+
+                                  (vector? value) (mapv remap value)
+                                  :else value))]
+                        (swap! graph update :models into
+                               (coll/into-> (:models created) []
+                                 (keep-indexed (fn [index node] (when (not= index root-id) (remap node))))))
+                        (swap! graph update :values into (mapv remap (:values created)))
+                        (remap (:reference (first (graph-skeletons created)))))))) entries)
+          root (:root @graph)]
+      (replace-node! graph root (assoc (graph-data @graph root) 0 (append-node! graph :array references)))
+      (swap! graph assoc :skeleton-count (count entries))
+      (decode-graph (decode (encode-graph @graph))))))

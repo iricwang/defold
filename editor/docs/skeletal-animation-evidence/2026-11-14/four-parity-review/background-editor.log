@@ -1,0 +1,31 @@
+2026-11-14 00:26:34.515 WARN  default    javafx - Unsupported JavaFX configuration: classes were loaded from 'unnamed module @4d861a61'
+Setting PULSE_DURATION to 60 hz
+2026-11-14 00:26:35.706 INFO  default    com.defold.libs.ResourceUnpacker - not deleting old unpack dirs from /private/tmp/spine-four-review/interaction as it is not in system support path /Users/applemima1111/Library/Application Support/Defold
+2026-11-14 00:26:38.570 INFO  default    com.defold.libs.ResourceUnpacker - defold.unpack.path=/private/tmp/spine-four-review/interaction/unpack
+2026-11-14 00:26:39.523 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_desktop' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libjogl_desktop.dylib
+2026-11-14 00:26:40.314 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'dmengine_shared' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libdmengine_shared.dylib
+2026-11-14 00:26:41.449 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'jogl_mobile' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libjogl_mobile.dylib
+2026-11-14 00:26:42.614 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_awt' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libnativewindow_awt.dylib
+2026-11-14 00:26:43.359 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'mouse_capture_shared' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libmouse_capture_shared.dylib
+2026-11-14 00:26:44.938 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'particle_shared' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libparticle_shared.dylib
+2026-11-14 00:26:48.494 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'gluegen_rt' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libgluegen_rt.dylib
+2026-11-14 00:26:48.701 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'nativewindow_macosx' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libnativewindow_macosx.dylib
+2026-11-14 00:26:48.958 INFO  default    com.defold.libs.ResourceUnpacker - preloaded bundled native library 'newt_head' from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib/libnewt_head.dylib
+2026-11-14 00:26:48.959 INFO  default    com.defold.libs.ResourceUnpacker - preloaded 9 bundled native libraries from /private/tmp/spine-four-review/interaction/unpack/arm64-macos/lib
+2026-11-14 00:26:52.613 INFO  default    editor.updater - {:line 594, :message "Automatic updates disabled", :channel nil, :sha1 "d7df2ef868cec3d63212b565b7e8bdd447a5446131e42ba4f64a102df11faaf5"}
+2026-11-14 00:27:11.561 INFO  default    editor.boot - {:line 86, :message "Finished loading editor namespaces.", :namespace-counter 3774}
+2026-11-14 00:27:11.665 INFO  default    internal.low-memory - {:line 55, :message "Adding post-gc low-memory notification listener to tenured generation pool.", :threshold-megabytes 2764}
+2026-11-14 00:27:12.304 INFO  default    editor.defold-project - {:line nil, :message "Initial resource sync completed in 424.76 ms"}
+2026-11-14 00:27:13.759 INFO  default    editor.defold-project - {:line 529, :message "Cached loaded save data in system cache.", :total 5, :retained 5, :unretained 0, :limit 20000}
+2026-11-14 00:27:14.039 INFO  default    editor.defold-project - {:line nil, :message "Project loaded", :allocated "146.06 MB"}
+2026-11-14 00:27:15.346 INFO  default    util.http-server - {:line 311, :msg "Http server running", :local-url "http://localhost:51898"}
+2026-11-14 00:27:15.359 INFO  default    util.http-server - {:line 311, :msg "Http server running", :local-url "http://localhost:17654"}
+2026-11-14 00:27:15.439 INFO  default    editor.boot-open-project - {:line 531, :message "project loaded"}
+2026-11-14 00:27:15.456 INFO  default    editor.boot-open-project - {:line nil, :message "Project loading completed in 3.77 s"}
+init logger success with file: file:///Users/applemima1111/.local/share/emmylua_ls/logs/private_tmp_spine-four-review_interaction_project.log
+init logger success with file: file:///Users/applemima1111/.local/share/emmylua_ls/logs/private_tmp_spine-four-review_interaction_project.log
+2026-11-14 00:27:18.988 INFO  default    editor.defold-project - {:line 529, :message "Cached compiled build targets in system cache.", :total 85, :retained 18, :unretained 67, :limit 20000}
+2026-11-14 00:27:27.771 INFO  default    editor.defold-project - {:line 529, :message "Cached compiled build targets in system cache.", :total 85, :retained 18, :unretained 67, :limit 20000}
+2026-11-14 00:27:32.374 INFO  default    editor.defold-project - {:line 529, :message "Cached compiled build targets in system cache.", :total 85, :retained 18, :unretained 67, :limit 20000}
+Server shutting down.
+Server shutting down.

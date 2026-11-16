@@ -1,0 +1,33 @@
+[
+  {
+    "variant": "current-final",
+    "scale": 0.3,
+    "atlas_width": 1024,
+    "atlas_height": 512,
+    "texture_format": 2,
+    "pixel_bytes": 2097152,
+    "archive_bytes": 582532,
+    "archive_resources": [
+      "/builtins/render/default.display_profilesc",
+      "/shader_3584690285151912715.spc",
+      "/builtins/input/default.gamepadsc",
+      "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.texturec",
+      "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.spinemodelc",
+      "/main.collectionc",
+      "/_generated_949bf3d7629b38d4.goc",
+      "/defold-spine/assets/spine.materialc",
+      "/input/game.input_bindingc",
+      "/rat.goc",
+      "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.spinescenec",
+      "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.spinejsonc",
+      "/builtins/render/default.renderc",
+      "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.a.texturesetc",
+      "/rat_go.factoryc",
+      "/rat.factoryc",
+      "/rat_go.goc",
+      "/builtins/render/default.render_scriptc",
+      "/bench.scriptc"
+    ],
+    "source_pixels_unchanged": true
+  }
+]

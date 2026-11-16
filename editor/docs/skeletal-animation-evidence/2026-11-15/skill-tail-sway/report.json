@@ -1,0 +1,44 @@
+{
+  "animation": "tail_sway_skill",
+  "resource": "/docs/source/spine_smart_mesh_validation/tail_path_example.skeleton",
+  "duration_seconds": 2.4,
+  "tracks": 3,
+  "keys": 27,
+  "tests": {
+    "clojure_tests": 6,
+    "assertions": 35,
+    "failures": 0,
+    "errors": 0,
+    "python_tests": 2,
+    "lint_errors": 0,
+    "lint_warnings": 0
+  },
+  "motion": {
+    "frames": 145,
+    "duration": 2.4,
+    "fps": 60,
+    "max_mesh_displacement": 46.74252722138082,
+    "loop_vertex_error": 5.684341886080802e-14,
+    "bone_scale_drift": 3.3306690738754696e-16,
+    "undo_restored_exact_document": true
+  },
+  "playback": {
+    "play_advances": true,
+    "pause_stops": true,
+    "seek_exact": true,
+    "five_real_viewport_snapshots": true
+  },
+  "saved_clean": true,
+  "saved_sha256": "da0cf9cd53508b8c764c24bee81bbdfc0f2360c4fdb766dd51e03199a4e07be7",
+  "original_animation_and_other_fields_unchanged": true,
+  "skill_protocol": 2,
+  "added_actions": [
+    "preview",
+    "snapshot",
+    "sample",
+    "save"
+  ],
+  "runtime_engine_changed": false,
+  "official_runtime_comparison": "not_run_for_this_skill_task",
+  "backup": "/tmp/spine-skill-creation/before.skeleton"
+}

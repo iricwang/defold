@@ -1,0 +1,4 @@
+interface:
+  display_name: "Defold Spine 创作"
+  short_description: "连接 Defold 内置骨骼编辑器，创作网格、权重与动画并验证交付"
+  default_prompt: "使用 $defold-spine-authoring 连接当前 Defold 项目，检查骨骼资产并完成这次动画创作。"

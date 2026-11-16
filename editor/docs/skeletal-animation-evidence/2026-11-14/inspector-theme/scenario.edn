@@ -1,0 +1,38 @@
+{:viewport [2200 1400]
+ :steps [{:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail.skeleton"}}
+         {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-tree-search"}
+         {:op :keys :keys [:t]} {:op :keys :keys [:a]} {:op :keys :keys [:i]} {:op :keys :keys [:l]}
+         {:op :click :selector "#skeletal-tree-attachment-05_tail"}
+         {:op :click :selector "#skeletal-rigging-weights"}
+         {:op :wait :selector "#skeletal-auto-weights" :property :visible :equals true :timeout-ms 10000}
+         {:op :assert :selector "#skeletal-rigging-weights" :property :selected :equals true}
+         {:op :click :selector "#skeletal-brush-mode" :at [0.95 0.5]}
+         {:op :snapshot}
+         {:op :keys :window-index 1 :keys [:escape]}
+         {:op :snapshot}
+         {:op :click :selector "#skeletal-inspector-lock"}
+         {:op :assert :selector "#skeletal-auto-weights" :property :disabled :equals true}
+         {:op :click :selector "#skeletal-inspector-lock"}
+         {:op :click :selector "#skeletal-rigging-skins"}
+         {:op :wait :selector "#skeletal-active-skin" :property :visible :equals true :timeout-ms 10000}
+         {:op :snapshot}
+         {:op :click :selector "#skeletal-rigging-properties"}
+         {:op :click :selector "#skeletal-mode" :at [0.9 0.5]}
+         {:op :keys :window-index 1 :keys [:down]} {:op :keys :window-index 1 :keys [:enter]}
+         {:op :wait :selector "#skeletal-inspector-auto-key" :property :visible :equals true :timeout-ms 10000}
+         {:op :assert :selector "#skeletal-slot-key-color-add" :property :text :equals ""}
+         {:op :click :selector "#skeletal-slot-key-attachment" :at [0.95 0.5]}
+         {:op :snapshot}
+         {:op :keys :window-index 1 :keys [:escape]}
+         {:op :click :selector "#skeletal-inspector-frame"}
+         {:op :keys :keys [:meta :a]} {:op :keys :keys [:digit2]} {:op :keys :keys [:digit4]} {:op :keys :keys [:enter]}
+         {:op :click :selector "#skeletal-slot-key-opacity"}
+         {:op :keys :keys [:meta :a]} {:op :keys :keys [:digit5]} {:op :keys :keys [:digit0]} {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-slot-key-opacity" :property :text :equals "50%" :timeout-ms 10000}
+         {:op :snapshot}
+         {:op :click :selector "#skeletal-slot-key-color-add"}
+         {:op :click :selector "#skeletal-edit-deform"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :tool] :equals "mesh"}
+         {:op :snapshot}]}

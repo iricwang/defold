@@ -20,8 +20,10 @@ def write_state(path, **value):
 
 
 def has_extensions(project):
-    if any(project.rglob('ext.manifest')):
-        return True
+    for directory, folders, files in os.walk(project):
+        folders[:] = [name for name in folders if name not in ('.git', '.internal', 'build', 'node_modules')]
+        if 'ext.manifest' in files:
+            return True
     for path in (project / '.internal/lib').glob('*.zip'):
         with zipfile.ZipFile(path) as archive:
             if any(n == 'ext.manifest' or n.endswith('/ext.manifest') for n in archive.namelist()):
@@ -42,7 +44,9 @@ def prepare(manifest, project, cache):
     root = manifest.parent
     runtime = json.loads(manifest.read_text(encoding='utf-8'))
     path = lambda key: root / runtime[key]
-    status = project.parent / 'progress.json'
+    state = project / '.internal/remote-manager'
+    state.mkdir(parents=True, exist_ok=True)
+    status = state / 'progress.json'
     stage = '检查运行环境'
     server = builder = thread = None
     kind = 'environment'
@@ -70,10 +74,8 @@ def prepare(manifest, project, cache):
             write_state(status, stage=stage)
             # Dependency downloads contain no project source upload; engine endpoint remains loopback.
             run(command + ['--build-server', 'http://127.0.0.1:1', 'resolve'])
-        stage = '迁移构建副本中的旧版 GUI 资源';kind = 'project'
-        write_state(status, stage=stage)
-        run(command[:command.index('com.dynamo.bob.Bob')] +
-            ['com.defold.editor.RemoteGuiMigration', str(project)])
+        # Bob/plugin migrations operate in memory. Never rewrite GUI source files
+        # now that the build root is the user's actual game project.
         native = has_extensions(project)
         extra = ['--build-server', 'http://127.0.0.1:1']
         if native:
@@ -87,7 +89,7 @@ def prepare(manifest, project, cache):
             spec = importlib.util.spec_from_file_location('local_extensions', root/'local_extensions.py')
             local = importlib.util.module_from_spec(spec);spec.loader.exec_module(local)
             local.ROOT = repository;local.PLATFORM = runtime['platform']
-            builder = local.Builder(sdk, project.parent/'native-jobs', cache)
+            builder = local.Builder(sdk, state/'native-jobs', cache)
             token = secrets.token_urlsafe(32)
             server = local.create_server(builder, token=token)
             thread = threading.Thread(target=server.serve_forever, daemon=True);thread.start()

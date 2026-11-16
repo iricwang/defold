@@ -16,6 +16,7 @@
   (:require [clojure.data.json :as json]
             [clojure.test :refer [deftest is]]
             [editor.skeletal-animation-data :as data]
+            [editor.skeletal-animation-events :as events]
             [editor.skeletal-animation-timeline :as timeline]
             [util.coll :as coll]))
 
@@ -119,7 +120,7 @@
       (is (close? (:softness (first (data/sample-ik document "default" time)))
                   (:softness (first (data/sample-ik reversed "default" (- 1.0 time))))))
       (is (coll/every? true? (mapv close? (get (data/sample-deforms document "default" time) "image")
-                                          (get (data/sample-deforms reversed "default" (- 1.0 time)) "image")))))))
+                                   (get (data/sample-deforms reversed "default" (- 1.0 time)) "image")))))))
 
 ;; Snap collisions use source-time order, not selection order; selected keys
 ;; replace resident ones, while :reject fails atomically for either collision.
@@ -258,7 +259,7 @@
                                      (map (fn [track] [(:physics track) (mapv :time (:keys track))])))
                             (get-in doc [:animations 0 :physics-tracks])))
         wind-keys (fn [doc] (:keys (coll/first-where #(and (= "spring" (:physics %)) (= "wind" (:property %)))
-                                                                   (get-in doc [:animations 0 :physics-tracks]))))]
+                                                     (get-in doc [:animations 0 :physics-tracks]))))]
     (is (= 5 (count refs)))
     (is (= #{:physics} (into #{} (map :type) refs)))
     (is (= refs (timeline/select-keys document "default" (vec (rseq refs)))))
@@ -271,8 +272,8 @@
     (is (= {"spring" [0.5] "" [1.0]}
            (reset-times (timeline/snap-keys document "default" refs 2.0 {}))))
     (is (coll/every? #(= "stepped" (:interpolation %))
-                    (eduction (filter #(= "reset" (:property %))) (mapcat :keys)
-                              (get-in reversed [:animations 0 :physics-tracks]))))
+                     (eduction (filter #(= "reset" (:property %))) (mapcat :keys)
+                               (get-in reversed [:animations 0 :physics-tracks]))))
     (is (= [] (timeline/all-key-refs (timeline/delete-keys document "default" refs) "default")))
     (is (= moved (data/read-json (data/write-json moved))))))
 
@@ -288,7 +289,7 @@
     (is (= 5 (count (timeline/all-key-refs pasted "other"))))
     (is (= pasted (timeline/paste-keys document "other" (update clipboard :tracks #(vec (rseq %))) 1.0 {})))
     (is (= 1.25 (:time (first (:keys (coll/first-where #(and (= "spring" (:physics %)) (= "reset" (:property %)))
-                                                                     (get-in pasted [:animations 1 :physics-tracks])))))))
+                                                       (get-in pasted [:animations 1 :physics-tracks])))))))
     (is (thrown? clojure.lang.ExceptionInfo
                  (timeline/paste-keys document "other" (assoc-in clipboard [:tracks 0 :physics-rank] -1) 1.0 {})))
     (is (thrown? clojure.lang.ExceptionInfo
@@ -298,7 +299,7 @@
 ;; array before retiming so source-only fields and curves follow copied keys.
 (deftest physics-legacy-metadata-test
   (let [source {"animations" {"default" {"physics" {"spring" {"wind" [{"time" 0.0 "value" 2.0 "note" "keep"
-                                                                                 "curve" [0.2 2.5 0.8 3.5]}]}}}}}
+                                                                       "curve" [0.2 2.5 0.8 3.5]}]}}}}}
         document (-> (physics-document)
                      (assoc :spine-source (json/write-str source))
                      (update-in [:animations 0 :physics-tracks]
@@ -306,8 +307,71 @@
         moved (timeline/move-keys document "default"
                                   [{:type :physics :id "spring" :property "wind" :time 0.0}] 0.5 {})
         key (first (:keys (coll/first-where #(and (= "spring" (:physics %)) (= "wind" (:property %)))
-                                                       (get-in moved [:animations 0 :physics-tracks]))))
+                                            (get-in moved [:animations 0 :physics-tracks]))))
         raw (json/read-str (:spine-frame-source key))]
     (is (= "keep" (get raw "note")))
     (is (= 0.5 (get raw "time")))
     (is (= [0.6 2.5 0.9 3.5] (get raw "curve")))))
+
+;; Events participate in atomic cross-track edits without colliding with other
+;; events at the same instant, and preserve payloads through copy/paste/reverse.
+(deftest event-batch-editing-test
+  (let [document (-> (data/new-document "event-batch")
+                     (events/add-definition {:name "step"})
+                     (events/add-definition {:name "hit"})
+                     (events/set-keyframe "default" {:name "step" :time 0.25 :int 7})
+                     (events/set-keyframe "default" {:name "hit" :time 0.25 :string "impact"})
+                     (events/set-keyframe "default" {:name "step" :time 0.75 :int 8})
+                     (data/add-animation {:id "other" :duration 1.0}))
+        refs (timeline/all-key-refs document "default")
+        moved (timeline/move-keys document "default" refs 0.25 {})
+        pasted (timeline/paste-keys moved "other" (timeline/copy-keys document "default" refs) 0.0 {})
+        scaled (timeline/scale-keys pasted "other" (timeline/all-key-refs pasted "other") 0.0 2.0 {})
+        snapped (timeline/snap-keys scaled "other" (timeline/all-key-refs scaled "other") 30.0 {})
+        reversed (timeline/reverse-keys snapped "other" (timeline/all-key-refs snapped "other") 0.0 1.0 {})
+        deleted (timeline/delete-keys reversed "other" (timeline/all-key-refs reversed "other"))]
+    (is (= 3 (count refs)))
+    (is (= #{:event} (coll/into-> refs #{} (map :type))))
+    (is (= [0.5 0.5 1.0] (mapv :time (events/keyframes moved "default"))))
+    (is (= [0.0 0.0 0.5] (mapv :time (events/keyframes pasted "other"))))
+    (is (= [[0.0 "step" 8] [1.0 "hit" nil] [1.0 "step" 7]]
+           (mapv (juxt :time :name :int) (events/keyframes reversed "other"))))
+    (is (= [] (events/keyframes deleted "other")))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (timeline/move-keys document "default" [{:type :event :id "step" :time 0.25}] 0.5 {:collision :reject})))
+    (is (= [8] (coll/into-> (events/keyframes (timeline/move-keys document "default" [{:type :event :id "step" :time 0.75}] -0.5 {}) "default") []
+                 (filter #(= "step" (:name %))) (map :int))))))
+
+;; Batch curves preserve independent channels and raw metadata, while tangent
+;; edits can touch incoming/outgoing handles across a multi-key selection.
+(deftest batch-curves-and-tangents-test
+  (let [document (fixture)
+        refs (timeline/matching-refs document "default" {:types #{:bone :ik :deform} :time-range [0.0 0.0]})
+        flat (timeline/set-curves document "default" refs {:type "bezier" :preset :flat})
+        root (get-in flat [:animations 0 :tracks 0 :keys 0])
+        softened (timeline/set-tangents flat "default" [(bone-ref 1.0)] {:side :in :mode :linear})
+        source (json/read-str (data/export-spine-json flat))]
+    (is (= [(/ 1.0 3.0) 0.0 (- 1.0 (/ 1.0 3.0)) 10.0] (:curve root)))
+    (is (= [0.0 1.0] (mapv :time (get-in flat [:animations 0 :tracks 0 :keys]))))
+    (is (= "bezier" (get-in flat [:animations 0 :ik-tracks 0 :keys 0 :softness-interpolation])))
+    (is (= 8 (count (get-in source ["animations" "default" "ik" "reach" 0 "curve"]))))
+    (is (= (/ 1.0 3.0) (get-in softened [:animations 0 :tracks 0 :keys 0 :curve 0])))
+    (is (< (abs (- (/ 20.0 3.0) (get-in softened [:animations 0 :tracks 0 :keys 0 :curve 3]))) 1e-8))
+    (is (= 2 (count (timeline/matching-refs document "default" {:query "ROOT X"}))))
+    (is (thrown? clojure.lang.ExceptionInfo (timeline/set-curves document "default" refs {:type "bezier" :weight -1.0}))))
+  (let [document (-> (data/new-document "discrete") (events/add-definition {:name "step"})
+                     (events/set-keyframe "default" {:name "step" :time 0.0}))]
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (timeline/set-curves document "default" [{:type :event :id "step" :time 0.0}] {:type "linear"})))))
+
+;; Cycle repetition offsets absolute Bezier controls and extends duration in
+;; one operation, with explicit collision rejection at overlapping seams.
+(deftest repeat-cycle-test
+  (let [document (fixture)
+        refs [(bone-ref 0.0) (bone-ref 1.0)]
+        repeated (timeline/repeat-keys document "default" refs 2 1.0 {})
+        keys (get-in repeated [:animations 0 :tracks 0 :keys])]
+    (is (= [0.0 1.0 2.0 3.0] (mapv :time keys)))
+    (is (= 3.0 (get-in repeated [:animations 0 :duration])))
+    (is (= [2.2 1.0 2.8 9.0] (:curve (nth keys 2))))
+    (is (thrown? clojure.lang.ExceptionInfo (timeline/repeat-keys document "default" refs 2 1.0 {:collision :reject})))))

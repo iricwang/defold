@@ -1,0 +1,1 @@
+{"mode":"animate","animation":"attack","time":0.0,"ik-mix":[{"id":"tail_tip_ik","mix":0.0,"target":"tail_ik_target"}],"disabled-handlers":0,"stopped-timers":0}

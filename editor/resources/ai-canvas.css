@@ -204,17 +204,34 @@ specific language governing permissions and limitations under the License.
 .ai-candidate .button-small { -fx-background-color: transparent; -fx-border-color: transparent; }
 .ai-reference { -fx-background-color: -df-background; -fx-border-radius: 5; -fx-border-color: -df-component-dark; -fx-padding: 4; }
 .ai-empty { -fx-min-height: 120; -fx-alignment: center; -fx-padding: 18 10; -fx-border-color: -df-component-dark; -fx-border-radius: 6; -fx-background-color: -df-background; -fx-background-radius: 6; }
-.ai-composer-shell { -fx-padding: 0 0 6 0; -fx-spacing: 6; }
-.ai-composer-toggle { -fx-background-color: -df-component-dark; -fx-background-radius: 12; -fx-border-color: transparent; -fx-padding: 0 8; -fx-min-width: 32; -fx-pref-width: 32; -fx-min-height: 20; -fx-max-height: 20; }
-.ai-composer-form { -fx-padding: 12; -fx-spacing: 8; -fx-background-color: -df-background-lightish; -fx-border-color: -df-component-lighter; -fx-border-width: 1; -fx-background-radius: 14; -fx-border-radius: 14; -fx-effect: dropshadow(gaussian, #00000070, 16, 0.12, 0, 3); }
-.ai-composer-form:compact { -fx-padding: 8 10; -fx-background-radius: 30; -fx-border-radius: 30; }
-.ai-composer-input, .ai-composer-input:focused { -fx-border-color: transparent; -fx-background-color: transparent; -fx-padding: 0; -fx-font-size: 14; }
-.ai-composer-input .content, .ai-composer-input .scroll-pane, .ai-composer-input .viewport { -fx-background-color: transparent; }
-.ai-composer-input .content { -fx-padding: 4 6; }
-.ai-send { -fx-min-width: 60; -fx-pref-width: 60; -fx-max-width: 60; -fx-min-height: 32; -fx-pref-height: 32; -fx-max-height: 32; -fx-padding: 4 10; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: transparent; -fx-background-color: -df-component-lighter; -fx-font-family: "Microsoft YaHei"; -fx-font-size: 13; -fx-text-fill: -df-text-light; }
-.ai-send:hover { -fx-background-color: -df-ui-accent; }
-.ai-send .send-glyph { -fx-fill: -df-text-light; }
-.ai-composer-heading { -fx-font-weight: bold; -fx-font-family: "Source Sans Pro Semibold"; }
+/* Composer selectors intentionally outrank the shared studio control styles. */
+.ai-composer-shell { -fx-padding: 0 0 8 0; -fx-spacing: 6; }
+.ai-studio .ai-composer-shell .ai-composer-toggle { -fx-background-color: -df-component-dark; -fx-background-radius: 12; -fx-border-color: transparent; -fx-padding: 0 8; -fx-min-width: 32; -fx-pref-width: 32; -fx-min-height: 20; -fx-max-height: 20; }
+.ai-composer-form { -fx-padding: 12 14 10 14; -fx-spacing: 8; -fx-background-color: -df-background-lightish; -fx-border-width: 0; -fx-background-radius: 22; }
+.ai-composer-form:compact { -fx-padding: 8 12; -fx-background-radius: 30; }
+.ai-studio .ai-composer-shell .ai-composer-form .ai-composer-input,
+.ai-studio .ai-composer-shell .ai-composer-form .ai-composer-input:focused,
+.ai-studio .ai-composer-shell .ai-composer-input .content,
+.ai-studio .ai-composer-shell .ai-composer-input:focused .content,
+.ai-studio .ai-composer-shell .ai-composer-input .scroll-pane,
+.ai-studio .ai-composer-shell .ai-composer-input .viewport,
+.ai-studio .ai-composer-shell .ai-composer-input .corner {
+    -fx-background-color: transparent; -fx-background-insets: 0; -fx-background-radius: 0;
+    -fx-border-color: transparent; -fx-border-width: 0; -fx-border-insets: 0;
+    -fx-focus-color: transparent; -fx-faint-focus-color: transparent; -fx-effect: null;
+}
+.ai-studio .ai-composer-shell .ai-composer-input { -fx-padding: 0; -fx-font-size: 14; -fx-text-fill: -df-text-light; -fx-prompt-text-fill: -df-text-dark; }
+.ai-studio .ai-composer-shell .ai-composer-input .content { -fx-padding: 3 0; }
+.ai-studio .ai-composer-shell .ai-send { -fx-min-width: 32; -fx-pref-width: 32; -fx-max-width: 32; -fx-min-height: 32; -fx-pref-height: 32; -fx-max-height: 32; -fx-padding: 0; -fx-background-radius: 16; -fx-border-radius: 16; -fx-border-color: transparent; -fx-background-color: -df-ui-accent; }
+.ai-studio .ai-composer-shell .ai-send:hover { -fx-background-color: derive(-df-ui-accent, 12%); }
+.ai-studio .ai-composer-shell .ai-send:focused { -fx-border-color: -df-text-light; }
+.ai-composer-toggle-icon { -fx-fill: transparent; -fx-stroke: -df-text-dark; -fx-stroke-width: 1.5; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.ai-composer-save-icon { -fx-fill: transparent; -fx-stroke: -df-background; -fx-stroke-width: 2; -fx-stroke-line-cap: round; -fx-stroke-line-join: round; }
+.ai-studio .ai-composer-shell .ai-composer-attach, .ai-studio .ai-composer-shell .ai-composer-clear { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 4 6; -fx-text-fill: -df-text-dark; }
+.ai-studio .ai-composer-shell .ai-composer-attach { -fx-min-width: 28; -fx-pref-width: 28; -fx-max-width: 28; -fx-font-size: 22; -fx-padding: 0; -fx-text-fill: -df-text-light; }
+.ai-studio .ai-composer-shell .ai-composer-attach:hover, .ai-studio .ai-composer-shell .ai-composer-clear:hover { -fx-background-color: -df-component-dark; }
+.ai-studio .ai-composer-shell .ai-composer-attach:focused, .ai-studio .ai-composer-shell .ai-composer-clear:focused { -fx-border-color: -df-ui-accent; }
+.ai-studio .ai-composer-shell .ai-composer-heading { -fx-font-weight: normal; -fx-font-size: 12; -fx-text-fill: -df-text-dark; }
 .ai-error { -fx-text-fill: -df-error-severity-warning; -fx-wrap-text: true; }
 
 /* Keep readable text independent of accent hues and editor muted-text tokens. */

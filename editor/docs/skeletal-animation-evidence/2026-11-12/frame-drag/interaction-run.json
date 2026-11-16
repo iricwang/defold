@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-frame-drag/build/editor.jar",
+  "sha256": "ac75d28cf6129d307659065f1ebe66f69e4be047efbb6fca944b3b3d37c0c2bc",
+  "project_source": "editor/test/resources/skeletal-animation/performance-project",
+  "project_copy": "/private/tmp/spine-frame-drag/interaction-final/project",
+  "scenario": "/Users/applemima1111/Documents/Dev/Defold/editor/test/headless/skeletal_animation_mesh_transform.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

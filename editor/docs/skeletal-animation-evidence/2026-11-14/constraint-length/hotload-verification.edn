@@ -1,0 +1,1 @@
+{:document-preserved true, :disabled true, :length-value "保持骨骼长度", :length-options ["保持骨骼长度" "伸缩以贴合路径"], :stopped-timers 0, :undo-preserved false, :same-resource true, :selection {:selected "tail_path_tip", :mode "animate", :animation "tail_path_demo", :playing false}, :failed-handlers 0}

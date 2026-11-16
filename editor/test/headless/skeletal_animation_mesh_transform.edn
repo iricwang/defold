@@ -1,0 +1,139 @@
+{:viewport [3000 1500]
+ :steps [{:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail.skeleton"}}
+         {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-mode"}
+         {:op :keys :window-index 1 :keys [:down]}
+         {:op :keys :window-index 1 :keys [:enter]}
+         {:op :assert :selector "#skeletal-mode" :property :value :equals "animate"}
+         {:op :click :selector "#skeletal-canvas" :at [0.9 0.1]}
+         {:op :remember :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pan-x] :as :pan}
+         {:op :remember :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :zoom] :as :zoom}
+         {:op :drag :button :secondary :path [{:selector "#skeletal-canvas" :at [0.2 0.12]}
+                                             {:selector "#skeletal-canvas" :at [0.3 0.14]}
+                                             {:selector "#skeletal-canvas" :at [0.4 0.16]}]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pan-x] :differs-from :pan}
+         {:op :scroll :selector "#skeletal-canvas" :delta [0 80]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :zoom] :differs-from :zoom}
+         {:op :click :selector "#skeletal-clip-controls"}
+         {:op :click :window-index 1 :selector "#skeletal-animation"}
+         {:op :click :window-index 2 :selector {:fx.plorer/style-classes #{"list-cell"} :text "idle_soft_tail"}}
+         {:op :assert :window-index 1 :selector "#skeletal-animation" :property :value :equals "idle_soft_tail"}
+         {:op :keys :keys [:escape]}
+         {:op :click :selector "#skeletal-canvas" :at [0.9 0.1]}
+         {:op :keys :keys [:space]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals true}
+         {:op :keys :keys [:space]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals false}
+         {:op :click :selector "#skeletal-tree-search"}
+         {:op :keys :keys [:t]}
+         {:op :keys :keys [:a]}
+         {:op :keys :keys [:i]}
+         {:op :keys :keys [:l]}
+         {:op :snapshot}
+         {:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail_tip_ik"}}
+         {:op :wait :selector "#skeletal-ik-name" :property :disable :equals true}
+         {:op :assert :selector "#skeletal-properties-property-constraint-setup-section" :property :visible :equals false}
+         {:op :assert :selector "#skeletal-properties-property-constraint-setup-section" :property :managed :equals false}
+         {:op :assert :selector "#skeletal-ik-mix" :property :disable :equals false}
+         {:op :click :selector "#skeletal-auto-key"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :auto-key] :equals false}
+         {:op :remember :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :as :pending}
+         {:op :click :selector "#skeletal-ik-mix"}
+         {:op :keys :keys [:meta :a]}
+         {:op :keys :keys [:digit0]}
+         {:op :keys :keys [:enter]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :differs-from :pending}
+         {:op :click :selector "#skeletal-canvas" :at [0.1 0.1]}
+         {:op :keys :keys [:meta :z]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :equals nil}
+         {:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail_tip_ik"}}
+         {:op :keys :keys [:up]}
+         {:op :keys :keys [:up]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :selected] :equals "05_tail"}
+         ;; Mesh numeric input must stage a deform, and the rotation key button must commit it.
+         {:op :click :selector "#skeletal-tool-rotate"}
+         {:op :click :selector "#skeletal-palette-rotation"}
+         {:op :keys :keys [:meta :a]}
+         {:op :keys :keys [:digit1]}
+         {:op :keys :keys [:digit5]}
+         {:op :keys :keys [:enter]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :differs-from :pending}
+         {:op :click :selector "#skeletal-key-rotation"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :equals nil}
+         {:op :snapshot}
+         {:op :click :selector "#skeletal-canvas" :at [0.9 0.1]}
+         {:op :keys :keys [:meta :z]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :equals nil}
+         {:op :click :selector "#skeletal-edit-deform"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :tool] :equals "mesh"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mesh-mode] :equals "modify"}
+         {:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail"}}
+         {:op :wait :selector "#skeletal-bone-inherit-animation" :property :visible :equals true}
+         {:op :assert :selector "#skeletal-bone-inherit-animation" :property :value :equals "normal"}
+         {:op :click :selector "#skeletal-bone-inherit-animation"}
+         {:op :keys :window-index 1 :keys [:home]}
+         {:op :keys :window-index 1 :keys [:down]}
+         {:op :keys :window-index 1 :keys [:enter]}
+         {:op :assert :selector "#skeletal-bone-inherit-animation" :property :value :equals "onlyTranslation"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :differs-from :pending}
+         {:op :click :selector "#skeletal-bone-inherit-key"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :equals nil}
+         {:op :click :selector "#skeletal-canvas" :at [0.1 0.1]}
+         {:op :keys :keys [:meta :z]}
+         {:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail"}}
+         {:op :wait :selector "#skeletal-bone-inherit-animation" :property :value :equals "normal"}
+         {:op :keys :keys [:meta :shift :z]}
+         {:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail"}}
+         {:op :wait :selector "#skeletal-bone-inherit-animation" :property :value :equals "onlyTranslation"}
+         {:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail_tip_ik"}}
+         {:op :keys :keys [:up]}
+         {:op :keys :keys [:up]}
+         {:op :wait :selector "#skeletal-slot-key-attachment" :property :visible :equals true}
+         {:op :click :selector "#skeletal-slot-key-attachment"}
+         {:op :keys :window-index 1 :keys [:home]}
+         {:op :keys :window-index 1 :keys [:enter]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :differs-from :pending}
+         {:op :click :selector "#skeletal-slot-key-attachment-add"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :pending-pose] :equals nil}
+         {:op :click :selector "#skeletal-canvas" :at [0.1 0.1]}
+         {:op :keys :keys [:meta :z]}
+         {:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail_tip_ik"}}
+         {:op :keys :keys [:up]}
+         {:op :keys :keys [:up]}
+         {:op :wait :selector "#skeletal-slot-key-attachment" :property :value :equals "05_tail"}
+         {:op :snapshot}
+         {:op :click :selector "#skeletal-animation-settings"}
+         {:op :scroll :window-index 1 :selector {:fx.plorer/style-classes #{"skeletal-settings-scroll"}} :delta [0 -1500]}
+         {:op :snapshot}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-reverse"}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-hold"}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-shortest"}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-start"}
+         {:op :keys :keys [:meta :a]}
+         {:op :keys :keys [:digit0]}
+         {:op :keys :keys [:period]}
+         {:op :keys :keys [:digit1]}
+         {:op :keys :keys [:enter]}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-end"}
+         {:op :keys :keys [:digit0]}
+         {:op :keys :keys [:period]}
+         {:op :keys :keys [:digit5]}
+         {:op :keys :keys [:enter]}
+         ;; Enter may dismiss the context menu; reopen explicitly before applying.
+         {:op :keys :keys [:escape]}
+         {:op :click :selector "#skeletal-animation-settings"}
+         {:op :scroll :window-index 1 :selector {:fx.plorer/style-classes #{"skeletal-settings-scroll"}} :delta [0 -1500]}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-set"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-enabled] :equals true}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-state :tracks 1 :reverse] :equals true}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-state :tracks 1 :hold-previous] :equals true}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-state :tracks 1 :shortest-rotation] :equals true}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-state :tracks 1 :animation-start] :equals 0.1}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-state :tracks 1 :animation-end] :equals 0.5}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-fade"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-state :tracks 1 :empty] :equals true}
+         {:op :click :window-index 1 :selector "#skeletal-mixer-stop"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :mixer-enabled] :equals false}
+         {:op :keys :keys [:escape]}
+         {:op :snapshot}]}

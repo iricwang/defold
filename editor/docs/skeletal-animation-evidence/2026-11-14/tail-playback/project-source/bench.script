@@ -1,0 +1,48 @@
+-- Copyright 2020-2026 The Defold Foundation
+-- Copyright 2014-2020 King
+-- Copyright 2009-2014 Ragnar Svensson, Christian Murray
+-- Licensed under the Defold License version 1.0 (the "License"); you may not use
+-- this file except in compliance with the License.
+--
+-- You may obtain a copy of the License, together with FAQs at
+-- https://www.defold.com/license
+--
+-- Unless required by applicable law or agreed to in writing, software distributed
+-- under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-- CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-- specific language governing permissions and limitations under the License.
+
+local socket = require "socket"
+local cases = {{0,false},{1,false},{16,false},{64,false},{64,true},{1,true},{0,false}}
+local function start_case(self)
+  if self.objects then for _, id in ipairs(self.objects) do go.delete(id, true) end end
+  self.case = self.case + 1
+  if self.case > #cases then
+    if self.round < 2 then self.round = self.round + 1; self.case = 1 else print("BENCH_DONE"); self.done=true;return end
+  end
+  self.objects = {}
+  local n, bonegos = unpack(cases[self.case]);self.n=n;self.bonegos=bonegos
+  local columns=math.max(1,math.ceil(math.sqrt(n)));local rows=math.max(1,math.ceil(n/columns))
+  for i=1,n do
+    local id = factory.create(bonegos and "#rat_go" or "#rat", vmath.vector3(((i-1)%columns+0.5)*1280/columns, (math.floor((i-1)/columns)+0.5)*720/rows, 0), nil, nil, 0.9/columns)
+    self.objects[#self.objects+1]=id
+    spine.play_anim(msg.url(nil,id,"spine"),"benchmark_sway",go.PLAYBACK_LOOP_FORWARD, {offset=(i-1)/math.max(n,1)})
+  end
+  self.frame=0;self.times={};self.cpus={};self.memory={};self.last=socket.gettime()
+  print("BENCH_PHASE "..json.encode({round=self.round,count=n,bone_go=bonegos}))
+end
+function init(self) self.case=0;self.round=1;start_case(self) end
+function update(self,dt)
+ if self.done then return end
+ self.frame=self.frame+1;local now=socket.gettime();local elapsed=(now-self.last)*1000;self.last=now
+ if self.frame==120 then self.cpu_start=os.clock() end
+ if self.frame>120 then
+   self.times[#self.times+1]=elapsed
+   if self.frame%30==0 then self.cpus[#self.cpus+1]=profiler.get_cpu_usage();self.memory[#self.memory+1]=profiler.get_memory_usage() end
+ end
+ if self.frame==360 then
+   table.sort(self.times);local total=0;for _,t in ipairs(self.times)do total=total+t end
+   print("BENCH_RESULT "..json.encode({round=self.round,count=self.n,bone_go=self.bonegos,cpu_ms_per_frame=(os.clock()-self.cpu_start)*1000/240,mean_ms=total/#self.times,p50_ms=self.times[120],p95_ms=self.times[228],p99_ms=self.times[238],cpu_samples=self.cpus,memory_samples=self.memory}))
+   start_case(self)
+ end
+end

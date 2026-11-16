@@ -1,0 +1,29 @@
+INFO:DLIB: Log server started on port 58794
+INFO:ENGINE: Target listening with name: applemima1111deMac-mini.local - 127.0.0.1 - Darwin
+INFO:ENGINE: Engine service started on port 8001
+INFO:ENGINE: OpenAPI: http://127.0.0.1:8001/openapi.json
+INFO:GRAPHICS: Installed graphics device 'ADAPTER_FAMILY_METAL'
+INFO:ENGINE: Defold Engine 1.14.1 (cc691a9)
+INFO:PROFILER: Initialized Remotery (ws://127.0.0.1:17815/rmt)
+INFO:ENGINE: Loading data from: build/default
+INFO:SPINEEXT: Registered spine extension
+
+INFO:SOUND:   DSP backend: Fallback
+INFO:SOUND: Sound
+INFO:SOUND:   nSamplesPerSec:   48000
+INFO:SOUND:        useThread:   1
+INFO:ENGINE: Initialised sound device 'default'
+INFO:PHYSICS: Created physics context: Box2D v2.2.1
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 1 start 0.000 7 1.25 setup-start
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 2 pulse 0.400 31 4.50 override-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 3 pulse 0.800 11 2.50 default-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 4 start 0.000 7 1.25 setup-start
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 5 pulse 0.400 31 4.50 override-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 6 pulse 0.800 11 2.50 default-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 7 start 0.000 7 1.25 setup-start
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 8 pulse 0.400 31 4.50 override-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 9 pulse 0.800 11 2.50 default-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 10 start 0.000 7 1.25 setup-start
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 11 pulse 0.400 31 4.50 override-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_EVENT 12 pulse 0.800 11 2.50 default-pulse
+DEBUG:SCRIPT: SPINE_WORKFLOW_RUNTIME_OK frames=527 events=12

@@ -1,0 +1,172 @@
+{
+  "runtime": "@esotericsoftware/spine-core",
+  "version": "4.2.120",
+  "fixture": "/Users/applemima1111/Documents/Game/Dragon/GameCopy/pok_analysis/defold_game/docs/source/spine_smart_mesh_validation/tail_ik_example.skeleton",
+  "exportSha256": "85d9c8cc52649f00b1db10bb10b0111e641318f023ca4206eaac946b736701fb",
+  "fps": 60,
+  "tolerance": 0.0001,
+  "frames": 617,
+  "passed": false,
+  "clips": [
+    {
+      "animation": "attack",
+      "frames": 88,
+      "boneError": 0.00005362431244293475,
+      "vertexError": 0.00006254694329754784,
+      "worstBone": {
+        "time": 0.8833333333333333,
+        "name": "bone8",
+        "component": 4,
+        "actual": 128.62803087468362,
+        "expected": 128.62808449899606
+      },
+      "worstVertex": {
+        "time": 0.8833333333333333,
+        "index": 44,
+        "actual": 129.17354459373425,
+        "expected": 129.17360714067755
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "death",
+      "frames": 79,
+      "boneError": 0.00005294814064882303,
+      "vertexError": 0.00006119675063587238,
+      "worstBone": {
+        "time": 0.3,
+        "name": "bone8",
+        "component": 4,
+        "actual": -44.54856358571014,
+        "expected": -44.54851063756949
+      },
+      "worstVertex": {
+        "time": 0.3,
+        "index": 44,
+        "actual": -68.18870040370658,
+        "expected": -68.18863920695594
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "hit",
+      "frames": 19,
+      "boneError": 0.000051151039826891065,
+      "vertexError": 0.00005996358990500994,
+      "worstBone": {
+        "time": 0.05,
+        "name": "bone8",
+        "component": 4,
+        "actual": 124.69621333911812,
+        "expected": 124.69626449015794
+      },
+      "worstVertex": {
+        "time": 0.05,
+        "index": 44,
+        "actual": 123.29503381042258,
+        "expected": 123.29509377401249
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "idle",
+      "frames": 85,
+      "boneError": 0.037722074000043904,
+      "vertexError": 0.04414788068982034,
+      "worstBone": {
+        "time": 0.6666666666666666,
+        "name": "bone8",
+        "component": 4,
+        "actual": 126.96656314876756,
+        "expected": 126.92884107476752
+      },
+      "worstVertex": {
+        "time": 1.3666666666666667,
+        "index": 44,
+        "actual": 131.94311491590182,
+        "expected": 131.98726279659164
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "stagger",
+      "frames": 67,
+      "boneError": 0.00005108698701405956,
+      "vertexError": 0.00005984936092318094,
+      "worstBone": {
+        "time": 1.1,
+        "name": "bone8",
+        "component": 4,
+        "actual": 118.8628800057848,
+        "expected": 118.86293109277182
+      },
+      "worstVertex": {
+        "time": 0.11666666666666667,
+        "index": 44,
+        "actual": 119.40614492153367,
+        "expected": 119.40620477089459
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "walk",
+      "frames": 73,
+      "boneError": 0.0000525640758866075,
+      "vertexError": 0.0000615158961210227,
+      "worstBone": {
+        "time": 1.2,
+        "name": "bone8",
+        "component": 4,
+        "actual": 118.8628800057848,
+        "expected": 118.86293256986069
+      },
+      "worstVertex": {
+        "time": 1.2,
+        "index": 44,
+        "actual": 117.46170047708927,
+        "expected": 117.46176199298539
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "idle_soft_tail",
+      "frames": 85,
+      "boneError": 0.00005181388665675968,
+      "vertexError": 0.00006411818726803631,
+      "worstBone": {
+        "time": 0.6833333333333333,
+        "name": "bone8",
+        "component": 4,
+        "actual": 126.80811460392603,
+        "expected": 126.80816641781269
+      },
+      "worstVertex": {
+        "time": 1.05,
+        "index": 44,
+        "actual": 126.88077357806014,
+        "expected": 126.88083769624741
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "tail_ik_demo",
+      "frames": 121,
+      "boneError": 0.0064301292746336,
+      "vertexError": 0.00570550290557037,
+      "worstBone": {
+        "time": 0.016666666666666666,
+        "name": "bone8",
+        "component": 4,
+        "actual": 119.03050188219781,
+        "expected": 119.02407175292318
+      },
+      "worstVertex": {
+        "time": 0.016666666666666666,
+        "index": 48,
+        "actual": 113.80545222938773,
+        "expected": 113.79974672648216
+      },
+      "stateErrors": 0
+    }
+  ]
+}

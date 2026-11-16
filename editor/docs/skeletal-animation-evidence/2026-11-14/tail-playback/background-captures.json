@@ -1,0 +1,86 @@
+[
+  {
+    "device_revision": 1,
+    "width": 1280,
+    "height": 720,
+    "input_sequence": 0,
+    "render_sequence": 369,
+    "capture_sequence": 2,
+    "coordinate_space": "frame_pixels_top_left",
+    "geometry_precision": "unavailable",
+    "image_path": "/private/tmp/tail-playback-benchmark/background/sessions/435fc795e1574703b8f11872f144b70e/1f8caa4dc9844c8ba31eb65b6fb5dddf.png",
+    "session_id": "435fc795e1574703b8f11872f144b70e",
+    "observation_id": "1f8caa4dc9844c8ba31eb65b6fb5dddf",
+    "source": "runtime",
+    "artifact_kind": "runtime_frame",
+    "build_id": "d393a171f94b446f832c2144c08b6267",
+    "temporal_consistency": "image_and_bridge_metadata",
+    "device": {
+      "width": 1280,
+      "height": 720
+    },
+    "image_sha256": "3363580373671f8e7ba543fa6501a67dcdef319fbe3224af897705d30f8a1183",
+    "project_id": "3a75909c9b712dc8",
+    "source_policy": "existing_compiled",
+    "resource_fingerprint": "eaf4d26dc093c69f430597dee1e6319ca6bd603f041f2aba0c65e5d05050e077",
+    "project_config": {},
+    "gui_projection_profile": "default_gui",
+    "artifact_id": "1f8caa4dc9844c8ba31eb65b6fb5dddf",
+    "uri": "defold://artifacts/1f8caa4dc9844c8ba31eb65b6fb5dddf/frame.png",
+    "inline_preview": {
+      "width": 960,
+      "height": 540,
+      "to_frame_scale": [
+        1.3333333333333333,
+        1.3333333333333333
+      ],
+      "to_frame_offset": [
+        0,
+        0
+      ],
+      "source_observation_id": "1f8caa4dc9844c8ba31eb65b6fb5dddf"
+    }
+  },
+  {
+    "device_revision": 1,
+    "width": 1280,
+    "height": 720,
+    "input_sequence": 0,
+    "render_sequence": 5078,
+    "capture_sequence": 3,
+    "coordinate_space": "frame_pixels_top_left",
+    "geometry_precision": "unavailable",
+    "image_path": "/private/tmp/tail-playback-benchmark/background/sessions/435fc795e1574703b8f11872f144b70e/9b85bf8f7aae4e8da2508b53ceb00e80.png",
+    "session_id": "435fc795e1574703b8f11872f144b70e",
+    "observation_id": "9b85bf8f7aae4e8da2508b53ceb00e80",
+    "source": "runtime",
+    "artifact_kind": "runtime_frame",
+    "build_id": "d393a171f94b446f832c2144c08b6267",
+    "temporal_consistency": "image_and_bridge_metadata",
+    "device": {
+      "width": 1280,
+      "height": 720
+    },
+    "image_sha256": "971d45c8e43e5ac8abdb93fdc0fc66175a7f44e1f525d1ac9eff048d019f9c91",
+    "project_id": "3a75909c9b712dc8",
+    "source_policy": "existing_compiled",
+    "resource_fingerprint": "eaf4d26dc093c69f430597dee1e6319ca6bd603f041f2aba0c65e5d05050e077",
+    "project_config": {},
+    "gui_projection_profile": "default_gui",
+    "artifact_id": "9b85bf8f7aae4e8da2508b53ceb00e80",
+    "uri": "defold://artifacts/9b85bf8f7aae4e8da2508b53ceb00e80/frame.png",
+    "inline_preview": {
+      "width": 960,
+      "height": 540,
+      "to_frame_scale": [
+        1.3333333333333333,
+        1.3333333333333333
+      ],
+      "to_frame_offset": [
+        0,
+        0
+      ],
+      "source_observation_id": "9b85bf8f7aae4e8da2508b53ceb00e80"
+    }
+  }
+]

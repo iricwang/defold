@@ -46,6 +46,30 @@
                                     (.setDisable (boolean disabled))
                                     (.setOnAction (ui/event-handler _ (f))))))
 
+(defn review-controls [state disabled]
+  (let [root (VBox. 6.0)
+        picker (doto (ComboBox.) (.setId "delivery-review-mode") (.setMaxWidth Double/MAX_VALUE)
+                     (.setDisable (boolean disabled)))
+        notice (doto (Label.) (.setId "delivery-review-notice") (.setWrapText true))
+        update! (fn update-review-mode []
+                  (let [mode (.getValue picker)]
+                    (swap! state assoc :review-mode mode)
+                    (.setText notice (if (= :automation mode)
+                                       "仅记录自动化核验；用户最终视觉验收未完成。"
+                                       "以当前用户身份记录审查决定。"))))]
+    (.addAll (.getItems picker) ^java.util.Collection (identity [:human :automation]))
+    (.setConverter picker (proxy [StringConverter] []
+                            (toString [mode]
+                              (get {:human "人工审查" :automation "自动化核验（不代表用户视觉批准）"} mode ""))
+                            (fromString [value] value)))
+    (.setValue picker (or (:review-mode @state) :human))
+    (update!)
+    (.addListener (.valueProperty picker)
+                  (reify javafx.beans.value.ChangeListener
+                    (changed [_ _ _ _] (update!))))
+    (.addAll (.getChildren root) ^java.util.Collection (identity [picker notice]))
+    root))
+
 (defn details [state card work! report!]
   (let [s @state data (:project-work s) id (:id card) root (VBox. 10.0)
         locked (or (and (not= :assets (:kind card)) (tasks/locked? s)) (contains? (:producing s) id))
@@ -54,6 +78,8 @@
         edit! (fn edit-delivery [key value] (swap! state assoc-in [:delivery-drafts id key] value))]
     (.add (.getStyleClass root) "ai-detail-section")
     (.setMinWidth root 0.0)
+    (when (contains? #{:assets :task} (:kind card))
+      (.add (.getChildren root) (review-controls state locked)))
     (case (:kind card)
       :action
       (do
@@ -76,19 +102,22 @@
         (text! root "资产版本审批")
         (if-let [record (delivery/artifact data (:artifact-id card))]
           (do
-            (text! root (str (if (delivery/approved? data (:id record)) "已批准" "待人工批准") " · " (subs (:revision record) 0 12)))
+            (text! root (str (if (delivery/approved? data (:id record))
+                               (if (= "automation" (:actor (last (filterv #(and (= "artifact" (:kind %)) (= (:id record) (:subject-id %))) (:approvals data)))))
+                                 "自动化核验已采纳 · 待用户视觉验收" "人工已批准")
+                               "待审查") " · " (subs (:revision record) 0 12)))
             (doseq [file (:files record)]
               (.add (.getChildren root) (file-reveal/install! (doto (Label. (:name file)) (.setWrapText true))
                                                               (:project-root s) (constantly (:path file)) report!))))
           (text! root "尚未建立固定版本。批准会保存当前文本与所有文件的副本。"))
-        (command! root "批准当前资产版本" "delivery-approve-assets" #(work! :approve-assets id nil) locked))
+        (command! root "批准当前资产版本" "delivery-approve-assets" #(work! :approve-assets id {:review-mode (:review-mode @state)}) locked))
       :task
       (when (= "allocated" (:status card))
-        (text! root "交付与人工验收")
+        (text! root "交付与验收")
         (text! root (str "交付类型 · " (get {"document" "文档" "assets" "资产包" "engineering" "工程集成"}
                                         (:delivery-type (delivery/task data id)) "文档")))
         (when-let [decision (last (filterv #(and (= "task-acceptance" (:kind %)) (= id (:subject-id %))) (:approvals data)))]
-          (text! root (str (if (delivery/accepted data id) "验收通过" (if (= "rejected" (:decision decision)) "已退回" "已有历史验收，当前版本待验收")) " · " (:notes decision))))
+          (text! root (str (if (delivery/accepted data id) (if (= "automation" (:actor decision)) "自动化核验通过 · 待用户视觉验收" "人工验收通过") (if (= "rejected" (:decision decision)) "已退回" "已有历史验收，当前版本待验收")) " · " (:notes decision))))
         (doseq [record (filterv #(and (= id (:task-id %)) (delivery/approved? data (:id %))) (:artifacts data))]
           (let [check (doto (CheckBox. (str (:title record) " · " (subs (:revision record) 0 8))) (.setSelected (contains? @selected (:id record))))]
             (.setOnAction check (ui/event-handler _ (swap! selected (if (.isSelected check) conj disj) (:id record)) (edit! :artifact-ids (vec @selected))))
@@ -127,10 +156,10 @@
             (doseq [[name title] [["runtime" "运行验证"] ["visual" "视觉检查"]] status ["passed" "failed"]]
               (command! root (str title (if (= "passed" status) "通过，附证据…" "失败，附证据…"))
                         (str "delivery-check-" name "-" status)
-                        #(work! :record-delivery-check id {:delivery-id (.getValue picker) :check name :status status :notes (.getText notes)}) locked)))
+                        #(work! :record-delivery-check id {:delivery-id (.getValue picker) :check name :status status :notes (.getText notes) :review-mode (:review-mode @state)}) locked)))
           (command! root "验收通过并回流项目" "delivery-accept-task"
-                    #(work! :accept-delivery id {:artifact-ids (vec @selected) :delivery-id (.getValue picker) :notes (.getText notes)}) locked)
-          (command! root "退回修改" "delivery-reject-task" #(work! :reject-delivery id {:notes (.getText notes)}) locked)))
+                    #(work! :accept-delivery id {:artifact-ids (vec @selected) :delivery-id (.getValue picker) :notes (.getText notes) :review-mode (:review-mode @state)}) locked)
+          (command! root "退回修改" "delivery-reject-task" #(work! :reject-delivery id {:notes (.getText notes) :review-mode (:review-mode @state)}) locked)))
       nil)
     (style-detail-buttons! root)
     root))

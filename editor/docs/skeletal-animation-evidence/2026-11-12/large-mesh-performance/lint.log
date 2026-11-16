@@ -1,0 +1,45 @@
+src/clj/editor/skeletal_animation_slots.clj:110:18: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:118:18: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:119:20: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:163:20: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:165:16: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:166:20: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:169:19: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:194:10: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:201:42: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:206:10: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:208:42: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:221:40: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:223:56: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:245:31: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:300:16: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:301:17: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_slots.clj:435:81: warning: Line is longer than 80 characters.
+src/clj/editor/skeletal_animation_view.clj:16:81: warning: Docstring line is longer than 80 characters.
+src/clj/editor/skeletal_animation_view.clj:229:14: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:299:81: warning: Line is longer than 80 characters.
+src/clj/editor/skeletal_animation_view.clj:398:10: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:961:28: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:990:52: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1535:59: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1540:61: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1707:55: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1761:58: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1763:136: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1788:63: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1792:76: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1841:109: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:1973:32: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:2147:49: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:2294:16: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:2745:45: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:2755:45: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:2844:76: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:2928:69: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:2937:37: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:3449:53: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:4129:25: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_view.clj:4233:81: warning: Line is longer than 80 characters.
+src/clj/editor/skeletal_animation_view.clj:4258:81: warning: Line is longer than 80 characters.
+src/clj/editor/skeletal_animation_view.clj:4413:81: warning: Line is longer than 80 characters.
+linting took 544ms, errors: 0, warnings: 44

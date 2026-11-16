@@ -1,0 +1,16 @@
+{
+  "version": "1.14.2-patch.126",
+  "base_revision": 125,
+  "feed": "local loopback HTTP",
+  "installed_app": "/Applications/Defold.app",
+  "verified_files": 169,
+  "mismatches": [],
+  "cold_start_project": "Lastlight District",
+  "compiled_spine_ui_verified": true,
+  "runtime_entries_checked": [
+    "libexec/arm64-macos/dmengine",
+    "libexec/arm64-macos/dmengine_release"
+  ],
+  "runtime_entries_changed": [],
+  "backup": "/Applications/Defold.app.patch-backup-e31231e8-f1cb-481f-ae73-3145ac57f5fa"
+}

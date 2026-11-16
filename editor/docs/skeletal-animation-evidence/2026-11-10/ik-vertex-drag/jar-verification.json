@@ -1,0 +1,10 @@
+{
+  "baseline": "/Applications/Defold.app/Contents/Resources/packages/defold-871d419fe7ad8f81d5d988f58afa153df5ca818f.jar",
+  "candidate": "/tmp/spine-drag-fix/build/editor.jar",
+  "candidate_sha256": "7aa21ff9c3241635f426e6bd422b9ff28aac61d248d171b1e921ad577cdea734",
+  "changed_entries": 981,
+  "unexpected_changes": [],
+  "runtime_byte_identical": true,
+  "installed": false,
+  "live_session_drag_handlers_hot_reloaded": true
+}

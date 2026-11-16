@@ -1,0 +1,96 @@
+benchmark.png
+size: 4096,4096
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+docs/source/spine_smart_mesh_validation/imported_images/01b_eye_closed
+rotate: false
+xy: 0, 0
+size: 77, 353
+orig: 77, 353
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/01b_eye_far
+rotate: false
+xy: 0, 0
+size: 35, 82
+orig: 35, 82
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/01c_jaw
+rotate: false
+xy: 0, 0
+size: 348, 223
+orig: 348, 223
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/01d_whiskers_near
+rotate: false
+xy: 0, 0
+size: 624, 377
+orig: 624, 377
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/01e_whiskers_far
+rotate: false
+xy: 0, 0
+size: 358, 541
+orig: 358, 541
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/03_front_left
+rotate: false
+xy: 0, 0
+size: 601, 908
+orig: 601, 908
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/01_head
+rotate: false
+xy: 0, 0
+size: 1123, 1119
+orig: 1123, 1119
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/05_tail
+rotate: false
+xy: 0, 0
+size: 849, 847
+orig: 849, 847
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/04_hind_left
+rotate: false
+xy: 0, 0
+size: 353, 668
+orig: 353, 668
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/06_body
+rotate: false
+xy: 0, 0
+size: 1145, 816
+orig: 1145, 816
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/02_front_right
+rotate: false
+xy: 0, 0
+size: 279, 173
+orig: 279, 173
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/01a_eye_closed
+rotate: false
+xy: 0, 0
+size: 324, 165
+orig: 324, 165
+offset: 0, 0
+index: -1
+docs/source/spine_smart_mesh_validation/imported_images/01a_eye_near
+rotate: false
+xy: 0, 0
+size: 126, 105
+orig: 126, 105
+offset: 0, 0
+index: -1

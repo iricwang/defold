@@ -21,12 +21,18 @@
   (:require [clojure.data.json :as json]
             [clojure.string :as string]
             [editor.skeletal-animation-constraints :as constraints]
+            [editor.skeletal-animation-events :as events]
             [editor.skeletal-animation-geometry :as geometry]
+            [editor.skeletal-animation-inherit :as inherit]
             [editor.skeletal-animation-interpolation :as interpolation]
             [editor.skeletal-animation-mesh :as mesh]
             [editor.skeletal-animation-physics :as physics]
+            [editor.skeletal-animation-sequence :as sequence]
+            [editor.skeletal-animation-skin :as skin]
+            [editor.skeletal-animation-textures :as textures]
             [util.coll :as coll])
-  (:import [java.util Map]
+  (:import [java.lang.ref WeakReference]
+           [java.util Map]
            [org.codehaus.jackson.map ObjectMapper]))
 
 (set! *warn-on-reflection* true)
@@ -153,7 +159,7 @@
     (* 2 (transduce (map count) + 0 weights))
     (count (:vertices attachment))))
 
-(defn validate-document
+(defn- validate-document-impl
   "Validate and return a document without discarding extension fields. Throws
   ex-info with the affected section/id/field for malformed data."
   [document]
@@ -164,11 +170,13 @@
                   "Expected a defold.skeleton version 1 document with a name." {})
   (let [bone-ids (validate-bones! (:bones document))]
     (validate-ids! (:slots document) {:section :slots})
-    (run! (fn [{:keys [id bone attachment color]}]
+    (run! (fn [{:keys [id bone attachment color dark-color blend]}]
             (require-value! (contains? bone-ids bone) "A slot bone does not exist." {:slot id :bone bone})
             (when color (validate-color! color {:slot id}))
+            (when dark-color (validate-color! (conj dark-color 1.0) {:slot id :field :dark-color}))
+            (require-value! (contains? #{nil "normal" "additive" "multiply" "screen"} blend) "Unknown slot blend mode." {:slot id})
             (when attachment
-              (when-not (= "path" (:type attachment))
+              (when (contains? #{"region" "mesh" "linkedmesh"} (get attachment :type "region"))
                 (let [path (:path attachment)]
                   (require-value! (and (map? attachment) (string? path)
                                        (string/starts-with? path "/")
@@ -180,10 +188,18 @@
                 (require-value! (and (pos? (double (:width attachment))) (pos? (double (:height attachment))))
                                 "Attachment dimensions must be positive." {:slot id}))
               (validate-color! (:color attachment) {:slot id})
-              (require-value! (contains? #{"region" "mesh" "path"} (get attachment :type "region")) "Unsupported attachment type." {:slot id})
+              (when-let [value (:sequence attachment)] (sequence/normalize value))
+              (require-value! (contains? #{"region" "mesh" "path" "linkedmesh" "point" "boundingbox" "clipping"} (get attachment :type "region")) "Unsupported attachment type." {:slot id})
               (case (:type attachment)
                 "mesh" (validate-mesh! attachment bone-ids {:slot id})
                 "path" (validate-path-attachment! attachment bone-ids {:slot id})
+                ("boundingbox" "clipping") (do
+                                             (validate-mesh! (assoc attachment :uvs (vec (repeat (count (:vertices attachment)) 0.0)) :triangles []) bone-ids {:slot id})
+                                             (when (= "clipping" (:type attachment))
+                                               (require-value! (or (nil? (:end attachment)) (coll/any? #(= (:end attachment) (:id %)) (:slots document))) "Clipping end slot does not exist." {:slot id})))
+                "point" (validate-numbers! attachment [:x :y :rotation] {:slot id})
+                "linkedmesh" (do (require-value! (valid-id? (:parent attachment)) "Linked mesh requires a parent attachment." {:slot id})
+                                 (require-value! (boolean? (:deform attachment true)) "Linked mesh deform flag must be boolean." {:slot id}))
                 nil)))
           (:slots document))
     (validate-ids! (get document :ik []) {:section :ik})
@@ -198,10 +214,15 @@
                                  (finite-number? mix) (<= 0.0 (double mix) 1.0)
                                  (boolean? bend-positive))
                             "IK requires one or two existing bones, a separate target and a finite mix." {:ik id})
-            (require-value! (or (= 1 (count bones)) (coll/every? (fn [bone-id] (= "normal" (get (coll/first-where #(= bone-id (:id %)) (:bones document)) :inherit "normal"))) bones))
-                            "Two-bone IK constrained bones must use normal inheritance." {:ik id})
             (require-value! (:parent (coll/first-where #(= (first bones) (:id %)) (:bones document)))
                             "IK cannot constrain a root bone. Add a parent bone above the chain first." {:ik id})
+            (let [parents (coll/into-> (:bones document) {} (map (juxt :id :parent)))
+                  constrained (set bones)]
+              (loop [ancestor target]
+                (when ancestor
+                  (require-value! (not (contains? constrained ancestor))
+                                  "IK target cannot descend from a constrained bone." {:ik id})
+                  (recur (get parents ancestor)))))
             (when (= 2 (count bones))
               (require-value! (= (first bones) (:parent (coll/first-where #(= (second bones) (:id %)) (:bones document))))
                               "Two-bone IK requires a direct parent-child chain." {:ik id})))
@@ -293,7 +314,7 @@
               (require-value! (vector? (get animation :deforms [])) "Deform tracks must be an array." {:animation id})
               (reduce (fn [seen {:keys [slot keys]}]
                         (let [attachment (:attachment (coll/first-where #(= slot (:id %)) (:slots document)))]
-                          (require-value! (and (contains? #{"mesh" "path"} (:type attachment)) (not (contains? seen slot))) "Deform tracks need a unique mesh or path slot." {:animation id :slot slot})
+                          (require-value! (and (contains? #{"mesh" "path" "boundingbox" "clipping"} (:type attachment)) (not (contains? seen slot))) "Deform tracks need a unique mesh or path slot." {:animation id :slot slot})
                           (validate-keys! keys duration {:animation id :slot slot}
                                           #(and (vector? (:vertices %)) (= (deform-size attachment) (count (:vertices %)))
                                                 (coll/every? finite-number? (:vertices %))))
@@ -307,12 +328,29 @@
                                                 (finite-number? (get % :softness 0.0)) (not (neg? (get % :softness 0.0)))
                                                 (boolean? (get % :compress false)) (boolean? (get % :stretch false))))
                           (validate-keys! (mapv (fn [key] (assoc key :value (get key :softness 0.0)
-                                                                              :interpolation (get key :softness-interpolation (:interpolation key))
-                                                                              :curve (or (:softness-curve key) (:curve key)))) keys)
+                                                                 :interpolation (get key :softness-interpolation (:interpolation key))
+                                                                 :curve (or (:softness-curve key) (:curve key)))) keys)
                                           duration {:animation id :ik ik :property "softness"} #(finite-number? (:value %)))
                           (conj seen ik)) #{} (:ik-tracks animation)))))
           (:animations document)))
+  (events/validate-document document)
+  (textures/scale document)
   document)
+
+;; Documents are immutable. Cache only successful validations by identity,
+;; without hashing large meshes or retaining closed documents. A fresh document
+;; always goes through the complete validator, including imported data.
+(def ^:private validated-documents (atom []))
+
+(defn validate-document [document]
+  (if (and (map? document)
+           (coll/any? #(identical? document (.get ^WeakReference %)) @validated-documents))
+    document
+    (let [validated (validate-document-impl document)]
+      (swap! validated-documents
+             (fn remember-validation [entries]
+               (coll/into-> entries [(WeakReference. validated)] (take 15))))
+      validated)))
 
 (defn new-document
   "Create a root bone and an empty one-second animation."
@@ -323,7 +361,8 @@
      :name name
      :bones [{:id "root" :parent nil :x 0.0 :y 0.0 :rotation 0.0 :scale-x 1.0 :scale-y 1.0 :length 80.0}]
      :slots []
-     :animations [{:id "default" :duration 1.0 :tracks []}]}))
+     :events []
+     :animations [{:id "default" :duration 1.0 :tracks [] :event-tracks []}]}))
 
 (declare upgrade-document)
 
@@ -378,13 +417,9 @@
                                          (get animation "attachments") (update "attachments" (fn [skins] (into {} (map (fn [[skin slots]] [skin (rename-map-key slots before after)])) skins)))
                                          (get animation "drawOrder") (update "drawOrder" (fn [frames] (mapv (fn [frame] (cond-> frame (get frame "offsets") (update "offsets" (fn [offsets] (mapv (fn [offset] (update offset "slot" rename)) offsets))))) frames))))])) %))))))
 
-(defn- require-source-removal-safe! [document deleted-bones deleted-slots]
+(defn- require-source-removal-safe! [document deleted-slots]
   (when-let [text (:spine-source document)]
     (let [source (json/read-str text)]
-      (run! (fn [skin]
-              (require-value! (not (coll/any? deleted-bones (get skin "bones" [])))
-                              "Cannot remove a bone required by a preserved skin." {:skin (get skin "name")}))
-            (get source "skins" []))
       (when (pos? (count deleted-slots))
         (run! (fn [[id animation]]
                 (require-value! (and (zero? (count (get animation "drawOrder"))) (zero? (count (get animation "draworder"))))
@@ -392,9 +427,30 @@
               (get source "animations" {}))))))
 
 (defn add-bone [document bone]
-  (validate-document
-    (update (validate-document document) :bones conj
-            (merge {:parent nil :x 0.0 :y 0.0 :rotation 0.0 :scale-x 1.0 :scale-y 1.0 :shear-x 0.0 :shear-y 0.0 :length 80.0} bone))))
+  (let [document (validate-document
+                   (update (validate-document document) :bones conj
+                           (merge {:parent nil :x 0.0 :y 0.0 :rotation 0.0 :scale-x 1.0 :scale-y 1.0 :shear-x 0.0 :shear-y 0.0 :length 80.0} bone)))]
+    (if-not (:spine-source document)
+      document
+      (let [source (json/read-str (:spine-source document))
+            id (:id bone)]
+        ;; Deleted source entries retain their indices for inactive meshes.
+        ;; A new bone with a reused name must not inherit that old identity.
+        (if-not (coll/any? #(= id (get % "name")) (get source "bones"))
+          document
+          (assoc document :spine-source
+                 (json/write-str
+                   (-> source
+                       (update "bones" #(mapv (fn [entry]
+                                                (if (= id (get entry "name"))
+                                                  (cond-> {"name" id} (:parent bone) (assoc "parent" (:parent bone)))
+                                                  entry)) %))
+                       (update "skins" #(mapv (fn [skin]
+                                                (if (contains? skin "bones")
+                                                  (update skin "bones" (fn [ids] (filterv (fn [value] (not= id value)) ids))) skin)) %))
+                       (update "animations" #(coll/map-vals (fn [animation]
+                                                              (if (contains? animation "bones")
+                                                                (update animation "bones" dissoc id) animation)) %))))))))))
 
 (defn update-bone
   "Update setup pose or reparent a bone. Renaming updates child, slot and track references."
@@ -403,23 +459,130 @@
         index (item-index document :bones bone-id)
         new-id (get changes :id bone-id)
         rename-reference #(if (= bone-id %) new-id %)]
-    (validate-document
-      (-> (cond-> document
-            (and (not= bone-id new-id) (:spine-source document))
-            (update :spine-source rename-source-bone bone-id new-id))
-          (update-in [:bones index] merge changes)
-          (update :bones #(mapv (fn [bone] (update bone :parent rename-reference)) %))
-          (update :slots #(mapv (fn [slot]
-                                 (cond-> (update slot :bone rename-reference)
-                                   (get-in slot [:attachment :weights])
-                                   (update-in [:attachment :weights] (fn [weights] (mapv (fn [influences] (mapv (fn [influence] (update influence :bone rename-reference)) influences)) weights))))) %))
-          (update :ik #(mapv (fn [constraint] (-> constraint (update :bones (fn [bones] (mapv rename-reference bones))) (update :target rename-reference))) %))
-          (update :transform #(mapv (fn [constraint] (-> constraint (update :bones (fn [bones] (mapv rename-reference bones))) (update :target rename-reference))) %))
-          (update :path #(mapv (fn [constraint] (update constraint :bones (fn [bones] (mapv rename-reference bones)))) %))
-          (update :physics #(mapv (fn [constraint] (update constraint :bone rename-reference)) %))
-          (update :animations #(mapv (fn [animation]
-                                       (update animation :tracks
-                                               (fn [tracks] (mapv (fn [track] (update track :bone rename-reference)) tracks)))) %))))))
+    (if (= bone-id new-id)
+      (validate-document (update-in document [:bones index] merge changes))
+      (validate-document
+        (-> (cond-> document
+              (:spine-source document)
+              (update :spine-source rename-source-bone bone-id new-id))
+            (update-in [:bones index] merge changes)
+            (update :bones #(mapv (fn [bone] (update bone :parent rename-reference)) %))
+            (update :slots #(mapv (fn [slot]
+                                    (cond-> (update slot :bone rename-reference)
+                                      (get-in slot [:attachment :weights])
+                                      (update-in [:attachment :weights] (fn [weights] (mapv (fn [influences] (mapv (fn [influence] (update influence :bone rename-reference)) influences)) weights))))) %))
+            (update :ik #(mapv (fn [constraint] (-> constraint (update :bones (fn [bones] (mapv rename-reference bones))) (update :target rename-reference))) %))
+            (update :transform #(mapv (fn [constraint] (-> constraint (update :bones (fn [bones] (mapv rename-reference bones))) (update :target rename-reference))) %))
+            (update :path #(mapv (fn [constraint] (update constraint :bones (fn [bones] (mapv rename-reference bones)))) %))
+            (update :physics #(mapv (fn [constraint] (update constraint :bone rename-reference)) %))
+            (update :animations #(mapv (fn [animation]
+                                         (update animation :tracks
+                                                 (fn [tracks] (mapv (fn [track] (update track :bone rename-reference)) tracks)))) %)))))))
+
+(declare import-bone import-weights)
+
+(defn- transfer-deleted-weights [weights offsets deleted by-id worlds]
+  (loop [remaining weights cursor 0 result [] deforms []]
+    (if (zero? (count remaining))
+      [result deforms]
+      (let [influences (first remaining)
+            transferred
+            (mapv (fn [index influence]
+                    (let [id (loop [id (:bone influence)]
+                               (if (contains? deleted id) (recur (:parent (get by-id id))) id))
+                          matrix (geometry/compose-transforms
+                                   (or (geometry/inverse-transform (get worlds id))
+                                       (throw (ex-info "Cannot transfer weights to a collapsed parent." {:bone id})))
+                                   (get worlds (:bone influence)))
+                          [x y] (geometry/transform-point matrix [(:x influence) (:y influence)])
+                          [dx dy] (geometry/transform-point (assoc matrix 4 0.0 5 0.0)
+                                                            (if offsets (subvec offsets (+ cursor (* index 2)) (+ cursor (* index 2) 2)) [0.0 0.0]))]
+                      {:bone id :x x :y y :weight (:weight influence) :dx dx :dy dy}))
+                  (range (count influences)) influences)
+            ids (coll/into-> transferred [] (map :bone) (distinct))
+            combined (mapv (fn [id]
+                             (let [group (filterv #(= id (:bone %)) transferred)
+                                   weight (transduce (map :weight) + 0.0 group)]
+                               (reduce (fn [result field]
+                                         (assoc result field
+                                                (if (zero? weight) (get (first group) field)
+                                                    (/ (transduce (map #(* (:weight %) (get % field))) + 0.0 group) weight))))
+                                       {:bone id :weight weight} [:x :y :dx :dy]))) ids)
+            total (transduce (map :weight) + 0.0 combined)
+            combined (mapv #(update % :weight / total) combined)]
+        (recur (subvec remaining 1) (+ cursor (* 2 (count influences)))
+               (conj result (mapv #(dissoc % :dx :dy) combined))
+               (coll/into-> combined deforms (mapcat (juxt :dx :dy))))))))
+
+(defn- transfer-source-weights [source deleted removed-slots by-id worlds]
+  (let [bones (mapv import-bone (get source "bones"))
+        indices (coll/into-> bones {} (map-indexed (fn [index bone] [(:id bone) index])))]
+    (reduce
+      (fn [source [skin-index slot-id name attachment]]
+        (let [vertices (get attachment "vertices")
+              count-vertices (or (get attachment "vertexCount") (quot (count (get attachment "uvs")) 2))]
+          (if-not (and (not (contains? removed-slots slot-id)) (vector? vertices)
+                       (pos? count-vertices) (not= (* 2 count-vertices) (count vertices)))
+            source
+            (let [weights (import-weights vertices count-vertices bones)]
+              (if-not (coll/any? #(contains? deleted (:bone %)) (coll/into-> weights [] cat))
+                source
+                (let [[after] (transfer-deleted-weights weights nil deleted by-id worlds)
+                      skin-name (get-in source ["skins" skin-index "name"])
+                      encoded (coll/into-> after [] (mapcat (fn [influences]
+                                                              (coll/into-> influences [(count influences)]
+                                                                (mapcat (fn [{:keys [bone x y weight]}] [(get indices bone) x y weight]))))))
+                      migrate (fn migrate-deform-frame [frame]
+                                (let [offset (get frame "offset" 0)
+                                      values (get frame "vertices" [])
+                                      dense (reduce-kv (fn [result index value] (assoc result (+ offset index) value))
+                                                       (vec (repeat (* 2 (transduce (map count) + 0 weights)) 0.0)) values)
+                                      [_ transferred] (transfer-deleted-weights weights dense deleted by-id worlds)]
+                                  (assoc (dissoc frame "offset") "vertices" transferred)))]
+                  (-> source
+                      (assoc-in ["skins" skin-index "attachments" slot-id name "vertices"] encoded)
+                      (update "animations"
+                              #(coll/map-vals
+                                 (fn [animation]
+                                   (reduce (fn [animation path]
+                                             (if (get-in animation path) (update-in animation path (fn [frames] (mapv migrate frames))) animation))
+                                           animation [["attachments" skin-name slot-id name "deform"]
+                                                      ["deform" skin-name slot-id name]])) %)))))))))
+      source
+      (coll/into-> (get source "skins") []
+        (map-indexed (fn [index skin]
+                       (coll/into-> (get skin "attachments") []
+                         (mapcat (fn [[slot-id attachments]]
+                                   (mapv (fn [[name attachment]] [index slot-id name attachment]) attachments))))))
+        cat))))
+
+(defn- transfer-surviving-weights [document deleted removed-slots]
+  (let [worlds (constraints/world-transforms (:bones document))
+        by-id (coll/into-> (:bones document) {} (map (juxt :id identity)))
+        document (cond-> document
+                   (:spine-source document)
+                   (update :spine-source #(json/write-str (transfer-source-weights (json/read-str %) deleted removed-slots by-id worlds))))]
+    (reduce
+      (fn [document [index slot]]
+        (let [weights (get-in slot [:attachment :weights])]
+          (if-not (and (not (contains? removed-slots (:id slot)))
+                       (coll/any? #(contains? deleted (:bone %)) (coll/into-> weights [] cat)))
+            document
+            (let [[after] (transfer-deleted-weights weights nil deleted by-id worlds)]
+              (-> document
+                  (assoc-in [:slots index :attachment :weights] after)
+                  (update :animations
+                          #(mapv (fn [animation]
+                                   (update animation :deforms
+                                           (fn [tracks]
+                                             (mapv (fn [track]
+                                                     (if (not= (:id slot) (:slot track)) track
+                                                         (update track :keys
+                                                                 (fn [frames]
+                                                                   (mapv (fn [frame]
+                                                                           (update frame :vertices
+                                                                                   (fn [offsets] (second (transfer-deleted-weights weights offsets deleted by-id worlds))))) frames))))) tracks)))) %)))))))
+      document (mapv vector (range (count (:slots document))) (:slots document)))))
 
 (defn remove-bone
   "Delete a bone, all descendants, their slots and their animation tracks."
@@ -434,13 +597,23 @@
         removed-path (into #{} (comp (filter #(or (contains? removed-slots (:target %)) (coll/any? deleted (:bones %)))) (map :id)) (:path document))
         removed-transform (into #{} (comp (filter #(or (contains? deleted (:target %)) (coll/any? deleted (:bones %)))) (map :id)) (:transform document))
         removed-ik (into #{} (comp (filter #(or (contains? deleted (:target %)) (coll/any? deleted (:bones %)))) (map :id)) (:ik document))]
-    (require-source-removal-safe! document deleted removed-slots)
-    (require-value! (not (coll/any? (fn [slot]
-                                     (and (not (contains? removed-slots (:id slot)))
-                                          (coll/any? #(contains? deleted (:bone %)) (into [] cat (get-in slot [:attachment :weights])))))
-                                   (:slots document)))
-                    "A surviving mesh is weighted to this bone. Remove those influences before deleting it." {:bone bone-id})
-    (-> document
+    (require-value! (:parent (nth (:bones document) (item-index document :bones bone-id)))
+                    "The root bone cannot be deleted." {:bone bone-id})
+    (require-source-removal-safe! document removed-slots)
+    (-> (cond-> (transfer-surviving-weights document deleted removed-slots)
+          (:spine-source document)
+          (update :spine-source
+                  (fn [text]
+                    (json/write-str
+                      (update (json/read-str text) "skins"
+                              (fn [skins]
+                                (mapv (fn [skin]
+                                        (reduce-kv (fn [skin section removed]
+                                                     (if (contains? skin section)
+                                                       (update skin section #(filterv (complement removed) %))
+                                                       skin))
+                                                   skin {"bones" deleted "ik" removed-ik "transform" removed-transform
+                                                         "path" removed-path "physics" removed-physics})) skins)))))))
         (update :bones #(filterv (fn [bone] (not (contains? deleted (:id bone)))) %))
         (update :slots #(filterv (fn [slot] (not (contains? deleted (:bone slot)))) %))
         (update :ik #(filterv (fn [constraint] (not (or (contains? deleted (:target constraint)) (coll/any? deleted (:bones constraint))))) %))
@@ -460,7 +633,7 @@
   (cond-> slot
     (:attachment slot)
     (update :attachment #(merge {:x 0.0 :y 0.0 :rotation 0.0 :scale-x 1.0 :scale-y 1.0
-                                :width 100.0 :height 100.0 :color [1.0 1.0 1.0 1.0]} %))))
+                                 :width 100.0 :height 100.0 :color [1.0 1.0 1.0 1.0]} %))))
 
 (defn- remap-deform-weights [vertices before after slot-bone worlds]
   (if (= (:weights before) (:weights after))
@@ -481,8 +654,8 @@
                                       (let [delta (geometry/transform-point (assoc (get worlds bone) 4 0.0 5 0.0) (offsets bone))]
                                         (mapv #(+ %1 (* weight %2)) sum delta))) [0.0 0.0] old)
                 values (into [] (mapcat (fn [{:keys [bone]}]
-                                         (if (and (:weights before) (:weights after) (contains? offsets bone))
-                                           (offsets bone) (to-local bone world-delta)))) (nth new-influences vertex))]
+                                          (if (and (:weights before) (:weights after) (contains? offsets bone))
+                                            (offsets bone) (to-local bone world-delta)))) (nth new-influences vertex))]
             (recur (inc vertex) (long (+ offset (* 2 (count old)))) (into result values))))))))
 
 (defn add-slot [document slot]
@@ -511,7 +684,7 @@
         update-track (fn [track]
                        (if (not= slot-id (:slot track))
                          track
-                         (when (contains? #{"mesh" "path"} (get-in updated [:attachment :type]))
+                         (when (contains? #{"mesh" "path" "boundingbox" "clipping"} (get-in updated [:attachment :type]))
                            (-> track
                                (assoc :slot (get changes :id slot-id))
                                (update :keys (fn [keys]
@@ -532,7 +705,7 @@
   (let [document (validate-document document)
         deleted-paths (into #{} (comp (filter #(= slot-id (:target %))) (map :id)) (:path document))]
     (item-index document :slots slot-id)
-    (require-source-removal-safe! document #{} #{slot-id})
+    (require-source-removal-safe! document #{slot-id})
     (-> document
         (update :slots #(filterv (fn [slot] (not= slot-id (:id slot))) %))
         (update :path #(filterv (fn [constraint] (not (contains? deleted-paths (:id constraint)))) %))
@@ -568,13 +741,13 @@
         renamed (cond-> document
                   (and (:spine-source document) (contains? changes :id) (not= animation-id (:id changes)))
                   (update :spine-source #(json/write-str (update (json/read-str %) "animations"
-                                                               (fn [animations]
-                                                                 (rename-map-key (dissoc animations (:id changes)) animation-id (:id changes)))))))
+                                                                 (fn [animations]
+                                                                   (rename-map-key (dissoc animations (:id changes)) animation-id (:id changes)))))))
         index (item-index document :animations animation-id)
         updated (validate-document (update-in renamed [:animations index] merge changes))]
-      (when (and (:spine-source updated) (< (get-in updated [:animations index :duration]) (get-in document [:animations index :duration])))
-        (export-spine-json updated))
-      updated))
+    (when (and (:spine-source updated) (< (get-in updated [:animations index :duration]) (get-in document [:animations index :duration])))
+      (export-spine-json updated))
+    updated))
 
 (defn remove-animation [document animation-id]
   (let [document (validate-document document)]
@@ -679,9 +852,9 @@
                                 #(mapv (fn [track]
                                          (if (not= ik-id (:ik track)) track
                                              (update track :keys (fn [keys]
-                                                                  (mapv (fn [key]
-                                                                          (assoc key :spine-frame-source
-                                                                                 (some-> (key-spine-frame key originals) json/write-str))) keys))))) %)))
+                                                                   (mapv (fn [key]
+                                                                           (assoc key :spine-frame-source
+                                                                                  (some-> (key-spine-frame key originals) json/write-str))) keys))))) %)))
                    document)]
     (move-track-keyframe document animation-id :ik-tracks #(= ik-id (:ik %)) old-time new-time)))
 
@@ -767,15 +940,9 @@
     (+ (* u u u a) (* 3.0 u u t b) (* 3.0 u t t c) (* t t t d))))
 
 (defn- curve-value [left right time]
-  (let [[t1 v1 t2 v2] (:curve left)
-        parameter (loop [low 0.0 high 1.0 iteration 0]
-                    (let [middle (* 0.5 (+ low high))]
-                      (if (= 40 iteration)
-                        middle
-                        (if (< (double (cubic-value (:time left) t1 t2 (:time right) middle)) (double time))
-                          (recur middle high (inc iteration))
-                          (recur low middle (inc iteration))))))]
-    (cubic-value (:value left) v1 v2 (:value right) parameter)))
+  (interpolation/sample-bezier
+    (interpolation/bezier-points (:time left) (:value left) (:time right) (:value right) (:curve left))
+    time))
 
 (defn- sample-track-impl [keys time setup-value]
   (if (or (zero? (count keys)) (< (double time) (double (:time (first keys)))))
@@ -789,19 +956,10 @@
                  (* (/ (- (double time) (double (:time left))) (- (double (:time right)) (double (:time left))))
                     (- (double (:value right)) (double (:value left)))))))))
 
-(defn set-deform-keyframe
-  "Record native Spine offsets (per influence for weighted meshes). Inserting
-  a key trims the preceding Bezier to its new interval without retiming it."
-  [document animation-id slot-id time vertices interpolation]
-  (let [document (validate-document document)
-        index (item-index document :animations animation-id)
-        slot (get-in document [:slots (item-index document :slots slot-id)])
-        deforms (get-in document [:animations index :deforms] [])
-        track (or (coll/first-where #(= slot-id (:slot %)) deforms)
-                  {:slot slot-id :attachment (get-in slot [:attachment :name] slot-id)
-                   :skin (get slot :spine-skin "default") :keys []})
-        _ (require-value! (and (finite-number? time) (not (neg? (double time)))) "Deform time must be finite and nonnegative." {})
-        keys (:keys track)
+(defn insert-deform-key
+  "Insert full offsets while preserving the left interval curve."
+  [keys time vertices interpolation]
+  (let [_ (require-value! (and (finite-number? time) (not (neg? (double time)))) "Deform time must be finite and nonnegative." {})
         key (merge (dissoc (coll/first-where #(== time (:time %)) keys) :curve)
                    (if (map? interpolation)
                      {:time time :vertices vertices :interpolation (:type interpolation) :curve (:curve interpolation)}
@@ -813,7 +971,7 @@
                                    (< (:time original) time (:time right)))
                         original
                         (let [{:keys [value left]} (editor.skeletal-animation-interpolation/split-bezier
-                                                    (:time original) 0.0 (:time right) 1.0 (:curve original) time)
+                                                     (:time original) 0.0 (:time right) 1.0 (:curve original) time)
                               [x0 y0 x1 y1] left]
                           (if (> (abs (double value)) 1.0e-12)
                             (assoc original :curve [x0 (/ y0 value) x1 (/ y1 value)])
@@ -821,9 +979,23 @@
                                     (and (< (abs (double y0)) 1.0e-12) (< (abs (double y1)) 1.0e-12)))
                               (-> original (dissoc :curve) (assoc :interpolation "linear"))
                               (throw (ex-info "Cannot split an FFD curve at a return to its starting value. Choose a nearby time to preserve the deformation."
-                                              {:time time :slot slot-id}))))))))
+                                              {:time time}))))))))
                   (range (count keys)) keys)
         inserted (vec (sort-by :time (conj (filterv #(not (== time (:time %))) trimmed) key)))]
+    inserted))
+
+(defn set-deform-keyframe
+  "Record native Spine offsets (per influence for weighted meshes). Inserting
+  a key trims the preceding Bezier to its new interval without retiming it."
+  [document animation-id slot-id time vertices interpolation]
+  (let [document (validate-document document)
+        index (item-index document :animations animation-id)
+        slot (get-in document [:slots (item-index document :slots slot-id)])
+        deforms (get-in document [:animations index :deforms] [])
+        track (or (coll/first-where #(= slot-id (:slot %)) deforms)
+                  {:slot slot-id :attachment (get-in slot [:attachment :name] slot-id)
+                   :skin (get slot :spine-skin "default") :keys []})
+        inserted (insert-deform-key (:keys track) time vertices interpolation)]
     (validate-document
       (-> document
           (update-in [:animations index :duration] max time)
@@ -858,7 +1030,7 @@
 
 (defn add-ik [document constraint]
   (validate-document (update (validate-document document) :ik (fnil conj [])
-                            (merge {:mix 1.0 :bend-positive true :softness 0.0 :compress false :stretch false :uniform false :order (inc (reduce max -1 (mapv #(get % :order 0) (into (into (into (get document :ik []) (:transform document)) (:path document)) (:physics document)))))} constraint))))
+                             (merge {:mix 1.0 :bend-positive true :softness 0.0 :compress false :stretch false :uniform false :order (inc (reduce max -1 (mapv #(get % :order 0) (into (into (into (get document :ik []) (:transform document)) (:path document)) (:physics document)))))} constraint))))
 
 (defn- rename-source-ik [text before after]
   (let [rename #(if (= before %) after %)
@@ -903,7 +1075,7 @@
                           (assoc bone field (sample-track-impl keys time (get bone field 0.0)))))
                       bone
                       (get tracks (:id bone))))
-            (:bones document)))))
+            (inherit/sample document animation-id time (:bones document))))))
 
 (defn sample-pose [document animation-id time]
   (validate-document document)
@@ -924,7 +1096,6 @@
 
 (defn transform-point [[a b c d tx ty] [x y]]
   [(+ (* a x) (* c y) tx) (+ (* b x) (* d y) ty)])
-
 
 (defn- decode-color [value]
   (require-value! (and (string? value) (boolean (re-matches #"(?i)[0-9a-f]{6}([0-9a-f]{2})?" value))) "Spine color must be hexadecimal RGB or RGBA." {:color value})
@@ -1013,21 +1184,23 @@
         index (item-index document :animations animation-id)]
     (update-in document [:animations index :transform-tracks]
                #(into [] (comp (map (fn [track]
-                                     (if (and (= constraint-id (:transform track)) (= property (:property track)))
-                                       (update track :keys (fn [keys] (filterv (fn [key] (not (== time (:time key)))) keys))) track)))
+                                      (if (and (= constraint-id (:transform track)) (= property (:property track)))
+                                        (update track :keys (fn [keys] (filterv (fn [key] (not (== time (:time key)))) keys))) track)))
                                (filter (fn [track] (pos? (count (:keys track)))))) %))))
 
 (defn move-transform-keyframe [document animation-id constraint-id property before after]
   (move-track-keyframe document animation-id :transform-tracks
                        #(and (= constraint-id (:transform %)) (= property (:property %))) before after))
 
+(declare sample-constraint-mix-track)
+
 (defn- sample-transforms-impl [document animation-id time]
   (let [animation (when animation-id (get-in document [:animations (item-index document :animations animation-id)]))
         time (if animation (max 0.0 (min time (:duration animation))) 0.0)
         tracks (group-by :transform (:transform-tracks animation))]
     (mapv (fn [constraint]
-            (reduce (fn [result {:keys [property keys]}]
-                      (let [field (keyword property)] (assoc result field (sample-track-impl keys time (get result field)))))
+            (reduce (fn [result {:keys [property] :as track}]
+                      (let [field (keyword property)] (assoc result field (sample-constraint-mix-track track (get tracks (:id constraint)) time (get result field)))))
                     (constraints/normalize-transform constraint) (get tracks (:id constraint)))) (:transform document))))
 
 (defn sample-transforms [document animation-id time]
@@ -1110,8 +1283,8 @@
         index (item-index document :animations animation-id)]
     (update-in document [:animations index :path-tracks]
                #(into [] (comp (map (fn [track]
-                                     (if (and (= constraint-id (:path track)) (= property (:property track)))
-                                       (update track :keys (fn [keys] (filterv (fn [key] (not (== time (:time key)))) keys))) track)))
+                                      (if (and (= constraint-id (:path track)) (= property (:property track)))
+                                        (update track :keys (fn [keys] (filterv (fn [key] (not (== time (:time key)))) keys))) track)))
                                (filter (fn [track] (pos? (count (:keys track)))))) %))))
 
 (defn move-path-keyframe [document animation-id constraint-id property before after]
@@ -1123,8 +1296,10 @@
         time (if animation (max 0.0 (min time (:duration animation))) 0.0)
         tracks (group-by :path (:path-tracks animation))]
     (mapv (fn [constraint]
-            (reduce (fn [result {:keys [property keys]}]
-                      (let [field (keyword property)] (assoc result field (sample-track-impl keys time (get result field)))))
+            (reduce (fn [result {:keys [property keys] :as track}]
+                      (let [field (keyword property)] (assoc result field (if (string/starts-with? property "mix-")
+                                                                            (sample-constraint-mix-track track (filterv #(string/starts-with? (:property %) "mix-") (get tracks (:id constraint))) time (get result field))
+                                                                            (sample-track-impl keys time (get result field))))))
                     (constraints/normalize-path constraint) (get tracks (:id constraint)))) (:path document))))
 
 (defn sample-paths [document animation-id time]
@@ -1167,7 +1342,7 @@
       (-> document
           (update-in [:physics (item-index document :physics constraint-id)] merge changes)
           (update :animations #(mapv (fn [animation] (-> animation (update :physics-order (fn [ids] (mapv rename ids)))
-                                                       (update :physics-tracks (fn [tracks] (mapv (fn [track] (update track :physics rename)) tracks))))) %))))))
+                                                         (update :physics-tracks (fn [tracks] (mapv (fn [track] (update track :physics rename)) tracks))))) %))))))
 
 (defn remove-physics [document constraint-id]
   (let [document (validate-document document)]
@@ -1211,8 +1386,8 @@
         index (item-index document :animations animation-id)]
     (update-in document [:animations index :physics-tracks]
                #(into [] (comp (map (fn [track]
-                                     (if (and (= constraint-id (:physics track)) (= property (:property track)))
-                                       (update track :keys (fn [keys] (filterv (fn [key] (not (== time (:time key)))) keys))) track)))
+                                      (if (and (= constraint-id (:physics track)) (= property (:property track)))
+                                        (update track :keys (fn [keys] (filterv (fn [key] (not (== time (:time key)))) keys))) track)))
                                (filter (fn [track] (pos? (count (:keys track)))))) %))))
 
 (defn move-physics-keyframe [document animation-id constraint-id property before after]
@@ -1302,15 +1477,15 @@
                                      (if reset
                                        (filterv (fn [track] (not= slot-id (:slot track))) tracks)
                                        (mapv (fn [track]
-                                             (if (not= slot-id (:slot track)) track
-                                                 (update track :keys
-                                                         (fn [keys]
-                                                           (mapv (fn [key]
-                                                                   (update key :vertices
-                                                                           (fn [vertices]
-                                                                             (if (= :bone-identity deform-policy)
-                                                                               (remap-deform-weights vertices before after (:bone slot) (constraints/world-transforms (:bones document)))
-                                                                               (mesh/remap-deform before after vertex-map vertices))))) keys))))) tracks))))) %))))))
+                                               (if (not= slot-id (:slot track)) track
+                                                   (update track :keys
+                                                           (fn [keys]
+                                                             (mapv (fn [key]
+                                                                     (update key :vertices
+                                                                             (fn [vertices]
+                                                                               (if (= :bone-identity deform-policy)
+                                                                                 (remap-deform-weights vertices before after (:bone slot) (constraints/world-transforms (:bones document)))
+                                                                                 (mesh/remap-deform before after vertex-map vertices))))) keys))))) tracks))))) %))))))
 
 (defn- import-bone [bone]
   (cond-> {:id (get bone "name") :parent (get bone "parent")
@@ -1334,12 +1509,12 @@
 
 (defn- import-timeline [bone timeline frames]
   (let [channels (get {"rotate" [["rotation" "value" 0.0]]
-                      "translate" [["x" "x" 0.0] ["y" "y" 0.0]]
-                      "translatex" [["x" "value" 0.0]] "translatey" [["y" "value" 0.0]]
-                      "scale" [["scale-x" "x" 1.0] ["scale-y" "y" 1.0]]
-                      "scalex" [["scale-x" "value" 1.0]] "scaley" [["scale-y" "value" 1.0]]
-                      "shear" [["shear-x" "x" 0.0] ["shear-y" "y" 0.0]]
-                      "shearx" [["shear-x" "value" 0.0]] "sheary" [["shear-y" "value" 0.0]]} timeline)]
+                       "translate" [["x" "x" 0.0] ["y" "y" 0.0]]
+                       "translatex" [["x" "value" 0.0]] "translatey" [["y" "value" 0.0]]
+                       "scale" [["scale-x" "x" 1.0] ["scale-y" "y" 1.0]]
+                       "scalex" [["scale-x" "value" 1.0]] "scaley" [["scale-y" "value" 1.0]]
+                       "shear" [["shear-x" "x" 0.0] ["shear-y" "y" 0.0]]
+                       "shearx" [["shear-x" "value" 0.0]] "sheary" [["shear-y" "value" 0.0]]} timeline)]
     (mapv (fn [channel [property field fallback]]
             (let [setup (get bone (keyword property) 0.0)
                   convert (if (string/starts-with? property "scale-") #(* setup %) #(+ setup %))]
@@ -1356,13 +1531,15 @@
     (if (= vertex count-vertices)
       (do (require-value! (= cursor (count vertices)) "Weighted mesh has trailing vertex data." {}) weights)
       (let [count-influences (get vertices cursor)
-            _ (require-value! (and (integer? count-influences) (pos? count-influences)
+            _ (require-value! (and (finite-number? count-influences) (== (Math/floor (double count-influences)) count-influences) (pos? count-influences)
                                    (<= (+ cursor 1 (* 4 count-influences)) (count vertices)))
                               "Weighted mesh contains invalid influence data." {})
+            count-influences (long count-influences)
             influences (mapv (fn [index]
                                (let [offset (+ cursor 1 (* index 4))
                                      bone-index (nth vertices offset)
-                                     bone (when (integer? bone-index) (get bones bone-index))]
+                                     bone (when (and (finite-number? bone-index) (== (Math/floor (double bone-index)) bone-index) (<= 0 bone-index (dec (count bones))))
+                                            (get bones (long bone-index)))]
                                  (require-value! bone "Mesh weight references an unknown bone index." {:index bone-index})
                                  {:bone (:id bone) :x (nth vertices (+ offset 1)) :y (nth vertices (+ offset 2)) :weight (nth vertices (+ offset 3))}))
                              (range count-influences))]
@@ -1377,10 +1554,14 @@
                     :x (get region "x" 0.0) :y (get region "y" 0.0) :rotation (get region "rotation" 0.0)
                     :scale-x (get region "scaleX" 1.0) :scale-y (get region "scaleY" 1.0)
                     :width (get region "width" 100.0) :height (get region "height" 100.0)
-                    :color (decode-color (get region "color" "ffffffff"))}]
-    (if-not (contains? #{"mesh" "path"} type)
+                    :color (decode-color (get region "color" "ffffffff"))}
+        attachment (cond-> attachment
+                     (get region "sequence") (assoc :sequence (sequence/decode (get region "sequence")))
+                     (= "linkedmesh" type) (assoc :parent (get region "parent") :skin (or (get region "skin") "default") :deform (get region "timelines" (get region "deform" true)))
+                     (= "clipping" type) (assoc :end (get region "end")))]
+    (if-not (contains? #{"mesh" "path" "boundingbox" "clipping"} type)
       attachment
-      (let [uvs (if (= "path" type) (vec (repeat (* 2 (get region "vertexCount" 0)) 0.0)) (get region "uvs"))
+      (let [uvs (if (not= "mesh" type) (vec (repeat (* 2 (get region "vertexCount" 0)) 0.0)) (get region "uvs"))
             raw-vertices (get region "vertices")
             _ (require-value! (and (vector? uvs) (vector? raw-vertices)) "Mesh UVs and vertices must be arrays." {:attachment name})
             weights (when (not= (count uvs) (count raw-vertices)) (import-weights raw-vertices (quot (count uvs) 2) bones))
@@ -1396,23 +1577,24 @@
                                                                    [(+ wx (* px weight)) (+ wy (* py weight))])) [0.0 0.0] influences)
                                                x (- wx tx) y (- wy ty)]
                                            [(/ (- (* d x) (* c y)) determinant) (/ (- (* a y) (* b x)) determinant)]))) weights)))]
-        (cond-> (if (= "path" type)
-                  (assoc (dissoc attachment :path) :vertices vertices :weights weights :closed (get region "closed" false)
-                         :constant-speed (get region "constantSpeed" true) :lengths (get region "lengths" []))
-                  (assoc attachment :vertices vertices :uvs uvs :triangles (get region "triangles" []) :weights weights))
+        (cond-> (cond
+                  (= "path" type) (assoc (dissoc attachment :path) :vertices vertices :weights weights :closed (get region "closed" false)
+                                         :constant-speed (get region "constantSpeed" true) :lengths (get region "lengths" []))
+                  (contains? #{"boundingbox" "clipping"} type) (assoc (dissoc attachment :path) :vertices vertices :weights weights)
+                  :else (assoc attachment :vertices vertices :uvs uvs :triangles (get region "triangles" []) :weights weights))
           (get region "edges") (assoc :constrained-edges
-                                       (let [edges (get region "edges")]
-                                         (require-value! (and (vector? edges) (even? (count edges))
-                                                              (coll/every? #(and (integer? %) (even? %) (<= 0 % (dec (count uvs)))) edges))
-                                                         "Mesh edge indices must reference vertex XY offsets." {:attachment name})
-                                         (into [] (comp (partition-all 2) (map #(mapv (fn [index] (quot index 2)) %))) edges))))))))
+                                 (let [edges (get region "edges")]
+                                   (require-value! (and (vector? edges) (even? (count edges))
+                                                        (coll/every? #(and (integer? %) (even? %) (<= 0 % (dec (count uvs)))) edges))
+                                                   "Mesh edge indices must reference vertex XY offsets." {:attachment name})
+                                   (coll/into-> edges [] (partition-all 2) (map #(mapv (fn [index] (quot index 2)) %))))))))))
 
 (defn decode-spine-attachment
   "Decode one resolved Spine 4.2 region, mesh or path for a preview cache.
   Bones retain the source index order; worlds and slot-bone use current setup
   transforms. Linked meshes must be resolved by the caller before decoding."
   [name attachment bones worlds slot-bone]
-  (require-value! (contains? #{"region" "mesh" "path"} (get attachment "type" "region"))
+  (require-value! (contains? #{"region" "mesh" "path" "linkedmesh" "point" "boundingbox" "clipping"} (get attachment "type" "region"))
                   "This attachment type cannot be previewed." {:attachment name})
   (import-attachment name attachment bones worlds slot-bone))
 
@@ -1452,8 +1634,8 @@
 (defn- physics-source-orders [text]
   (let [^Map source (.readValue (ObjectMapper.) ^String text Map)]
     (into {} (keep (fn [[id ^Map animation]]
-                    (when-let [^Map tracks (.get animation "physics")]
-                      [id (vec (.keySet tracks))]))) (.get source "animations"))))
+                     (when-let [^Map tracks (.get animation "physics")]
+                       [id (vec (.keySet tracks))]))) (.get source "animations"))))
 
 (defn- import-spine-json-impl
   "Import Spine 4.2 JSON, retaining source fields for overlay
@@ -1464,7 +1646,7 @@
   (let [source (json/read-str text)
         physics-orders (when (pos? (count (get source "physics"))) (physics-source-orders text))
         version (get-in source ["skeleton" "spine"] "")
-        _ (require-value! (and (string? version) (boolean (re-matches #"4\.2(?:\..*)?" version))) "Only Spine 4.2 JSON is supported." {:version version})
+        _ (require-value! (and (string? version) (boolean (re-matches #"4\.[23](?:\..*)?" version))) "Only Spine 4.2 / 4.3 JSON is supported." {:version version})
         bones (mapv import-bone (get source "bones" []))
         _ (validate-bones! bones)
         bone-map (into {} (map (juxt :id identity)) bones)
@@ -1481,34 +1663,22 @@
         default-skin (coll/first-where #(= "default" (get % "name")) skins)
         attachments (merge-with merge (get default-skin "attachments" {}) (get skin "attachments" {}))
         warnings (transient [])
-        _ (run! (fn [section] (when (pos? (count (get source section)))
-                               (conj! warnings (str section " are preserved in JSON but are not evaluated by this editor."))))
-                ["events"])
-        _ (run! (fn [bone]
-                  (when (get bone "skin")
-                    (conj! warnings (str "Bone " (get bone "name") " has skin-required data; it is preserved but previewed as an active bone."))))
-                (get source "bones"))
-        _ (run! (fn [[section constraint]]
-                  (when (get constraint "skin")
-                    (conj! warnings (str "Constraint " (get constraint "name") " (" section ") has skin-required data; it is preserved but previewed as active."))))
-                (into [] (mapcat (fn [section] (mapv #(vector section %) (get source section)))) ["ik" "transform" "path" "physics"]))
         slots (mapv (fn [slot]
                       (let [id (get slot "name")
                             name (get slot "attachment")
                             regions (get attachments id {})
                             region (get regions name)
-                            supported (contains? #{"region" "mesh" "path"} (get region "type" "region"))]
-                        (when (> (count regions) 1) (conj! warnings (str "Slot " id " has additional attachments preserved in JSON; only its setup attachment is editable.")))
-                        (when (or (get slot "dark") (not= "normal" (get slot "blend" "normal")))
-                          (conj! warnings (str "Slot " id " uses two-color tint/blending preserved in JSON but not previewed.")))
+                            supported (contains? #{"region" "mesh" "path" "linkedmesh" "point" "boundingbox" "clipping"} (get region "type" "region"))]
+
                         (when (and region (not supported)) (conj! warnings (str "Attachment " name " uses " (get region "type") "; it remains in JSON but is not editable.")))
-                        (when (get region "sequence")
-                          (conj! warnings (str "Attachment " name " contains an image sequence preserved in JSON; sequence frames are not previewed.")))
+
                         (when (and name (nil? region))
                           (conj! warnings (str "Slot " id " has no setup attachment in the selected skin; its original assignment remains in JSON.")))
                         (cond-> {:id id :bone (get slot "bone")
                                  :spine-skin (if (contains? (get-in skin ["attachments" id]) name) skin-name "default")}
                           (get slot "color") (assoc :color (decode-color (get slot "color")))
+                          (get slot "dark") (assoc :dark-color (subvec (decode-color (str (get slot "dark") "ff")) 0 3))
+                          (get slot "blend") (assoc :blend (get slot "blend"))
                           (and name (or (nil? region) (not supported))) (assoc :unsupported-attachment true)
                           (and region supported) (assoc :attachment (import-attachment name region bones worlds (get slot "bone"))))))
                     (get source "slots" []))
@@ -1544,70 +1714,67 @@
                                                     (let [bone (get bone-map bone-id)]
                                                       (require-value! bone "Animation references a missing bone." {:bone bone-id})
                                                       (into [] (mapcat (fn [[timeline frames]]
-                                                                        (if (contains? #{"rotate" "translate" "translatex" "translatey" "scale" "scalex" "scaley" "shear" "shearx" "sheary"} timeline)
-                                                                          (import-timeline bone timeline frames)
-                                                                          (warn-preserved! warnings (str "Animation " id "/" bone-id "/" timeline " is preserved but not editable."))))) timelines))))
+                                                                         (if (contains? #{"rotate" "translate" "translatex" "translatey" "scale" "scalex" "scaley" "shear" "shearx" "sheary"} timeline)
+                                                                           (import-timeline bone timeline frames)
+                                                                           (when-not (= "inherit" timeline) (warn-preserved! warnings (str "Animation " id "/" bone-id "/" timeline " is preserved but not editable.")))))) timelines))))
                                           (get animation "bones" {}))
                              deforms (into []
                                            (keep (fn [{:keys [skin slot attachment frames]}]
                                                    (let [target (get slot-map slot)]
-                                                     (if (and (= skin (:spine-skin target)) (= attachment (get-in target [:attachment :name])) (contains? #{"mesh" "path"} (get-in target [:attachment :type])))
+                                                     (if (and (= skin (:spine-skin target)) (= attachment (get-in target [:attachment :name])) (contains? #{"mesh" "path" "boundingbox" "clipping"} (get-in target [:attachment :type])))
                                                        (import-deform target skin attachment frames)
                                                        (warn-preserved! warnings (str "Deform " id "/" slot "/" attachment " is retained for an inactive attachment."))))))
                                            (spine-deform-tracks animation))
                              ik-tracks (mapv (fn [[ik-id frames]]
                                                {:ik ik-id :keys (mapv (fn [frame]
-                                                                       (let [softness-curve (import-curve frame (if (and (vector? (get frame "curve")) (> (count (get frame "curve")) 4)) 4 0) identity)]
-                                                                         (merge {:time (get frame "time" 0.0) :mix (get frame "mix" 1.0) :bend-positive (get frame "bendPositive" true)
-                                                                                 :softness (get frame "softness" 0.0) :compress (get frame "compress" false) :stretch (get frame "stretch" false)
-                                                                                 :softness-interpolation (:interpolation softness-curve) :softness-curve (:curve softness-curve)
-                                                                                 :spine-frame-source (json/write-str frame)}
-                                                                                (import-curve frame 0 identity)))) frames)})
+                                                                        (let [softness-curve (import-curve frame (if (and (vector? (get frame "curve")) (> (count (get frame "curve")) 4)) 4 0) identity)]
+                                                                          (merge {:time (get frame "time" 0.0) :mix (get frame "mix" 1.0) :bend-positive (get frame "bendPositive" true)
+                                                                                  :softness (get frame "softness" 0.0) :compress (get frame "compress" false) :stretch (get frame "stretch" false)
+                                                                                  :softness-interpolation (:interpolation softness-curve) :softness-curve (:curve softness-curve)
+                                                                                  :spine-frame-source (json/write-str frame)}
+                                                                                 (import-curve frame 0 identity)))) frames)})
                                              (get animation "ik" {}))
                              physics-tracks (into [] (mapcat (fn [[constraint timelines]]
-                                                              (into [] (keep (fn [[property frames]]
-                                                                               (if-not (contains? (conj (set physics/animated-properties) "reset") property)
-                                                                                 (warn-preserved! warnings (str "Physics timeline " id "/" constraint "/" property " is preserved but not editable."))
-                                                                                 {:physics constraint :property property
-                                                                                  :keys (mapv (fn [frame]
-                                                                                                (merge {:time (get frame "time" 0.0) :value (get frame "value" 0.0)
-                                                                                                        :spine-frame-source (json/write-str frame)}
-                                                                                                       (if (= "reset" property) {:interpolation "stepped"} (import-curve frame 0 identity)))) frames)}))) timelines))) (get animation "physics" {}))
+                                                               (into [] (keep (fn [[property frames]]
+                                                                                (if-not (contains? (conj (set physics/animated-properties) "reset") property)
+                                                                                  (warn-preserved! warnings (str "Physics timeline " id "/" constraint "/" property " is preserved but not editable."))
+                                                                                  {:physics constraint :property property
+                                                                                   :keys (mapv (fn [frame]
+                                                                                                 (merge {:time (get frame "time" 0.0) :value (get frame "value" 0.0)
+                                                                                                         :spine-frame-source (json/write-str frame)}
+                                                                                                        (if (= "reset" property) {:interpolation "stepped"} (import-curve frame 0 identity)))) frames)}))) timelines))) (get animation "physics" {}))
                              path-tracks (into [] (mapcat (fn [[constraint timelines]]
-                                                           (into [] (mapcat (fn [[timeline frames]]
-                                                                             (let [properties (case timeline "position" ["position"] "spacing" ["spacing"] "mix" ["mix-rotate" "mix-x" "mix-y"] [])]
-                                                                               (when (zero? (count properties)) (conj! warnings (str "Path timeline " id "/" constraint "/" timeline " is preserved but not editable.")))
-                                                                               (mapv (fn [channel property]
-                                                                                       {:path constraint :property property
-                                                                                        :keys (mapv (fn [frame]
-                                                                                                      (merge {:time (get frame "time" 0.0) :spine-frame-source (json/write-str frame)
-                                                                                                              :value (if (= "mix" timeline)
-                                                                                                                       (get frame (get path-source-fields (keyword property)) (if (= "mix-y" property) (get frame "mixX" 1.0) 1.0))
-                                                                                                                       (get frame "value" 0.0))}
-                                                                                                             (import-curve frame (* 4 channel) identity))) frames)})
-                                                                                     (range (count properties)) properties)))) timelines))) (get animation "path" {}))
+                                                            (into [] (mapcat (fn [[timeline frames]]
+                                                                               (let [properties (case timeline "position" ["position"] "spacing" ["spacing"] "mix" ["mix-rotate" "mix-x" "mix-y"] [])]
+                                                                                 (when (zero? (count properties)) (conj! warnings (str "Path timeline " id "/" constraint "/" timeline " is preserved but not editable.")))
+                                                                                 (mapv (fn [channel property]
+                                                                                         {:path constraint :property property
+                                                                                          :keys (mapv (fn [frame]
+                                                                                                        (merge {:time (get frame "time" 0.0) :spine-frame-source (json/write-str frame)
+                                                                                                                :value (if (= "mix" timeline)
+                                                                                                                         (get frame (get path-source-fields (keyword property)) (if (= "mix-y" property) (get frame "mixX" 1.0) 1.0))
+                                                                                                                         (get frame "value" 0.0))}
+                                                                                                               (import-curve frame (* 4 channel) identity))) frames)})
+                                                                                       (range (count properties)) properties)))) timelines))) (get animation "path" {}))
                              transform-tracks (into [] (mapcat (fn [[constraint frames]]
-                                                                (mapv (fn [channel property]
-                                                                        {:transform constraint :property property
-                                                                         :keys (mapv (fn [frame]
-                                                                                       (merge {:time (get frame "time" 0.0)
-                                                                                               :spine-frame-source (json/write-str frame)
-                                                                                               :value (get frame (get transform-source-fields (keyword property))
-                                                                                                           (case property "mix-y" (get frame "mixX" 1.0) "mix-scale-y" (get frame "mixScaleX" 1.0) 1.0))}
-                                                                                              (import-curve frame (* 4 channel) identity))) frames)})
-                                                                      (range 6) constraints/transform-properties))) (get animation "transform" {}))]
-                         (run! (fn [section] (when (pos? (count (get animation section)))
-                                              (conj! warnings (str "Animation " id "/" section " is preserved in JSON but not previewed."))))
-                               ["events"])
-                         (when (coll/any? (fn [timelines] (coll/any? #(not= "deform" %) (coll/keys timelines)))
+                                                                 (mapv (fn [channel property]
+                                                                         {:transform constraint :property property
+                                                                          :keys (mapv (fn [frame]
+                                                                                        (merge {:time (get frame "time" 0.0)
+                                                                                                :spine-frame-source (json/write-str frame)
+                                                                                                :value (get frame (get transform-source-fields (keyword property))
+                                                                                                            (case property "mix-y" (get frame "mixX" 1.0) "mix-scale-y" (get frame "mixScaleX" 1.0) 1.0))}
+                                                                                               (import-curve frame (* 4 channel) identity))) frames)})
+                                                                       (range 6) constraints/transform-properties))) (get animation "transform" {}))]
+                         (when (coll/any? (fn [timelines] (coll/any? #(not (contains? #{"deform" "sequence"} %)) (coll/keys timelines)))
                                           (into [] (comp (mapcat coll/vals) (mapcat coll/vals)) (coll/vals (get animation "attachments" {}))))
-                           (conj! warnings (str "Attachment sequence timelines in " id " are preserved but not previewed.")))
+                           (conj! warnings (str "Unrecognized attachment timelines in " id " are preserved but not previewed.")))
                          {:id id :duration (timeline-duration animation) :tracks tracks :deforms deforms :ik-tracks ik-tracks :transform-tracks transform-tracks :path-tracks path-tracks :physics-tracks physics-tracks :physics-order (get physics-orders id [])}))
                      (get source "animations" {}))]
-    (validate-document {:schema "defold.skeleton" :version 1 :name "Imported skeleton"
-                        :spine-source text :active-skin skin-name :warnings (into [] (distinct) (persistent! warnings))
-                        :reference-scale (get-in source ["skeleton" "referenceScale"] 100.0)
-                        :bones bones :slots slots :ik ik :transform transforms :path paths :physics physics-constraints :animations animations})))
+    (validate-document (events/materialize-document {:schema "defold.skeleton" :version 1 :name "Imported skeleton"
+                                                     :spine-source text :active-skin skin-name :warnings (coll/into-> (persistent! warnings) [] (distinct))
+                                                     :reference-scale (get-in source ["skeleton" "referenceScale"] 100.0)
+                                                     :bones bones :slots slots :ik ik :transform transforms :path paths :physics physics-constraints :animations animations}))))
 
 (defn import-spine-json
   "Import Spine 4.2 using the default skin, retaining source data for other
@@ -1632,8 +1799,8 @@
             animations (into {} (map (juxt :id identity)) (:animations imported))]
         (-> (cond-> document needs-transform (assoc :transform (:transform imported)) needs-path (assoc :path (:path imported)) needs-physics (assoc :physics (:physics imported) :reference-scale (:reference-scale imported)))
             (update :slots #(mapv (fn [slot] (if (and needs-path (:unsupported-attachment slot))
-                                             (let [source-slot (coll/first-where (fn [source-slot] (= (:id slot) (:id source-slot))) (:slots imported))]
-                                               (if (= "path" (get-in source-slot [:attachment :type])) (merge slot (select-keys source-slot [:attachment :spine-skin]) {:unsupported-attachment false}) slot)) slot)) %))
+                                               (let [source-slot (coll/first-where (fn [source-slot] (= (:id slot) (:id source-slot))) (:slots imported))]
+                                                 (if (= "path" (get-in source-slot [:attachment :type])) (merge slot (select-keys source-slot [:attachment :spine-skin]) {:unsupported-attachment false}) slot)) slot)) %))
             (update :bones #(mapv (fn [bone] (merge (select-keys (bones (:id bone)) [:inherit :shear-x :shear-y]) bone)) %))
             (update :ik #(mapv (fn [constraint] (merge (select-keys (ik (:id constraint)) [:order :softness :compress :stretch :uniform]) constraint)) %))
             (update :animations
@@ -1642,14 +1809,14 @@
                                    tracks (into {} (map (juxt :ik identity)) (:ik-tracks source))]
                                (-> (merge (select-keys source (cond-> [:transform-tracks] needs-path (conj :path-tracks) needs-physics (into [:physics-tracks :physics-order]))) animation)
                                    (update :deforms (fn [current] (into (filterv (fn [track] (not (contains? restored-path-slots (:slot track)))) current)
-                                                                      (filter (fn [track] (contains? restored-path-slots (:slot track)))) (:deforms source))))
+                                                                        (filter (fn [track] (contains? restored-path-slots (:slot track)))) (:deforms source))))
                                    (update :ik-tracks (fn [current]
-                                                       (mapv (fn [track]
-                                                               (update track :keys
-                                                                       (fn [keys]
-                                                                         (mapv (fn [key]
-                                                                                 (merge (select-keys (coll/first-where (fn [old] (== (:time old) (:time key))) (:keys (tracks (:ik track))))
-                                                                                                     [:softness :compress :stretch :softness-interpolation :softness-curve]) key)) keys)))) current)))))) %)))))))
+                                                        (mapv (fn [track]
+                                                                (update track :keys
+                                                                        (fn [keys]
+                                                                          (mapv (fn [key]
+                                                                                  (merge (select-keys (coll/first-where (fn [old] (== (:time old) (:time key))) (:keys (tracks (:ik track))))
+                                                                                                      [:softness :compress :stretch :softness-interpolation :softness-curve]) key)) keys)))) current)))))) %)))))))
 
 (defn- sample-ik-impl
   "Sample imported animated IK mix/bend into the document's constraints."
@@ -1661,11 +1828,11 @@
             (if-let [keys (:keys (get tracks (:id constraint)))]
               (let [key (reduce (fn [previous key] (if (> (double (:time key)) time) (reduced previous) key)) nil keys)]
                 (cond-> (assoc (constraints/normalize-ik constraint)
-                               :mix (sample-track-impl (mapv #(assoc % :value (:mix %)) keys) time (:mix constraint))
-                               :softness (sample-track-impl (mapv #(assoc % :value (get % :softness 0.0)
-                                                                          :interpolation (get % :softness-interpolation (:interpolation %))
-                                                                          :curve (or (:softness-curve %) (:curve %))) keys)
-                                                           time (get constraint :softness 0.0)))
+                          :mix (sample-track-impl (mapv #(assoc % :value (:mix %)) keys) time (:mix constraint))
+                          :softness (sample-track-impl (mapv #(assoc % :value (get % :softness 0.0)
+                                                                     :interpolation (get % :softness-interpolation (:interpolation %))
+                                                                     :curve (or (:softness-curve %) (:curve %))) keys)
+                                                       time (get constraint :softness 0.0)))
                   key (assoc :bend-positive (:bend-positive key) :compress (get key :compress false) :stretch (get key :stretch false))))
               (constraints/normalize-ik constraint))) (:ik document))))
 
@@ -1674,22 +1841,29 @@
   (require-value! (finite-number? time) "Sample time must be finite." {})
   (sample-ik-impl document animation-id time))
 
-(defn- evaluate-pose-step [document animation-id time previous-time physics-state slot-sampler]
-  (let [bones (sample-pose-impl document animation-id time)
+(defn- evaluate-pose-step [document animation-id time previous-time physics-state slot-sampler activation]
+  (let [setup-bones (coll/into-> (:bones document) {} (map (juxt :id identity)))
+        bones (mapv (fn [bone]
+                      (let [active (contains? (:bone-ids activation) (:id bone))]
+                        (assoc (if active bone (setup-bones (:id bone))) :active active)))
+                    (sample-pose-impl document animation-id time))
         transforms (sample-transforms-impl document animation-id time)
         ik (sample-ik-impl document animation-id time)
         paths (sample-paths-impl document animation-id time)
         dynamics (sample-physics-impl document animation-id time)
         animation (coll/first-where #(= animation-id (:id %)) (:animations document))
         resets (into #{} (comp (filter #(= "reset" (:property %)))
-                              (filter #(coll/any? (fn [key] (< previous-time (:time key) (+ time 1.0e-12))) (:keys %)))
-                              (map :physics)) (:physics-tracks animation))
+                               (filter #(coll/any? (fn [key] (< previous-time (:time key) (+ time 1.0e-12))) (:keys %)))
+                               (map :physics)) (:physics-tracks animation))
         sampled-slots (when (and slot-sampler (pos? (count paths))) (slot-sampler document animation-id time))
         slots (into {} (map (juxt :id identity)) (if sampled-slots (:slots sampled-slots) (:slots document)))
         deforms (if sampled-slots (:deforms sampled-slots) (sample-deforms-impl document animation-id time))
         ordered (sort-by #(get (second %) :order 0)
-                         (into [] (mapcat (fn [[type values]] (mapv #(vector type %) values)))
-                               [[:ik ik] [:transform transforms] [:path paths] [:physics dynamics]]))]
+                         (coll/into-> [[:ik ik] [:transform transforms] [:path paths] [:physics dynamics]] []
+                           (mapcat (fn [[type values]]
+                                     (coll/into-> values []
+                                       (filter #(contains? (get-in activation [:constraints type]) (:id %)))
+                                       (map #(vector type %)))))))]
     (reduce (fn [{:keys [pose state]} [type constraint]]
               (case type
                 :ik {:pose (constraints/apply-ik-constraint pose constraint) :state state}
@@ -1702,43 +1876,48 @@
                                                      :mode (if (or (contains? resets "") (contains? resets (:id constraint))) :reset-event :update)})]
                            {:pose (constraints/apply-world-transform pose (:bone constraint) (:matrix result))
                             :state (assoc state (:id constraint) (:state result))})))
-            {:pose (constraints/pose bones) :state physics-state} ordered)))
+            {:pose (assoc (constraints/pose bones) :active-bone-ids (:bone-ids activation)) :state physics-state} ordered)))
 
 (def ^:private validated-pose-documents (atom []))
 
 (defn- evaluate-pose-state-impl [document animation-id time previous-state slot-sampler]
-  (when-not (coll/any? #(identical? document %) @validated-pose-documents)
-    (validate-document document)
-    ;; Documents are immutable. Keep the tiny preview cache bounded, and only
-    ;; retain successfully validated identities so edits always cross the edge.
-    (swap! validated-pose-documents #(into [document] (take 3) %)))
-  (require-value! (finite-number? time) "Sample time must be finite." {})
-  (when (and (nil? slot-sampler) animation-id (:spine-source document) (pos? (count (:path document))))
-    (let [source (json/read-str (:spine-source document))]
-      (require-value!
-        (not (coll/any? #(coll/not-empty (get-in source ["animations" animation-id "slots" (:target %) "attachment"])) (:path document)))
-        "Animated path attachments require a slot sampler. Use evaluate-pose-with-slots-state." {})))
-  (let [animation (when animation-id (get-in document [:animations (item-index document :animations animation-id)]))
-        time (if animation (max 0.0 (min time (:duration animation))) 0.0)]
-    (if (or (nil? animation) (zero? (count (:physics document))))
-      {:pose (:pose (evaluate-pose-step document animation-id time -1.0 {} slot-sampler)) :state nil}
-      (let [fps (reduce max 1.0 (mapv #(get % :fps 60.0) (:physics document)))
-            target (long (Math/floor (+ (* time fps) 1.0e-10)))
-            reusable (and (= document (:document previous-state)) (= animation-id (:animation previous-state))
-                          (identical? slot-sampler (:slot-sampler previous-state))
-                          (<= (:time previous-state) time))
-            initial (if reusable previous-state
-                        (let [{:keys [pose state]} (evaluate-pose-step document animation-id 0.0 -1.0 {} slot-sampler)]
-                          {:document document :animation animation-id :step 0 :time 0.0 :pose pose :physics state :slot-sampler slot-sampler}))
-            _ (require-value! (<= (- target (:step initial)) 100000) "Physics replay is too long. Shorten the animation or reduce simulation FPS." {})
-            canonical (loop [cache initial]
-                        (if (>= (:step cache) target) cache
-                            (let [step (inc (:step cache)) sample-time (/ step fps)
-                                  result (evaluate-pose-step document animation-id sample-time (:time cache) (:physics cache) slot-sampler)]
-                              (recur (assoc cache :step step :time sample-time :pose (:pose result) :physics (:state result))))))
-            pose (if (< (- time (:time canonical)) 1.0e-10) (:pose canonical)
-                     (:pose (evaluate-pose-step document animation-id time (:time canonical) (:physics canonical) slot-sampler)))]
-        {:pose pose :state canonical}))))
+  (let [cached (coll/first-where #(identical? document (:document %)) @validated-pose-documents)
+        activation (if cached
+                     (:activation cached)
+                     (do
+                       (validate-document document)
+                       ;; Cache skin membership once per immutable document,
+                       ;; outside both preview frames and Physics replay steps.
+                       (let [activation (skin/activation document)]
+                         (swap! validated-pose-documents #(coll/into-> % [{:document document :activation activation}] (take 3)))
+                         activation)))]
+    (require-value! (finite-number? time) "Sample time must be finite." {})
+    (when (and (nil? slot-sampler) animation-id (:spine-source document) (pos? (count (:path document))))
+      (let [source (json/read-str (:spine-source document))]
+        (require-value!
+          (coll/not-any? #(coll/not-empty (get-in source ["animations" animation-id "slots" (:target %) "attachment"])) (:path document))
+          "Animated path attachments require a slot sampler. Use evaluate-pose-with-slots-state." {})))
+    (let [animation (when animation-id (get-in document [:animations (item-index document :animations animation-id)]))
+          time (if animation (max 0.0 (min time (:duration animation))) 0.0)]
+      (if (or (nil? animation) (zero? (count (get-in activation [:constraints :physics]))))
+        {:pose (:pose (evaluate-pose-step document animation-id time -1.0 {} slot-sampler activation)) :state nil}
+        (let [fps (reduce max 1.0 (mapv #(get % :fps 60.0) (:physics document)))
+              target (long (Math/floor (+ (* time fps) 1.0e-10)))
+              reusable (and (= document (:document previous-state)) (= animation-id (:animation previous-state))
+                            (identical? slot-sampler (:slot-sampler previous-state))
+                            (<= (:time previous-state) time))
+              initial (if reusable previous-state
+                          (let [{:keys [pose state]} (evaluate-pose-step document animation-id 0.0 -1.0 {} slot-sampler activation)]
+                            {:document document :animation animation-id :step 0 :time 0.0 :pose pose :physics state :slot-sampler slot-sampler}))
+              _ (require-value! (<= (- target (:step initial)) 100000) "Physics replay is too long. Shorten the animation or reduce simulation FPS." {})
+              canonical (loop [cache initial]
+                          (if (>= (:step cache) target) cache
+                              (let [step (inc (:step cache)) sample-time (/ step fps)
+                                    result (evaluate-pose-step document animation-id sample-time (:time cache) (:physics cache) slot-sampler activation)]
+                                (recur (assoc cache :step step :time sample-time :pose (:pose result) :physics (:state result))))))
+              pose (if (< (- time (:time canonical)) 1.0e-10) (:pose canonical)
+                       (:pose (evaluate-pose-step document animation-id time (:time canonical) (:physics canonical) slot-sampler activation)))]
+          {:pose pose :state canonical})))))
 
 (defn evaluate-pose-state
   "Evaluate shared constraint order with cached, deterministic Physics replay.
@@ -1786,13 +1965,24 @@
   (let [{:keys [path x y rotation scale-x scale-y width height color type vertices weights uvs triangles]} attachment
         base (merge original {"type" (or type "region") "path" (when path (subs path 1 (- (count path) 4)))
                               "x" x "y" y "rotation" rotation "scaleX" scale-x "scaleY" scale-y
-                              "width" width "height" height "color" (encode-color color)})]
+                              "width" width "height" height "color" (encode-color color)})
+        base (if-let [value (:sequence attachment)] (assoc base "sequence" (sequence/encode value (get original "sequence"))) (dissoc base "sequence"))]
     (cond
+      (= "linkedmesh" type)
+      (assoc (apply dissoc base ["uvs" "triangles" "vertices" "hull" "edges" "vertexCount" "deform"])
+        "parent" (:parent attachment) "skin" (:skin attachment "default") "timelines" (:deform attachment true))
+      (= "point" type)
+      (apply dissoc base ["path" "width" "height" "scaleX" "scaleY" "vertices" "uvs" "triangles" "sequence"])
+      (contains? #{"boundingbox" "clipping"} type)
+      (cond-> (assoc (apply dissoc base ["path" "x" "y" "rotation" "scaleX" "scaleY" "width" "height" "uvs" "triangles" "hull" "edges" "sequence"])
+                "vertexCount" (quot (count vertices) 2)
+                "vertices" (if weights (coll/into-> weights [] (mapcat (fn [influences] (coll/into-> influences [(count influences)] (mapcat (fn [{:keys [bone x y weight]}] [(get bone-indices bone) x y weight])))))) vertices))
+        (= "clipping" type) (assoc "end" (:end attachment)))
       (= "path" type)
       (assoc (apply dissoc base ["path" "x" "y" "rotation" "scaleX" "scaleY" "width" "height" "uvs" "triangles" "hull" "edges"])
-             "closed" (:closed attachment) "constantSpeed" (:constant-speed attachment) "lengths" (:lengths attachment)
-             "vertexCount" (quot (count vertices) 2)
-             "vertices" (if weights (into [] (mapcat (fn [influences] (into [(count influences)] (mapcat (fn [{:keys [bone x y weight]}] [(get bone-indices bone) x y weight])) influences))) weights) vertices))
+        "closed" (:closed attachment) "constantSpeed" (:constant-speed attachment) "lengths" (:lengths attachment)
+        "vertexCount" (quot (count vertices) 2)
+        "vertices" (if weights (coll/into-> weights [] (mapcat (fn [influences] (coll/into-> influences [(count influences)] (mapcat (fn [{:keys [bone x y weight]}] [(get bone-indices bone) x y weight])))))) vertices))
       (= "mesh" type)
       (assoc (cond-> base
                (:spine-export-hull attachment) (assoc "hull" (:spine-export-hull attachment) "edges" (:spine-export-edges attachment))) "uvs" uvs "triangles" triangles
@@ -1801,7 +1991,7 @@
                                              (into [(count influences)]
                                                    (mapcat (fn [{:keys [bone x y weight]}] [(get bone-indices bone) x y weight])) influences))) weights)
                           vertices))
-      :else (dissoc base "uvs" "triangles" "vertices" "hull" "edges" "parent" "skin" "deform"))))
+      :else (dissoc base "uvs" "triangles" "vertices" "hull" "edges" "parent" "skin" "deform" "timelines"))))
 
 (defn- reindex-spine-attachment [attachment old-bones bone-indices]
   (let [vertices (get attachment "vertices")
@@ -1853,6 +2043,20 @@
                     clipped (first (split-curve tail (if (= a 1.0) 0.0 (/ (- b a) (- 1.0 a)))))]
                 (into (nth clipped 1) (nth clipped 2))) linear)}))
 
+(defn- sample-constraint-mix-track [track tracks time setup]
+  ;; Spine stores all mix components on shared frames. A key inserted in one
+  ;; component splits the Bezier lookup of every other component at export.
+  (let [times (vec (sort (coll/into-> tracks #{} (mapcat :keys) (map :time))))
+        start (reduce (fn [previous value] (if (> value time) (reduced previous) value)) nil times)
+        end (coll/first-where #(> % time) times)]
+    (if-not (and start end)
+      (sample-track-impl (:keys track) time setup)
+      (let [{:keys [from to stepped bezier curve]} (transform-segment track setup start end)]
+        (cond
+          stepped from
+          bezier (interpolation/sample-bezier (interpolation/bezier-points start from end to curve) time)
+          :else (+ from (* (/ (- time start) (- end start)) (- to from))))))))
+
 (defn- export-constraint-mix-tracks [document tracks originals section properties fields normalize]
   (into {}
         (map (fn [[id tracks]]
@@ -1889,7 +2093,7 @@
         scalars (filterv #(contains? #{"position" "spacing"} (:property %)) tracks)
         mixes (filterv #(not (contains? #{"position" "spacing"} (:property %))) tracks)
         exported-mixes (export-constraint-mix-tracks document mixes (coll/map-vals #(get % "mix") (get original "path" {}))
-                                                   :path ["mix-rotate" "mix-x" "mix-y"] path-source-fields constraints/normalize-path)]
+                                                     :path ["mix-rotate" "mix-x" "mix-y"] path-source-fields constraints/normalize-path)]
     (reduce (fn [result track]
               (assoc-in result [(:path track) (:property track)]
                         (mapv (fn [key]
@@ -1962,11 +2166,11 @@
         (if (or (not= "mesh" (:type attachment)) (not changed)) document
             (let [initial #{[skin (:id slot) name]}
                   links (into [] (mapcat (fn [source-skin]
-                                          (into [] (keep (fn [[linked-name linked-attachment]]
-                                                           (when (= "linkedmesh" (get linked-attachment "type"))
-                                                             {:id [(get source-skin "name") (:id slot) linked-name]
-                                                              :parent [(get linked-attachment "skin" "default") (:id slot) (get linked-attachment "parent")]})))
-                                                (get-in source-skin ["attachments" (:id slot)])))) (get source "skins" []))
+                                           (into [] (keep (fn [[linked-name linked-attachment]]
+                                                            (when (= "linkedmesh" (get linked-attachment "type"))
+                                                              {:id [(get source-skin "name") (:id slot) linked-name]
+                                                               :parent [(get linked-attachment "skin" "default") (:id slot) (get linked-attachment "parent")]})))
+                                                 (get-in source-skin ["attachments" (:id slot)])))) (get source "skins" []))
                   linked (disj (loop [affected initial]
                                  (let [expanded (into affected (comp (filter #(contains? affected (:parent %))) (map :id)) links)]
                                    (if (= affected expanded) affected (recur expanded)))) [skin (:id slot) name])
@@ -1980,8 +2184,8 @@
                   (update :animations #(mapv (fn [animation] (remap-export-deforms animation (:id slot) attachment mesh vertex-map)) %)))))))
     document (mapv vector (range (count (:slots document))) (:slots document))))
 
-(defn export-spine-json
-  "Export Spine 4.2 JSON by overlaying editable data onto the original source.
+(defn export-spine-data
+  "Export Spine 4.2 data by overlaying editable data onto the original source.
   Unknown skins, attachments, curves and constraint/timeline fields survive.
   Source image paths are project relative without the PNG extension."
   [document]
@@ -2002,8 +2206,8 @@
                          (map (fn [{:keys [id duration tracks deforms ik-tracks transform-tracks path-tracks physics-tracks] :as animation}]
                                 (let [original (get-in source ["animations" id] {})
                                       bone-tracks (into {} (comp (filter (fn [[bone-id]] (contains? bone-map bone-id)))
-                                                                (map (fn [[bone-id timelines]]
-                                                                       [bone-id (apply dissoc timelines ["rotate" "translate" "translatex" "translatey" "scale" "scalex" "scaley" "shear" "shearx" "sheary"])])))
+                                                                 (map (fn [[bone-id timelines]]
+                                                                        [bone-id (apply dissoc timelines ["rotate" "translate" "translatex" "translatey" "scale" "scalex" "scaley" "shear" "shearx" "sheary"])])))
                                                         (get original "bones" {}))
                                       tracks (filterv #(pos? (count (:keys %))) tracks)
                                       tracks (if (and (zero? (count tracks)) (pos? (count bones)))
@@ -2014,13 +2218,13 @@
                                                             (assoc-in result [(:bone track) (get {"x" "translatex" "y" "translatey" "rotation" "rotate" "scale-x" "scalex" "scale-y" "scaley" "shear-x" "shearx" "shear-y" "sheary"} (:property track))]
                                                                       (export-timeline (get bone-map (:bone track)) track duration))) bone-tracks tracks)
                                       raw-deforms (into {} (map (fn [[skin slots]]
-                                                                 [skin (into {} (comp (filter (fn [[slot]] (contains? current-slot-ids slot)))
-                                                                                     (map (fn [[slot attachments]]
-                                                                                            [slot (into {} (map (fn [[name timelines]]
-                                                                                                                 [name (if (coll/any? #(and (= slot (:id %))
-                                                                                                                                             (= skin (get % :spine-skin "default"))
-                                                                                                                                             (= name (get-in % [:attachment :name] (:id %)))) (:slots document))
-                                                                                                                         (dissoc timelines "deform") timelines)])) attachments)]))) slots)]))
+                                                                  [skin (into {} (comp (filter (fn [[slot]] (contains? current-slot-ids slot)))
+                                                                                       (map (fn [[slot attachments]]
+                                                                                              [slot (into {} (map (fn [[name timelines]]
+                                                                                                                    [name (if (coll/any? #(and (= slot (:id %))
+                                                                                                                                               (= skin (get % :spine-skin "default"))
+                                                                                                                                               (= name (get-in % [:attachment :name] (:id %)))) (:slots document))
+                                                                                                                            (dissoc timelines "deform") timelines)])) attachments)]))) slots)]))
                                                         (get original "attachments" {}))
                                       deform-tracks (reduce (fn [result {:keys [skin slot attachment keys]}]
                                                               (assoc-in result [(or skin "default") slot attachment "deform"]
@@ -2033,7 +2237,8 @@
                                         (pos? (count ik-tracks)) (assoc "ik" ik-tracks)
                                         (pos? (count transform-tracks)) (assoc "transform" (export-transform-tracks document transform-tracks original))
                                         (or (pos? (count path-tracks)) (get original "path")) (assoc "path" (export-path-tracks document path-tracks original))
-                                        (or (pos? (count physics-tracks)) (get original "physics")) (assoc "physics" (export-physics-tracks document animation original)))]))) (:animations document))
+                                        (or (pos? (count physics-tracks)) (get original "physics")) (assoc "physics" (export-physics-tracks document animation original))
+                                        (contains? animation :event-tracks) (assoc "events" (events/export-keyframes document id)))]))) (:animations document))
         skins (reduce (fn [skins {:keys [id attachment spine-skin]}]
                         (if (nil? attachment)
                           skins
@@ -2043,13 +2248,15 @@
                                 path [index "attachments" id (get attachment :name id)]]
                             (assoc-in skins path (export-attachment attachment (get-in skins path {}) bone-indices)))))
                       (reindex-spine-skins (get source "skins" []) (get source "bones" []) bone-indices (into #{} (map :id) (:slots document))) (:slots document))
-        slots (mapv (fn [{:keys [id bone attachment color unsupported-attachment]}]
-                      (cond-> (assoc (if unsupported-attachment (get old-slots id {}) (dissoc (get old-slots id {}) "attachment")) "name" id "bone" bone)
+        slots (mapv (fn [{:keys [id bone attachment color dark-color blend unsupported-attachment]}]
+                      (cond-> (assoc (dissoc (if unsupported-attachment (get old-slots id {}) (dissoc (get old-slots id {}) "attachment")) "dark" "blend") "name" id "bone" bone)
                         attachment (assoc "attachment" (get attachment :name id))
-                        color (assoc "color" (encode-color color)))) (:slots document))
+                        color (assoc "color" (encode-color color))
+                        dark-color (assoc "dark" (subs (encode-color (conj dark-color 1.0)) 0 6))
+                        blend (assoc "blend" blend))) (:slots document))
         old-ik (into {} (map (juxt #(get % "name") identity)) (get source "ik" []))
         skins (mapv (fn [skin] (cond-> skin
-                                (get skin "ik") (update "ik" #(filterv (into #{} (map :id) (:ik document)) %)))) skins)
+                                 (get skin "ik") (update "ik" #(filterv (coll/into-> (:ik document) #{} (map :id)) %)))) skins)
         old-transform (into {} (map (juxt #(get % "name") identity)) (get source "transform" []))
         skins (mapv (fn [skin] (cond-> skin (get skin "transform") (update "transform" #(filterv (into #{} (map :id) (:transform document)) %)))) skins)
         old-path (into {} (map (juxt #(get % "name") identity)) (get source "path" []))
@@ -2058,43 +2265,51 @@
         skins (mapv (fn [skin] (cond-> skin (get skin "physics") (update "physics" #(filterv (into #{} (map :id) (:physics document)) %)))) skins)
         maximum-ik-order (reduce max -1 (mapv #(get % "order" 0) (get source "ik" [])))
         output (assoc source
-                      "skeleton" (assoc (merge {"spine" "4.2.0"} (get source "skeleton" {})) "referenceScale" (get document :reference-scale 100.0))
-                      "bones" (mapv (fn [{:keys [id parent x y rotation scale-x scale-y shear-x shear-y length inherit spine-color]}]
-                                      (cond-> (assoc (dissoc (get old-bones id {}) "parent") "name" id "x" x "y" y "rotation" rotation "scaleX" scale-x "scaleY" scale-y "shearX" (or shear-x 0.0) "shearY" (or shear-y 0.0) "inherit" (or inherit "normal") "length" length)
-                                        parent (assoc "parent" parent) spine-color (assoc "color" spine-color))) ordered-bones)
-                      "slots" slots "skins" skins "animations" animations
-                      "physics" (mapv (fn [constraint]
-                                        (reduce (fn [result [field source-field]]
-                                                  (assoc result source-field (get constraint field false)))
-                                                (assoc (get old-physics (:id constraint) {}) "name" (:id constraint) "bone" (:bone constraint))
-                                                physics-source-fields)) (mapv physics/normalize-constraint (:physics document)))
-                      "path" (mapv (fn [constraint]
+                 "skeleton" (assoc (merge {"spine" "4.2.0"} (get source "skeleton" {})) "referenceScale" (get document :reference-scale 100.0))
+                 "bones" (mapv (fn [{:keys [id parent x y rotation scale-x scale-y shear-x shear-y length inherit spine-color]}]
+                                 (cond-> (assoc (dissoc (get old-bones id {}) "parent") "name" id "x" x "y" y "rotation" rotation "scaleX" scale-x "scaleY" scale-y "shearX" (or shear-x 0.0) "shearY" (or shear-y 0.0) "inherit" (or inherit "normal") "length" length)
+                                   parent (assoc "parent" parent) spine-color (assoc "color" spine-color))) ordered-bones)
+                 "slots" slots "skins" skins "animations" animations
+                 "physics" (mapv (fn [constraint]
+                                   (reduce (fn [result [field source-field]]
+                                             (assoc result source-field (get constraint field false)))
+                                           (assoc (get old-physics (:id constraint) {}) "name" (:id constraint) "bone" (:bone constraint))
+                                           physics-source-fields)) (mapv physics/normalize-constraint (:physics document)))
+                 "path" (mapv (fn [constraint]
+                                (reduce (fn [result [field source-field]] (assoc result source-field (get constraint field)))
+                                        (assoc (get old-path (:id constraint) {}) "name" (:id constraint) "bones" (:bones constraint) "target" (:target constraint))
+                                        path-source-fields)) (mapv constraints/normalize-path (:path document)))
+                 "transform" (mapv (fn [constraint]
                                      (reduce (fn [result [field source-field]] (assoc result source-field (get constraint field)))
-                                             (assoc (get old-path (:id constraint) {}) "name" (:id constraint) "bones" (:bones constraint) "target" (:target constraint))
-                                             path-source-fields)) (mapv constraints/normalize-path (:path document)))
-                      "transform" (mapv (fn [constraint]
-                                          (reduce (fn [result [field source-field]] (assoc result source-field (get constraint field)))
-                                                  (assoc (get old-transform (:id constraint) {}) "name" (:id constraint) "bones" (:bones constraint) "target" (:target constraint))
-                                                  transform-source-fields)) (mapv constraints/normalize-transform (:transform document)))
-                      "ik" (mapv (fn [index {:keys [id bones target mix bend-positive softness compress stretch uniform order]}]
-                                   (assoc (get old-ik id {}) "name" id "bones" bones "target" target "mix" mix "bendPositive" bend-positive "softness" (or softness 0.0)
-                                          "compress" (boolean compress) "stretch" (boolean stretch) "uniform" (boolean uniform)
-                                          "order" (or order (get (get old-ik id) "order" (+ maximum-ik-order 1 index)))))
-                                 (range (count (:ik document))) (:ik document)))
+                                             (assoc (get old-transform (:id constraint) {}) "name" (:id constraint) "bones" (:bones constraint) "target" (:target constraint))
+                                             transform-source-fields)) (mapv constraints/normalize-transform (:transform document)))
+                 "ik" (mapv (fn [index {:keys [id bones target mix bend-positive softness compress stretch uniform order]}]
+                              (assoc (get old-ik id {}) "name" id "bones" bones "target" target "mix" mix "bendPositive" bend-positive "softness" (or softness 0.0)
+                                     "compress" (boolean compress) "stretch" (boolean stretch) "uniform" (boolean uniform)
+                                     "order" (or order (get (get old-ik id) "order" (+ maximum-ik-order 1 index)))))
+                            (range (count (:ik document))) (:ik document)))
+        output (cond-> output
+                 (contains? document :events) (assoc "events" (events/export-definitions document)))
         ;; Spine runs orders 0..constraint-count-1. Deletion and user-assigned
         ;; priorities may leave gaps, so serialize the same stable preview order
         ;; using contiguous indices instead of silently disabling later constraints.
         sections ["ik" "transform" "path" "physics"]
-          ordered (sort-by #(get (second %) "order" 0)
-                           (into [] (mapcat (fn [section] (mapv #(vector section %) (get output section)))) sections))
-          orders (into {} (map-indexed (fn [index [section constraint]] [[section (get constraint "name")] index])) ordered)
-          output (reduce (fn [output section]
-                           (update output section #(mapv (fn [constraint] (assoc constraint "order" (get orders [section (get constraint "name")]))) %))) output sections)]
+        ordered (sort-by #(get (second %) "order" 0)
+                         (into [] (mapcat (fn [section] (mapv #(vector section %) (get output section)))) sections))
+        orders (into {} (map-indexed (fn [index [section constraint]] [[section (get constraint "name")] index])) ordered)
+        output (reduce (fn [output section]
+                         (update output section #(mapv (fn [constraint] (assoc constraint "order" (get orders [section (get constraint "name")]))) %))) output sections)]
     (doseq [{:keys [id duration]} (:animations document)]
       (require-value! (<= (timeline-duration (get animations id)) (+ (double duration) 1.0e-9))
                       "Animation duration cannot end before preserved inactive or unsupported timeline keys. Edit or remove those keys first."
                       {:animation id :duration duration}))
-    (str (json/write-str output :escape-slash false :indent true) "\n")))
+    output))
+
+(defn export-spine-json
+  "Serialize validated Spine data for a human-readable export file. Internal
+  mesh proposals use export-spine-data to avoid a redundant JSON round trip."
+  [document]
+  (str (json/write-str (export-spine-data document) :escape-slash false :indent true) "\n"))
 
 (defn skin-names [document]
   (if-let [source (:spine-source document)]
@@ -2110,7 +2325,7 @@
     (-> document
         (merge (select-keys selected [:slots :spine-source :active-skin :warnings]))
         (update :animations #(mapv (fn [animation]
-                                    (assoc animation :deforms (get deforms (:id animation) []))) %)))))
+                                     (assoc animation :deforms (get deforms (:id animation) []))) %)))))
 
 (defn select-skin
   "Flush current editable attachments/deforms into the complete source before
@@ -2175,10 +2390,10 @@
           source (-> source
                      (assoc "skins" (conj skins (duplicate-spine-skin source skin new-id)))
                      (update "animations" #(coll/map-vals
-                                              (fn [animation]
-                                                (if-let [tracks (get-in animation ["attachments" old-id])]
-                                                  (assoc-in animation ["attachments" new-id] tracks)
-                                                  animation)) %)))
+                                             (fn [animation]
+                                               (if-let [tracks (get-in animation ["attachments" old-id])]
+                                                 (assoc-in animation ["attachments" new-id] tracks)
+                                                 animation)) %)))
           source (if promote-default
                    (update source "skins"
                            #(mapv (fn [skin]

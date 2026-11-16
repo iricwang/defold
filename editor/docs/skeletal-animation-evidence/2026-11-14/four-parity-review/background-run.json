@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-four-review/build/editor.jar",
+  "sha256": "d7df2ef868cec3d63212b565b7e8bdd447a5446131e42ba4f64a102df11faaf5",
+  "project_source": "editor/test/resources/skeletal-animation/performance-project",
+  "project_copy": "/private/tmp/spine-four-review/interaction/project",
+  "scenario": "/private/tmp/spine-four-review/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

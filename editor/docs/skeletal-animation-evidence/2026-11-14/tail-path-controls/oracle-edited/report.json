@@ -1,0 +1,32 @@
+{
+  "runtime": "@esotericsoftware/spine-core",
+  "version": "4.2.120",
+  "fixture": "/private/tmp/spine-tail-path/background-final/project/tail_path.skeleton",
+  "exportSha256": "56f52d8dc3833ccabcb0e31cac3bdbf073b54c0948d61849e6144dd45ea215cf",
+  "fps": 60,
+  "tolerance": 0.0001,
+  "frames": 121,
+  "passed": true,
+  "clips": [
+    {
+      "animation": "tail_path_demo",
+      "frames": 121,
+      "boneError": 0.00006087753587280531,
+      "vertexError": 0.00006345730797363558,
+      "worstBone": {
+        "time": 0,
+        "name": "tail_path_tip",
+        "component": 4,
+        "actual": 85.12909112669978,
+        "expected": 85.12915200423565
+      },
+      "worstVertex": {
+        "time": 0,
+        "index": 44,
+        "actual": 84.91914302211454,
+        "expected": 84.91920647942251
+      },
+      "stateErrors": 0
+    }
+  ]
+}

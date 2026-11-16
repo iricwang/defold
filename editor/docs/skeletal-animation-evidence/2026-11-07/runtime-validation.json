@@ -1,0 +1,35 @@
+{
+  "phase": "complete",
+  "runtime": {
+    "exit_code": 0,
+    "frames": 302,
+    "width": 800,
+    "height": 600,
+    "callbacks": [
+      "DEBUG:SCRIPT: SPINE_EVENT 1 zero t=0.000 integer=7 float=1.250 string=setup-zero track=1",
+      "DEBUG:SCRIPT: SPINE_EVENT 2 hit t=0.500 integer=41 float=9.500 string=override-hit track=1",
+      "DEBUG:SCRIPT: SPINE_EVENT 3 sound t=0.500 integer=17 float=3.750 string=setup-sound track=1",
+      "DEBUG:SCRIPT: SPINE_EVENT 4 zero t=0.000 integer=7 float=1.250 string=setup-zero track=1",
+      "DEBUG:SCRIPT: SPINE_EVENT 5 hit t=0.500 integer=41 float=9.500 string=override-hit track=1",
+      "DEBUG:SCRIPT: SPINE_EVENT 6 sound t=0.500 integer=17 float=3.750 string=setup-sound track=1"
+    ],
+    "passed": true
+  },
+  "standard_export_build_run": true,
+  "runtime_recompiled": false,
+  "skin_tests": {
+    "tests": 14,
+    "assertions": 1312,
+    "failures": 0,
+    "errors": 0
+  },
+  "new_skin_lint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "existing_constraints_lint": {
+    "errors": 0,
+    "warnings": 15,
+    "baseline_warnings": 15
+  }
+}

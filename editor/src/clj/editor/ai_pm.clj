@@ -56,8 +56,10 @@
        "directory 只能为 /ai-workspace/library 下的工作分类及子目录；"
        "分类：01-concept、02-world、03-characters、04-levels、05-systems、06-interface、07-motion、08-audio、09-balancing、10-delivery。"
        "template 只能为 concept（文本）、gui（GUI）、art-characters（角色与怪物）、art-levels（场景与关卡）、balancing（数值与配置）。\n"
+       "完整职责与自定义职能按需读取 /ai-workspace/config/project-roles.aicanvas；不要把整份配置重复写入计划。\n"
        "可用职员（包括自定义职能）：\n"
-       (json/write-str (mapv #(select-keys % [:id :title :role-type :responsibilities :deliverables]) (filterv :enabled staff))) "\n\n"))
+       (json/write-str (mapv #(select-keys % [:id :title :role-type]) (filterv :enabled staff))
+                       :escape-unicode false :escape-slash false) "\n\n"))
 
 (defn validate-task! [task staff]
   (doseq [key [:title :stage :directory :prompt :deliverables]]

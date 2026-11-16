@@ -1,0 +1,35 @@
+[
+  {
+    "variant": "full",
+    "visible_bounds": [
+      456,
+      99,
+      864,
+      414
+    ],
+    "image_path": "/private/tmp/spine-texture-scale/runtime-evidence/full/sessions/5b740a2297f14ec6ac53bf23be174df0/0ed44cc65e1846608a5df402577ced71.png",
+    "sha256": "4e4c01f3e728064fd4e3ea2f76f341f1337363a7e263427c681ef877fa5ad133"
+  },
+  {
+    "variant": "half",
+    "visible_bounds": [
+      456,
+      100,
+      863,
+      412
+    ],
+    "image_path": "/private/tmp/spine-texture-scale/runtime-evidence/half/sessions/31f0aea21b704c91803990e886fa33d1/9432f22a7b1a4f6fac5528bc977e326a.png",
+    "sha256": "7d3f86c869334e0b4b6de5d1b1ea9133ea41d41b132ddf9ff5d07f2de0d9c8f9"
+  },
+  {
+    "variant": "fractional",
+    "visible_bounds": [
+      455,
+      100,
+      863,
+      413
+    ],
+    "image_path": "/private/tmp/spine-texture-scale/runtime-evidence/fractional/sessions/7ee2caf577294ef585ad0dbfe59f9231/268a1fe36ecd4fb9910a5c499dc83484.png",
+    "sha256": "99da73d4cee4af5d6b50694d1f72ad2de79a847c691c79eecbb8d81d01617425"
+  }
+]

@@ -1,0 +1,6 @@
+{"id": "smart-mesh", "ns": "user", "session": "8512e4a4-1b26-4686-81e5-c732c6b87b04", "value": "nil"}
+{"id": "smart-mesh", "ns": "user", "session": "8512e4a4-1b26-4686-81e5-c732c6b87b04", "value": "#'editor.skeletal-animation-slots/persist-tracks"}
+{"id": "smart-mesh", "ns": "user", "session": "8512e4a4-1b26-4686-81e5-c732c6b87b04", "value": "#'editor.skeletal-animation-view/register-view-types"}
+{"id": "smart-mesh", "out": "{:namespaces-reloaded true, :handlers-rebound true, :document-preserved true, :existing-compiled-timer-replaced false, :full-update-requires-new-view-or-package true, :disabled-handlers 0, :stopped-timers 0}\n", "session": "8512e4a4-1b26-4686-81e5-c732c6b87b04"}
+{"id": "smart-mesh", "ns": "user", "session": "8512e4a4-1b26-4686-81e5-c732c6b87b04", "value": "nil"}
+{"id": "smart-mesh", "session": "8512e4a4-1b26-4686-81e5-c732c6b87b04", "status": ["done"]}

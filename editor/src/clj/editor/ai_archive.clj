@@ -20,6 +20,7 @@
             [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.walk :as walk]
+            [editor.ai-file-ops :as file-ops]
             [editor.craft-project :as craft-project]
             [util.coll :as coll]
             [util.digest :as digest])
@@ -60,8 +61,21 @@
 (defn- read-json [^File file]
   (if-not (.isFile file) {} (json/read-str (slurp file) :key-fn keyword)))
 
+(defn- ensure-archive-attributes! [root]
+  (let [file (file-ops/file root "/ai-workspace/.gitattributes")
+        previous (if (.isFile file) (slurp file :encoding "UTF-8") "")
+        rules (str "# AI Canvas immutable files must retain their SHA-256 bytes.\n"
+                   "/attachments/files/** -text\n"
+                   "/artifacts/files/** -text\n"
+                   "/deliveries/files/** -text\n")]
+    ;; Append after user rules so these three immutable directories stay binary.
+    ;; Editable library documents and project resources keep their own policy.
+    (when-not (string/ends-with? (string/replace previous "\r\n" "\n") rules)
+      (atomic-bytes! file (.getBytes (str previous (when-not (or (string/blank? previous) (string/ends-with? previous "\n")) "\n") rules) "UTF-8")))))
+
 (defn ensure-project! [root project-id]
   (locking archive-lock
+    (ensure-archive-attributes! root)
     (let [file (file-at root "project.json")
           previous (read-json file)
           record (cond-> (assoc (merge {:schemaVersion 1 :id (str (UUID/randomUUID))} previous) :storage "project-local")
@@ -120,18 +134,33 @@
   (when-not (and (.isFile source) (<= (.length source) (* 64 1024 1024)))
     (throw (ex-info "资料不存在或超过 64 MB" {})))
   (locking archive-lock
-    (let [sha (with-open [input (io/input-stream source)] (digest/stream->sha256-hex input))
+    (let [bytes (with-open [input (io/input-stream source)] (.readNBytes input (inc (* 64 1024 1024))))
+          size (alength ^bytes bytes)
+          _ (when (> size (* 64 1024 1024)) (throw (ex-info "资料超过 64 MB" {})))
+          sha (file-ops/hash-bytes bytes)
+          archive-path (.toPath (.getCanonicalFile (io/file root "ai-workspace")))
+          source-path (.toPath (.getCanonicalFile source))
+          source-hash (when (.startsWith source-path archive-path)
+                        (second (re-matches #"(?:attachments|artifacts|deliveries)/files/([a-f0-9]{64})/[^/]+"
+                                            (string/replace (str (.relativize archive-path source-path)) "\\" "/"))))
+          _ (when (and source-hash (not= source-hash sha))
+              (throw (ex-info "归档源文件已损坏，请恢复原文件后重试" {:path (str source) :expected source-hash :actual sha})))
           name (string/replace (.getName source) #"[^\p{L}\p{N}._-]" "_")
           name (if (string/starts-with? name ".") (str "file_" name) name)
           relative (str category "/files/" sha "/" name)
           file (file-at root relative)
-          metadata (file-at root (str category "/records/" sha "-" (subs (digest/string->sha256-hex name) 0 12) ".json"))
-          previous (read-json metadata)
-          record (merge previous {:schemaVersion 1 :sha256 sha :size (.length source) :path (str "ai-workspace/" relative) :name name}
-                        {:origins (coll/into-> (conj (vec (:origins previous)) origin) [] (distinct))})]
-      (when-not (.isFile file) (atomic-bytes! file (Files/readAllBytes (.toPath source))))
-      (when (not= previous record) (write-json! metadata record))
-      (assoc record :file file))))
+          metadata (file-at root (str category "/records/" sha "-" (subs (digest/string->sha256-hex name) 0 12) ".json"))]
+      (ensure-archive-attributes! root)
+      (when-not (.exists file) (atomic-bytes! file bytes))
+      ;; Existing objects may have been changed by Git or another process. Never
+      ;; replace them or publish a receipt for bytes that no longer match.
+      (when-not (and (= size (.length file)) (= sha (file-ops/hash-file file)))
+        (throw (ex-info "归档副本已损坏，请恢复原文件后重试" {:path (str file) :expected sha})))
+      (let [previous (read-json metadata)
+            record (merge previous {:schemaVersion 1 :sha256 sha :size size :path (str "ai-workspace/" relative) :name name}
+                          {:origins (coll/into-> (conj (vec (:origins previous)) origin) [] (distinct))})]
+        (when (not= previous record) (write-json! metadata record))
+        (assoc record :file file)))))
 
 (defn local-file
   "Resolve a local file; never resolve virtual HTTP paths."
@@ -266,7 +295,7 @@
                           (if-not (.isFile file)
                             (assoc (or (coll/first-where #(= path (:path %)) (:files previous)) {:path path}) :missing true)
                             (let [archived (import-file! root "deliveries" file {:resource path :gui (:gui output)})]
-                              {:path path :archivePath (:path archived) :size (.length file) :sha256 (:sha256 archived)}))))
+                              {:path path :archivePath (:path archived) :size (:size archived) :sha256 (:sha256 archived)}))))
                       (sort (:paths output)))
           record {:schemaVersion 1 :gui (:gui output) :atlas (:atlas output) :files files}]
       (when (not= previous record) (write-json! index record)))))

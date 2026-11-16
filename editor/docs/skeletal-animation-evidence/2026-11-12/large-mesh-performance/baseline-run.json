@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-perf/build/editor.jar",
+  "sha256": "c13a145356453fc28c87a7fbbc07b52fdb5fafd715f1dccfeeb27586660f4f13",
+  "project_source": "editor/test/resources/skeletal-animation/performance-project",
+  "project_copy": "/private/tmp/spine-large-mesh/baseline/project",
+  "scenario": "/Users/applemima1111/Documents/Dev/Defold/editor/test/headless/skeletal_animation_performance.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

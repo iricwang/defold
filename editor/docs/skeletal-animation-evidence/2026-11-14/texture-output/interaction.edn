@@ -1,0 +1,29 @@
+{:viewport [2000 1200]
+ :steps [{:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail.skeleton"}}
+         {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-texture-output-menu"}
+         {:op :wait :window-index 1 :selector "#skeletal-texture-scale-apply" :property :disabled :equals false :timeout-ms 30000}
+         {:op :assert :window-index 1 :selector "#skeletal-texture-scale-percent" :property :text :equals "100.0"}
+         {:op :click :window-index 1 :selector "#skeletal-texture-scale-percent"}
+         {:op :keys :window-index 1 :keys [:meta :a]}
+         {:op :keys :window-index 1 :keys [:digit5]} {:op :keys :window-index 1 :keys [:digit0]}
+         {:op :click :window-index 1 :selector "#skeletal-texture-scale-apply"}
+         {:op :snapshot}
+         {:op :keys :window-index 1 :keys [:escape]}
+         {:op :click :selector "#skeletal-canvas" :at [0.95 0.95]}
+         {:op :keys :keys [:meta :z]}
+         {:op :click :selector "#skeletal-texture-output-menu"}
+         {:op :wait :window-index 1 :selector "#skeletal-texture-scale-apply" :property :disabled :equals false :timeout-ms 30000}
+         {:op :assert :window-index 1 :selector "#skeletal-texture-scale-percent" :property :text :equals "100.0"}
+         {:op :keys :window-index 1 :keys [:escape]}
+         {:op :click :selector "#skeletal-canvas" :at [0.95 0.95]}
+         {:op :keys :keys [:meta :shift :z]}
+         {:op :keys :keys [:meta :s]}
+         {:op :keys :keys [:meta :w]}
+         {:op :keys :keys [:meta :shift :t]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-texture-output-menu"}
+         {:op :wait :window-index 1 :selector "#skeletal-texture-scale-apply" :property :disabled :equals false :timeout-ms 30000}
+         {:op :assert :window-index 1 :selector "#skeletal-texture-scale-percent" :property :text :equals "50.0"}
+         {:op :snapshot}]}

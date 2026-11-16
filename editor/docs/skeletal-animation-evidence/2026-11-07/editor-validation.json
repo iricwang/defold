@@ -1,0 +1,21 @@
+{
+  "events": {
+    "created": "hit",
+    "keyTime": 0.0,
+    "observedLoopCallbacks": 37,
+    "status": ""
+  },
+  "mixing": {
+    "baseRotation": -25,
+    "overlayRotation": 90,
+    "alpha": 0.5,
+    "observedRotation": 32.5
+  },
+  "slot": {
+    "drawOrderKeyTime": 0.0,
+    "offsets": []
+  },
+  "gameAssetsChanged": false,
+  "runtimeEngineChanged": false,
+  "deployment": "source + hot reload only; no persistent patch package"
+}

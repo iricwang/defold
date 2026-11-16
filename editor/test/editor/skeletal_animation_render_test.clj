@@ -132,3 +132,27 @@
           ;; ui/run-now rethrows Throwable return values, including the result
           ;; returned by a successful thrown? assertion.
           nil)))))
+
+;; Fixed topology reuses CPU storage and notifies only the changed vertex
+;; interval. Invalid input must leave both the mesh and scratch reusable.
+(deftest partial-point-buffer-update-test
+  (ui/run-now
+    (let [mesh (TriangleMesh.)
+          before [[1.0 2.0] [3.0 4.0] [5.0 6.0]]
+          entry (#'render/update-point-buffer! {:mesh mesh} before)
+          changes (atom [])
+          listener (reify ArrayChangeListener
+                     (onChanged [_ _ resized from to] (swap! changes conj [resized from to])))]
+      (.addListener (.getPoints mesh) listener)
+      (let [moved (#'render/update-point-buffer! entry (assoc before 1 [7.0 8.0]))]
+        (is (identical? (:point-buffer entry) (:point-buffer moved)))
+        (is (= [[false 3 5]] @changes))
+        (is (= [1.0 2.0 0.0 7.0 8.0 0.0 5.0 6.0 0.0] (vec (.toArray (.getPoints mesh) (float-array 0)))))
+        (is (thrown? clojure.lang.ExceptionInfo (#'render/update-point-buffer! moved [[9.0 9.0] [##NaN 8.0] [5.0 6.0]])))
+        (is (= [1.0 2.0 0.0 7.0 8.0 0.0 5.0 6.0 0.0] (vec (:point-buffer moved))))
+        (reset! changes [])
+        (#'render/update-point-buffer! moved (assoc before 1 [7.0 8.0]))
+        (is (= [] @changes))
+        (let [resized (#'render/update-point-buffer! moved [[9.0 9.0]])]
+          (is (not (identical? (:point-buffer moved) (:point-buffer resized))))
+          (is (= [9.0 9.0 0.0] (vec (.toArray (.getPoints mesh) (float-array 0))))))))))

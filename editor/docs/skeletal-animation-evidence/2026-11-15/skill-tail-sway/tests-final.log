@@ -1,0 +1,14 @@
+Picked up JAVA_TOOL_OPTIONS: --add-opens=java.base/sun.nio.fs=ALL-UNNAMED
+11月 15, 2026 7:58:02 下午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @2189e7a7'
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/private/tmp/spine-property-structure/build/editor.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/Users/applemima1111/Documents/Dev/Defold/editor/.m2/repository/ch/qos/logback/logback-classic/1.2.1/logback-classic-1.2.1.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [ch.qos.logback.classic.util.ContextSelectorStaticBinder]
+Reflection warning, editor/skeletal_animation_properties.clj:76:18 - call to method updateItem can't be resolved (target class is unknown).
+
+Testing defold-spine-agent-test
+
+Ran 6 tests containing 35 assertions.
+0 failures, 0 errors.

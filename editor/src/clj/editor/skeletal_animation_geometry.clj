@@ -128,33 +128,30 @@
     (if weighted
       (:vertices
         (reduce (fn [{:keys [vertices offset]} [index influences]]
-                  (let [total (reduce + 0.0 (mapv :weight influences))]
-                    (doseq [{:keys [weight x y]} influences]
-                      (validate-numbers! [weight x y] "Mesh influence")
-                      (when (neg? weight)
-                        (throw (ex-info "Mesh weights cannot be negative" {}))))
-                    (when-not (pos? total)
-                      (throw (ex-info "Weighted vertices need a positive influence" {:vertex index})))
-                    (let [[x y] (reduce (fn [[x y] [influence-index {:keys [bone weight] :as influence}]]
-                                          (let [transform (get transforms bone)
-                                                deform-offset (if per-influence (+ offset (* 2 influence-index)) (* 2 index))]
-                                            (when-not transform
-                                              (throw (ex-info "Mesh references a missing bone" {:bone bone})))
-                                            (let [[px py] (transform-point transform
-                                                                          [(+ (:x influence) (get deform deform-offset 0.0))
-                                                                           (+ (:y influence) (get deform (inc deform-offset) 0.0))])]
-                                              [(+ x (* (/ weight total) px)) (+ y (* (/ weight total) py))])))
-                                        [0.0 0.0] (eduction (map-indexed vector) influences))]
-                      {:vertices (conj vertices x y)
-                       :offset (+ offset (* 2 (count influences)))})))
+                  (doseq [{:keys [weight x y]} influences]
+                    (validate-numbers! [weight x y] "Mesh influence")
+                    (when (neg? weight)
+                      (throw (ex-info "Mesh weights cannot be negative" {}))))
+                  (let [[x y] (reduce (fn [[x y] [influence-index {:keys [bone weight] :as influence}]]
+                                        (let [transform (get transforms bone)
+                                              deform-offset (if per-influence (+ offset (* 2 influence-index)) (* 2 index))]
+                                          (when-not transform
+                                            (throw (ex-info "Mesh references a missing bone" {:bone bone})))
+                                          (let [[px py] (transform-point transform
+                                                                         [(+ (:x influence) (get deform deform-offset 0.0))
+                                                                          (+ (:y influence) (get deform (inc deform-offset) 0.0))])]
+                                            [(+ x (* weight px)) (+ y (* weight py))])))
+                                      [0.0 0.0] (eduction (map-indexed vector) influences))]
+                    {:vertices (conj vertices x y)
+                     :offset (+ offset (* 2 (count influences)))}))
                 {:vertices [] :offset 0} (eduction (map-indexed vector) weights)))
       (let [transform slot-transform]
         (when-not transform
           (throw (ex-info "Mesh slot references a missing bone" {})))
         (into [] (mapcat (fn [index]
-                          (transform-point transform
-                                           [(+ (vertices index) (get deform index 0.0))
-                                            (+ (vertices (inc index)) (get deform (inc index) 0.0))])))
+                           (transform-point transform
+                                            [(+ (vertices index) (get deform index 0.0))
+                                             (+ (vertices (inc index)) (get deform (inc index) 0.0))])))
               (range 0 (count vertices) 2))))))
 
 (defn region-to-mesh
@@ -172,21 +169,21 @@
     (merge (dissoc region :x :y :rotation :scale-x :scale-y :shear-x :shear-y)
            {:type "mesh"
             :vertices (into [] (mapcat (fn [index]
-                                (transform-point transform
-                                                 [(* width (- (/ (mod index stride) columns) 0.5))
-                                                  (* height (- (/ (quot index stride) rows) 0.5))])))
-                     (range vertex-count))
-     :uvs (into [] (mapcat (fn [index]
-                           [(/ (double (mod index stride)) columns)
-                            (- 1.0 (/ (double (quot index stride)) rows))]))
-                (range vertex-count))
-     :triangles (into [] (mapcat (fn [index]
-                                 (let [bottom-left (+ (mod index columns) (* stride (quot index columns)))
-                                       bottom-right (inc bottom-left)
-                                       top-left (+ bottom-left stride)
-                                       top-right (inc top-left)]
-                                   [bottom-left bottom-right top-right bottom-left top-right top-left])))
-                      (range (* columns rows)))})))
+                                         (transform-point transform
+                                                          [(* width (- (/ (mod index stride) columns) 0.5))
+                                                           (* height (- (/ (quot index stride) rows) 0.5))])))
+                            (range vertex-count))
+            :uvs (into [] (mapcat (fn [index]
+                                    [(/ (double (mod index stride)) columns)
+                                     (- 1.0 (/ (double (quot index stride)) rows))]))
+                       (range vertex-count))
+            :triangles (into [] (mapcat (fn [index]
+                                          (let [bottom-left (+ (mod index columns) (* stride (quot index columns)))
+                                                bottom-right (inc bottom-left)
+                                                top-left (+ bottom-left stride)
+                                                top-right (inc top-left)]
+                                            [bottom-left bottom-right top-right bottom-left top-right top-left])))
+                             (range (* columns rows)))})))
 
 (defn paint-influences
   "Changes one bone's normalized weight by amount, redistributing remaining
@@ -257,9 +254,9 @@
         (if (or (< best-error 1.0e-5) (= iteration 96))
           best
           (let [next-pose (reduce (fn [current index]
-                                   (turn-toward current index
-                                                (tip current (world-transforms current) last-index) target))
-                                 pose (rseq chain-indices))
+                                    (turn-toward current index
+                                                 (tip current (world-transforms current) last-index) target))
+                                  pose (rseq chain-indices))
                 next-error (error next-pose)]
             (if (= pose next-pose)
               best
@@ -362,3 +359,54 @@
       (throw (ex-info "Image compensation would require shear. Region images cannot represent this transform; disable Images compensation or adjust the parent scaling." {:attachment-type "region"})))
     (assoc attachment :x x :y y :rotation (Math/toDegrees (Math/atan2 b a))
            :scale-x sx :scale-y (* (if (neg? (- (* a d) (* b c))) -1.0 1.0) sy))))
+
+(defn attachment-world-geometry
+  "World-space authoring overlays for clipping, bounding boxes and point axes.
+  Polygon attachments share weighted mesh/deform evaluation with rendered art."
+  [attachment transforms bone-id deform]
+  (let [type (:type attachment)
+        transform (get transforms bone-id)]
+    (case type
+      ("clipping" "boundingbox")
+      (cond-> {:type type
+               :points (coll/into-> (mesh-world-vertices attachment transform transforms deform) [] (partition-all 2))}
+        (= "clipping" type) (assoc :end (:end attachment)))
+
+      "point"
+      (let [origin (transform-point transform [(get attachment :x 0.0) (get attachment :y 0.0)])
+            rotation (Math/toRadians (double (get attachment :rotation 0.0)))
+            tip (transform-point transform [(+ (get attachment :x 0.0) (* 24.0 (Math/cos rotation)))
+                                            (+ (get attachment :y 0.0) (* 24.0 (Math/sin rotation)))])]
+        {:type type :points [origin tip]
+         :rotation (Math/toDegrees (Math/atan2 (- (tip 1) (origin 1)) (- (tip 0) (origin 0))))})
+
+      nil)))
+
+(defn mesh-to-region
+  "Fit the undeformed texture rectangle to mesh UVs in slot-local space.
+  Nonrigid mesh distortion is removed; reflection and affine placement remain."
+  [attachment vertices]
+  (let [samples (mapv (fn [[u v] [x y]] [(- u 0.5) (- 0.5 v) x y])
+                      (partitionv 2 (:uvs attachment)) (partitionv 2 vertices))
+        n (count samples)]
+    (when (< n 3) (throw (ex-info "A mesh needs at least three UV samples to restore its image." {})))
+    (let [[mu mv mx my] (mapv #(/ % n) (reduce #(mapv + %1 %2) [0.0 0.0 0.0 0.0] samples))
+          [uu uv vv ux vx uy vy]
+          (reduce (fn [sum [u v x y]]
+                    (let [u (- u mu) v (- v mv) x (- x mx) y (- y my)]
+                      (mapv + sum [(* u u) (* u v) (* v v) (* u x) (* v x) (* u y) (* v y)])))
+                  (vec (repeat 7 0.0)) samples)
+          det (- (* uu vv) (* uv uv))]
+      (when (< (abs det) 1.0e-12) (throw (ex-info "Mesh UVs are degenerate; the image rectangle cannot be recovered." {})))
+      (let [a (/ (- (* ux vv) (* vx uv)) det)
+            c (/ (- (* vx uu) (* ux uv)) det)
+            b (/ (- (* uy vv) (* vy uv)) det)
+            d (/ (- (* vy uu) (* uy uv)) det)
+            sx (Math/hypot a b)
+            sy (Math/hypot c d)
+            width (max 1.0 (double (:width attachment 100.0)))
+            height (max 1.0 (double (:height attachment 100.0)))]
+        (merge (select-keys attachment [:name :path :width :height :color :sequence])
+               {:type "region" :x (- mx (* a mu) (* c mv)) :y (- my (* b mu) (* d mv))
+                :rotation (Math/toDegrees (Math/atan2 b a))
+                :scale-x (/ sx width) :scale-y (* (if (neg? (- (* a d) (* b c))) -1.0 1.0) (/ sy height))})))))

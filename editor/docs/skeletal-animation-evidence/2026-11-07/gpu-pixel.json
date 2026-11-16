@@ -1,0 +1,31 @@
+{
+  "image": "gpu-pixel.png",
+  "dimensions": [
+    16,
+    16
+  ],
+  "texture_rgba": [
+    128,
+    64,
+    32,
+    255
+  ],
+  "light": [
+    1,
+    0.8,
+    0.6
+  ],
+  "dark": [
+    0.2,
+    0.3,
+    0.4
+  ],
+  "opacity": 1,
+  "expected_pixel_rgba": [
+    153,
+    109,
+    108,
+    255
+  ],
+  "actual_center_argb": "ff996d6c"
+}

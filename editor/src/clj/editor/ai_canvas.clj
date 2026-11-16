@@ -369,14 +369,21 @@
     (throw (ex-info "Result 与来源 Action 固定绑定，不能断开" {})))
   (update model :edges #(filterv (fn remove-edge [item] (not= [(:from edge) (:to edge)] [(:from item) (:to item)])) %)))
 
+(defn- invalidate-gui-outputs [model assets-id]
+  (reduce (fn invalidate-gui [model {:keys [from to]}]
+            (if-not (and (= assets-id from) (= :gui (:kind (node-by-id model to))))
+              model
+              (update-node model to #(assoc % :gui-stale true))))
+          model (:edges model)))
+
 (defn adopt-components [model assets-id candidate]
-  (let [upstream (:from (coll/first-where #(= assets-id (:to %)) (:edges model)))
-        downstream (:to (coll/first-where #(= assets-id (:from %)) (:edges model)))]
+  (let [upstream (:from (coll/first-where #(= assets-id (:to %)) (:edges model)))]
     (-> model
-        (update-node assets-id #(assoc (dissoc % :production :production-plan :production-source-key)
+        (update-node assets-id #(assoc (dissoc % :production :production-plan :production-source-key :document-output :artifact-id :delivery-id)
                                   :source-result upstream :source-candidate (:id candidate)
+                                  :source-revision (results/revision {:candidates [candidate]}) :proposal-text (:text candidate)
                                   :assets (mapv (fn [file] (cond-> file (= (:path file) (:image-path candidate)) (assoc :preview (:preview candidate)))) (:files candidate))))
-        (update-node downstream #(assoc % :gui-stale true)))))
+        (invalidate-gui-outputs assets-id))))
 
 (defn adopt-candidate [canvas result-id]
   (let [result (node-by-id canvas result-id)
@@ -395,8 +402,7 @@
                                                                                                                                                         [{:name "设计方案" :text (:text chosen)}])
                                     :source-result result-id :source-candidate (:id chosen)
                                     :source-revision (results/revision result) :proposal-text (:text chosen)))
-        (update-node (:to (coll/first-where #(= target (:from %)) (:edges canvas)))
-                     #(assoc % :gui-stale true))
+        (invalidate-gui-outputs target)
         (assoc :selected target))))
 
 (defn- proposal-sections [text]
@@ -742,6 +748,7 @@
                              (text! version (str (if (:manually-edited card) "人工修改版本" "Action 原始产出") " · "
                                                  (if (= (:confirmed-revision card) (results/revision card))
                                                    (str "已选定 · " (get tasks/status-labels (tasks/status s id))) "尚未确认")))
+                             (.add (.getChildren version) (delivery-view/review-controls state pending))
                              (image! body (:preview proposal))
                              (.add (.getChildren body) text)
                              (.addListener (.textProperty text)
@@ -764,7 +771,7 @@
                                  (.add (.getChildren body) row)))
                              (.add (.getChildren body)
                                    (doto (primary-button (if pending "已加入负责人队列" "确认此方案并排队") "ai-result-confirm"
-                                                         #(work! :confirm-result id {:text (.getText text)}))
+                                                         #(work! :confirm-result id {:text (.getText text) :review-mode (:review-mode @state)}))
                                      (.setDisable pending))))
                            (text! (section! "方案内容") "等待 Action 产出方案。"))
                          :gui

@@ -1,0 +1,23 @@
+{
+  "original_png_hashes": {
+    "02_front_right.png": "d35b965ca0fbf89dda2b7b2d57fac6b09e32fc0efcf50cb77c0ef77940f3244a",
+    "03_front_left.png": "841c514a1fa3ed4ff9e7c5d2c1882ce4a5d853a9df5ed3a1bf1e3f1de3a6bc43",
+    "01b_eye_far.png": "f1b10a86db107aeff1d75bb94d015d8e0813334dfb29cc939efc5734f9e7a462",
+    "01a_eye_near.png": "04b6e3caf5ebd772005b5e382b57cca9f06a8ec7837c0c37e09efcc0c3f0a574",
+    "04_hind_left.png": "89e0fa74169a20e1d9a8c3a6ea196406154776474d12a131b6dbdddc0adbc32b",
+    "01_head.png": "3ee637f3de6745a6ca6fc5e22bc1cd02d8fb66b4883bd884c596b777a5a7fdbb",
+    "01b_eye_closed.png": "13dd475ac7aca8bf79829ddcd769ba6b6f1b0e97fd64e19b15f28ee8a86a7528",
+    "05_tail.png": "353a9fce79c7c45c5a743580bab68876849dc97c793690cde56f3f950fd0aa42",
+    "01a_eye_closed.png": "d4757b4b7de26d1b545952df98296f0928e025bb840c4b47e98065f0e6ec040a",
+    "01c_jaw.png": "01f172e9650e6b3536b91304015b15098cc1a7cfdf4331bb9a4940f584f98d88",
+    "01e_whiskers_far.png": "790506e040b9416c678b4a015f807e39fe2d1488a5a00d5ce87a2520a63cb434",
+    "06_body.png": "5100d41ca7ac99fbfbecc457b722ee40732bc22c7c4817bd6d317ff388a94c7d",
+    "01d_whiskers_near.png": "5da75725ab5dc7c5a84e6660b3bc69f3850fd554dcc4e095e3b72bcf99549513"
+  },
+  "export_json_hashes": {
+    "full": "a3d1ec5935f48a0ea0ea2ef563d152d4dcd8707212439ace889f8de301ce3c2a",
+    "half": "a3d1ec5935f48a0ea0ea2ef563d152d4dcd8707212439ace889f8de301ce3c2a",
+    "fractional": "a3d1ec5935f48a0ea0ea2ef563d152d4dcd8707212439ace889f8de301ce3c2a"
+  },
+  "unchanged": true
+}

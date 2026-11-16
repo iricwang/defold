@@ -1,0 +1,203 @@
+--- before/editor/src/clj/editor/skeletal_animation_view.clj
++++ after/editor/src/clj/editor/skeletal_animation_view.clj
+@@ -2689,6 +2689,11 @@
+     (.setOnMouseDragged canvas
+                         (ui/event-handler event
+                           (let [gesture (:drag @(:state context))]
++                            ;; Remember out-and-back movement before coalescing.
++                            (when (and (:secondary gesture) (not (:pan-moved gesture))
++                                       (> (Math/hypot (- (.getX ^MouseEvent event) (first (:start gesture)))
++                                                      (- (.getY ^MouseEvent event) (second (:start gesture)))) 3.0))
++                              (swap! (:state context) assoc-in [:drag :pan-moved] true))
+                             ;; Retain all brush and creation samples.
+                             (if (and gesture (not (:brush gesture)) (not (:create-id gesture))
+                                      (#{"move" "rotate" "scale" "shear" "mesh" "path" "pose"} (:tool gesture)))
+@@ -2816,10 +2821,21 @@
+                                                                :else #{hit})]
+                                             (set-selection! context :slot (if (contains? selected hit) hit (first (sort selected))))
+                                             (swap! (:state context) assoc :selected-slots selected))
+-                                          (swap! (:state context) assoc :slot-selection-box
+-                                                 {:start [x y] :current [x y] :original (if additive (:selected-slots state #{}) #{})}
+-                                                 :selected-slots (if additive (:selected-slots state #{}) #{})
+-                                                 :selected-kind :slot :selected nil :selected-bones #{}))))))
++                                          (cond
++                                            (and (not additive) (= :bone (:selected-kind state))
++                                                 (selected-bone context doc)
++                                                 (#{"move" "rotate" "scale" "shear"} (:tool state))) nil
++
++                                            (or (= :bone (:selected-kind state)) (false? (:show-images state)))
++                                            (swap! (:state context) assoc :bone-selection-box
++                                                   {:start [x y] :current [x y] :original (if additive (:selected-bones state #{}) #{})}
++                                                   :selected-bones (if additive (:selected-bones state #{}) #{}))
++
++                                            :else
++                                            (swap! (:state context) assoc :slot-selection-box
++                                                   {:start [x y] :current [x y] :original (if additive (:selected-slots state #{}) #{})}
++                                                   :selected-slots (if additive (:selected-slots state #{}) #{})
++                                                   :selected-kind :slot :selected nil :selected-bones #{})))))))
+                                 (when-not (or create delete other-slot)
+                                   (swap! (:state context) assoc :drag {:document doc :start [x y] :world (world context x y)
+                                                                        :last-point [x y] :brush brush :axis axis :rotation-handle rotation-handle
+@@ -2848,7 +2864,7 @@
+                                                                                [position (Math/hypot (- x px) (- y py))])) (:points frame))))
+                                       position (if (and nearest (< (second nearest) 10.0)) (first nearest) target)]
+                                   (swap! (:state context) assoc :mesh-pivot {:token (:token frame) :point position}))
+-                                pan (when (> (Math/hypot (- x (first start)) (- y (second start))) 3.0)
++                                pan (when (or (:pan-moved drag) (> (Math/hypot (- x (first start)) (- y (second start))) 3.0))
+                                       (swap! (:state context) assoc
+                                              :auto-fit false :pan-x (+ (first pan-origin) (- x (first start)))
+                                              :pan-y (+ (second pan-origin) (- y (second start)))))
+@@ -2924,6 +2940,16 @@
+     (.setOnMouseReleased canvas
+                          (ui/event-handler event
+                            (let [state @(:state context) drag (:drag state)]
++                             (when (and (:secondary drag) (not (:pan-moved drag))
++                                        (<= (Math/hypot (- (.getX ^MouseEvent event) (first (:start drag)))
++                                                        (- (.getY ^MouseEvent event) (second (:start drag)))) 3.0))
++                               (if (and (= "mesh" (:tool state)) (= "setup" (:mode state)))
++                                 (swap! (:state context) assoc :mesh-mode
++                                        (case (:mesh-mode state "modify") "modify" "create" "create" "delete" "modify")
++                                        :inspector-token nil)
++                                 (select-tool! context
++                                               (if (and (= "animate" (:mode state)) (= "create" (:previous-tool state)))
++                                                 "move" (:previous-tool state "rotate")))))
+                              (when-let [id (:create-id drag)]
+                                (attempt! context #(commit! context (or (:draft state)
+                                                                        (create-bone-drag context (:document drag) (:bone drag) (:world drag) (:world drag) id))))
+@@ -4247,6 +4273,10 @@
+         tools (mapv (fn [[id _glyph]]
+                       (doto (identify! (ToggleButton. (tr context-base (str "tool-" id))) (str "tool-" id))
+                         (.setGraphic (authoring-icon (keyword id)))
++                        (.setTooltip (Tooltip. (str (tr context-base (str "tool-" id))
++                                                    (when-let [key (get {"rotate" "C" "move" "V" "scale" "X" "shear" "Z"
++                                                                         "weights" "G" "pose" "B" "create" "N"} id)]
++                                                      (str " · " key)))))
+                         (.setMaxWidth Double/MAX_VALUE)
+                         (.setFocusTraversable false)
+                         (.setOnAction (ui/event-handler _ (select-tool! (context) id)))))
+--- before/editor/test/editor/skeletal_animation_drag_test.clj
++++ after/editor/test/editor/skeletal_animation_drag_test.clj
+@@ -286,3 +286,77 @@
+             (g/undo! :undo/global)
+             (is (= doc (g/node-value (:resource-node context) :document))))
+           (finally (p/key-release! scene :shift) (.hide window)))))))
++
++;; A selected bone transforms from empty space, preserving selection and one
++;; undo operation in setup and animate; a handle is not required.
++(deftest empty-space-bone-transform-test
++  (doseq [mode ["setup" "animate"]
++          [tool start target property expected] [["move" [180.0 80.0] [190.0 100.0] :x 110.0]
++                                                 ["rotate" [180.0 80.0] [20.0 80.0] :rotation 90.0]
++                                                 ["scale" [180.0 80.0] [260.0 160.0] :scale-x 2.0]
++                                                 ["shear" [180.0 80.0] [100.0 120.0] :shear-y 45.0]]]
++    (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++      (ui/run-now
++        (let [doc (rig) context (context doc {:mode mode :tool tool})]
++          (drag! context start target)
++          (let [after (g/node-value (:resource-node context) :document)
++                bone (coll/first-where #(= "lower" (:id %)) (if (= "animate" mode) (:bones (pose after)) (:bones after)))]
++            (is (= "lower" (:selected @(:state context))))
++            (is (< (abs (- expected (get bone property))) 1.0e-4) (str mode " " tool))
++            (g/undo! :undo/global)
++            (is (= doc (g/node-value (:resource-node context) :document)))))))))
++
++;; Cmd-drag remains additive box selection; starting on a different bone
++;; still selects and transforms that bone rather than the prior selection.
++(deftest empty-space-selection-modifiers-test
++  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++    (ui/run-now
++      (let [doc (rig) context (context doc {:mode "setup"})
++            scene (:scene context)
++            window (doto (javafx.stage.Stage.) (.setScene scene) (.show))]
++        (try
++          (.requestFocus (:canvas context))
++          (p/key-press! scene :meta)
++          (p/mouse-press! scene (mouse-point context [-10.0 -10.0]) :primary)
++          (p/mouse-move! scene (mouse-point context [10.0 10.0]))
++          (p/mouse-release! scene (mouse-point context [10.0 10.0]) :primary)
++          (p/key-release! scene :meta)
++          (is (= #{"root" "upper" "lower"} (:selected-bones @(:state context))))
++          (is (= doc (g/node-value (:resource-node context) :document)))
++          (finally (p/key-release! scene :meta) (.hide window)))))))
++
++;; Right click swaps tools and cycles mesh modes, but any pan beyond the
++;; threshold (even an out-and-back burst before a pulse) must never swap.
++(deftest secondary-click-versus-pan-test
++  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
++    (ui/run-now
++      (let [doc (rig) context (context doc {:mode "setup" :previous-tool "rotate"})
++            scene (:scene context)
++            window (doto (javafx.stage.Stage.) (.setScene scene) (.show))
++            origin (mouse-point context [100.0 100.0])
++            target (mouse-point context [140.0 120.0])]
++        (try
++          (p/mouse-press! scene origin :secondary)
++          (p/mouse-release! scene origin :secondary)
++          (is (= "rotate" (:tool @(:state context))))
++          (p/mouse-press! scene origin :secondary)
++          (p/mouse-move! scene target)
++          (p/mouse-move! scene origin)
++          (p/mouse-release! scene origin :secondary)
++          (is (= "rotate" (:tool @(:state context))))
++          (is (= [150.0 300.0] ((juxt :pan-x :pan-y) @(:state context))))
++          (p/mouse-press! scene origin :secondary)
++          (p/mouse-move! scene target)
++          (p/mouse-release! scene target :secondary)
++          (is (= "rotate" (:tool @(:state context))))
++          (is (= [190.0 280.0] ((juxt :pan-x :pan-y) @(:state context))))
++          (p/mouse-press! scene origin :secondary)
++          (p/mouse-release! scene origin :secondary)
++          (is (= "move" (:tool @(:state context))))
++          (swap! (:state context) assoc :tool "mesh" :mesh-mode "modify")
++          (doseq [mode ["create" "delete" "modify"]]
++            (p/mouse-press! scene origin :secondary)
++            (p/mouse-release! scene origin :secondary)
++            (is (= mode (:mesh-mode @(:state context)))))
++          (is (= doc (g/node-value (:resource-node context) :document)))
++          (finally (.hide window)))))))
+--- before/editor/src/clj/editor/skeletal_animation_toolbar.clj
++++ after/editor/src/clj/editor/skeletal_animation_toolbar.clj
+@@ -123,6 +123,14 @@
+   (doto (HBox. 2.0 (into-array Node nodes))
+     (.setAlignment Pos/CENTER_LEFT)
+     (ui/add-style! "animation-tool-group")))
++
++(defn- ruler-step [width start span fps]
++  (let [largest-frame (long (Math/ceil (max (abs (* start fps)) (abs (* (+ start span) fps)))))
++        label-width (max 48.0 (+ 14.0 (* 7.0 (count (str largest-frame)))))
++        needed (max 1.0 (/ (* fps span label-width) (max 1.0 (- width 80.0))))
++        magnitude (Math/pow 10.0 (Math/floor (Math/log10 needed)))
++        fraction (/ needed magnitude)]
++    (* magnitude (cond (<= fraction 1.0) 1.0 (<= fraction 2.0) 2.0 (<= fraction 5.0) 5.0 :else 10.0))))
+ 
+ (defn install!
+   [{:keys [^ToolBar playback ^ToolBar curve-strip ^Node root state tr actions
+@@ -183,7 +191,7 @@
+                             fps (double (or fps 60.0))
+                             width (.getWidth ruler)
+                             scale (/ (max 1.0 (- width 80.0)) span)
+-                            step (max 1.0 (Math/pow 10.0 (Math/floor (Math/log10 (/ (* fps span) (max 2.0 (/ width 80.0)))))))
++                            step (ruler-step width start span fps)
+                             gc (.getGraphicsContext2D ruler)]
+                         (.setFill gc (Color/web "#474747")) (.fillRect gc 0.0 0.0 width 30.0)
+                         (.setFont gc (javafx.scene.text.Font/font 11.0))
+--- before/editor/test/editor/skeletal_animation_toolbar_test.clj
++++ after/editor/test/editor/skeletal_animation_toolbar_test.clj
+@@ -81,3 +81,17 @@
+       ((:refresh! result))
+       (is (.isDisabled ^ToggleButton (get curves 7)))
+       (is (.isDisabled ^ToggleButton (get curves 8))))))
++
++;; Ruler labels must stay separated when zooming out or viewing large frame
++;; numbers; the previous floor-based interval drew 87 labels in 600 pixels.
++(deftest adaptive-ruler-spacing-test
++  (is (= 10.0 (#'toolbar/ruler-step 600.0 0.0 1.45 60.0)))
++  (doseq [width [160.0 600.0 1200.0]
++          start [0.0 10000.0 -10000.0]
++          span [0.1 1.45 60.0 600.0]]
++    (let [step (#'toolbar/ruler-step width start span 60.0)
++          pixels (* step (/ (- width 80.0) (* 60.0 span)))
++          largest (long (Math/ceil (max (abs (* start 60.0)) (abs (* (+ start span) 60.0)))))
++          required (max 48.0 (+ 14.0 (* 7.0 (count (str largest)))))]
++      (is (>= step 1.0))
++      (is (>= (+ pixels 1.0e-7) required)))))

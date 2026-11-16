@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-property-structure/build/editor.jar",
+  "sha256": "531b6ea9392f52e772b429d14423e6385bdbd55e5e635626f65abc9ba45a47cc",
+  "project_source": "/tmp/spine-rig-ui/project",
+  "project_copy": "/private/tmp/spine-property-structure/interaction-final/project",
+  "scenario": "/private/tmp/spine-property-structure/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

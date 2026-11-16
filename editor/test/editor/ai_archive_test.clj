@@ -216,3 +216,82 @@
           (archive/refresh-deliveries! root)
           (is (:missing (first (:files (json/read-str (slurp index) :key-fn keyword)))))))
       (finally (fs/delete-directory! root)))))
+
+;; Git's text conversions must not change the immutable byte identity, while
+;; editable library files retain the user's own attributes and line endings.
+(deftest archive-git-attributes-test
+  (let [root (temp-root)
+        attributes (io/file root "ai-workspace/.gitattributes")
+        user-rules "*.md text eol=crlf\r\n/library/** text"]
+    (try
+      (io/make-parents attributes)
+      (spit attributes user-rules :encoding "UTF-8")
+      (archive/ensure-project! root nil)
+      (let [saved (slurp attributes :encoding "UTF-8")]
+        (is (string/starts-with? saved user-rules))
+        (doseq [category ["attachments" "artifacts" "deliveries"]]
+          (is (string/includes? saved (str "/" category "/files/** -text\n"))))
+        (archive/ensure-project! root nil)
+        (is (= saved (slurp attributes :encoding "UTF-8")))
+        (spit attributes (string/replace saved #"\r?\n" "\r\n") :encoding "UTF-8")
+        (let [crlf (slurp attributes :encoding "UTF-8")]
+          (archive/ensure-project! root nil)
+          (is (= crlf (slurp attributes :encoding "UTF-8")))))
+      (is (not (.exists (io/file root ".gitattributes"))))
+      (finally (fs/delete-directory! root)))))
+
+;; CRLF, LF, UTF-8 and binary inputs must keep their exact bytes, hash and size
+;; across both initial import and later deduplicated imports.
+(deftest immutable-file-bytes-test
+  (let [root (temp-root)
+        source (io/file root "input.md")]
+    (try
+      (doseq [category ["attachments" "artifacts" "deliveries"]
+              bytes [(.getBytes "设计\r\n方案\r\n" "UTF-8")
+                     (.getBytes "设计\n方案\n" "UTF-8")
+                     (byte-array [0 13 10 -1 -128 65])]]
+        (with-open [out (io/output-stream source)] (.write out ^bytes bytes))
+        (let [record (archive/import-file! root category source {:task "first"})
+              repeated (archive/import-file! root category source {:task "second"})]
+          (is (= (vec bytes) (vec (java.nio.file.Files/readAllBytes (.toPath ^java.io.File (:file record))))))
+          (is (= (alength ^bytes bytes) (:size record)))
+          (is (= (digest/stream->sha256-hex (java.io.ByteArrayInputStream. bytes)) (:sha256 record)))
+          (is (= (:sha256 record) (:sha256 repeated)))
+          (is (= [{:task "first"} {:task "second"}] (:origins repeated)))))
+      (is (.isFile (io/file root "ai-workspace/.gitattributes")))
+      (finally (fs/delete-directory! root)))))
+
+;; Oversized sources must fail before allocating a snapshot or creating an
+;; archive entry, including sparse files with little physical disk use.
+(deftest oversized-immutable-file-rejected-test
+  (let [root (temp-root)
+        source (io/file root "oversized.md")]
+    (try
+      (with-open [file (java.io.RandomAccessFile. source "rw")]
+        (.setLength file (inc (* 64 1024 1024))))
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"超过 64 MB"
+                            (archive/import-file! root "artifacts" source {})))
+      (is (not (.exists (io/file root "ai-workspace"))))
+      (finally (fs/delete-directory! root)))))
+
+;; Reusing a corrupt immutable object must fail without replacing its bytes or
+;; receipt; importing that same object must not legitimize it under a new hash.
+(deftest corrupt-immutable-file-rejected-test
+  (let [root (temp-root)
+        source (io/file root "proposal.md")]
+    (try
+      (spit source "version one\r\n" :encoding "UTF-8")
+      (let [record (archive/import-file! root "artifacts" source {:task "first"})
+            receipt (io/file root "ai-workspace/artifacts/records"
+                             (str (:sha256 record) "-" (subs (digest/string->sha256-hex (:name record)) 0 12) ".json"))
+            original-receipt (slurp receipt)
+            corrupt "version two\r\n"]
+        (spit (:file record) corrupt :encoding "UTF-8")
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo #"归档副本已损坏"
+                              (archive/import-file! root "artifacts" source {:task "second"})))
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo #"归档源文件已损坏"
+                              (archive/import-file! root "artifacts" (:file record) {:task "third"})))
+        (is (= corrupt (slurp (:file record) :encoding "UTF-8")))
+        (is (= original-receipt (slurp receipt)))
+        (is (= 1 (count (.listFiles (io/file root "ai-workspace/artifacts/files"))))))
+      (finally (fs/delete-directory! root)))))

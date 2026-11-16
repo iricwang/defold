@@ -138,7 +138,7 @@
                                       {:task-id "integrate" :staff-id "s" :canvas-id "native-test" :action-id rid}])
             _ (work/update-jobs! root (set (mapv :id jobs)) {:status "completed"})
             plan-version (delivery/card-snapshot! root state result "integration-plan")
-            _ (delivery/approve! root (:id plan-version) "测试中明确批准入库方案")
+            _ (delivery/approve! root (:id plan-version) "测试中明确批准入库方案" :human)
             state (update state :canvas canvas/update-node rid #(assoc % :artifact-id (:id plan-version)))
             applied (workflow/apply-state! root state rid (fn no-rebuild [_] (throw (ex-info "重复事务不应重编译" {}))))
             assets (canvas/node-by-id (:canvas applied) (:to (coll/first-where #(= rid (:from %)) (get-in applied [:canvas :edges]))))
@@ -147,13 +147,13 @@
         (is (= (get-in output [:validation :build-id]) (:build-id receipt)))
         (is (= (:delivery-id assets) (:delivery-id gui)))
         (is (= (:id plan-version) (:plan-artifact-id receipt)))
-        (delivery/approve! root (:artifact-id receipt) "测试中批准实际编译的工程包")
-        (is (thrown-with-msg? Exception #"检查" (delivery/decide-task! root "integrate" "accepted" [(:artifact-id receipt)] (:id receipt) "尚无运行证据")))
+        (delivery/approve! root (:artifact-id receipt) "测试中批准实际编译的工程包" :human)
+        (is (thrown-with-msg? Exception #"检查" (delivery/decide-task! root "integrate" "accepted" [(:artifact-id receipt)] (:id receipt) "尚无运行证据" :human)))
         ;; This is synthetic QA evidence for testing the decision contract, not
         ;; a claim that a person has played or visually accepted this fixture.
         (doseq [check ["runtime" "visual"]]
           (delivery/record-check! root (:id receipt) check "passed" "验收契约测试用证据" [{:path (:gui output)}]))
-        (delivery/decide-task! root "integrate" "accepted" [(:artifact-id receipt)] (:id receipt) "测试验收回流")
+        (delivery/decide-task! root "integrate" "accepted" [(:artifact-id receipt)] (:id receipt) "测试验收回流" :human)
         (is (= "已验收" (work/task-status (work/read-work root) "integrate")))
         (let [config (io/file root "game.project") original (slurp config)]
           (try

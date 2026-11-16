@@ -116,94 +116,11 @@ public final class RemoteSnapshotTest {
         check("the next stable resource list completes after an atomic removal", afterDeletion.sourceStamp().equals(RemoteManager.stamp(deleted, RemoteManager.resources(deleted))));
     }
 
-    private static final class ControlledManager extends RemoteManager {
-        SnapshotObserver changes = NONE;
-        int buildsObserved, launchesObserved;
-        boolean compilationFails;
-        ControlledManager(Path manifest, Path state) throws Exception { super(manifest, state, 18720); monitor.shutdownNow(); }
-        @Override SnapshotObserver snapshotObserver(Project p, long generation) {
-            return new SnapshotObserver() {
-                public void check() throws Exception { ControlledManager.this.check(p, generation); changes.check(); }
-                public void copied(Path source, Path target, int attempt) throws Exception { changes.copied(source, target, attempt); }
-            };
-        }
-        @Override Path automaticBuild(Project p, Path destination, long generation) throws Exception {
-            check(p, generation); buildsObserved++;
-            if (compilationFails) throw new IOException("INTENTIONAL_SCRIPT_COMPILE_ERROR");
-            Path compiled = destination.resolve("build/default/game.projectc"); Files.createDirectories(compiled.getParent());
-            Files.writeString(compiled, "[display]\nwidth = 320\nheight = 240\n"); return path("engine");
-        }
-        @Override void launch(Project p, long generation) throws Exception { check(p, generation); launchesObserved++; }
-        Project add(Path source) throws Exception {
-            Map<?, ?> added = (Map<?, ?>)command(Map.of("method", "add", "params", Map.of("path", source.toString())));
-            return project(added.get("id").toString());
-        }
-        void settled() throws Exception { builds.submit(() -> { }).get(20, TimeUnit.SECONDS); }
-        void observeNow() throws Exception { var method = RemoteManager.class.getDeclaredMethod("observe"); method.setAccessible(true); method.invoke(this); }
-    }
-    private static void schedulingCases(Path manifest, Path work) throws Exception {
-        try (ControlledManager manager = new ControlledManager(manifest, work.resolve("edit-state"))) {
-            Path root = project(work, "edit-project"); RemoteManager.Project p = manager.add(root);
-            manager.changes = new RemoteManager.SnapshotObserver() {
-                public void check() { }
-                public void copied(Path source, Path target, int attempt) throws Exception {
-                    if (source.getFileName().toString().equals("b.lua")) write(root.resolve("a.lua"), "edit after capture");
-                }
-            };
-            manager.prepare(p, true, false); manager.settled();
-            check("a later edit does not lose the original launch request", manager.launchesObserved == 1);
-            check("a built frozen version reports subsequent source edits as modified", p.modified && !p.builtStamp.equals(RemoteManager.stamp(root, RemoteManager.resources(root))));
-            check("build receipt records the captured source stamp", Objects.equals(RemoteManager.JSON.readValue(p.build.getParent().resolve("receipt.json").toFile(), Map.class).get("sourceStamp"), p.builtStamp));
-            manager.settings.put("prepare", false); manager.observeNow();
-            check("a stopped frozen version becomes dirty when the later edit is observed", p.state.equals("dirty"));
-        }
-        try (ControlledManager manager = new ControlledManager(manifest, work.resolve("retry-state"))) {
-            Path root = project(work, "retry-project"); RemoteManager.Project p = manager.add(root);
-            manager.changes = new RemoteManager.SnapshotObserver() {
-                public void check() { }
-                public void copied(Path source, Path target, int attempt) throws Exception {
-                    if (source.getFileName().toString().equals("a.lua")) write(source, "changing " + clock.incrementAndGet());
-                }
-            };
-            manager.prepare(p, true, false); manager.settled();
-            check("transient copy failure keeps the explicit start intent", p.startAfterBuild && !p.busy && p.errorKind.equals("source_changed"));
-            check("transient copy failure waits without calling the compiler or launcher", manager.buildsObserved == 0 && manager.launchesObserved == 0 && p.state.equals("preparing"));
-            manager.changes = NONE; manager.observeNow(); manager.settled();
-            check("a stable retry reaches launch with the original intent", manager.launchesObserved == 1 && !p.startAfterBuild && p.error.isEmpty());
-        }
-        try (ControlledManager manager = new ControlledManager(manifest, work.resolve("cancel-state"))) {
-            RemoteManager.Project p = manager.add(project(work, "cancel-project")); CountDownLatch copied = new CountDownLatch(1), resume = new CountDownLatch(1);
-            manager.changes = new RemoteManager.SnapshotObserver() {
-                public void check() { }
-                public void copied(Path source, Path target, int attempt) throws Exception {
-                    if (source.getFileName().toString().equals("a.lua")) { copied.countDown(); if (!resume.await(10, TimeUnit.SECONDS)) throw new AssertionError("cancel latch timeout"); }
-                }
-            };
-            manager.prepare(p, true, false); if (!copied.await(10, TimeUnit.SECONDS)) throw new AssertionError("copy did not begin");
-            manager.stop(p); resume.countDown(); manager.settled();
-            check("stop during copying cancels the original generation and run intent", manager.buildsObserved == 0 && manager.launchesObserved == 0 && !p.startAfterBuild && !p.busy);
-            manager.changes = NONE; manager.observeNow(); manager.settled();
-            check("later observation never restores a cancelled launch request", manager.launchesObserved == 0 && !p.startAfterBuild);
-            write(p.root.resolve("a.lua"), "edit after cancellation"); manager.observeNow(); manager.settled();
-            check("automatic preparation after a later edit still does not restore cancelled run intent", manager.buildsObserved == 1 && manager.launchesObserved == 0 && !p.startAfterBuild);
-        }
-        try (ControlledManager manager = new ControlledManager(manifest, work.resolve("error-state"))) {
-            Path root = project(work, "error-project"); RemoteManager.Project p = manager.add(root); manager.compilationFails = true;
-            manager.prepare(p, true, false); manager.settled();
-            check("real compiler failures are errors and clear the run intent", p.state.equals("error") && !p.startAfterBuild && p.error.contains("INTENTIONAL_SCRIPT_COMPILE_ERROR"));
-            manager.observeNow(); manager.settled();
-            check("unchanged failed source is not automatically rebuilt or launched", manager.buildsObserved == 1 && manager.launchesObserved == 0);
-            manager.compilationFails = false; write(root.resolve("a.lua"), "fixed script"); manager.observeNow(); manager.settled();
-            check("editing failed source may prepare a fix but does not silently launch it", manager.buildsObserved == 2 && manager.launchesObserved == 0 && p.state.equals("ready"));
-            manager.prepare(p, true, false); manager.settled();
-            check("explicit retry can launch the repaired cached build", manager.launchesObserved == 1);
-        }
-    }
     public static void main(String[] args) throws Exception {
         Path manifest = Path.of(args[0]).toAbsolutePath(), work = Path.of(args[1]).toAbsolutePath(); Files.createDirectories(work);
-        copyCases(work); schedulingCases(manifest, work);
+        copyCases(work); // Current in-place scheduling is covered by RemoteInPlaceBuildTest.
         RemoteManager.JSON.writerWithDefaultPrettyPrinter().writeValue(work.resolve("report.json").toFile(), Map.of("passed", checks,
-                "scope", "Real file snapshot I/O, deterministic cancellation and prepare control flow; compiler/launch fakes, no user project or game process touched",
+                "scope", "Legacy snapshot utility I/O only; current production never copies source projects",
                 "monitorBoundary", "The passive monitor checks metadata rather than hashing all content. Later edits preserving size, time and absent file identity remain a pre-existing watcher limitation."));
         System.out.println("RemoteSnapshotTest: " + checks.size() + " checks passed; " + work);
     }

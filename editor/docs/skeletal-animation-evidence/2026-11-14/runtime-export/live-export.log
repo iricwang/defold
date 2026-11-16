@@ -1,0 +1,5 @@
+{'id': 'patch', 'ns': 'user', 'session': '8cfadcae-7614-461d-bed2-54f934df142a', 'value': 'nil'}
+{'id': 'patch', 'out': ':export {:spinejson "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.spinejson", :atlas "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.atlas", :spinescene "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.spinescene", :spinemodel "/game/assets/spine_validation/tail_path_example/05_tail_path_controls.spinemodel", :warnings [], :texture-scale 0.3}\n', 'session': '8cfadcae-7614-461d-bed2-54f934df142a'}
+{'id': 'patch', 'out': ':integrity {:document-preserved true, :undo-preserved false, :failed-handlers 0, :stopped-timers 0}\n', 'session': '8cfadcae-7614-461d-bed2-54f934df142a'}
+{'id': 'patch', 'ns': 'user', 'session': '8cfadcae-7614-461d-bed2-54f934df142a', 'value': 'nil'}
+{'id': 'patch', 'session': '8cfadcae-7614-461d-bed2-54f934df142a', 'status': ['done']}

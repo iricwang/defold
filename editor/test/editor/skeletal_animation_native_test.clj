@@ -58,8 +58,8 @@
 ;; Short ASCII and UTF-16-length strings decode without guessing reference IDs.
 (deftest native-bone-names-and-parent-references-test
   (doseq [[fixture-name expected] [[:two-bones ["root" "child"]]
-                                  [:unicode ["根骨" "子骨"]]
-                                  [:one-char ["R" "C"]]]]
+                                   [:unicode ["根骨" "子骨"]]
+                                   [:one-char ["R" "C"]]]]
     (let [bones (:bones (native/decode (fixture fixture-name)))]
       (is (= expected (mapv :name bones)))
       (is (= [0 12] (mapv :parent-reference bones)))
@@ -88,7 +88,7 @@
 (deftest native-all-transform-fields-write-test
   (let [project (native/decode (fixture :fields))]
     (doseq [[property tag] [[:length 9] [:x 10] [:y 11] [:rotation 12]
-                           [:scale-x 13] [:scale-y 14] [:shear-x 23] [:shear-y 25]]]
+                            [:scale-x 13] [:scale-y 14] [:shear-x 23] [:shear-y 25]]]
       (let [updated (native/set-bone-properties project 0 {property -11.25})
             reopened (native/decode (native/encode updated))
             expected (aclone ^bytes (::native/payload project))]
@@ -120,12 +120,12 @@
 (deftest native-edit-boundaries-test
   (let [project (native/decode (fixture :minimal))]
     (doseq [[bone-index changes] [[-1 {:x 0}] [1 {:x 0}] [0 {:name "renamed"}]
-                                 [0 {:x Double/NaN}] [0 {:x Double/POSITIVE_INFINITY}]
-                                 [0 {:x 1.0e100}] [0 {:x "1"}] [0 nil]]]
+                                  [0 {:x Double/NaN}] [0 {:x Double/POSITIVE_INFINITY}]
+                                  [0 {:x 1.0e100}] [0 {:x "1"}] [0 nil]]]
       (is (thrown? clojure.lang.ExceptionInfo (native/set-bone-properties project bone-index changes))))))
 
 (def ^:private graph-fixtures
-  {   :translatex "dVLbTsJAEJ3T0pZLW0CMINdyawAVjOFd8Af0FzBeQgJiCBifiA/6FfwEiT/hj/Csib7rzPqANHGTc2bn7JnuZLrdlbfyuu2TdvcVyJaaoD8rRRQHYvCraIxgEOlkxEEgTdfR7gzHg9vrT5eVMnXQPnsjKlyAv3AUMGeVWuGSwfxq+H4YOE5zTDBaAG6Gj7P5dF1SFZ7iKB9pqG+KsINIeAbYyLmnT2zjOkwnky9HsiI07Ev3hlBaSKewnGRlHxMqkC0hWcRyufwu8QWm5LlERoIl5qjsIkIhNQs9j8vJ3XrBHevAePKwNqGTNYpp3FAKRggmwSFb0mfAdaG9cIhLbY9xHoBaytG/Z0fvH0eEDMiMatyjw9hjhPgK2ymq4ZBmsnKMJnOYkVNqXrEfmHOGDsiS8dkLKm//aTUfd1vzqUVa/4NoF78PJCmmpt2AtW2Mi57Y1kJUETWPmg8qMurkieBQFQVOEdt4fwA="
+  {:translatex "dVLbTsJAEJ3T0pZLW0CMINdyawAVjOFd8Af0FzBeQgJiCBifiA/6FfwEiT/hj/Csib7rzPqANHGTc2bn7JnuZLrdlbfyuu2TdvcVyJaaoD8rRRQHYvCraIxgEOlkxEEgTdfR7gzHg9vrT5eVMnXQPnsjKlyAv3AUMGeVWuGSwfxq+H4YOE5zTDBaAG6Gj7P5dF1SFZ7iKB9pqG+KsINIeAbYyLmnT2zjOkwnky9HsiI07Ev3hlBaSKewnGRlHxMqkC0hWcRyufwu8QWm5LlERoIl5qjsIkIhNQs9j8vJ3XrBHevAePKwNqGTNYpp3FAKRggmwSFb0mfAdaG9cIhLbY9xHoBaytG/Z0fvH0eEDMiMatyjw9hjhPgK2ymq4ZBmsnKMJnOYkVNqXrEfmHOGDsiS8dkLKm//aTUfd1vzqUVa/4NoF78PJCmmpt2AtW2Mi57Y1kJUETWPmg8qMurkieBQFQVOEdt4fwA="
    :translatey "dVLJTgJBEK03C9vMsIgRZB22CaAOxnAX/AH9BYxLSEAMAeOJeNCv4CdI/Al/hLMmeteq9oBDYievquv1q+nKm+6u3JXb9U/87iuQK7dAf1aaKAFY8GpojmAS6WQmQCBN1+F3huPB7fVnnJkKdeCfvREVL8BfONoS5xRb5ZbB/Gr4frh1nOGcZLQB3AwfZ/Ppuqw6XBVjfKShsWnCDqKRGWAjHz99Yhn3YTqZfDlSlaBhX6Y3JWQk6BSRk5zsLQlFsiWlSlgul99lviAkdT6ZlRQWcUx2UQmG8kIv4HJyt17wxDownjysQ9ApPLI0HigN00CI4JAt5TPArmgvkqS3xzjfglpK0b9nRe8fRZRMiEd1ntFh7DEMvsJ2Ssoc0kLMHKPFMcLIK7agorflc5YOKCz22QuqBP+08ice5Dxqk9b/INrF7wNJiahlNxEOChPCJ4OcQVVhC6h7oBKjQa4QDtVQ5BLWRvsD"
    :scalex "dVJLTgJBEK03Pz4zA4MYQf7/ACoYw17wAnoFjJ+QgGMIGFfEhZ6CS5B4CS/CWhPda1W7QCaxk/eq69Wr6U5N91alVanXOen0XoFMsQX6s5JEccBGo4rmGCaRTmYcBNJ0HZ3uaDK8vf6MsVKmLjpnb0T5C/AXjgLmjFIr3DKcX43eDwPlFEeP0QZwM3qczafrouooKY5ySUN904QdRMIzwEE2dvrENu7D1Pe/XMkK0LAvtzeFUkI6haWSkb0tlCdHQqKA5XL5XeQDLMmzXlpCSMxR2UWEDDULPYdL/269II10YOI/rC3oFBrbGl8oCdOARXDJkfQZiHnQXjjEpbfPOA9ALeUY3LOj/48jQiZkRjW+o8vYYxh8hOMW1HBIs1g5Ros5zMgqNae4EZhzmg4oJONzFlTe/tNqPrFtrUFt0gYfRLv4fSAJMbWcJkLbxrjo3rZmUEXUHGoNUIFRp5IILlWR5xT2xvsD"
    :scaley "dVLJTgJBEK03G8vMsIgRZBl2AqiDMdwFf0B/AeMSEnAMAeOJeNCv4CdI/Al/hLMmeteq9oCQ2Ml71fXq1XSnprvL0rLU9U/87iuQLbZAf1aKKA7YaFTRHMEk0smMg0CarsPvDMeD2+vPGCtl6sA/eyMqXIC/cLRlziq1wi2D2dXw/XCrnOaYYLQB3Awfp7PJqqg6SoqjXNJQXzdhB5HwFHCQi50+sY37MAmCL1cyDxr25famUFpIp7BUsrK3hQrkSEh6WCwW30U+wJI8l8hICIk5KruIkKFmoedxGdyt5qSRDoyDh5UFnUIjW+MLpWAasAguOZI+A7EktBcOcentMc63oJZy9O/Z0fvHESETMqMa39Fl7DEMPsJxPTUc0ixWjtFiDjNySs0rbmzNOUMHFJLxOXMqb/5pNZ/YptagNmn9D6Jd/D6QpJhaThOhTWNc9MSmZlBF1DxqDZDHqFNJBJeqKHAKe+39AQ=="
@@ -166,8 +166,8 @@
 ;; Model references stay distinct from ordinary values, including repeated names.
 (deftest native-model-reference-graph-test
   (doseq [[name expected] [[:chain3 [nil "root" "alpha"]]
-                          [:siblings3 [nil "root" "root"]]
-                          [:multi-minimal [nil nil "root"]]]]
+                           [:siblings3 [nil "root" "root"]]
+                           [:multi-minimal [nil nil "root"]]]]
     (let [graph (graph-fixture name)
           bones (filterv #(= :bone (:kind %)) (:models graph))]
       (is (= expected
@@ -180,7 +180,7 @@
 ;; Native Bezier handles span adjacent keys and time is stored in frames.
 (deftest native-transform-key-graph-test
   (doseq [[name property values] [[:rotate2 0 [7.0]] [:translate2 1 [11.0 13.0]]
-                                 [:scale2 2 [1.25 0.75]] [:shear2 3 [3.0 5.0]]]]
+                                  [:scale2 2 [1.25 0.75]] [:shear2 3 [3.0 5.0]]]]
     (let [graph (graph-fixture name)
           timeline (first (filterv #(= :timeline (:kind %)) (:models graph)))
           keys (mapv #(native/graph-node graph %)
@@ -194,8 +194,8 @@
     (is (= [12.0 22.0] (subvec (get-in keys [1 :data :curves 0]) 0 2)))
     (is (= 1 (get-in keys [0 :data :flag]))))
   (is (= 2 (get-in (first (filterv #(= :keyframe (:kind %))
-                                  (:models (graph-fixture :rotate-stepped))))
-                  [:data :flag]))))
+                                   (:models (graph-fixture :rotate-stepped))))
+                   [:data :flag]))))
 
 ;; Structural writes rebuild references when a new native keyframe is inserted.
 (deftest native-graph-structural-write-test
@@ -270,7 +270,7 @@
 ;; Independent scalar channels retain their exact native codes and split flags.
 (deftest native-scalar-timelines-test
   (doseq [[name code flag] [[:translatex 14 1] [:translatey 15 1]
-                           [:scalex 16 2] [:scaley 17 2] [:shearx 18 4] [:sheary 19 4]]]
+                            [:scalex 16 2] [:scaley 17 2] [:shearx 18 4] [:sheary 19 4]]]
     (let [graph (graph-fixture name)
           timeline (first (filterv #(= :timeline (:kind %)) (:models graph)))
           split (first (filterv #(= :empty-116 (:kind %)) (:values graph)))]
@@ -304,14 +304,14 @@
         source (native/to-spine-json original 0)
         edited (-> source
                    (assoc "bones" [{"name" "新的根" "x" 7.5}
-                                     {"name" "child" "parent" "新的根" "rotation" 25.0}])
+                                   {"name" "child" "parent" "新的根" "rotation" 25.0}])
                    (assoc-in ["slots" 0 "bone"] "child")
                    (assoc-in ["skins" 0 "attachments" "slot" "second"] {"type" "region" "width" 12.0 "height" 18.0})
                    (assoc-in ["slots" 0 "attachment"] "second")
                    (update "skins" conj {"name" "alternate" "attachments" {"slot" {"image" {"type" "region" "name" "alternate/image" "width" 30.0 "height" 40.0}}}})
                    (assoc "animations" {"walk" {"bones" {"child" {"translatex" [{"value" 2.0 "curve" [0.1 3.0 0.4 9.0]}
-                                                                                       {"time" 0.5 "value" 10.0}
-                                                                                       {"time" 1.0 "value" 20.0}]}}}}))
+                                                                                {"time" 0.5 "value" 10.0}
+                                                                                {"time" 1.0 "value" 20.0}]}}}}))
         updated (native/update-skeleton original 0 edited)
         readback (native/to-spine-json updated 0)
         deleted (-> readback
@@ -368,7 +368,7 @@
   (let [first-source (native/to-spine-json (graph-fixture :region-fields) 0)
         second-source (native/to-spine-json (graph-fixture :split-all) 0)
         graph (native/from-skeletons [{:name "制作工程" :source first-source}
-                                     {:name "second" :source second-source}])
+                                      {:name "second" :source second-source}])
         reopened (native/decode-graph (native/decode (native/encode-graph graph)))]
     (is (= ["制作工程" "second"] (mapv :name (native/graph-skeletons reopened))))
     (is (= first-source (native/to-spine-json reopened 0)))
@@ -499,9 +499,14 @@
     (is (= [0.0 0.25 0.5 0.75] (mapv #(get % "time") events)))
     (is (= ["test_event" "second" "test_event" "second"] (mapv #(get % "name") events)))
     (is (= [10 -10 20 -20] (mapv #(get % "int") events)))
+    (is (= ["test_event" "second" "test_event" "second"]
+           (mapv #(get % "name")
+                 (get-in (native/to-spine-json
+                           (native/update-skeleton graph 0 (assoc-in edited ["animations" "a" "events" 2 "time"] 0.25)) 0)
+                         ["animations" "a" "events"]))))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"simultaneous event order"
                           (native/update-skeleton graph 0
-                            (assoc-in edited ["animations" "a" "events" 2 "time"] 0.25))))))
+                                                  (assoc-in edited ["animations" "a" "events" 1 "time"] 0.0))))))
 
 ;; Invalid advanced references fail instead of dropping or overwriting objects.
 (deftest native-advanced-edit-boundaries-test
@@ -618,7 +623,7 @@
             (is (= source (native/to-spine-json created 0)))
             (when cyclic
               (is (thrown-with-msg? clojure.lang.ExceptionInfo #"cannot depend on a constrained bone"
-                                   (data/import-spine-json (json/write-str source)))))
+                                    (data/import-spine-json (json/write-str source)))))
             (let [document (data/import-spine-json (json/write-str editable))
                   saved (native/update-skeleton graph index (json/read-str (data/export-spine-json document)))
                   reopened (data/import-spine-json (json/write-str (native/to-spine-json saved index)))]
@@ -671,22 +676,211 @@
                       (assoc-in source ["animations" "a" "path" "follow" "unknown"] [{"value" 1}])]]
       (is (thrown? clojure.lang.ExceptionInfo (native/from-skeletons [{:name "invalid" :source modified}]))))))
 
-
-;; Native skin memberships must fail explicitly instead of changing constraint activation.
+;; Native skin memberships round-trip without changing constraint activation.
 (deftest native-constraint-skin-dependency-read-test
-  (doseq [packed [
-    "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"]]
+  (doseq [packed ["nVTNbtNAEJ7P68RO7fy4TZOQpI6TtFFbIEUocEOorSr1Bq+QFooiBYKiFnEKiNeIhDiXSyV4AW59kQhuIIHEjTCzzk8N7aUreWZ3dna/2W9m3DoLzoJW826z9QkoVjZAF8YSURpw0KhjvYsYkaJYGgQylEJzq/O8/ezpzxRbqrSF5s450cpj8A23585IwlMwfYx5xEKVgjJQSj18SxSAR7/X+5WUlQ8DNwQ4JiIvQpEtO0WZOyJWyBXl+RgOh+MKg8dlXXIKoixxXpBZQoSpn6HKOOi9GA1owZfnjV2yKf3g9PSjE64tCeJl+/hbYg85l5+sdvdDApJYElXhuN/QeFkuL9+DSXsJI434fQ7Xg/ElmNDlAeIxMc9YjJp32Hvn8//m80vNu+6ll+zmomYw0a6tPOhX+2RnYBi2o8kQYRWyohY9uLNoJ2MazzSAKeIUwqQYs3N40n81CqhOVZCV6cZJJTHQhVDUGa9xObRPnnS+37qQ+n3kUkBckHUiLJ1VWTphoMrSYBxsYZZ1Pqfzp9OelBlTbbjTenGAd+0ri8W+brFsf5gXS3pAEbiDK+Gy14ATpMT2jwgcqaC7CBz1ut3e7xpyzEENCUsoXOL26Hy1ffx5/2hsIs53kmJGKHaB6FpOMhHmI69PZdhjk/N21Hl9fNIfVXSSAi0XeMvA2j/9vMo6Ke1qMTqZ3AOu7WbdZV+fIYOBsZe4gw3etTVkSe+UtWx08wW6SRwxDaga/YlojlJRW4M2yRASsgj/PZ44bbjrsKKOabFnojaTaroRsdoA+fytURAWSx0rvIQz9/0L"
+                  "nVPLbtNAFL3Hjyaxx48AoiUPx3XbqGkhRSgLVlTmB+AXggiVpUCiqFG7ivofkap+QiV+oj9SsWBBBawJ906FYkcKi440d2bOPTNnfH2mdx1fx73uq27vK1BrdUC59pgoAFy0d7A/hE1kkh2AQIZponuUfe6fDH75jGzTEbpvb4ia78EnvFgh1zSa8Jb+9GP24/kyjdd4FMKDQy6MAIZC3T++IIrBbToeD356soxg4JncyJawKcH8x3SByWj0ey2PypKpydyV0CQlQzXCfD5ftPiKG7Kuu1sylITsyKwiwdJ1MBv4MPpyO3vwUenV8qhwRip39+Ho7D8f6TxAUcQq6bigmK/WaX9yMlhfLzcnmcZ5ycUxrZO8WamXfCT5aUj35CoFug6w31xIPh6Wgex7gqdsgQSVkjihwj8y+1aO8Ofy3cLCBiuRyaYgO+eXxBdDzbStNjkX6p0H7JZP2fnpdHLb0l6LdXSYYGBvxY27PHrcWZusAJZylaOU8iK9hwwRfokOx7IWrGu8oWN7GGzRIfF9aUbbxdei6+YXsTYdkJHeET3B/SOrCqmj9lEqEgPBwyJmUSJoA7ttUMR9j2IBPNpBk5dwl9y/"
+                  "nVJdTxNRED1nd0u3290u+AX0Y7tdoKGoxZg+migmPutfQPxgk0INSiIv1Uf8DTWEn0DiH/DRHyLxURN8FmeGpKUkvrjJPXNn5uyduWdu7yQ9SXvd+93eF7La7BCXvutATJbZXuJqnwXARSEmCMd12V3PdzZfvzyrSKSFdXYffwMazygn3L1Crlo0k18291/kP+9M0jxgVofLWuXhRyClfFvbef97pG5Ch4vaR0FhXmHMDMi9weD3P3nwNVPVfVmhgVDNXMLRaHTelMZm1K8FC2qKSg50V1Lw7PZunc8Hu6fD/z5q43hyVDxE8cNX4Ma4iDVbw001oWqXoPXk8yMVXS5xUdK3QgqBBmYVrqnbhPfg8PBTA4uwqtZBpGDyxONm4aZ9n3yzffA23zrLeEs0z1gqqvQl0TD/4Sf8c/T03OOM3ASuI1i4NKAs1AkObY7zkpuVtSZjepW/f7e/d9q00aaGgaQcrlwZ/rLYSJZUhhfTCcthkBgfjpa8x44141uxmmXqhu1+tIDbkF4xRGv6adpMKtOxNtbgbPwSkXnxoueU1AlXWZwmxibmdMxDptE6l9tEImsFqQYiLLEhLssT7l8="]]
     (let [graph (native/decode-graph (native/decode (.decode (Base64/getDecoder) ^String packed)))]
-      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"constraint skin dependencies"
-                           (native/to-spine-json graph 0))))))
+      (let [source (native/to-spine-json graph 0)]
+        (is (= source (native/to-spine-json (native/update-skeleton graph 0 source) 0)))))))
 
 ;; Unverified constraint activation flags cannot silently become always-active constraints.
 (deftest native-constraint-unverified-activation-read-test
   (let [graph (native/from-skeletons [{:name "flag" :source (native/to-spine-json
-                  (native/decode-graph (native/decode (.decode (Base64/getDecoder) ^String (:path-default path-fixtures)))) 0)}])
+                                                              (native/decode-graph (native/decode (.decode (Base64/getDecoder) ^String (:path-default path-fixtures)))) 0)}])
         index (first (into [] (keep-indexed (fn [index node] (when (= :path-constraint (:kind node)) index))) (:models graph)))
         altered (assoc-in graph [:models index :data 34] false)]
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"activation state"
-                         (native/to-spine-json altered 0)))))
+                          (native/to-spine-json altered 0)))))
+
+;; First-party minimum projects saved by official Spine 4.2.43.
+(def ^:private attachment-fixtures
+  {:point-fields "nVJNSxtRFD1nJpOZzEcm0VI1H5OJicFojVKyLSX+goLQvW3TdiA1YBVchS77H/IP7EZw49adP0SXpULdx3snoE3QTR/cr/Puve+dd1/3LD6Lu53Xne45Waq1iX/WIhCSHlsNrg9oASaskCAM02RnO/m2/6X/Ny9IHdvs7F4B1XeUDluPyUbAoslMxIksa2ryNA2W829/ADFlHQ6Hd4FGEQ2u6MGWqiVVJhzdKanvqarCV1OMOB6PJzU5PKtx2VtWY2uyq15OVSalYVb4YXhwM4IbKb2JDwfhm9PTX940tvUS3wfDu9wevWzvJ+DsNqVDxIXu+xP78kIbWZKTHPV/x2igTtiFQRZmwBGeIug+8PPIj1+TwfWz/Jz/4NeL5/iFz3NbIPsH1zk83FenV0rHtCoz3D/+lPx5NTfcJbEFkQ3h/Dk5OTo+vKmlFXGqXdkyuDZX1BQb6MDtwH0pfkZ83/G9KK2BkZWvtJfbYVv2HJFyildS3ZrrtYxN2OKPUJ/9kelj5WexFjZg9G6BF5x+5KImtf112rOJoeKFWSyDVUUrbLaISGQNsQIBGqxKSO8x9x4="
+   :boundingbox "nVPNbtNAEJ5v7cR2bMdxU2jJj+M0bdQUSBEy3BBKnoBHoEAKlkIjlVbqKep75A3KpRIvwJEHaY+oSPQeZjZR2hhyYaWdn29+dmdnNrmML+Ok+7ybfAMqjQ7o3ioTBYCLdgu7Q+SIDMoFIJAyDHT3088HHwe/i4w0aR/d/g+i+htwhqd3zspHaMCMMOWVm7EiDIVq8fU5UQxex6PRrS9aBIVHcnBOyIYQg2yxVER2hdTJExZGmEwm0wYfnhe96m4Ks8S5IJIjxNRlGDW8Gx1dj6kQSXlTj2wKXl1cfHVnuiWX+DIc3ToJymWJaER4e0PTB5Kt9gImJY4KYL7k+4VQi/cJAfGYw/3VcO/7XzBlYPBLe7YRQl88IrsEm5QyzTzlXV2VEKu0LmwtZON89e9xnXDOTcpxWenJ4GdMLWqCY4d5MnyM6V89KSxa4gLvP6XDq5Utsf+jJb0405JgdTvWgMHRlUOL+8rAVfRkbfHYHZx+SG+eZOZxg3mJ9x7XfJienZweXzd0RKxpgU0KO5mgbea+zKjlBw9ZNln2bK8U6RhSee5J4jxDh20276rGa5q2M7k26TFZLI+pufyJ9GMVl7E27ZHq/SJax+zvheLU8XZhLTsGgpeWMZO29Fxiuw2KeO9QLIBPLdRZhXvn+wc="
+   :boundingbox-weighted "nVNLbhNBEK3XM/aMPT9PHEjwZzyOEysO4CA8sIPIOQFHIBADlkws5SNlZeUawTcIm0hcgCUHSZYoSGRvqnoCwcbZUFJXVVe/qu5+XZ2cx+dx0n7aTr4ApVoL9JcUiQLAQbOB9QEyRAZlAhBIGQbam/2PO+97P32O1GkT7e1vRNVX4AqPb8HKQ2jAjDBhyaTGh6FQ9rdOiGKw7A+H157MIig8kI0zopZEGWTLSkl8R1SVXDFhhPF4PKnx5lmZl51lMZaA8+LlRJn6GkYFb4Z7lyPKR3K9iUs2BS/Ozj476dySQxwMhte5BMWiZNQivL6iyT2pVnkGk5KcCmA85/OFMGlWQqitTqfz8vT00w1kex7kJHXnVOl+TSHiCwxMnGu7v0lygLcf+oOLO0my/4OkbjxDUjAiI4QORbALyJJSJpmORouy3EUxCyGy/1BwIyZlmMv+Ye97TA2qg6zCIEuGhxHNa4S88u96kwWgt3eRoz/50nUl3V4r3Hs7R7v9q0czTbnEtsBjg8/wrn98eLR/WdMZsdZ5XlJYm0laZetJo1pecJ99M+Xej3QOqSx/gST3BC1es3mUdbyidXOm1jI9JIv9EdWnf5J+H3861qQNUt0fRItIP2AooJa7DmsaGEi8MB0zaUU3J1aboIjHGsUS8KiBKk/h3GJ/AQ=="
+   :clipping "nVNLbhNBEK3XM+P5e2aCIcGf8ThOrDiAg5BhEQkh+wQsfIEABiyZWAqJxMriHr5B2ETiAizZcItkiUAie1PVNkls8IaWuj6vq6tfqarbZ9lZ1m49arU/A8VqE3Rj3SKKAB+NOnaGsIgMsiIQSBkGWnuDdwdv+r/yjNRoD63uV6LKc3CGB9fBKkRiwEwx5WXNVB6GQin/7CNRBl5Ho9FlKF4KhbvysCViXYRBjpwUxfZFVCgQlaSYTCbTKj+eE7/kb4iyJdgTyxVh6jKMMl6MDi/G5KVS3jQgh6Knp6ef/JlvC4n3w9Gl20Mh+Adf74quD7x8Oxier6Tr/AfdTrZEN1pNdQ3oH567FA9zZIQYS4+Iqin2979Nb0u68mOY1HNVBPMJE0ygrvqZABIxh7ur4c6Xv2BagsGTEThGAs08JSeGQ0qZZo5yvi5LhB0XRK0lfDhf3RtaJ5xrkyxuw+C4/z2jOtXAd//UGHoyckU9W5s8eAcnrwY/7i9N5DrrmPcuZ3k9+HB8cnRR1TcyLT0+UtheurTFOpQptUPvDtsm24ET+Km+QyrHVfbch2jymcO7pPGylo2lXBt0j2y2x1Rb/EZ6JPKLWIN2SXV+EhUw+32JBDWDHdiLgZHg8SJm0qbuNLYaoJT3NmUChFRHhV3417G/AQ=="
+   :clipping-weighted "nVNLbhNBEK3XM/aM5+PxBEOCP+NxnFhxAAdhwyISRM4JWPgCIRiwZGIpJBIrK9cIvkHYROICLNlwi2SJQCJ7U9VjJdg4G0rq+vXr6lfq6vZ5fB63m0+a7S9AodIA/SV3iALARb2GjQFSRAalAhBIGQaaW/33e297v7OcqdIWmrvfiMovwRUe3YCVj9CAGWHCkkpMFoZCMbtzQhSD5XA4vPIliqBwXy5OiVoWZZAtOwXxXVFl8sSEEcbj8aTCl6clLrorYiwBO+JlRJm6DaOEV8ODyxE5kbQ38cim4PnZ2Wc3iS0h8WEwvMp0kfcW8HWu6brA/rv+4OJWuvZ/0O3Ec3SD26kuAb2DiwzlBmkyfIzkjYgqEba3v0/uSrnSU5jUzagAxjMmGMKkeQmhdlqt1ovT009TyO4iyEniLqjS+ZpAxBcY+KE923ONELqRCHYOaVLKJNPVPYqyvLyYpRDpfyhNxaQUv0X/qPcjphpVQdZ1o74jc1fQA7bK07d3/Lr/8+HcWC6zzfHa5Cpv+h+Pjg8vK/pErLXDWwrrc4fW2Poyqpbv3GPfnHYT6TOk0vwJupnHaPCezauo8yWt63O1VugBWeyPqDr7l/RcZGdzddok1flFlEfyBUMBNbwNWLPAQPK52ZxJq/q5sVYHRbzWKZaETzWUOYR7g/0D"
+   :blend-additive "nVJJbhNREH2vB3e7R1sgEjy023FixTE4CHmLkHMCrhDAQEsmlkIisbLIOXyDZBOJC7DkIMkSgUT2pupbSrAFLCjp1/Rr+O9XDS/zy3w4eDoYfiZrrR7xG90DUjJkt8PdCV3AhpsShGXbHOwX7w/fjn8m4mljn4ODr0DzBaXC47tgK2bVppNxIeQuRULbYj15/gnIKXQ8nd7EamW0+FAbu8o2lNnw9aameqisiUhFNeN8Pl+0pHlJ7Xq4qcLT4EC1sjLHwLAbfDk9up4hyBTeIoKP9Nn5+UW4tD1pyw+T6U25z2qK8EDTtVA0+gIky0ebLqZyzDNPpXmYA1cQFCfjbzk6aBNeZVKCHXOGPyEPboGH5Kt3xeTqr8D9/wA+yteAp/8ALTQ+uirj9sE615oZ4JZM9/D0dfH90drYN0RW5OxJ8pvi48np8XXLZOSGB3JlcWctaVtkrKvgxcED0R3RIz8KM5MDqyRL1i8/YU/ufDl1428Y3l2rtYk+PNFnaK/uqvmtZNXXxR6s0Q/gPpcrXtWgXrRLbzUwVX9l1edgS70NbneJTM4OcnXE6LApJsO72F8="
+   :blend-multiply "nVJLbhNBEH1vPp7xfG2BSPBnPI4TK47BQchbhJwTcIUABkYysRQSiZVFzuEbJJtIXIAlB0mWCCSyN1VtKcEWsKCkrn9V9+uq4WV+mQ8HTwfDz2St1SN+o3tASobsdrg7oQvYcFOCsGybg/3i/eHb8c9EPG3sc3DwFWi+oHR4fJdsxazadDIuhNylSGhbrCfPPwE5hY6n05tYrYwWH+rFrrINZTZ8jdRUD5U1EamoZpzP54uWXF5Sux5uqvA0OVCtrMwxMOwGX06PrmcIMoW3iOAjfXZ+fhEubY82+WEyvSn3WU0RHmi5NopGX4Bk+Whzi+kc88xTaR7mwBUExcn4W44O2oRXmZRgx5zhT8iDW+Ah+epdMbn6K3D/P4CP8jXg6T9AC42Prsq4fbDOtWYGuCXTPTx9XXx/tDb2DZEVOXtS/Kb4eHJ6fN0yFbnhgYQs7qwVbYuMdRW8OHgguiN65EdhZmpglWTJ+uUn7EnMl1M3/obh3bVem+jDE32G9uqumt9KVn1d7MEa/QDuc7niVU3qRbv0VhNT9VdWfQ621NvgdpfI5OwgV0eMDptiMrzL/QU="
+   :blend-screen "nVJLbhNBEH1vPp7xfG2BSPBnPI4TK47BQchbhJwTcIUABkYysRQSiZVFzuEbJJtIXIAlB0mWCCSyN1VtKcEWsKCkrn9V9+uq4WV+mQ8HTwfDz2St1SN+o3tASobsdrg7oQvYcFOCsGybg/3i/eHb8c9EPG3sc3DwFWi+oHR4fJdsxazadDIuhNylSGhbrCfPPwE5hY6n05tYrYwWH+rFrrINZTZ8jdRUD5U1EamoZpzP54uWXF5Sux5uqvA0OVCtrMwxMOwGX06PrmcIMoW3iOAjfXZ+fhEubY8O+WEyvSn3WU0RHmi5NopGX4Bk+Whzi+kc88xTaR7mwBUExcn4W44O2oRXmZRgx5zhT8iDW+Ah+epdMbn6K3D/P4CP8jXg6T9AC42Prsq4fbDOtWYGuCXTPTx9XXx/tDb2DZEVOXtS/Kb4eHJ6fN0yFbnhgYQs7qwVbYuMdRW8OHgguiN65EdhZmpglWTJ+uUn7EnMl1M3/obh3bVem+jDE32G9uqumt9KVn1d7MEa/QDuc7niVU3qRbv0VhNT9VdWfQ621NvgdpfI5OwgV0eMDptiMrzL/QU="
+   :linkedmesh "nVTLbhJhFD7fPwMMzAzDUGyRyzBcSkrVwRjizhjYuPUVqmJLREgqTVwR34M3qJsmvoBLHwSWRqPd4zkzLQVSNv7Jf+7nP5c5ZzpX/pXfCZ4FnW9AodICrZ09Igcw0azjaIgYkUYxBwRSmoagPfh4ctr/m2ZJldoIej+Iyq/BLzy5M1Y2XA26hyWfWITS0BSK6ZdfiHzwOR+Pr23hPCg8lMAxAQcCNDJEUxDaFFAmS5DrYTabLSscPC580cwLSohxSqikAD0sQyvhzXi0mFLKk/KWFhnkvLi8/GpGfEKS+DQcXycDlApyKdNjheXCuG2FvHuL1+kipSF9WLjd70QNqpHdhmTETWKoSNsT00pU+QNxKb2CTkFKOdCfc8Eu1KrhLiAWN+LebrEE2xLTlhj86SxDcxG1wiMjw+XESSldj5thnwQkMjlB2bVae2s4fPEG6xTjRg0m/Z8+1akK9o3alCsijfHkrP9nrQv7OwpPKicPp6q5tVVe9XvSaUTRhoPRh/58FW8YJ83GlO6bqtRqqEzg7dlgON85VMZ/DFXX3xoqZ/dAZYH+aJ6kVb6yMoVwN2q8OCcX7wa/Hm9t1AHjDN9jrvr94PPk4nxRCT38EKZYpXC45dRgbMuWJWx3n2mdacuwsl7oQyrOfJAKkk/RYq3BtxhqSiFsbr2Wp0eUYHpK1c0fQdiu9KasScekur+Jcoj+H64YtawjJDYNHZFnNmU61cKJQKMJ8vgeki8Cm+ooMwvzzvYf"
+   :linkedmesh-timelines-false "nVTdbhJREJ7v7AILu8uyFFvkZ1l+SkrVxRjinTFw462vUBVbIkJSaeIV8T14g3rTxBfw0geBS6PR3uPMbkuBlBtPcmbmzM+ZM9/ObOfKv/I7wbOg8w0oVFqgtbVH5AAmmnUcDREj0ijmgEBK0xC0Bx9PTvt/06ypUhtB7wdR+TX4hid3zsqGq0H3sOQVi1gamkIx/fILkQ9e5+PxtS0nDwoPJXFMyIEQjQyxFEQ2hZTJEuZ6mM1mywonj8u5aOaFJcQ5JVJSiB6WoZXwZjxaTCnlSXlLiwxyXlxefjWjc0Ie8Wk4vk4GKBVkU6bHBsuFcQuF3HvL1+UipSE4LNzud6IG1chuQ17EIDFVpO2JayWq/IGElF5BpyClHOjPuWAXagW4C4jHjbq3Wy3JttS0pQZ/OsvQXERQeGRkuJw4KaXrcTPESUgikxOWXau1t8bDG2+4TjEGajDp//SpTlVwbARTTlAYT876f9ZQ2N9ReFI5eTjVjYfV73lPI0o3HIw+9OerhMM4aTamdF9bpVZdZQJvzwbD+c6uMv6jq7r+Vlc5uzsqC/RH8ySt3iszUwiHo8aTc3LxbvDr8dZIHTDP8D7mqt8PPk8uzheVMMIPaYpNCodbQQ3mtoxZwnb3WdZZtgwr64UxpOJ8DlJB8ilabDV4F0NLKaTNrdvy9IgSLE+puvknCOFKb+qadEyq+5soh+gH4opTyzpCYtPREX1mU6dTLWwJNJogj/ch+aKwqY4yH2He+f4D"
+   :sequence-region "nVLbblJREF3rXDgHzg3U2MrlcCgtKUWpMbwaQ7/AX0ClSkJLQtvExIT4H/xBfWniD/joh5RHo4l9x5lN0gqxL+5kz2Xt2TOz157eVXaV9bovur2vZLneJv5aD4GEDNhqcn9MF7DhJgRh2Ta7h6OTwfvh71iQBg7ZPfoO1F5TMjy7C7Yilmw6KZey3JWKaVusxK8+AxllTSeTm0i9lBafaGFXxZYKG76elNUOVNQQqiqlnM/ny7oUz6lfCbZVeRpcUCuvwjHPsKt8MzldzFBI9XnLED6Sl5eXX4KV72kTZ+PJTb7DUvKJjgMrZzu0giNNpCnD/jcgXrVv6pkaEY+ng5OFp7Zp04ErqUbnwx8ZmmgQXnGcgx1xhn/xULilISDffhiNr++lwf8PGvrZBg3J/RQ8IIen13nc9qufXDa/uSNfPbh4N/r5dGMGtkQXZR/Im49HH88vpou6uZEZWZAji3sbl3ZFRzoXXhQ8FtsRO/TDMDV3hHiZuE7+Odty5suuGLxqZGsj1zY68MSeobE+uIaseB1r4QBW/xfwiKt5L2lQO9yntx6YKF5cxxzsKFrlbotIZe8hUyBCkzVxGdzF/gE="
+   :sequence-mesh "nVPNbtNAEJ5vvYmd2I7tttCSH8f5adQUcBCKuCGUXLjyCgVCiRQaqbQSElLEe+QNyqUSL8CRB2mOCCR6DzNOmyYWubDSzjf77czuzs92L6PLqBs/jbvfgGK1DVoZ20QeYKPVwMEIGSKDMh4IpAwDcWf44eh48KfATI06iPs/iCqvwCc8vjNWLgIDOsScR2YBBRgKpcKLL0QReJyOx9eurEIoPJCLMyJ2RRhkyU5RdFtEhRyBIMR0Op1X+fKsrEv2noApxnnRciJ0EoZRxuvxyWxC+VDCmztkkff84uKrvVib8oiPo/F1Lka5SH6fSSeAdZsGOfMWV/USFSA5mAW970TNz9BaqayhoerkdiDv4lSxVGRsi1N1Ef89cS6/hKY4pzzoZxx2ALVMewCIxQ3d30zLtSmaUjS4gI5lBFgkJCTL58CypJTWWTvJlgjT3xHYWom6v4LJiTeoKcPpGp4NfkbUoBrYd5Qlw8WE/lXr/LLUNvDm/XB0tbHU1n+UuhelSu1tLvMWMDi5ytHyvdLIxaRj69zOR+dvh78epfp8l9Hnecgxvxt+Ojs/nVUTjyiRed5S2E85NRld6X3T9e+zrll3LCcIEx9SWS5KnHuCNu9ZPEsJX05kK3XWHj0kk/UJ1dY/Z5KswjrXokNSvd9EO1j86UCM2s4BzHVDT3h/ndNUTxoTzRYo5LlPkRAuNVDhJew7278="
+   :sequence-timeline "nVNLbxJRFD7fPJgZ5gW0aSuPYSgtKUWpMWyr0rUL/wIqrZPQYhASExPiQn8F/6BumvgHunRR/0VZ+kjsHs+5JEWI3XiTex7fOfee172ti/gibjUfNVtfgHy5DvprrRGFgItaFXs9mEQ6mSEIpOk6mgfJaeek+ztgpEIHaB59JSo9B9/wYOGs+cjqMCLMeJlzFkDXUAiefCCKwWvQ79/4okXQcE8Cm0I2hehkiyUvsiukRJ6wbITJZDIrc/CU6AV3S5glzmmRHCGGKkMv4kX/bDqmdCTlzTyyKTw8P//sznVLknjb6984DWTD9zAMQwv0FHT3SC6SK732JVEwT1/FUzF8HA86p1NLZJWmQSZflQy732OqUgVkZXop0n2M6V99SN+2wQVevk5613e2wf6PNrTjlTaEd7cgB3TPrh26zVeGnFfT3OZRd0avkp/3V97AJvMM732u+Th5NxwNpmV1IlY0zSYNu4tDyMGxh2zReeajH9xgsnpZjQ1rMA2kCDblRP3IyAa0T8zWJfOnvKWiw6urb6TQ9htGL+eWx88YtRqOI83ntHY4ri8vz/LdDZYNlj3b8yKVFWkpjtBwHqLONpt3QeFFRWsrJW5RgyzJPDemyvLnUAMJlrEa7ZPW/kW0jvmfyopT3duDtewYCp5ZxgzaFrSInRoo4r1LsQA+VVFiFe7C9w8="
+   :same-events-consistent "nVPdThNBFD7f7M5ud7s//UFACstCoQGqxRhujSlP4CsgFt1koYSWxKtGjT4Fb4A3JL6Alz5IuTSa2Pt6zjShlNgbJ5lzZs75zpnzzZk5uElv0oPW89bBN2BlfRd0b1SJYqCIRh07OTSRRTqGqsO3lJ/bnmAKIhx8JEvhJLvojWwxaO1CYPYsTAuq1znung3vYCBlWWjtZ6dHbzt/ohi0QftoHf4gWnvFXnp67+gQZQt2gjEPPVEROGctevmBKAWPi253FMougcJjc4qIJREWFcSzIuuiiDUKRJUTXF1djdf5cEf2tWhZlCtgX1aGgymZrFW87p7dDshP5LLGAXOLX1xffy1O9q4U0cu7I6+JckzFQwmXREH7O1E0KdqcYjKH2jX3IwibNMdm/c7PlOq0AfJKeYGsEAP6F/HwjncEHL/L8uFc3v5/8G6nD3hX5nN+BHTOhh7d1StdXTHt2+TeHl2+yX49mfbRuJdYl3juMeeT7H3/8uJ23USkRvry0nTdUdieBqICr9BnrwV8OnJgkZtXFNur0DaccwTsq7JBfQYWAqgvrBZN/XD05AkII23oQqsJoH0+H6DvZarNzeQo2wDmZmKA40l/mfkWsw7lNXthsMhrm9eBH4SJIU7KYULN4jPssq/As2bsq0Y2HtziMjXJlYupDmhj9vuankeztgbtkWr/JlrA5NeXBbQb7MCdBcZiL83abNoU6yq2GqCE5zalYgipjjXeojjF/gU="})
+
+;; Every verified attachment retains its native model and editable JSON after
+;; independent creation.
+(deftest native-attachment-types-roundtrip-test
+  (doseq [[name encoded] attachment-fixtures]
+    (testing (str name)
+      (let [bytes (.decode (Base64/getDecoder) ^String encoded)
+            graph (native/decode-graph (native/decode bytes))
+            source (native/to-spine-json graph 0)
+            created (native/from-skeletons [{:name "fixture" :source source}])
+            reloaded (native/decode-graph (native/decode (native/encode-graph created)))]
+        (is (= source (native/to-spine-json reloaded 0)))
+        (is (Arrays/equals ^bytes bytes ^bytes (native/encode-graph graph)))))))
+
+;; Point transforms, weighted clipping, linked timelines and sequence modes
+;; remain distinct authoring data.
+(deftest native-attachment-semantics-test
+  (let [read-source (fn read-source [name]
+                      (native/to-spine-json
+                        (native/decode-graph (native/decode (.decode (Base64/getDecoder) ^String (get attachment-fixtures name)))) 0))
+        attachment (fn attachment [source name] (get-in source ["skins" 0 "attachments" "slot" name]))
+        point (attachment (read-source :point-fields) "item")
+        clipping (attachment (read-source :clipping-weighted) "item")
+        linked (attachment (read-source :linkedmesh-timelines-false) "linked")
+        sequence-source (read-source :sequence-timeline)]
+    (is (= [17.0 -23.0 41.0 "12345678"] (mapv point ["x" "y" "rotation" "color"])))
+    (is (= ["clipping" "end" 3] (mapv clipping ["type" "end" "vertexCount"])))
+    (is (= 19 (count (get clipping "vertices"))))
+    (is (= ["linkedmesh" "item" false] (mapv linked ["type" "parent" "timelines"])))
+    (is (= {"count" 7 "start" -2 "digits" 3 "setup" 2} (get (attachment sequence-source "item") "sequence")))
+    (is (= ["loop" "pingpongReverse"] (mapv #(get % "mode") (get-in sequence-source ["animations" "run" "attachments" "default" "slot" "item" "sequence"]))))))
+
+;; Native event lanes follow Spine's name order; ambiguous ordering fails
+;; instead of being changed silently.
+(deftest native-simultaneous-event-order-test
+  (let [source {"skeleton" {"fps" 30} "bones" [{"name" "root"}]
+                "events" {"a" {} "b" {}}
+                "animations" {"run" {"events" [{"name" "a"} {"name" "b"}]}}}]
+    (is (= ["a" "b"] (mapv #(get % "name")
+                           (get-in (native/to-spine-json (native/from-skeletons [{:name "fixture" :source source}]) 0)
+                                   ["animations" "run" "events"]))))
+    (doseq [frames [[{"name" "b"} {"name" "a"}] [{"name" "a"} {"name" "a"}]]]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"simultaneous event order"
+                            (native/from-skeletons [{:name "fixture" :source (assoc-in source ["animations" "run" "events"] frames)}]))))))
+
+;; Mixed create/rename/delete keeps project and surviving skeleton editor
+;; state rather than rebuilding it.
+(deftest native-project-update-preserves-editor-state-test
+  (let [source {"bones" [{"name" "root"}]}
+        original (native/from-skeletons [{:name "keep" :source source} {:name "delete" :source source}])
+        root (:root original)
+        reference (:reference (first (native/graph-skeletons original)))
+        original (-> original
+                     (assoc-in [(:space root) (:id root) :data 8] 1.375)
+                     (assoc-in [(:space reference) (:id reference) :data 47] false))
+        result (native/update-skeletons original [{:name "new" :source source}
+                                                  {:name "renamed" :original-index 0 :source source}])
+        surviving (:reference (second (native/graph-skeletons result)))]
+    (is (= ["new" "renamed"] (mapv :name (native/graph-skeletons result))))
+    (is (= ["keep" "delete"] (mapv :name (native/graph-skeletons original))))
+    (is (= 1.375 (get-in (native/graph-node result (:root result)) [:data 8])))
+    (is (false? (get-in (native/graph-node result surviving) [:data 47])))
+    (is (= "root" (get-in (native/to-spine-json result 0) ["bones" 0 "name"])))
+    (is (= "root" (get-in (native/to-spine-json result 1) ["bones" 0 "name"])))
+    (doseq [entries [[] [{:name "a" :source source :original-index 9}]
+                     [{:name "a" :source source :original-index 0} {:name "b" :source source :original-index 0}]]]
+      (is (thrown? clojure.lang.ExceptionInfo (native/update-skeletons original entries))))))
+
+;; Polygon and linked attachment deformation must use vertex counts and
+;; parent geometry, not missing UVs.
+(deftest native-polygon-and-linked-deform-test
+  (doseq [[fixture-name attachment-name] [[:boundingbox "item"] [:boundingbox-weighted "item"]
+                                          [:clipping "item"] [:clipping-weighted "item"]
+                                          [:linkedmesh-timelines-false "linked"]]]
+    (let [graph (native/decode-graph (native/decode (.decode (Base64/getDecoder) ^String (get attachment-fixtures fixture-name))))
+          source (native/to-spine-json graph 0)
+          path ["animations" "deform" "attachments" "default" "slot" attachment-name "deform"]
+          source (assoc-in source path [{"time" 0.0 "vertices" [3.0 -2.0]}])
+          output (native/to-spine-json (native/from-skeletons [{:name "fixture" :source source}]) 0)]
+      (is (= [3.0 -2.0] (subvec (get-in output (into path [0 "vertices"])) 0 2))))))
+
+;; First-party color, draw order and skin fixtures from official Spine 4.2.43.
+(def ^:private remaining-fixtures
+  {:slot-rgba-light-only "zVRNbxJRFL1nPpiBmWGYYizyMQylJaUoNYaVSSH0D9gf4Aa1VRIsptLEFVGj+7rT8A9qTZq4041Ll7rXXbs0YuxavHdISiF240Zf8u5999z73rsn583UDoPDoFa9Vq29BdL5MujMSBK5gIVSEcsd6EQq6S4IpKgqqqvt+627mz/jjBRoFdX1j0S5DfAJVybFigNPheZjxEMfuzhUBZl44zFRAB473e6JI5EPBZfkYl3MvBiVTMmkZW2JyZEtzvMxGAxGeb48InHGSokzpDgmq6gYLaShZnGru33cp5gv9EY2meSu7e+/tsaxIU087HRPohV4Llnrsl0OspsfiOLjpsNbwpMdPDHEh41ppPPmdm/zW0BFKoCMRCdCqoM+/Yl57JS4Bdy+1+4cnUvc/AvizWCGuHs+6Tlgc/soSqf9iqzpUL8FFre1e6f9/fKM6vPsEzxXmPNW+1Fvd+c4H+4IQhvjlIKlySbMIWr2OKMCT1sRqGR0EgrjSegaIgSTPAmfcaUG5Tm7pDS+trf3or7x6XP94OBNfTj8cfZR3piZ/xKjsOPmA6JG/9eocfPL18b1d+8bqZev/tuOjai8WNZykcVy5AM1nNhFXmu8tk3b8kMpSYmwLpXoVZQ5Z/LMhHg2tKWZd5GiChkit9enwvQ/JHzF8WmsRCukNIdEFzD+9XhSVLaXYUwXuoInpjGNFgTNYrEE8nkuUSCAQ0XkOIQ1qf0N"
+   :slot-rgb-light-only "zVRLbxJRFD7fPJgZhmGY0tjKYxhKS0pRagwrk5bQP2B/gBtUVBIsptLEFVGj+7rmH9SaNHGnG5cuda+7dmk0sWvxnEtSCrEbF8abnPc5955vzp1bP4qOonrteq3+FsgUKqBzK03kAy7KJax2YRLpZPogkKbrqK13Hrbut38m2VOkddS2PhLlt8E7XJ0kax4CHUaIES9zLJLQNWSTjadEEXjt9nqnnlghNFyWg01hC8J0siWSEd0VlqeEiCDEcDgcFfjwmNhZd1GEJclx0RxhhoKh53C7t3MyoHgo8EYJssnfODh47Y5tS5p43O2dOlUEPrlbUi4bJZofiJLjptUpamcPzyyRqjGDTC7u9NvfIipREWSlujHSPQzoT8jjZ8Bd4M6DTvf4QuD2XwBvRjPA/YtBzwHtnWOHzvqVsWbU/JZ4uK29u53vV2amvsAyxbTGmO91nvT3dk8KqiJSPM4hDSuTIszBsfuAZ9mkA89bMehkdVMah9IwDcQINgVivuDkeWgvWaSl9439/Veb258+bx4evjl/J2/O0L/ykeqs+YioMfg1atz68rVx4937/6Izy5FLyONZ5u/vyT9nefFLrBusJ+yEG6rpkBbj71x1rqHCMZspq/w5xcszo16kKlkywWBAxelnQV3M5LSvTGukNX8QzWP8mgSSVEmswppO9MWfmvYZtCTeHJbLoJBphSJxeFRCnk24k9zf"
+   :slot-alpha "nVNNbxJhEJ5nP3h32V2WLWorH8sCLSlFqVGu2tCzif4FVFQSLKbSxBNRo7+Cf1AvTfwDHj3ov2iPRhN7x5mXpFuIvTjJfM+8M09mt3uSnCTdzt1O9wtQrLZAl6hAFAIemg1sj2ATmWSHIJBhmujsDl/1Xwz+5DhSo1109r8RVR6DX7idFhsBIhNWjDmTvVA5mAZKub13RAmYDsfj80C8GAZuymBbxLoIkxzJFMX2RFTIFxXFmM1m8yoPz4hf8jZEKSnOiuWKsDQMs4wn44OzKWVjgTf34VB4//j4sxcjqt+bK1nizWh87rYRheTtS7s85Pe+EuUWS+sp+uUA75VovZhFNjcPJ4OfCTWoBlL5UYbMAFP6F/LsBXAPePpyODq9ErjzH8B7yQrwMAVNKWjx1RowODh16WJfOWtR36/Ox+0fPRv+urVy9XXWeeYdxvx8+HZydHhW1R2JlllOGdhKm7AG15kAgXLIBD70MzBJjfIGpwqwLWSIbxGJ+5GLr8P4xKoguz94+P3HI9aXWZOu6L0m2ruqQrlyFF53k/cJ5BtUQfYG2xbbvuN7sd6WjAzPbbt30OKcw1zS8bKWzRXoG9QmJYiiKdWWfxN9qNxyrEk7ZPR+E13D4u+KpKjlb0MtF4YSzy/HLKpLtIzNJihm3qJEAgE1UGEXXlr7Fw=="
+   :slot-rgba2 "zVRBbxJREJ5vd2GB3QW2GIuUbhdoSWmVGuVkUjb06sH+AC9VUUloMZUmnogavVRN6k3DLxBr0sSbXjyaaKre9dYeqzX2LM4sSSlELx6ML3kzb76Z9958+d5uacvdckvFM8XSSyA1UQAdGQmiGGAgn8N0HQEilQIxEEhRVRTnastL16o/ooxkaA7FhbdE44vgE071ixULtgrNQZdHoOeiUBWMRb3bRC54rDYaB5ZEDhSckIsDYkbFqBSSTErWhphxMsXZDtrtdneCLw9KPGYkxelSHJFVWIzm01DTuNRY2W1RxBF6XRMhis13Os8NB3b2bFeXJm7WGwfhWdgxMhZkuxxkVt4QRXtN+7f4J1u4o4v3G9MowJtrzeqeSznKgPR4PUiqhRb9jnnkkLgBXL5eq+/8kXjoL4hX3CHisT5p6pOWWB8Bqis7YTrsV2RN+fplWdyltSu1byeHVB9lH+c5w5yv1m4111Z3J/wdrm8jnFIw1d+EEYRDTc6owN2lIFTS63GF8QQCGoLEQtgS3uNKDcp9dglpfH5j43F58eOn8ubmi/L+/vey+fBReX39QXl7+8MFzh+dNBT/S4z8jis3iLzWz6538fMX79yr117yyVNvee+rd/7de6/wrPNfdayH5cWylpMsliUfqG5FjvNa47UZMg3Hl5KUIOsyGz6NAudCPMd8PO3b/NC7SNIs6SK33aLM4D/Ef8XRQSxPM6RU9omOoffrsaWoYE5DHyyMCR4fxDTKCprGZB7k8JwiVwCLchjnEEa/9hc="
+   :slot-rgb2 "xVTPTxNREJ5vf3S33d1uF4ggpcu2QEOpFqOcTOimXD3IH+ClStUmhRqExFOjRi+oCZ75C0RMSLzpxaOJBvWuNziiJnK2zmwTShu9mBhfMjNvfrz35tvv7ZvbDXaDudL50txLYHS8ADoxBolcwEJ+AtMN6EQq6S4IpKgqSrP15eqN2o8kR7I0i9LCW6LMIniHs91ixYGnQvPR5qF3TBKqgnQyvEsUgMdqs3nkiOdDwWk5WBc1LEolUzKjMrdEZcgW4/nY2tpqj/PhMfHT1ogYQ4oTMouL0iIY6hiuNlcOWpTwBV7bhknu/Pb2c8uHl7vQNqSJ243mUbwIzyVrQZbLRnblDVGy03R0SrSzg3uG2KgxjXReXF+rHQY0QVmQkWrESHXQot8hTxwDt4BrN+uN/T8CN/8CeCXoA+52QVMXtPjGAFBb2Y/Tcb9C62jEX47Jra4v1b+d6WN9mG2KZYYxX6/fWVtfPRiPVgSRTnBKwVR3EQYQN9cAxzBJBe5XY1DJaKQUTg1C1xAj5sIT9wEXD0F5yGZQep/f3HxaXvz4qbyz86JsP35S3th4VN7b+3CZcyeF+vx/FaOos8otorD1sx1e+fwlvPjqdbh8+DW89O59WHi2/d86M+JyCZmeSf7+jvxzhpM4xXON57ZpW37EDikx/s7F+DkUOGeypKP4WKTzfVSPUJEMYdBrUbb3WYguZrI3lqcZUirfiYbQeU08KSrY0zB6C12Jp3pjGuUkOobJPMhnmaJAAg5NIMMurG7tLw=="
+   :slot-rgba-light-bezier "rVRNbxJhEJ5nd2EXlmXZYizyuZSWlKLUGE4m5aN/wP4AL6ioJFhMpYknUo3e603DP6g1aeJNLx496l1v7dGIsWdxZtHyEXvQ+iYz887zzrzvPJnZLR+4B265dKVUfg3EMwXQxIoS2YCJfA7LbfiIVPLZIJCiqiittu417jS/hxnJ0ipK6++JUhvgGy6NgxULjgotjSEv38iEoSpIhKs7RC54bXU6x5Z4aSi4IA/7RM2LUsmQk7jsTVEpColx0uj3+8MMP+4XP2HGxOgSHJRdQJTm0VCTuNHZPOpRMC30hiEyyF7b23tpjnxdinjQ7hwHinBsMtclXS4K1d8RhUdFe694N1t4pIv1CtPIx8mtbvOLSznKgvRI20+qhR79iXnwhLgJ3Lzbah+eStz4B+J1d4a4fTrpOaC5eRigk3qlrXGvfwvc3Mb2rdbXizNdn2cbYVlhzrdbD7vbW0cZL8P1dJCPFCyNkzCHgNHlExV43PBDJb0dURiPwqfBTzDIEfcJR2pQnrKJSuFru7vPKhsfPlb2919VBoNvk0N57ZfUakSVnf+H/Za/weBVXL9PVO39GFavf/pcvfrmbTX2/MVkxXV+rVqbzjwLdpaKSQ/IxHIvF7lZlnyguhU8z3uN9yEjZKa9VpLi574UA5dR4DODJeHhSU/nZ+YiRkXSpd1Oj7LT/xBvisPTWJ5WSKkPiM5h9OtxJKgQWoY+HWgLHpnGNFoQNInFPCjNskSuABblkGIX5jj2Jw=="
+   :slot-rgb-light-bezier "pVQ9bxNBEH3vzvadfXf+iCMS/HmOEyuOwUHIFVL8kT9AfgCNAQOWTIyCI1FZAUEfav+DEKRIdNBQUkIPXVIikEiN2TlDHFtEgmSlmdl5O7M772ZvKwfugVspXy9X3pCJbJE4NeJAhLRYyHO5Qz+gwx8hCE3XWV5tP2zeb/0IKySHVZbXPwDpDaodro6DNYcxnb4Mh2r4RyZMXWMyXNsBXKqx1e0eO+JlqPGyHOwXNSdKhykrCZlbotKwxcQyHAwGw6w6PCB+0poXY0hwSGZBUT6Php7i7e7mUR+hjNAb2jARWdvbe2WNfEOKeNzpHgdLjEVgrUu6bGQ33gPhUdHeKd7ODp8aYr3CfPCr5Hav9dVFHjnCiHYC0B328TfmoRPiFnnnQbtzeCZx8xzEG+4U8cjZpGfI1uZhECf1SlsTXv8WVHOb23fb365MdX1O2aiSFcX5XvtJb3vrKOtluJ4OqSWNS+MkzjBo9kjHMKGTz5oB6jA6UU0txen3MQCaiIn7XAXPUnuhTFxqX9vdfVnd+Pipur//+vSdvPlb6nWgunM+7I/8D0avssYjoNb/Oazd+vylduPtu9OVNdRJtfpk1r9iF6kMRlAuoWrPovr+jvxzhhO6pOY+NbdN28p43YEWUN+5FLzGolozlSQ9POXpwlSr51GCIR2M9ZGbfBa8ixmexApYgdb4Dsxy9JrEJKhoL9OYDIwIHp3EfFgQNMXFApFRsgRXAAd5ppVLaxz7Cw=="
+   :slot-alpha-bezier "nVPNbhJRFD7f/DAzzAzDFLWVn2GAlpSi1ChbBbo2qa+AFnUSLKbSxBWpRp+CN6ibJr6ASxf6Fu3SaGL3eM4lFiG68Sb3/H73nvPl3Ns+i8/idutuq/0RyJcboD9WjigAXNRr2B7CJNLJDEAgTdfR2k1e9J8NfmY4UqFdtPY+E5UegW+4vQBrPkIdRoQZL3OuMtA1FDKdE6IYvI5Go0tfvAgabkphU8S6CJ1syeTFdkWUyBMVRphOp7MyF0+JX3A3RFkCTovliDAUDb2Ix6PDiwmlI6E382BTcP/09IMbIazem1nSxKvh6NJpIgzI3ZPjcpHX+0SUmTetqqibfbyxRKvGDDL5cDIefIupRhWQlR2mSPcxob8xT18Rd4Enz5Ph+T+J2/9BvBevEA8WpGlBWnxrDRgcnjt01a+MNa/mV+Xh9o8Pku+3Vqa+zjrLe4c5P01ej4+PLsrqRKxkmlMathaHsAbHHgO+ZZMOvO2noJM1zGqcysE0kCKeRSjuOwZfh/aeVU56f/Dwy9d91rK7XfZP5m8SCtF7SdRhRI8zne4ctf/72VqODIXb3eR+fHmDlp++wbbBtmd7bqS6JS3FdZvOHTQ4Z/MuqHhRyfoK9Q1qkiWMwglVlr+JGlRmOVanHdJ6P4iuYf67QgE1vG1Yy8BA4tnlmEFViRaxWQdFvLcoloBPNZTYhbvA/gI="
+   :slot-rgba2-bezier "xVRBTxNREJ5vd9ttu7ttlxpBaJdtCw0FLUY5mbBLuXqQH+AFtWqTQg2WxFODRi+oCd40/AIrJiTe9OLRRIN61xsc0Ro5W2e2CbVEL154yZt5872Z9+bL93Zntt1td6Z0rjTzChgeLYL+GCmiBGCgkMdEDSEilUIJEEhRVZSmq0uLNyo/44xkaRql+XdEmQXwCWd6yYoFW4XmoMMj1HVxqApG4v4akQseK/X6gSWRAwWn5OKQmEExKkVkZ1jWhpgMmeJsB5ubm51Rvjws8YgxJE6X5JisomK0gIaaxpX68l6TYo7Q65iIUGK21XphOLBz5zu6NHG7Vj+ITsFOkDEv5XKQWX5LFO82HdwSnGzhri4+aEyjEBdXG5V9l/KUBenJWphUC036G/PYIXEDuHqzWtv9J/HIfxAvu0eIJ3qkqUdaYn0AqCzvRumwX5F1ONAvx+Iurl6rfj99RPVB9kmek8z5evVOY3VlbzSocAMb4y0F470iDCAaafCOCtxbDEMlvZZUGE8hpCFMLIQt4X3O1KA8YJeSxmc3Np54C58+e1tbL712+4dnPnrsra8/9HZ2Pl7ifZlzc0TeWvehHheGoOPyLSK/+avjX/7y1b/w+o0/9PSZv7T/zb/4/oNffN4qc4U/1ztBxnFhpEflxbKWYyyWJR+obsVO8lrjtRkxDSeQkpQw6zIVPYsi70V4jgR4OrCFI+9iiKZIF7ntJmX7/yHBK473YwWaJKXcJjqB7q/HlqSiOQG9PzEheLIf0ygnaBpjBZDDc5xcASzKI8MhjF7ubw=="
+   :slot-rgb2-bezier "vVTPTxNBFH7fbtvddnfbLiWCtF22FBpKtRjtyYRuy9WD/AFeKqI2KdRgSTw1aPSCmuC5f4GICYk3vXg00aDe9QZH1ETO1ve2CbWNXjwwybw379fM+/abndKeu+eWiheLpVfAxGQe9MdIEMUAA7ksZhsIEqkUjIFAiqqiOF9frd1a+RllT4bmUVx8R5ReAu9wvp+sWLBVBBx0eQR7KgpVQTLqbRK54LHebB5bYjlQcFYODooYE6GSLpEJWRsi0mSKsh10Op3uJB8eEjtpjIvSJDkiq7CIgA9DTeF6c+2wTRFH4HVN6BRb2Nl5YTiwpy51NWnibqN5HC7AjpGxKOWykVl9SxTtNe2f4u9s4b4m2m8sQEEurrdWjlzKUgakxRshUi206W/IIyfADWD5dr1x8E/g+n8Ar7pDwGN90NQHLbY2AqysHYTppF+hdcLnb4rJrW3cqH8/N8T6GOs4zznGfLN+r7WxfjjpV7i+jHBIwUy/CCMI6y3A0nRSgQe1EFTSGnGFQwkEAwgRc2GL+ZCTR6E8YpWQ3he2t5+Vlz59Lu/uviybT56Wt7Yel/f3P17lmMxKhai82bunp+GD31n1DpHX/tX1rn356l1+/cZbPfrmXXn/wcs/36lytlfpV8s4DR9pYbmETM80f39L/jnNipzhdYDXpm4ajs8OKSH+zoXwBeQ5pvNM+v6UL3NDVI9TgTRh0G5TZvBZ8C9mdNCXozlSqj+IRtF7TWxJypuz0AYTY+KPD/oCNCXeFKZzIIfnDLnisCiLNJsw+rm/AQ=="
+   :draw-order "nVPdbhJREP6+/WEXdpdl28ZWfrYLtFiKUqPcGkOfwFdARUuCpak08Yqo0afgDepNE1/ASx+kvTSa2HucWUwRojee5MzM+ebnzLdztnORXCSd9oN25zNZ3G4Sf6x1ICQ9NurcG9IGTNghQRimyfbB4FXvZf9nXpAqDtg+/ApUnlAq3FsEGwEjk1bMmSx7rvI0DZbyj98CCWWdjkbXgZ5iGrytF9sqNlWYcNVTVNtTUYGvKoo5nU5n23J5Rs8lb0uVo8E5tbIqrJSGWebT0fHVBLlY6c18uggfnZ9/8mJGtYczR5t4PRxdZ1uMQniHmq6F/O4XID9vOr0lrRzwnaM6bcyCLcmDcf9bgjqqhFMYZmAGnOBvzHM3xD3y2dFgePlP4u5/EO8mK8TDBWksSOvZWSP7x5dZ3PSrYy2m86vJcHtnzwff765MfVN0Qfa+cH4xeDM+O73aTjOSVObEZXB3kcQ1Zt2xeEzyfS9DE86wYAi+TttC5oSB+CIFPkhsQOOjqI20d/IODTi/oe6JQsJNvrb0sSMXBfq4nCB3S2xLbN/1vThtA0ZGKray99kUnyu7lOLlVDZWOG2hBUdbjSaoLr//dAL5ZayBfRjdH8AG579NpEFNf4/OcmCoeGEZs1BTtMydBhHL3kWiQIA6K3Kkt4j9BQ=="
+   :skin-membership-true "hVPLbtNQED3Hj9iJ7TgGREsejpO0UdNAiiBbhNIfgF8IEKgl00illVhF8B2R+ICyqcQPsORD2iUCiawJd26kmkRFXMnznrn3zIyHF8lFMhw8Ggy/kNVmj/jr3AZC0mO3w72MNmDCDgnCME0ODtK34zeTX2VlaeGAg8NvQOM5VYUHebARMDJpxVyqY69YmabBWvnpByChOifT6SIQLabBe3KxLWRLiAlXPFWRPSEN+MKimPP5fNlUlxdEr3nbwhwJLolUFGJpGGadL6bHVzOUYoG39OkifHJ+/tmLGbUfLx15xLtsuij2GYXwDiVdCvmjr0B59Wh9i64c8KMjXD/Mgq2S09PJ9wQdtAinkhVgBpzhJuSla+Ae+fIozS7/Cdz9H3C2WXRkHBxnCzfm70/PlhYLyuF7MA3lsfM5sO3L2GY3dGuUbHQrzDuFvFOiO7fIyfFlEdcgpWhVD72tNmJ89ir9cX9jVbYUr6hvXzXqdfr+9OzkqqkzEk1LymVwdyNpR/FA1scJSneVbCnZd30v1jkwBGa/+JA95XM1vJr21DXtZsE2+pDuzNBaX2rd1vK6rYt9GKOfwB2u/oVIgnr+Hp31wFDslXWbhbZY69zpErH6dpGIIUCHDaXSy2P/AA=="
+   :skin-ik "dVNLbhNBEH1vPp6x5+cJiAR/xmM7seIYHAResEGRcwG4ggETLA2xFBKJlQXnsMQBwiYSF2DJQZIVQiDhNaarLcVxhFuaqq7q+rzX1dO7SC/SXvdxt/eVLNXaxI11B4hIj60mdzPagAk7IgjDNNndH70bHA3/hMpTxz67h9+B6guqCg+XwUbA2KSVcK6WvVAhTYPl8OAjkFKtk/F4FoiV0OB9aWyL2BRhwpWTkuw9EVX4omJV6gDzmmqeE7vsbYlyJLggu7wIS9MwK3w5Pr6aoJAIvblPF9Gz8/MvXsK48WTuCIj32XiW7zCO4B1KuhTy+9+AcAFad9GVA35yRGtgFmyVPDod/kzRRJ1wilkOZsAJ/se8cE3cI1+9HWWXa4m7a4lPp9M1xPvpLeLRkjSWpMV2Nsjh8WUe13hlrCU9v4Ya7uDs9ejXg+Ug+ZQbRQbqCjwYyvQ90/URShuNI0a0uHZbkMBMs0Ddy48G76ngBvOOlAjJQTZzE/79/HxuMadIwFTVYN9o1IgEyQLPptoXdeaeuuY3ow+nZydXNQ0y1bIgwdy59Tq3lQ7k8TlBQfWHpfa+63uJzoGhGrOTf8S2OnN1y7I+qWjZyopb6EAhxgT11V9CDyVc9bWwB6P/G7jLxZ8US1Db36WzGhiJv7jqs9AQb4XbLSJR3w5ScQRosqpMesvYfw=="
+   :skin-transform "nVPdbhJREJ5vd2EX9o9ttbT8LMvSklKUGuXWGPoC+gqotJKskFCaeEX0OUh8gHrTxBfw0gdpLxtN5FqcOZtAafTGk5yZM3PmnPm+mXO6V9FV1O087XS/AqVaC3RnbBP5gI1mA4cJMkQ6ZXwQSNN1dI6H7/tng18ee+p0jM7Jd6LqK/ANj9fBmotAhxFiySOTKg+6hrL34iNRBB6T8XjhihVCw54kzogoitDJkp2SrG0RVXJEBSHm8/myxsmzYpftXVGmBOdllRNhKBp6Ba/Ho5sZ5UOht3Rgkf/88vKLHSKIny1NAXGejBe5NgKf7BM5Lhc5vW9EXgpaZVE3u/hkilbADMrw4eF0cBtRg+ogs5BkSXcxo78xz6+I28Cbd8Pk+p/Erf8g3ovuEffXpGlNWmxzCxiMrnO0wittLan+xdzc/sXb4Y9H60aih4rCsZWic1dFfkDbvO3YPgUqtSB5mFZH0SmIUFj3VFFFFFfcFHpPFVd8Zgo8SlxgOumPzk/Hk9sYO5whRs4UHB7QTxZWiN+fXy4NZLkSpGssM3fQxr7QSUkVeV3gecSdOh1+mF5MbmqKZ6RkXkJxcO+B77N25f2abn5HpTXYcizHDtUp0jgx2rknaHGkpVKW1U5FyWZS2KU2MWKaUX3zX6naeJu+Jh2R1vvJ5UT6HQMJajmHMDcDffEXNn0GxeKtYL8JCnkeUCQOlxqosgl7HfsH"
+   :skin-path "nVRBbxJREJ5v38Iu7C6wtAUssCzQklKVGq3ejKEJiTf9C6ioJGsxlSae0P/RxHiulyb+Am/+kDbxYmxiz+LMo0Bp8OJLdua9efPefDPfvN09CU/C3dbd1u5XYL3SBF0ZK0RpwEGjjq0IMSJFsTQIZCiF1k7/TfdV73eKLVXaQWvvO1H5KfiG23Nnw4OvYAYY84hNVArKQDH16CNRCB4Hg8GFJ6sABm5I4JiIvAhFtuysy9wRUSZXlB/g6OhoXOHgcVkXnYIoS5yTMkuIMHUaqoRng/2zESUDSW/swqb0w+PjL04Av3ZvbAmId9HgItFBzuWUVft8UgAPK6IqjPsDjdfk8tJ9mNRJGGnEHzBcH8a38LJcPiAel+ZZFRfN7eXe7c/LzedLzXvXLgHT5NrKh846IDsDw7AdXQwRVmFVVNaHO0N7OaZ4pgCmEachTIpxdfrD3s+Q6lQFWZkoTsrDiJZRm5wx6wDPX/ej038ya/8Hs4J2gdn0nFWasyprKwv09k8TNMMrfbuuG7TG3ds9fNH/dWveqXiMXAqISxx9u6WhytKZ1FVZGiDXtjBLhc/pdtO5eDIzhIssqTBaBd52hz9qyLGphoQlQdaAbnRhB/jz6cnYRJzTJMVnKHYFSi0nWCeI8/pUhj22mYiX/ffDw4Ozik4j1DLJWwY2rz3QDdaevD/L8zk+mTx3bTcb6DNkcGB0EnfQ5D1bhyzqnZKWjShfoJvEiGlE1cW/gk41tWhr0DbpZl3F5Gfii1PT3YK16JgWe2bRZlJNvyxsNEABf5sUTspZR5mXcOa+fwE="
+   :skin-physics "nVPLbtNAFD3Hj9qJ7Tgpjz6SOI7TRk0DKYIsQZBKrOEXShtoJNOgPiS6CbAr31DEB5RNJX6AJR/SLhFI7ZowdyIlTQUbRvJ9zZ2559w7bp/Gp3G7db/V/kouVhrElXUDCEmP9RpXUtqACTskCMM02Vrrvd541b3IqUgVa2ytfwfKz6luuDtJNgIWTFoRh2rZI5WjabCYe/weiKnWbr9/GYgX0eCCFLZFzIkw4crOotieiDJ8UYWIx8fHw4oqPiN+0ZsX5UhyVqyMCEvTMEt80d85HyAbCb2hTxfho5OTL17EQvJg6AiIvbR/mWmyEMJbl+Nykd/5BuRGoHUVfXPAD45oDcyCrQ739rs/YtRQJZx8OgMz4AB/Y54dE/fIze1eevZP4u5/EO/E14iHE9KYkBbfmSW7O2cZjPHKWBf1/BI13I2Drd7PO5NB8pBJCabnvFM9uTnusC11i7glti8vIEL16acn8nQUkREDV+PW/ZNAXsSsuBVYD4+OPpaxAE1CEwpE6B6FY+4w4zQg32wf7vU2LxLeVngSZhyBlSM30ks34u/Pz4YWZ1RjYBpK2lfAJ6GwG3GcU3ZefatqcC97b/cPds8rmnasZVZSuXztvS8pHchzdoKsqg5L2b7re5E+A0OVZTNzjw0NydUli3qvpGU9zc+jCYUYA1SnfzM96Nx0rI5VGJ1fqtUc/Z0FSWr4K3SmE0Pd0umYhUSiJS7ViUh9y4glEKDGsnLpTXL/AA=="})
+
+(defn- remaining-graph [name]
+  (native/decode-graph (native/decode (.decode (Base64/getDecoder) ^String (get remaining-fixtures name)))))
+
+;; Imported curves, order keys and reciprocal skin members remain
+;; independently editable.
+(deftest native-color-order-skin-oracle-roundtrip-test
+  (doseq [[name encoded] remaining-fixtures]
+    (testing (str name)
+      (let [bytes (.decode (Base64/getDecoder) ^String encoded)
+            graph (native/decode-graph (native/decode bytes))
+            source (native/to-spine-json graph 0)
+            recreated (native/from-skeletons [{:name "fixture" :source source}])]
+        (is (Arrays/equals ^bytes bytes ^bytes (native/encode-graph graph)))
+        (is (= source (native/to-spine-json recreated 0)))
+        (is (= source (native/to-spine-json (native/update-skeleton graph 0 source) 0)))))))
+
+;; Color channels retain their own Bezier handles, while RGB and alpha stay
+;; separate.
+(deftest native-slot-color-curves-test
+  (doseq [[name property dimensions] [[:slot-rgba-light-bezier "rgba" 4] [:slot-rgb-light-bezier "rgb" 3]
+                                      [:slot-alpha-bezier "alpha" 1] [:slot-rgba2-bezier "rgba2" 7]
+                                      [:slot-rgb2-bezier "rgb2" 6]]]
+    (let [source (native/to-spine-json (remaining-graph name) 0)
+          path ["animations" "a" "slots" "slot" property]
+          frames (get-in source path)
+          curve (get (first frames) "curve")
+          edited (assoc-in source (into path [0 "curve"]) "stepped")
+          output (native/to-spine-json (native/from-skeletons [{:name "fixture" :source edited}]) 0)]
+      (is (= (* 4 dimensions) (count curve)))
+      (is (coll/every? (fn [[actual expected]] (< (Math/abs (- (double actual) (double expected))) 1.0e-5))
+                       (mapv vector curve (coll/into-> (range dimensions) [] (mapcat (constantly [0.1 0.25 0.4 0.75]))))))
+      (is (= "stepped" (get-in output (into path [0 "curve"])))))))
+
+;; Negative offsets and restoring setup order must survive native persistence.
+(deftest native-draw-order-edit-test
+  (let [source (native/to-spine-json (remaining-graph :draw-order) 0)
+        path ["animations" "a" "drawOrder"]
+        edited (assoc-in source path [{"time" 0.0 "offsets" [{"slot" "end" "offset" -1}]} {"time" 0.5}])
+        output (native/to-spine-json (native/from-skeletons [{:name "fixture" :source edited}]) 0)]
+    (is (= (get-in edited path) (get-in output path)))
+    (doseq [offsets [[{"slot" "missing" "offset" 1}] [{"slot" "slot" "offset" 2}]
+                     [{"slot" "slot" "offset" 1} {"slot" "end" "offset" 0}]]]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (native/from-skeletons [{:name "fixture" :source (assoc-in edited (into path [0 "offsets"]) offsets)}]))))))
+
+;; Full graph decoding handles skin-linked bones without exposing unsafe
+;; byte-patch edits.
+(deftest native-skin-membership-edit-test
+  (let [bytes (.decode (Base64/getDecoder) ^String (:skin-membership-true remaining-fixtures))
+        preservation (native/decode bytes)
+        graph (native/decode-graph preservation)
+        source (native/to-spine-json graph 0)
+        detached (-> source (update-in ["bones" 1] dissoc "skin") (assoc-in ["skins" 1 "bones"] []))
+        output (native/to-spine-json (native/update-skeleton graph 0 detached) 0)]
+    (is (= #{:opaque-roundtrip} (:capabilities preservation)))
+    (is (Arrays/equals ^bytes bytes ^bytes (native/encode preservation)))
+    (is (true? (get-in source ["bones" 1 "skin"])))
+    (is (= ["child"] (get-in source ["skins" 1 "bones"])))
+    (is (nil? (get-in output ["bones" 1 "skin"])))
+    (is (nil? (get-in output ["skins" 1 "bones"])))
+    (doseq [invalid [(update-in source ["bones" 1] dissoc "skin")
+                     (assoc-in source ["skins" 1 "bones"] [])]]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"skin-required state"
+                            (native/from-skeletons [{:name "fixture" :source invalid}]))))))
+
+;; Light-only keys retain setup dark tint when saved to native format.
+(deftest native-light-color-preserves-setup-dark-test
+  (let [source {"bones" [{"name" "root"}]
+                "slots" [{"name" "slot" "bone" "root" "dark" "123456"}]
+                "animations" {"a" {"slots" {"slot" {"rgba" [{"color" "ff0000ff"} {"time" 1.0 "color" "0000ffff"}]}}}}}
+        output (native/to-spine-json (native/from-skeletons [{:name "fixture" :source source}]) 0)
+        frames (get-in output ["animations" "a" "slots" "slot" "rgba2"])]
+    (is (= ["123456" "123456"] (mapv #(get % "dark") frames)))
+    (is (= ["ff0000ff" "0000ffff"] (mapv #(get % "light") frames)))))

@@ -1,0 +1,5 @@
+{'id': 'patch', 'ns': 'user', 'session': '8e3226da-3a79-476e-885b-5e046f58e18a', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '8e3226da-3a79-476e-885b-5e046f58e18a', 'value': 'nil'}
+{'id': 'patch', 'out': ':hotloaded {:document-preserved true, :undo-preserved true, :selection-preserved true, :groups [{:id "05_tail_auto1_follow", :slot "05_tail", :controls ["05_tail_auto1_control1" "05_tail_auto1_control2"], :bones ["05_tail_auto1_bone1" "05_tail_auto1_bone2" "05_tail_auto1_bone3" "05_tail_auto1_bone4" "05_tail_auto1_bone5" "05_tail_auto1_bone6" "05_tail_auto1_bone7" "05_tail_auto1_bone8"]}], :failed-handlers 0, :stopped-timers 0}\n', 'session': '8e3226da-3a79-476e-885b-5e046f58e18a'}
+{'id': 'patch', 'ns': 'user', 'session': '8e3226da-3a79-476e-885b-5e046f58e18a', 'value': 'nil'}
+{'id': 'patch', 'session': '8e3226da-3a79-476e-885b-5e046f58e18a', 'status': ['done']}

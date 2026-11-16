@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-runtime-fixes/build/editor.jar",
+  "sha256": "d09c9b6b94ec139ab5ad42245b222011bfd9ba2fb68e207f25387223478e51a0",
+  "project_source": "tmp/background-skeletal-final/project",
+  "project_copy": "/private/tmp/spine-runtime-fixes/background-verified/project",
+  "scenario": "/Users/applemima1111/Documents/Dev/Defold/editor/test/headless/skeletal_animation_runtime_gaps.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

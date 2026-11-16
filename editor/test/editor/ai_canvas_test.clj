@@ -60,6 +60,51 @@
     (is (:gui-stale (canvas/node-by-id (canvas/adopt-candidate model "result-1") "gui_assets-1")))
     (is (= [sheet] (:asset-candidates (canvas/node-by-id (canvas/merge-candidates base "assets-1" [sheet]) "result-1"))))))
 
+;; Adoption invalidates every GUI output even when an import Action is first.
+(deftest gui-adoption-invalidation-test
+  (let [screen {:id "screen" :image-path "screen.png" :files [{:path "screen.png"}]}
+        sheet {:id "sheet" :text "New components" :image-path "sheet.png" :files [{:path "sheet.png" :sha256 "new-content"}]}
+        model (-> (assoc (canvas/initial-canvas) :workflow :document :template "gui")
+                  (canvas/merge-candidates "action-1" [screen])
+                  (canvas/adopt-candidate "result-1")
+                  (canvas/deliver-gui "assets-1" {:gui "/screen.gui"})
+                  (canvas/update-node "assets-1" #(assoc % :artifact-id "approved-screen" :delivery-id "delivered-screen"
+                                                         :document-output "screen.md" :production-plan {:module "screen"}
+                                                         :production-source-key "screen-source"))
+                  (update :nodes into [{:id "import-action" :kind :action :task-type "resource-import"}
+                                       {:id "gui-second" :kind :gui :gui-stale false}
+                                       {:id "gui-unrelated" :kind :gui :gui-stale false}])
+                  (update :edges #(into [{:from "assets-1" :to "import-action"}
+                                         {:from "assets-1" :to "gui-second"}] %)))
+        adopted (canvas/adopt-components model "assets-1" sheet)
+        assets (canvas/node-by-id adopted "assets-1")]
+    (doseq [next [(canvas/adopt-candidate model "result-1") adopted]]
+      (is (:gui-stale (canvas/node-by-id next "gui_assets-1")))
+      (is (:gui-stale (canvas/node-by-id next "gui-second")))
+      (is (false? (:gui-stale (canvas/node-by-id next "gui-unrelated"))))
+      (is (= (canvas/node-by-id model "import-action") (canvas/node-by-id next "import-action"))))
+    (is (= "sheet" (:source-candidate assets)))
+    (is (= (results/revision {:candidates [sheet]}) (:source-revision assets)))
+    (is (= "New components" (:proposal-text assets)))
+    (doseq [key [:production :production-plan :production-source-key :document-output :artifact-id :delivery-id]]
+      (is (not (contains? assets key))))))
+
+;; New screen proposals preserve the adopted component sheet and GUI.
+(deftest unconfirmed-screen-preserves-adoption-test
+  (let [sheet {:id "sheet" :purpose "component-sheet" :image-path "sheet.png" :files [{:path "sheet.png"}]}
+        screen {:id "screen" :image-path "screen.png" :files [{:path "screen.png"}]}
+        adopted (-> (assoc (canvas/initial-canvas) :workflow :document :template "gui")
+                    (canvas/merge-candidates "action-1" [sheet])
+                    (canvas/adopt-components "assets-1" sheet)
+                    (canvas/deliver-gui "assets-1" {:gui "/components.gui"}))
+        received (-> adopted
+                     (canvas/merge-candidates "action-1" [screen])
+                     (assoc :selected "result-1"))]
+    (is (= "screen" (:chosen (canvas/node-by-id received "result-1"))))
+    (is (= (canvas/node-by-id adopted "assets-1") (canvas/node-by-id received "assets-1")))
+    (is (= (canvas/node-by-id adopted "gui_assets-1") (canvas/node-by-id received "gui_assets-1")))
+    (is (false? (:gui-stale (canvas/node-by-id received "gui_assets-1"))))))
+
 ;; Connections must remain directional and unambiguous for reply attribution.
 (deftest linear-connections-test
   (let [model (canvas/initial-canvas)]

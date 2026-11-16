@@ -9,9 +9,24 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
+
+
+def macos_icon(destination):
+    """Package the supplied artwork at Apple's standard icon resolutions."""
+    with tempfile.TemporaryDirectory(prefix='remote-icon-') as temporary:
+        iconset = Path(temporary) / 'DefoldRemote.iconset'
+        iconset.mkdir()
+        for size in (16, 32, 128, 256, 512):
+            for scale in (1, 2):
+                name = f'icon_{size}x{size}' + ('@2x' if scale == 2 else '') + '.png'
+                subprocess.run(['sips', '-z', str(size * scale), str(size * scale),
+                                str(HERE/'icons/icon.png'), '--out', str(iconset/name)],
+                               check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(['iconutil', '-c', 'icns', str(iconset), '-o', str(destination)], check=True)
 
 
 def build(app, output, engine=None, shell=False):
@@ -21,7 +36,7 @@ def build(app, output, engine=None, shell=False):
     automation = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(automation)
     base = automation.prepare(app, ROOT / 'tmp/remote-manager-runtime', engine)
-    sources = sorted((HERE / 'java').rglob('*.java')) + [ROOT / 'editor/src/java/com/defold/editor' / f for f in ('RemoteVideoEncoder.java', 'RemoteStreamQuality.java')]
+    sources = sorted((HERE / 'java').rglob('*.java')) + [ROOT / 'editor/src/java/com/defold/editor' / f for f in ('RemoteVideoEncoder.java', 'RemoteStreamQuality.java', 'RemoteAudioFile.java')]
     compiler = shutil.which('javac')
     if not compiler and os.name == 'nt':
         compiler = str(sorted(Path('C:/Program Files/Eclipse Adoptium').glob('jdk-25*/bin/javac.exe'))[-1])
@@ -45,6 +60,19 @@ def build(app, output, engine=None, shell=False):
         for arg in json.loads(configure.read_text(encoding='utf-8'))['args']:
             if arg.startswith('-DDEFOLD_SDK_ROOT') and '=' in arg:
                 sdk = Path(arg.split('=', 1)[1])
+    # Refuse to ship a runtime which only fails once a user starts a native project.
+    spec = importlib.util.spec_from_file_location('remote_local_extensions', ROOT/'scripts/windows/local_extensions.py')
+    local = importlib.util.module_from_spec(spec); spec.loader.exec_module(local)
+    local.PLATFORM = base['platform']
+    sdk_revision = local.sdk_revision(sdk)
+    local.check_engine_libraries(sdk, ROOT/'engine/engine/build'/base['platform'])
+    import re, zipfile
+    with zipfile.ZipFile(base['jar']) as archive:
+        revisions = set(re.findall(rb'\x01\x00\x28([0-9a-f]{40})', archive.read('com/dynamo/bob/archive/EngineVersion.class')))
+    if revisions != {sdk_revision.encode('ascii')}:
+        raise ValueError('Selected editor Bob and native extension SDK revisions differ')
+    if automation.digest(base['engine']) != automation.digest(sdk/'bin'/base['platform']/('dmengine.exe' if os.name=='nt' else 'dmengine')):
+        raise ValueError('Packaged engine differs from the installed native extension SDK')
     tool_paths = sorted({str(Path(tool).resolve().parent) for name in ('cmake', 'ninja') if (tool := shutil.which(name))})
     profile = {'python': sys.executable, 'repository': str(ROOT), 'sdk': str(sdk.resolve()), 'toolPaths': tool_paths}
     inputs['nativeBuild'] = profile
@@ -93,11 +121,12 @@ def build(app, output, engine=None, shell=False):
             bundled_config = dict(config, manifest=str(Path(package.name)/'manifest.json'))
             (macos/'remote-manager.json').unlink(missing_ok=True)
             (resources/'remote-manager.json').write_text(json.dumps(bundled_config), encoding='utf-8')
+            macos_icon(resources/'DefoldRemote.icns')
             version = json.loads((HERE/'tauri.conf.json').read_text())['version']
             with (contents/'Info.plist').open('wb') as info:
                 plistlib.dump(dict(CFBundleExecutable=executable, CFBundleIdentifier='com.defold.remote.manager',
                                   CFBundleName='Defold Remote Manager', CFBundleDisplayName='Defold Remote Manager',
-                                  CFBundlePackageType='APPL', CFBundleShortVersionString=version,
+                                  CFBundlePackageType='APPL', CFBundleIconFile='DefoldRemote.icns', CFBundleShortVersionString=version,
                                   CFBundleVersion=version, LSMinimumSystemVersion='11.0',
                                   NSHighResolutionCapable=True), info)
             subprocess.run(['codesign', '--force', '--sign', '-', str(bundle)], check=True)

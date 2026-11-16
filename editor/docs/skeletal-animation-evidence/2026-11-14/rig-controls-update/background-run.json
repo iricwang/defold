@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/defold-rig-update/payload/Contents/Resources/packages/defold-871d419fe7ad8f81d5d988f58afa153df5ca818f.jar",
+  "sha256": "7fe34d093398d2672e6964eb17227aecc16aed05c2f6e6cc92bfbd7c0f5977e5",
+  "project_source": "/tmp/spine-tail-path/project",
+  "project_copy": "/private/tmp/defold-rig-update/background/project",
+  "scenario": "/private/tmp/spine-rig-ui/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

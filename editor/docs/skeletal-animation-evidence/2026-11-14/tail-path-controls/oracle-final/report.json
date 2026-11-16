@@ -1,0 +1,32 @@
+{
+  "runtime": "@esotericsoftware/spine-core",
+  "version": "4.2.120",
+  "fixture": "/Users/applemima1111/Documents/Dev/Defold/editor/test/resources/skeletal-animation/performance-project/tail_path.skeleton",
+  "exportSha256": "7ccc603885cb7a5d6227d3547f54fe8e7a140e102c199f0f226e82e359786ad0",
+  "fps": 60,
+  "tolerance": 0.0001,
+  "frames": 121,
+  "passed": true,
+  "clips": [
+    {
+      "animation": "tail_path_demo",
+      "frames": 121,
+      "boneError": 0.00005835895350969622,
+      "vertexError": 0.00006089424977062663,
+      "worstBone": {
+        "time": 1.5,
+        "name": "tail_path_tip",
+        "component": 4,
+        "actual": 93.22946844396891,
+        "expected": 93.22952680292242
+      },
+      "worstVertex": {
+        "time": 1.5,
+        "index": 44,
+        "actual": 93.00326092383135,
+        "expected": 93.00332181808112
+      },
+      "stateErrors": 0
+    }
+  ]
+}

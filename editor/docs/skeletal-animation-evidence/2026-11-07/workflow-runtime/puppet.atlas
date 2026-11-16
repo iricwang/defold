@@ -1,0 +1,38 @@
+animations {
+  id: "images/gray"
+  images { image: "/images/gray.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+animations {
+  id: "images/grid"
+  images { image: "/images/grid.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+animations {
+  id: "images/pulse01"
+  images { image: "/images/pulse01.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+animations {
+  id: "images/pulse02"
+  images { image: "/images/pulse02.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+animations {
+  id: "images/pulse03"
+  images { image: "/images/pulse03.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+animations {
+  id: "images/tint"
+  images { image: "/images/tint.png" }
+  playback: PLAYBACK_ONCE_FORWARD
+  fps: 0
+}
+extrude_borders: 2
+inner_padding: 2

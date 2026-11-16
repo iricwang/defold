@@ -16,7 +16,10 @@
   (:require [clojure.test :refer [deftest is]]
             [dynamo.graph :as g]
             [editor.skeletal-animation-data :as data]
+            [editor.skeletal-animation-events :as events]
             [editor.skeletal-animation-geometry :as geometry]
+            [editor.skeletal-animation-mesh :as mesh]
+            [editor.skeletal-animation-slots :as slots]
             [editor.skeletal-animation-timeline :as timeline]
             [editor.skeletal-animation-tools :as tools]
             [editor.skeletal-animation-view :as view]
@@ -54,12 +57,12 @@
                             :triangles [0 1 2 0 2 3]}
                      weighted
                      (assoc :weights
-                            (mapv (fn [[x y]]
-                                    (let [[bx by] (geometry/inverse-transform-point (transforms "other")
-                                                                                    (geometry/transform-point (transforms "arm") [x y]))]
-                                      [{:bone "arm" :weight 0.6 :x x :y y}
-                                       {:bone "other" :weight 0.4 :x bx :y by}]))
-                                  (partitionv 2 vertices))))]
+                       (mapv (fn [[x y]]
+                               (let [[bx by] (geometry/inverse-transform-point (transforms "other")
+                                                                               (geometry/transform-point (transforms "arm") [x y]))]
+                                 [{:bone "arm" :weight 0.6 :x x :y y}
+                                  {:bone "other" :weight 0.4 :x bx :y by}]))
+                             (partitionv 2 vertices))))]
     (data/add-slot doc {:id "mesh" :bone "arm" :attachment attachment})))
 
 (defn- slot-context [doc mode]
@@ -82,7 +85,7 @@
 
 (defn- rendered-vertices [context doc]
   (#'view/attachment-points context doc (slot doc)
-                           (geometry/world-transforms (#'view/pose context doc))))
+                            (geometry/world-transforms (#'view/pose context doc))))
 
 (defn- drag-vertex [context doc vertex target]
   (#'view/drag-vertices context doc #{vertex} (nth (partitionv 2 (rendered-vertices context doc)) vertex) target))
@@ -96,8 +99,8 @@
         parent ((geometry/world-transforms (:bones doc)) "root")
         start (geometry/transform-point parent [20.0 20.0])]
     (doseq [[tool local-target expected] [["move" [25.0 28.0] [15.0 28.0 15.0 -1.0 2.0]]
-                                        ["rotate" [10.0 30.0] [10.0 20.0 105.0 -1.0 2.0]]
-                                        ["scale" [30.0 20.0] [10.0 20.0 15.0 -2.0 4.0]]]]
+                                          ["rotate" [10.0 30.0] [10.0 20.0 105.0 -1.0 2.0]]
+                                          ["scale" [30.0 20.0] [10.0 20.0 15.0 -2.0 4.0]]]]
       (let [changed (#'view/drag-bone context doc arm tool start (geometry/transform-point parent local-target))]
         (is (near? expected ((juxt :x :y :rotation :scale-x :scale-y) (bone (:bones changed) "arm"))))
         (is (= (:animations doc) (:animations changed)))
@@ -114,12 +117,12 @@
         parent ((geometry/world-transforms (:bones doc)) "root")
         start (geometry/transform-point parent [30.0 20.0])]
     (doseq [[tool local-target properties expected] [["move" [35.0 28.0] #{"x" "y"} [25.0 28.0 15.0 -1.0 2.0]]
-                                                   ["rotate" [20.0 30.0] #{"rotation"} [20.0 20.0 105.0 -1.0 2.0]]
-                                                   ["scale" [40.0 20.0] #{"scale-x" "scale-y"} [20.0 20.0 15.0 -2.0 4.0]]]]
+                                                     ["rotate" [20.0 30.0] #{"rotation"} [20.0 20.0 105.0 -1.0 2.0]]
+                                                     ["scale" [40.0 20.0] #{"scale-x" "scale-y"} [20.0 20.0 15.0 -2.0 4.0]]]]
       (let [changed (#'view/drag-bone context doc arm tool start (geometry/transform-point parent local-target))
             sample (bone (data/sample-pose changed "default" 0.5) "arm")
             keys-at-time (into #{} (comp (filter #(coll/any? (fn [key] (= 0.5 (:time key))) (:keys %)))
-                                        (map :property)) (get-in changed [:animations 0 :tracks]))]
+                                         (map :property)) (get-in changed [:animations 0 :tracks]))]
         (is (near? expected ((juxt :x :y :rotation :scale-x :scale-y) sample)))
         (is (= properties keys-at-time))
         (is (= (:bones doc) (:bones changed)))))))
@@ -194,26 +197,35 @@
     (swap! (:state context) assoc :timeline-pan -480.0 :timeline-zoom 4.0)
     (is (near? [2.0] [(#'view/timeline-time context (#'view/timeline-x context 2.0))]))))
 
-;; Vertical wheel events must reach the track ScrollPane in compact layouts;
-;; only horizontal/Shift panning and Control zoom consume the gesture.
+;; Wheel over row labels scrolls rows; over the plot it zooms around the cursor.
+;; Horizontal or Shift wheel pans without changing the scale.
 (deftest timeline-scroll-routing-test
   (ui/run-now
-    (doseq [[dx dy shift control consumed pan zoom]
-            [[0.0 -80.0 false false false -120.0 2.0]
-             [-40.0 0.0 false false true -160.0 2.0]
-             [0.0 -80.0 true false true -200.0 2.0]
-             [0.0 80.0 false true true -120.0 (* 2.0 (Math/pow 1.002 80.0))]]]
+    (doseq [[x dx dy shift consumed]
+            [[10.0 0.0 -80.0 false false]
+             [400.0 -40.0 0.0 false true]
+             [400.0 0.0 -80.0 true true]
+             [400.0 0.0 80.0 false true]]]
       (let [canvas (javafx.scene.canvas.Canvas.)
             context (assoc (context (rig) "animate") :timeline canvas)
+            before @(:state context)
+            before-time (/ (- x 180.0 (:timeline-pan before)) (* 120.0 (:timeline-zoom before)))
             event (javafx.scene.input.ScrollEvent.
-                    javafx.scene.input.ScrollEvent/SCROLL 10.0 10.0 10.0 10.0
-                    shift control false false false false dx dy dx dy
+                    javafx.scene.input.ScrollEvent/SCROLL x 10.0 x 10.0
+                    shift false false false false false dx dy dx dy
                     javafx.scene.input.ScrollEvent$HorizontalTextScrollUnits/NONE 0.0
                     javafx.scene.input.ScrollEvent$VerticalTextScrollUnits/NONE 0.0 0 nil)]
         (#'view/timeline-events! context)
         (.handle (.getOnScroll canvas) event)
         (is (= consumed (.isConsumed event)))
-        (is (near? [pan zoom] [(:timeline-pan @(:state context)) (:timeline-zoom @(:state context))]))))))
+        (let [after @(:state context)]
+          (cond
+            (not consumed) (is (= before after))
+            (or shift (not (zero? dx)))
+            (do (is (= (:timeline-zoom before) (:timeline-zoom after)))
+                (is (= (+ (:timeline-pan before) dx (if shift dy 0.0)) (:timeline-pan after))))
+            :else (do (is (> (:timeline-zoom after) (:timeline-zoom before)))
+                      (is (near? [before-time] [(/ (- x 180.0 (:timeline-pan after)) (* 120.0 (:timeline-zoom after)))])))))))))
 
 ;; Singular parent scales cannot be inverted by gizmos. Bone dragging leaves
 ;; the document untouched and mesh dragging raises a recoverable editor error.
@@ -276,7 +288,7 @@
 ;; the same rectangle as a region imported with type="region".
 (deftest default-region-preview-test
   (let [doc (data/add-slot (rig) {:id "image" :bone "arm"
-                                :attachment {:path "/image.png" :width 20.0 :height 10.0}})
+                                  :attachment {:path "/image.png" :width 20.0 :height 10.0}})
         context (context doc "setup")
         worlds (geometry/world-transforms (:bones doc))
         implicit (slot doc)
@@ -304,8 +316,8 @@
   (let [committed (atom nil)
         messages (atom [])]
     (with-redefs-fn {#'g/node-value (fn [_ _] (:draft @(:state context)))
-                    #'view/commit! (fn [_ doc] (reset! committed (data/validate-document doc)))
-                    #'view/message! (fn [_ text] (swap! messages conj text))}
+                     #'view/commit! (fn [_ doc] (reset! committed (data/validate-document doc)))
+                     #'view/message! (fn [_ text] (swap! messages conj text))}
       #(action context))
     {:document @committed :messages @messages}))
 
@@ -490,18 +502,17 @@
     (is (:stretch key))))
 
 ;; A batch drag offsets each influence in its own bone space and performs one
-;; FFD write, retaining different existing offsets rather than collapsing them.
+;; FFD key, retaining different existing offsets rather than collapsing them.
 (deftest selected-mesh-drag-retains-influence-offsets-test
   (let [doc (mesh-document true)
         size (data/deform-size (:attachment (slot doc)))
         doc (data/set-deform-keyframe doc "default" "mesh" 0.5 (mapv double (range size)) "linear")
         context (slot-context doc "animate")
         before (rendered-vertices context doc)
-        calls (atom 0)
-        setter data/set-deform-keyframe
-        changed (with-redefs [data/set-deform-keyframe (fn [& args] (swap! calls inc) (apply setter args))]
-                  (#'view/drag-vertices context doc #{0 1 2 3} [0.0 0.0] [7.0 -3.0]))]
-    (is (= 1 @calls))
+        changed (#'view/drag-vertices context doc #{0 1 2 3} [0.0 0.0] [7.0 -3.0])]
+    (is (= (mapv :time (get-in doc [:animations 0 :deforms 0 :keys]))
+           (mapv :time (get-in changed [:animations 0 :deforms 0 :keys]))))
+    (is (= 1 (count (filterv #(= 0.5 (:time %)) (get-in changed [:animations 0 :deforms 0 :keys])))))
     (is (near? (into [] (mapcat #(mapv + % [7.0 -3.0])) (partitionv 2 before))
                (rendered-vertices context changed)))
     (is (= (:slots doc) (:slots changed)))))
@@ -568,12 +579,12 @@
        #'view/commit! (fn [_ updated] (swap! state assoc :draft updated))}
       #(do
          (#'view/batch-keys! context
-                            (fn [d id refs] (timeline/scale-keys d id refs 0.0 0.333 {}))
-                            (fn [time] (* 0.333 time)))
+                             (fn [d id refs] (timeline/scale-keys d id refs 0.0 0.333 {}))
+                             (fn [time] (* 0.333 time)))
          (is (= #{0.0 0.333} (into #{} (map :time) (:selected-keys @state))))
          (#'view/batch-keys! context
-                            (fn [d id refs] (timeline/snap-keys d id refs 60.0 {}))
-                            (fn [time] (/ (Math/round (* time 60.0)) 60.0)))
+                             (fn [d id refs] (timeline/snap-keys d id refs 60.0 {}))
+                             (fn [time] (/ (Math/round (* time 60.0)) 60.0)))
          (is (= #{0.0 (/ 20.0 60.0)} (into #{} (map :time) (:selected-keys @state))))
          (is (= (:selected-keys @state) (set (timeline/all-key-refs (:draft @state) "default"))))
          (#'view/batch-keys! context timeline/delete-keys nil)
@@ -585,7 +596,7 @@
 (deftest selected-mesh-timeline-priority-test
   (let [doc (mesh-document false)
         tracks (#'view/timeline-tracks (slot-context doc "animate") doc)]
-    (is (= {:slot "mesh" :property "deform" :keys nil} (first tracks)))
+    (is (= {:slot "mesh" :skin "default" :attachment "mesh" :property "deform" :keys []} (first tracks)))
     (is (= "x" (:property (second tracks))))))
 
 ;; Filtering retains ancestor context and matching descendants, instead of
@@ -615,7 +626,7 @@
     (is (= (:scale-x (bone (:bones doc) "arm")) (:scale-x (bone (:bones result) "arm"))))
     (is (= (:bones doc) (:bones keyed)))
     (is (coll/any? #(and (= "arm" (:bone %)) (= "shear-y" (:property %)))
-                  (:tracks (first (:animations keyed)))))))
+                   (:tracks (first (:animations keyed)))))))
 
 ;; A constrained drag projects onto the selected world axis before parent-space
 ;; conversion; the other world coordinate must stay unchanged under reflection.
@@ -704,3 +715,790 @@
     (is (= "region" (get-in edited [:slots 0 :attachment :type])))
     (is (near? (#'view/attachment-points context doc (slot doc) (data/world-transforms (:bones doc)))
                (#'view/attachment-points context edited (slot edited) (data/world-transforms (:bones edited)))))))
+
+;; Event selection survives refresh and uses discrete timeline references.
+(deftest event-selection-and-lane-test
+  (let [doc (-> (rig)
+                (events/add-definition {:name "hit" :int 3})
+                (events/set-keyframe "default" {:name "hit" :time 0.5}))
+        context (context doc "animate")]
+    (#'view/set-selection! context :event "hit")
+    (#'view/repair-selection! context doc)
+    (is (= :event (:selected-kind @(:state context))))
+    (is (= "hit" (:selected @(:state context))))
+    (let [track (first (#'view/timeline-tracks context doc))]
+      (is (= "hit" (:event track)))
+      (is (= {:type :event :id "hit" :time 0.5}
+             (#'view/key-ref track (first (:keys track))))))))
+
+;; Slot and draw-order keys must not be mistaken for mesh deform keys.
+(deftest slot-animation-lane-reference-test
+  (let [doc (-> (mesh-document false)
+                (slots/set-keyframe "default" "mesh" "attachment" {:time 0.5 :name nil})
+                (slots/set-keyframe "default" "mesh" "rgba" {:time 0.5 :color "ff00ffff"})
+                (slots/set-draw-order-keyframe "default" 0.5 ["mesh"]))
+        context (slot-context doc "animate")
+        tracks (#'view/timeline-tracks context doc)
+        refs (coll/into-> tracks #{} (mapcat (fn [track] (mapv #(#'view/key-ref track %) (:keys track)))))]
+    (is (contains? refs {:type :slot :id "mesh" :property "attachment" :time 0.5}))
+    (is (contains? refs {:type :slot :id "mesh" :property "rgba" :time 0.5}))
+    (is (contains? refs {:type :draw-order :id "draw-order" :time 0.5}))))
+
+;; Key Shown resolves each lane instead of repeating the selected event.
+(deftest event-property-transaction-test
+  (ui/run-now
+    (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+      (let [doc (-> (rig)
+                    (events/add-definition {:name "hit"})
+                    (events/add-definition {:name "sound"}))
+            resource-node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (context doc "animate") :resource-node resource-node
+                           :status (javafx.scene.control.Label.))]
+        (swap! (:state context) dissoc :draft)
+        (#'view/set-selection! context :event "hit")
+        (#'view/key-properties! context ["◆ hit" "◆ sound"])
+        (is (= ["hit" "sound"]
+               (mapv :name (events/keyframes (g/node-value resource-node :document) "default"))))))))
+
+;; Mixed visual transforms cannot be authored back into the base animation.
+(deftest mixed-preview-edit-guard-test
+  (let [context (context (rig) "animate")]
+    (swap! (:state context) assoc :mix-enabled true)
+    (is (thrown? clojure.lang.ExceptionInfo (#'view/require-editable-preview! context)))
+    (swap! (:state context) assoc :mix-enabled false)
+    (is (nil? (#'view/require-editable-preview! context)))))
+
+;; Polygon attachments use the same weighted Setup and FFD drag path as paths.
+(deftest polygon-attachment-drag-test
+  (doseq [type ["boundingbox" "clipping"]
+          weighted [false true]
+          mode ["setup" "animate"]]
+    (let [doc (mesh-document weighted)
+          source (:attachment (slot doc))
+          attachment (-> source (dissoc :uvs :triangles :hull) (assoc :type type))
+          doc (data/update-slot doc "mesh" {:attachment attachment})
+          context (slot-context doc mode)
+          before (rendered-vertices context doc)
+          origin (subvec before 0 2)
+          target (mapv + origin [11.0 -7.0])
+          changed (#'view/drag-vertices context doc #{0} origin target)
+          result (rendered-vertices (slot-context changed mode) changed)]
+      (is (near? target (subvec result 0 2)))
+      (is (near? (subvec before 2) (subvec result 2)))
+      (is (= type (get-in (data/read-json (data/write-json changed)) [:slots 0 :attachment :type]))))))
+
+;; Empty canvas clicks and toggling off the final slot leave a selection kind
+;; without an ID. The inspector must show the selection hint, not sample nil.
+(deftest empty-selection-inspector-test
+  (ui/run-now
+    (let [doc (mesh-document false)]
+      (doseq [mode ["setup" "animate"]
+              kind [nil :slot :bone :ik :transform :path :physics]]
+        (let [context (context doc mode)
+              state (:state context)]
+          (swap! state assoc :selected-kind kind :selected nil
+                 :selected-slots #{} :selected-bones #{})
+          (#'view/repair-selection! context doc)
+          (let [before @state
+                controls (#'view/entity-inspector context doc)]
+            (is (= 1 (count controls)) (str mode " / " kind))
+            (is (coll/any? #(= "Invalid editor operation" (.getText ^javafx.scene.control.Label %))
+                           (.lookupAll ^javafx.scene.Node (first controls) ".label")))
+            (is (= before @state))
+            (is (= doc (:draft @state)))))))))
+
+;; Both image and existing mesh selections expose an enabled meshing entry.
+(deftest smart-mesh-entry-visibility-test
+  (ui/run-now
+    (let [mesh (mesh-document false)
+          region (update-in mesh [:slots 0 :attachment]
+                            #(-> % (assoc :type "region" :width 20.0 :height 20.0 :x 0.0 :y 0.0 :rotation 0.0 :scale-x 1.0 :scale-y 1.0)
+                                 (dissoc :uvs :vertices :triangles :weights)))]
+      (doseq [[doc disabled] [[mesh false] [region false]]]
+        (let [context (slot-context doc "setup")
+              _ (swap! (:state context) assoc :vertex 0 :weight 1.0)
+              nodes (#'view/entity-inspector-content context doc)
+              button (.lookup (javafx.scene.layout.VBox. (into-array javafx.scene.Node nodes)) "#skeletal-smart-mesh")]
+          (is (some? button))
+          (is (.isVisible ^javafx.scene.control.Button button))
+          (is (= disabled (.isDisable ^javafx.scene.control.Button button)))
+          (is (some? (.getTooltip ^javafx.scene.control.Button button))))))))
+
+;; Animation mode must expose FFD editing without exposing setup topology or
+;; weights. Opening the tool must retain the setup mesh and pause playback.
+(deftest animate-mesh-deform-entry-test
+  (ui/run-now
+    (let [doc (mesh-document false)
+          context (slot-context doc "animate")
+          _ (swap! (:state context) assoc :playing true :tool "move")
+          panel (javafx.scene.layout.VBox.
+                  (into-array javafx.scene.Node (#'view/entity-inspector context doc)))
+          edit (.lookup panel "#skeletal-edit-deform")]
+      (is (some? edit))
+      (is (some? (.lookup panel "#skeletal-key-deform")))
+      (is (nil? (.lookup panel "#skeletal-smart-mesh")))
+      (is (nil? (.lookup panel "#skeletal-assign-weight")))
+      (.fire ^javafx.scene.control.Button edit)
+      (is (= {:tool "mesh" :mesh-mode "modify" :property "deform" :playing false}
+             (select-keys @(:state context) [:tool :mesh-mode :property :playing])))
+      (is (= doc (#'view/document context))))))
+
+;; The all-node graph must retain separate channel identities for identical
+;; properties, so a curve edit cannot silently modify a different bone.
+(deftest all-node-timeline-and-curve-target-test
+  (let [doc (-> (rig)
+                (data/set-keyframe "default" "arm" "rotation" 0.0 1.0 "linear")
+                (data/set-keyframe "default" "arm" "rotation" 1.0 2.0 "linear")
+                (data/set-keyframe "default" "other" "rotation" 0.0 3.0 "linear")
+                (data/set-keyframe "default" "other" "rotation" 1.0 4.0 "linear"))
+        context (context doc "animate")]
+    (swap! (:state context) assoc :selected nil :selected-kind nil)
+    (let [tracks (#'view/timeline-tracks context doc)
+          other (coll/first-where #(= "other" (:bone %)) tracks)
+          key (assoc (first (:keys other)) :track (:channel-id other))
+          updated (#'view/update-curve context doc key "stepped")]
+      (is (= #{"arm" "other"} (set (mapv :bone tracks))))
+      (is (= 2 (count (set (mapv :channel-id tracks)))))
+      (is (identical? tracks (#'view/timeline-tracks context doc)))
+      (is (= "stepped" (:interpolation (first (:keys (coll/first-where #(= "other" (:bone %)) (:tracks (first (:animations updated)))))))))
+      (is (= "linear" (:interpolation (first (:keys (coll/first-where #(= "arm" (:bone %)) (:tracks (first (:animations updated)))))))))
+      (with-redefs [g/node-value (fn read-document [_ _] doc)]
+        (let [graph (#'view/curve-state context)]
+          (is (= 2 (count (:channels graph))))
+          (is (= 2 (count (set (mapv :property (:channels graph)))))))))
+    (swap! (:state context) assoc :selected "arm" :selected-kind :bone :selected-bones #{"arm" "other"})
+    (is (= #{"arm" "other"} (set (mapv :bone (#'view/timeline-tracks context doc)))))
+    (swap! (:state context) assoc :selected-bones #{"arm"})
+    (is (= #{"arm"} (set (mapv :bone (#'view/timeline-tracks context doc)))))))
+
+;; Recreating a bone changes its setup endpoints without moving descendants or
+;; the selected mesh; the temporary helper bone must never enter the document.
+(deftest recreate-bone-compensation-test
+  (let [doc (data/add-bone (mesh-document false) {:id "child" :parent "arm" :x 20.0 :y 15.0 :rotation 45.0})
+        context (slot-context doc "setup")
+        before (rendered-vertices context doc)
+        old-child (get (data/world-transforms (:bones doc)) "child")
+        after (#'view/creation-document context {:document doc :bone (bone (:bones doc) "arm")
+                                                 :world [25.0 40.0] :create-id "temporary" :recreate true} [80.0 90.0])]
+    (is (= (count (:bones doc)) (count (:bones after))))
+    (is (nil? (bone (:bones after) "temporary")))
+    (is (near? old-child (get (data/world-transforms (:bones after)) "child")))
+    (is (near? before (rendered-vertices context after)))))
+
+;; Attachment-assisted creation retains mesh vertices and existing FFD offsets
+;; in world space instead of shifting the artwork onto the new bone's origin.
+(deftest create-with-mesh-attachment-test
+  (let [doc (data/set-deform-keyframe (mesh-document false) "default" "mesh" 0.5 [1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0] "linear")
+        context (slot-context doc "setup")
+        after (#'view/creation-document context {:document doc :bone (bone (:bones doc) "root")
+                                                 :world [50.0 80.0] :create-id "new" :slots ["mesh"]} [90.0 110.0])]
+    (is (= "new" (:bone (slot after))))
+    (is (near? (rendered-vertices context doc) (rendered-vertices context after)))
+    (is (near? (rendered-vertices (slot-context doc "animate") doc)
+               (rendered-vertices (slot-context after "animate") after)))))
+
+;; A gesture previews without authoring, commits once, undoes in one step,
+;; supports sibling creation and cancels atomically with Escape.
+(deftest creation-gesture-transaction-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (rig) resource-node (g/make-node! ToolTransactionFixture :document doc)
+            canvas (javafx.scene.canvas.Canvas. 500.0 400.0)
+            context (assoc (context doc "setup") :resource-node resource-node :canvas canvas :status (javafx.scene.control.Label.))
+            state (:state context)
+            mouse (fn send-mouse [type x y shift]
+                    (javafx.event.Event/fireEvent canvas
+                                                  (javafx.scene.input.MouseEvent. type x y x y javafx.scene.input.MouseButton/PRIMARY 1
+                                                                                  shift false false false true false false false false false nil)))
+            press javafx.scene.input.MouseEvent/MOUSE_PRESSED
+            drag javafx.scene.input.MouseEvent/MOUSE_DRAGGED
+            release javafx.scene.input.MouseEvent/MOUSE_RELEASED]
+        (swap! state #(-> % (dissoc :draft) (assoc :tool "create" :zoom 1.0 :pan-x 0.0 :pan-y 400.0 :show-images false)))
+        (#'view/creation-events! context)
+        (#'view/creation-events! context)
+        (mouse press 200.0 200.0 false)
+        (mouse drag 260.0 170.0 false)
+        (is (= doc (g/node-value resource-node :document)))
+        (is (= 4 (count (:bones (:draft @state)))))
+        (mouse release 260.0 170.0 false)
+        (let [created (g/node-value resource-node :document)
+              id (:selected @state)]
+          (is (= "arm" (:parent (bone (:bones created) id))))
+          (g/undo! :undo/global)
+          (is (= doc (g/node-value resource-node :document)))
+          (g/redo! :undo/global)
+          (is (= created (g/node-value resource-node :document)))
+          (mouse press 300.0 250.0 true)
+          (mouse release 300.0 250.0 true)
+          (is (= id (:selected @state)))
+          (is (= 0.0 (:length (last (:bones (g/node-value resource-node :document))))))
+          (g/undo! :undo/global)
+          (mouse press 300.0 250.0 false)
+          (mouse drag 330.0 260.0 false)
+          (javafx.event.Event/fireEvent canvas
+                                        (javafx.scene.input.KeyEvent. javafx.scene.input.KeyEvent/KEY_PRESSED "" "" javafx.scene.input.KeyCode/ESCAPE false false false false))
+          (mouse release 330.0 260.0 false)
+          (is (= created (g/node-value resource-node :document)))
+          (is (nil? (:draft @state)))
+          (swap! state assoc :mode "animate")
+          (mouse press 300.0 250.0 false)
+          (mouse release 330.0 260.0 false)
+          (is (= created (g/node-value resource-node :document))))))))
+
+;; Alternate skins must fail before authoring instead of silently shifting
+;; hidden artwork when the selected setup attachment is reparented.
+(deftest create-alternate-attachment-guard-test
+  (let [doc (assoc (mesh-document false) :spine-source
+                   "{\"skins\":[{\"name\":\"other\",\"attachments\":{\"mesh\":{\"alternate\":{}}}}]}")
+        context (slot-context doc "setup")]
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (#'view/creation-document context
+                                           {:document doc :bone (bone (:bones doc) "root")
+                                            :world [50.0 80.0] :create-id "new" :slots ["mesh"]}
+                                           [90.0 110.0])))))
+
+;; Binding works mesh-first and bone-first; pending picks are UI-only, while
+;; completion is a single graph transaction with undo and FFD preservation.
+(deftest binding-workflow-transaction-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (data/set-deform-keyframe (mesh-document false) "default" "mesh" 0.5 [1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0] "linear")
+            node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (slot-context doc "setup") :resource-node node :status (javafx.scene.control.Label.))]
+        (swap! (:state context) dissoc :draft)
+        (#'view/start-binding! context)
+        (#'view/pick-binding! context :bone "arm")
+        (is (= doc (g/node-value node :document)))
+        (#'view/finish-binding! context)
+        (let [bound (g/node-value node :document)]
+          (is (some? (get-in bound [:slots 0 :attachment :weights])))
+          (is (near? (rendered-vertices (slot-context doc "animate") doc)
+                     (rendered-vertices (slot-context bound "animate") bound))))
+        (is (nil? (:binding @(:state context))))
+        (g/undo! :undo/global)
+        (is (= doc (g/node-value node :document)))
+        (swap! (:state context) assoc :rigging-panel :properties :tool "move")
+        (#'view/set-selection! context :bone "arm")
+        (#'view/start-binding! context)
+        (#'view/pick-binding! context :slot "mesh")
+        (#'view/transport! context :play)
+        (is (= "setup" (:mode @(:state context))))
+        (is (false? (:playing @(:state context))))
+        (is (nil? (:binding @(:state context))))
+        (g/undo! :undo/global)
+        (is (= doc (g/node-value node :document)))))))
+
+;; Weight slider dragging is one undoable edit, not one transaction per pixel;
+;; its initial value comes from the selected vertices, not a stale UI default.
+(deftest weight-slider-transaction-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (mesh-document true)
+            node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (slot-context doc "setup") :resource-node node :status (javafx.scene.control.Label.))
+            pane (javafx.scene.layout.VBox.)]
+        (swap! (:state context) #(-> % (dissoc :draft) (assoc :weight-bone "arm" :vertices #{0})))
+        (.addAll (.getChildren pane) ^java.util.Collection (#'view/weights-inspector context doc))
+        (let [slider ^javafx.scene.control.Slider (.lookup pane "#skeletal-direct-weight-slider")]
+          (is (= 60.0 (.getValue slider)))
+          (.setValueChanging slider true)
+          (.setValue slider 70.0)
+          (.setValue slider 80.0)
+          (is (= doc (g/node-value node :document)))
+          (.setValueChanging slider false)
+          (let [after (g/node-value node :document)]
+            (is (= 0.8 (get-in after [:slots 0 :attachment :weights 0 0 :weight])))
+            (is (= (get-in doc [:slots 0 :attachment :weights 1]) (get-in after [:slots 0 :attachment :weights 1]))))
+          (g/undo! :undo/global)
+          (is (= doc (g/node-value node :document))))))))
+
+;; Undo can remove the binding while the overlay toggle remains enabled.
+;; Rendering that state must leave a transparent canvas, not stop UI timers.
+(deftest unbound-weight-overlay-render-test
+  (ui/run-now
+    (let [canvas (javafx.scene.canvas.Canvas. 40.0 40.0)
+          gc (.getGraphicsContext2D canvas)
+          points [[0.0 0.0] [40.0 0.0] [0.0 40.0]]
+          state {:weight-overlay true}
+          params (doto (javafx.scene.SnapshotParameters.) (.setFill javafx.scene.paint.Color/TRANSPARENT))
+          alpha (fn [] (.getOpacity (.getColor (.getPixelReader (.snapshot canvas params nil)) 5 5)))]
+      (#'view/draw-weight-overlay! gc state points [[0 1 2]] nil)
+      (is (= 0.0 (alpha)))
+      (#'view/draw-weight-overlay! gc state points [[0 1 2]] (vec (repeat 3 [{:bone "arm" :weight 1.0}])))
+      (is (> (alpha) 0.5))
+      (.clearRect gc 0.0 0.0 40.0 40.0)
+      (is (nil? (#'view/draw-weight-overlay! gc state points [[0 1 2]] nil))))))
+
+;; Weights live in the inspector tab, never a fourth split column. Hot reload
+;; removes an existing legacy dock without changing authoring or undo state.
+(deftest integrated-weight-tab-layout-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (mesh-document true)
+            node (g/make-node! ToolTransactionFixture :document doc)
+            viewport (javafx.scene.layout.StackPane.)
+            tree (javafx.scene.layout.VBox.)
+            properties (javafx.scene.layout.VBox.)
+            legacy (javafx.scene.layout.VBox.)
+            split (javafx.scene.control.SplitPane. (into-array javafx.scene.Node [viewport legacy tree properties]))
+            root (javafx.scene.layout.BorderPane. split)
+            scene (javafx.scene.Scene. root 1100.0 700.0)
+            context (assoc (slot-context doc "setup") :root root :viewport viewport :resource-node node)
+            undo (:undo @g/*the-system*)]
+        (ui/user-data! root :editor.skeletal-animation-view/weight-dock {:panel legacy})
+        (swap! (:state context) assoc :tool "weights" :rigging-panel :weights)
+        (.applyCss (.getRoot scene))
+        (.layout root)
+        (#'view/refresh-weight-dock! context)
+        (is (= [viewport tree properties] (vec (.getItems split))))
+        (.addAll (.getChildren properties) ^java.util.Collection (#'view/entity-inspector context doc))
+        (is (some? (.lookup properties "#skeletal-auto-weights")))
+        (is (.isSelected ^javafx.scene.control.ToggleButton (.lookup properties "#skeletal-rigging-weights")))
+        (.fire ^javafx.scene.control.ToggleButton (.lookup properties "#skeletal-inspector-lock"))
+        (is (.isDisabled (.lookup properties "#skeletal-auto-weights")))
+        (.fire ^javafx.scene.control.ToggleButton (.lookup properties "#skeletal-inspector-lock"))
+        (.fire ^javafx.scene.control.ToggleButton (.lookup properties "#skeletal-rigging-properties"))
+        (is (= :properties (:rigging-panel @(:state context))))
+        (is (= "move" (:tool @(:state context))))
+        (is (= doc (g/node-value node :document)))
+        (is (= undo (:undo @g/*the-system*)))))))
+
+;; Group gizmos share the primary world delta, including reflected parents and
+;; selected descendants. Descendants must not receive the delta twice.
+(deftest multi-selection-transform-test
+  (doseq [mode ["setup" "animate"]
+          tool ["move" "rotate" "scale" "shear"]]
+    (let [doc (data/add-bone (rig) {:id "child" :parent "arm" :x 12.0 :y 3.0})
+          context (context doc mode)
+          _ (swap! (:state context) assoc :selected-bones #{"arm" "other" "child"} :coordinate-space "world")
+          primary (bone (:bones doc) "arm")
+          before (data/world-transforms (#'view/pose context doc))
+          origin (subvec (before "arm") 4 6)
+          start (mapv + origin [25.0 18.0])
+          target (mapv + origin [40.0 42.0])
+          single (#'view/drag-bone context doc primary tool start target)
+          delta (geometry/compose-transforms (get (data/world-transforms (#'view/pose context single)) "arm")
+                                             (geometry/inverse-transform (before "arm")))
+          result (#'view/transform-group context doc primary single)
+          after (data/world-transforms (#'view/pose context result))]
+      (is (= result (data/validate-document result)))
+      (doseq [id ["arm" "other" "child"]]
+        (is (near? (geometry/compose-transforms delta (before id)) (after id)) (str mode " " tool " " id)))
+      (is (near? (before "root") (after "root")))
+      (when (= "animate" mode) (is (= (:bones doc) (:bones result)))))))
+
+;; Selected attachments on one bone must not compound its transformation.
+;; Numeric edits use the same group path as dragging.
+(deftest attachment-group-numeric-transform-test
+  (let [doc (-> (rig) (data/add-slot {:id "a" :bone "arm"})
+                (data/add-slot {:id "b" :bone "arm"}) (data/add-slot {:id "c" :bone "other"}))
+        context (context doc "setup")
+        _ (swap! (:state context) assoc :selected-kind :slot :selected "a" :selected-slots #{"a" "b" "c"} :coordinate-space "world")
+        before (data/world-transforms (:bones doc))
+        result (#'view/change-displayed-value context doc (bone (:bones doc) "arm") "x" (+ 15.0 (nth (before "arm") 4)))
+        after (data/world-transforms (:bones result))]
+    (doseq [id ["arm" "other"]]
+      (is (near? (update (before id) 4 + 15.0) (after id))))))
+
+;; Group field edits and group key operations each have one undo/redo step.
+;; Manual keys preserve all moved nodes when Auto Key is disabled.
+(deftest multi-selection-undo-and-key-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (let [doc (rig) resource-node (g/make-node! ToolTransactionFixture :document doc)
+          context (assoc (context doc "setup") :resource-node resource-node :status (ui/run-now (javafx.scene.control.Label.)))
+          state (:state context)]
+      (swap! state #(-> % (dissoc :draft) (assoc :selected-bones #{"arm" "other"} :coordinate-space "world")))
+      (ui/run-now
+        (do
+          (#'view/pose-change! context (fn [doc] (#'view/change-displayed-value context doc (bone (:bones doc) "arm") "rotation" 80.0)))
+          (let [edited (g/node-value resource-node :document)]
+            (is (not= doc edited))
+            (g/undo! :undo/global) (is (= doc (g/node-value resource-node :document)))
+            (g/redo! :undo/global) (is (= edited (g/node-value resource-node :document))))
+          (swap! state assoc :mode "animate" :auto-key false)
+          (let [base (g/node-value resource-node :document)]
+            (#'view/pose-change! context (fn [doc] (#'view/change-displayed-value context doc (bone (:bones doc) "arm") "rotation" 120.0)))
+            (is (= base (g/node-value resource-node :document)))
+            (let [preview (#'view/document context)]
+              (#'view/key-properties! context ["rotation"])
+              (let [keyed (g/node-value resource-node :document)]
+                (doseq [id ["arm" "other"]]
+                  (is (near? (get (data/world-transforms (data/sample-pose preview "default" 0.5)) id)
+                             (get (data/world-transforms (data/sample-pose keyed "default" 0.5)) id))))
+                (g/undo! :undo/global) (is (= base (g/node-value resource-node :document)))
+                (g/redo! :undo/global) (is (= keyed (g/node-value resource-node :document)))))))))))
+
+;; Parent/child deletion is atomic; root failure retains the selection.
+(deftest multi-selection-delete-undo-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (let [doc (data/add-bone (rig) {:id "child" :parent "arm"})
+          node (g/make-node! ToolTransactionFixture :document doc)
+          context (assoc (context doc "setup") :resource-node node :status (ui/run-now (javafx.scene.control.Label.)))]
+      (swap! (:state context) #(-> % (dissoc :draft) (assoc :selected-bones #{"arm" "child" "other"})))
+      (ui/run-now
+        (do
+          (#'view/delete-selection! context)
+          (is (= ["root"] (mapv :id (:bones (g/node-value node :document)))))
+          (g/undo! :undo/global) (is (= doc (g/node-value node :document)))
+          (swap! (:state context) assoc :selected "root" :selected-kind :bone :selected-bones #{"root"})
+          (#'view/delete-selection! context)
+          (is (= doc (g/node-value node :document)))
+          (is (= "root" (:selected @(:state context)))))))))
+
+;; Real event dispatch must delete bones from tree and canvas in weight mode,
+;; without treating timeline or text-field Delete as a structural edit.
+(deftest structural-delete-key-routing-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (rig) node (g/make-node! ToolTransactionFixture :document doc)
+            tree (javafx.scene.control.TreeView.) canvas (javafx.scene.canvas.Canvas.)
+            text (javafx.scene.control.TextField. "abc")
+            root (javafx.scene.layout.VBox.)
+            context (assoc (context doc "setup") :resource-node node :tree tree :canvas canvas :root root
+                           :status (javafx.scene.control.Label.))
+            dispatch (fn dispatch-delete [target code]
+                       (javafx.event.Event/fireEvent target
+                                                     (javafx.scene.input.KeyEvent. javafx.scene.input.KeyEvent/KEY_PRESSED "" "" code false false false false)))]
+        (.addAll (.getChildren root) ^java.util.Collection [tree canvas text])
+        (swap! (:state context) #(-> % (dissoc :draft) (assoc :tool "weights" :selected-bones #{"arm"})))
+        (#'view/rigging-events! context)
+        (#'view/rigging-events! context)
+        (dispatch text javafx.scene.input.KeyCode/DELETE)
+        (dispatch root javafx.scene.input.KeyCode/DELETE)
+        (is (= doc (g/node-value node :document)))
+        (dispatch tree javafx.scene.input.KeyCode/DELETE)
+        (is (nil? (bone (:bones (g/node-value node :document)) "arm")))
+        (g/undo! :undo/global)
+        (is (= doc (g/node-value node :document)))
+        (swap! (:state context) assoc :selected-kind :bone :selected "arm" :selected-bones #{"arm"})
+        (dispatch canvas javafx.scene.input.KeyCode/BACK_SPACE)
+        (is (nil? (bone (:bones (g/node-value node :document)) "arm")))
+        (g/undo! :undo/global)
+        (swap! (:state context) assoc :selected-kind :bone :selected "arm" :selected-bones #{"arm"} :mode "animate")
+        (dispatch tree javafx.scene.input.KeyCode/DELETE)
+        (is (= doc (g/node-value node :document)))))))
+
+;; A mesh rigidly attached to its slot bone is not yet usefully bound to a
+;; new chain. Completing that bind must assign weights, preserve its shape,
+;; move descendants and mesh together, and undo as one transaction.
+(deftest initial-rigid-binding-follows-chain-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [base (mesh-document false)
+            doc (-> base
+                    (data/add-bone {:id "chain" :parent "arm" :length 5.0})
+                    (data/add-bone {:id "tip" :parent "chain" :x 5.0 :length 5.0})
+                    (data/update-slot "mesh" {:attachment {:weights
+                                                           (mapv (fn [[x y]] [{:bone "arm" :weight 1.0 :x x :y y}
+                                                                              {:bone "chain" :weight 0.0 :x x :y y}
+                                                                              {:bone "tip" :weight 0.0 :x (- x 5.0) :y y}])
+                                                                 (partitionv 2 (get-in base [:slots 0 :attachment :vertices])))}}))
+            node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (slot-context doc "setup") :resource-node node :status (javafx.scene.control.Label.))]
+        (swap! (:state context) dissoc :draft)
+        (#'view/start-binding! context)
+        (#'view/finish-binding! context)
+        (let [bound (g/node-value node :document)
+              positive (coll/into-> (get-in bound [:slots 0 :attachment :weights]) #{} cat
+                         (filter #(pos? (:weight %))) (map :bone))
+              before (rendered-vertices (slot-context bound "setup") bound)]
+          (is (contains? positive "chain"))
+          (is (contains? positive "tip"))
+          (is (near? (rendered-vertices (slot-context doc "setup") doc) before))
+          (#'view/set-selection! context :bone "arm")
+          (swap! (:state context) assoc :coordinate-space "world")
+          (let [world (data/world-transforms (:bones bound))
+                moved (#'view/change-displayed-value context bound (bone (:bones bound) "arm") "x" (+ 10.0 (nth (world "arm") 4)))
+                after-world (data/world-transforms (:bones moved))]
+            (doseq [id ["arm" "chain" "tip"]]
+              (is (near? (update (world id) 4 + 10.0) (after-world id))))
+            (is (near? (mapv (fn [index value] (+ value (if (even? index) 10.0 0.0))) (range (count before)) before)
+                       (rendered-vertices (slot-context moved "setup") moved))))
+          (g/undo! :undo/global) (is (= doc (g/node-value node :document)))
+          (g/redo! :undo/global) (is (= bound (g/node-value node :document))))))))
+
+;; Editing a genuinely weighted mesh's binding retains its authored weights.
+(deftest existing-distributed-binding-is-preserved-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (mesh-document true) node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (slot-context doc "setup") :resource-node node :status (javafx.scene.control.Label.))]
+        (swap! (:state context) dissoc :draft)
+        (#'view/start-binding! context)
+        (#'view/finish-binding! context)
+        (is (= (get-in doc [:slots 0 :attachment :weights])
+               (get-in (g/node-value node :document) [:slots 0 :attachment :weights])))))))
+
+;; IK target picking is non-destructive until confirmed, preserves the tip on
+;; scaled roots, rejects descendant targets, and undoes target plus constraint.
+(deftest ik-target-workflow-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (-> (rig)
+                    (data/update-bone "arm" {:scale-x 1.0 :scale-y 1.0})
+                    (data/add-bone {:id "tip" :parent "arm" :x 10.0 :y 0.0 :length 8.0 :rotation 35.0}))
+            node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (context doc "setup") :resource-node node :status (javafx.scene.control.Label.))
+            state (:state context)]
+        (swap! state dissoc :draft)
+        (#'view/add-ik! context)
+        (is (= ["arm"] (get-in @state [:ik-pick :bones])))
+        (is (= doc (g/node-value node :document)))
+        (#'view/finish-ik! context "tip" nil)
+        (is (= doc (g/node-value node :document)))
+        (swap! state assoc :selected-bones #{"arm" "tip"})
+        (#'view/add-ik! context)
+        (is (= ["arm" "tip"] (get-in @state [:ik-pick :bones])))
+        (#'view/finish-ik! context "tip" nil)
+        (let [after (g/node-value node :document)
+              target (:target (first (:ik after)))
+              worlds (data/world-transforms (:bones after))
+              tip (geometry/transform-point (worlds "tip") [8.0 0.0])]
+          (is (= 1 (count (:ik after))))
+          (is (= "root" (:parent (bone (:bones after) target))))
+          (is (near? tip (geometry/transform-point (worlds target) [0.0 0.0])))
+          (is (nil? (:ik-pick @state)))
+          (is (= target (:selected @state)))
+          (g/undo! :undo/global)
+          (is (= doc (g/node-value node :document)))
+          (g/redo! :undo/global)
+          (is (= after (g/node-value node :document))))))))
+
+;; Enlarged axis arrowheads remain pickable at a fixed screen size regardless
+;; of zoom, while their center and space beyond the handles remain free.
+(deftest enlarged-move-handle-hit-test
+  (let [doc (rig) context (context doc "setup")
+        [x y] (geometry/transform-point (get (data/world-transforms (:bones doc)) "arm") [0.0 0.0])]
+    (doseq [zoom [0.2 1.0 5.0]]
+      (swap! (:state context) assoc :tool "move" :coordinate-space "world" :zoom zoom :pan-x 0.0 :pan-y 0.0)
+      (let [px (* x zoom) py (- (* y zoom))]
+        (is (= 0 (#'view/gizmo-axis context doc (+ px 76.0) (+ py 9.0))))
+        (is (= 1 (#'view/gizmo-axis context doc (+ px 9.0) (- py 76.0))))
+        (is (nil? (#'view/gizmo-axis context doc px py)))
+        (is (nil? (#'view/gizmo-axis context doc (+ px 100.0) py)))))))
+
+;; Long clip names must remain readable after list replacement, translation, and font changes.
+(deftest animation-choice-fits-complete-name-test
+  (ui/run-now
+    (let [choice (#'view/choice "animation" ["idle"] "idle" (fn ignore-choice [_]))
+          original (.getPrefWidth choice)
+          long-name "tail_ik_secondary_motion_preview_very_long_animation_name"]
+      (.add (.getItems choice) long-name)
+      (is (> (.getMinWidth choice) (* 2.0 original)))
+      (is (= (.getMinWidth choice) (.getPrefWidth choice)))
+      (let [wide (.getPrefWidth choice)]
+        (.setValue choice long-name)
+        (is (= wide (.getPrefWidth choice)))
+        (.setFont (.getButtonCell choice) (javafx.scene.text.Font/font 24.0))
+        (is (> (.getPrefWidth choice) wide)))
+      (.setValue choice nil)
+      (.setItems choice (javafx.collections.FXCollections/observableArrayList (java.util.ArrayList. ^java.util.Collection ["a"])))
+      (let [short-width (.getPrefWidth choice)]
+        (.add (.getItems choice) long-name)
+        (is (> (.getPrefWidth choice) short-width)))
+      (.setConverter choice (proxy [javafx.util.StringConverter] []
+                              (toString [value] (str "动画名称及预览版本：" value))
+                              (fromString [value] value)))
+      (is (> (.getMinWidth choice) original)))))
+
+;; Constraint targets/order are setup data, while mix/bend remain editable in
+;; animation mode. The hidden section must not leave a large empty property area.
+(deftest animate-constraint-setup-controls-test
+  (ui/run-now
+    (let [doc (data/add-ik (rig) {:id "reach" :bones ["arm"] :target "other"})
+          context (context doc "animate")]
+      (swap! (:state context) assoc :selected-kind :ik :selected "reach")
+      (let [panel (javafx.scene.layout.VBox.
+                    (into-array javafx.scene.Node (#'view/object-inspector context doc)))
+            section (.lookup panel "#skeletal-properties-property-constraint-setup-section")]
+        (is (false? (.isVisible section)))
+        (is (false? (.isManaged section)))
+        (is (.isDisable section))
+        (is (.isDisable (.lookup panel "#skeletal-ik-name")))
+        (is (not (.isDisable (.lookup panel "#skeletal-ik-mix"))))
+        (is (not (.isDisable (.lookup panel "#skeletal-ik-bend"))))))))
+
+;; Setup callbacks can outlive their inspector after switching mode. Reject
+;; them before evaluating mutations, including creation from an open menu.
+(deftest stale-setup-action-in-animation-test
+  (ui/run-now
+    (let [doc (rig)
+          context (assoc (context doc "animate") :status (javafx.scene.control.Label.))
+          invoked (atom false)]
+      (is (nil? (#'view/setup-change! context (fn unexpected-setup-edit [_] (reset! invoked true)))))
+      (is (false? @invoked))
+      (doseq [command [#'view/add-path! #'view/add-transform! #'view/add-physics!]]
+        (is (nil? (command context))))
+      (is (= doc (#'view/document context))))))
+
+;; Non-rendered vertex attachments also support deform keys in Spine; do not
+;; strand bounding boxes and clipping shapes without an animation editing tool.
+(deftest animate-vertex-attachment-entry-test
+  (ui/run-now
+    (let [doc (data/update-slot (mesh-document false) "mesh" {:attachment {:type "boundingbox"}})
+          context (slot-context doc "animate")
+          _ (swap! (:state context) assoc :tool "move" :playing true)
+          panel (javafx.scene.layout.VBox.
+                  (into-array javafx.scene.Node (#'view/object-inspector context doc)))
+          edit (.lookup panel "#skeletal-edit-deform")]
+      (is (some? edit))
+      (.fire ^javafx.scene.control.Button edit)
+      (is (= {:tool "path" :mesh-mode "modify" :property "deform" :playing false}
+             (select-keys @(:state context) [:tool :mesh-mode :property :playing])))
+      (is (= doc (#'view/document context))))))
+
+;; Picking a bone keeps the mesh target. Bound/unbound selections control list
+;; highlight and actions; binding and removal preserve geometry and undo.
+(deftest weight-selection-actions-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [doc (mesh-document true)
+            node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (slot-context doc "setup") :resource-node node :status (javafx.scene.control.Label.))
+            panel (fn panel [] (javafx.scene.layout.VBox.
+                                 (into-array javafx.scene.Node (#'view/weights-inspector context (#'view/document context)))))
+            bound (fn bound [] (mesh/binding-bones (get-in (g/node-value node :document) [:slots 0 :attachment])))
+            root (panel)]
+        (swap! (:state context) assoc :rigging-panel :weights :tool "weights")
+        (is (false? (.isManaged (.lookup root "#skeletal-unbind-bone"))))
+        (#'view/set-selection! context :bone "arm")
+        (let [root (panel)]
+          (is (= "mesh" (:selected @(:state context))))
+          (is (= ["arm"] (vec (.getSelectedItems (.getSelectionModel ^javafx.scene.control.ListView (.lookup root "#skeletal-weight-bone-list"))))))
+          (is (.isManaged (.lookup root "#skeletal-unbind-bone")))
+          (is (false? (.isManaged (.lookup root "#skeletal-bind-selected-bones")))))
+        (#'view/set-selection! context :bone "root")
+        (let [root (panel)]
+          (is (= "mesh" (:selected @(:state context))))
+          (is (= [] (vec (.getSelectedItems (.getSelectionModel ^javafx.scene.control.ListView (.lookup root "#skeletal-weight-bone-list"))))))
+          (is (false? (.isManaged (.lookup root "#skeletal-unbind-bone"))))
+          (is (.isDisabled (.lookup root "#skeletal-direct-weight-percent")))
+          (.fire ^javafx.scene.control.Button (.lookup root "#skeletal-bind-selected-bones")))
+        (is (= ["arm" "other" "root"] (bound)))
+        (is (= (get-in doc [:slots 0 :attachment :vertices])
+               (get-in (g/node-value node :document) [:slots 0 :attachment :vertices])))
+        (is (= (get-in doc [:slots 0 :attachment :weights 0])
+               (subvec (get-in (g/node-value node :document) [:slots 0 :attachment :weights 0]) 0 2)))
+        (let [root (panel)]
+          (is (.isManaged (.lookup root "#skeletal-unbind-bone")))
+          (.fire ^javafx.scene.control.Button (.lookup root "#skeletal-unbind-bone")))
+        (is (= ["arm" "other"] (bound)))
+        (g/undo! :undo/global)
+        (is (= ["arm" "other" "root"] (bound)))
+        (g/undo! :undo/global)
+        (is (= doc (g/node-value node :document)))))))
+
+;; The list consumes extra viewport height through all inspector containers,
+;; and a shorter window still allows scrolling instead of clipping controls.
+(deftest weight-list-fills-viewport-test
+  (ui/run-now
+    (let [doc (mesh-document true)
+          context (slot-context doc "setup")
+          inspector (javafx.scene.layout.VBox.)
+          scroll (doto (javafx.scene.control.ScrollPane. inspector) (.setFitToWidth true) (.setFitToHeight true))
+          root (javafx.scene.layout.VBox. (into-array javafx.scene.Node [scroll]))
+          _ (javafx.scene.Scene. root 360.0 1000.0)]
+      (swap! (:state context) assoc :rigging-panel :weights :tool "weights")
+      (.addAll (.getChildren inspector) ^java.util.Collection (#'view/entity-inspector context doc))
+      (javafx.scene.layout.VBox/setVgrow scroll javafx.scene.layout.Priority/ALWAYS)
+      (.setMinHeight scroll 0.0)
+      (.resize root 360.0 650.0)
+      (.applyCss root) (.layout root)
+      (let [list ^javafx.scene.control.ListView (.lookup root "#skeletal-weight-bone-list")
+            short-height (.getHeight list)]
+        (.resize root 360.0 1000.0) (.layout root)
+        (is (> (.getHeight list) (+ short-height 300.0)))
+        (is (> (.getHeight list) 500.0))))))
+
+;; Canvas bone clicks must select the corresponding weight influence while
+;; keeping the mesh target; picking an unbound bone must not edit the document.
+(deftest weight-canvas-bone-selection-test
+  (ui/run-now
+    (let [doc (mesh-document true)
+          canvas (javafx.scene.canvas.Canvas. 500.0 400.0)
+          context (assoc (slot-context doc "setup") :canvas canvas)
+          state (:state context)
+          transforms (geometry/world-transforms (:bones doc))]
+      (swap! state assoc :rigging-panel :weights :tool "weights" :zoom 2.0 :pan-x 200.0 :pan-y 200.0)
+      (#'view/rigging-events! context)
+      (doseq [[id bound] [["arm" #{"arm"}] ["root" #{}]]]
+        (let [[x y] (#'view/screen context (geometry/transform-point (get transforms id) [0.0 0.0]))]
+          (javafx.event.Event/fireEvent canvas
+                                        (javafx.scene.input.MouseEvent. javafx.scene.input.MouseEvent/MOUSE_PRESSED
+                                                                        x y x y javafx.scene.input.MouseButton/PRIMARY 1
+                                                                        false false false false true false false false false false nil)))
+        (is (= "mesh" (:selected @state)))
+        (is (= [id] (:weight-picked-bones @state)))
+        (is (= bound (:weight-bones @state)))
+        (is (= doc (#'view/document context)))))))
+
+;; The visible grid/restore controls form reversible graph transactions, keep
+;; the image under the original bone, and sit in the same grouped tool area.
+(deftest inspector-grid-image-roundtrip-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (let [image {:type "region" :path "/image.png" :width 100.0 :height 60.0
+                   :x 3.0 :y 8.0 :rotation 20.0 :scale-x 0.8 :scale-y 0.8}
+            doc (data/add-slot (rig) {:id "mesh" :bone "arm" :attachment image})
+            node (g/make-node! ToolTransactionFixture :document doc)
+            context (assoc (slot-context doc "setup") :resource-node node :status (javafx.scene.control.Label.))
+            panel (fn panel [] (javafx.scene.layout.VBox.
+                                 (into-array javafx.scene.Node (#'view/object-inspector context (#'view/document context)))))]
+        (swap! (:state context) dissoc :draft)
+        (let [root (panel)]
+          (is (some? (.lookup root "#skeletal-properties-property-transform")))
+          (is (some? (.lookup root "#skeletal-properties-property-mesh-tools")))
+          (.fire ^javafx.scene.control.Button (.lookup root "#skeletal-make-mesh")))
+        (let [meshed (g/node-value node :document)
+              root (panel)]
+          (is (= "mesh" (get-in meshed [:slots 0 :attachment :type])))
+          (is (= 16 (quot (count (get-in meshed [:slots 0 :attachment :vertices])) 2)))
+          (.fire ^javafx.scene.control.Button (.lookup root "#skeletal-restore-image"))
+          (let [restored (g/node-value node :document)]
+            (is (= "region" (get-in restored [:slots 0 :attachment :type])))
+            (is (= "arm" (get-in restored [:slots 0 :bone])))
+            (is (= (:bones doc) (:bones restored)))
+            (g/undo! :undo/global)
+            (is (= meshed (g/node-value node :document)))
+            (g/undo! :undo/global)
+            (is (= doc (g/node-value node :document)))
+            (g/redo! :undo/global) (g/redo! :undo/global)
+            (is (= restored (g/node-value node :document)))))))))
+
+;; Empty primary clicks clear object/vertex selection without editing the asset;
+;; additive clicks and right-button navigation retain the selected object.
+(deftest empty-canvas-click-selection-test
+  (binding [g/*the-system* (atom (system/make-system {:cache-size 1000}))]
+    (ui/run-now
+      (doseq [mode ["setup" "animate"]
+              kind [:bone :slot]
+              [button shift clear] [[javafx.scene.input.MouseButton/PRIMARY false true]
+                                    [javafx.scene.input.MouseButton/PRIMARY true false]
+                                    [javafx.scene.input.MouseButton/SECONDARY false false]]]
+        (let [doc (mesh-document true)
+              node (g/make-node! ToolTransactionFixture :document doc)
+              canvas (javafx.scene.canvas.Canvas. 500.0 400.0)
+              context (assoc (context doc mode) :resource-node node :canvas canvas
+                             :workspace-cache (atom nil) :preview-cache (atom {})
+                             :status (javafx.scene.control.Label.))
+              state (:state context)
+              id (if (= :bone kind) "arm" "mesh")
+              history (:undo @g/*the-system*)]
+          (swap! state #(-> % (dissoc :draft)
+                            (assoc :tool "move" :zoom 1.0 :pan-x 0.0 :pan-y 400.0
+                                   :show-images false :selected-kind kind :selected id
+                                   :selected-bones (if (= :bone kind) #{"arm" "other"} #{})
+                                   :selected-slots (if (= :slot kind) #{"mesh"} #{}) :vertices #{0 1})))
+          (#'view/canvas-events! context)
+          (doseq [type [javafx.scene.input.MouseEvent/MOUSE_PRESSED javafx.scene.input.MouseEvent/MOUSE_RELEASED]]
+            (javafx.event.Event/fireEvent canvas
+                                          (javafx.scene.input.MouseEvent. type 450.0 20.0 450.0 20.0 button 1
+                                                                          shift false false false (= button javafx.scene.input.MouseButton/PRIMARY)
+                                                                          false (= button javafx.scene.input.MouseButton/SECONDARY) false false false nil)))
+          (if clear
+            (do (is (nil? (:selected @state)))
+                (is (nil? (:selected-kind @state)))
+                (is (= #{} (:selected-bones @state) (:selected-slots @state) (:vertices @state))))
+            (is (= id (:selected @state))))
+          (is (= doc (g/node-value node :document)))
+          (is (= history (:undo @g/*the-system*))))))))

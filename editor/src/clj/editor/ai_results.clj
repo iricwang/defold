@@ -15,6 +15,7 @@
 (ns editor.ai-results
   "One editable proposal per Result, with permanent Action provenance."
   (:require [clojure.string :as string]
+            [editor.ai-delivery :as delivery]
             [editor.ai-graph :as graph]
             [editor.ai-tasks :as tasks]
             [util.coll :as coll]
@@ -107,21 +108,25 @@
                            :revision-history (if (= proposal (merge proposal fields)) (:revision-history card)
                                                  (conj (vec (:revision-history card)) {:revision (revision card) :candidate proposal :edited-at (str (java.time.Instant/now))}))))))
 
-(defn confirmation [model id]
-  (let [card (graph/node model id)
+(defn confirmation [model id review-mode]
+  (let [identity (delivery/review-identity review-mode)
+        card (graph/node model id)
         proposal (candidate card)]
     (when (or (nil? proposal)
               (and (string/blank? (:text proposal)) (string/blank? (:image-path proposal))
                    (not (coll/not-empty (:files proposal)))))
       (throw (ex-info "请先补全方案内容" {})))
-    {:result-id id :action-id (action-id model id) :revision (revision card) :candidate proposal
-     :draft (str "[人工确认方案]\n来源任务：" (:title (graph/node model (action-id model id)))
-                 "\n方案：" (:title card) "\n版本：" (revision card)
-                 "\n用户已确认下面的方案（可能包含人工修改），请将其作为此任务后续工作的正式依据，记录确认并整理交付；保留其他已确认方案的独立产出，不覆盖其他方案。\n\n"
-                 (:text proposal)
-                 (when (:image-path proposal) (str "\n方案图片：" (:image-path proposal)))
-                 (when (coll/not-empty (:files proposal))
-                   (str "\n附件：\n" (coll/join-to-string "\n" (mapv #(or (:source %) (:path %) (:name %)) (:files proposal))))))}))
+    (merge identity
+           {:result-id id :action-id (action-id model id) :revision (revision card) :candidate proposal
+            :draft (str (if (= :automation review-mode) "[自动化核验方案]" "[人工确认方案]") "\n来源任务：" (:title (graph/node model (action-id model id)))
+                        "\n方案：" (:title card) "\n版本：" (revision card)
+                        (if (= :automation review-mode)
+                          "\n以下方案经授权的自动化核验采纳，可用于后续工作；不代表用户已批准，用户最终视觉验收未完成。请如实记录核验身份与未验证项并整理交付；保留其他已确认方案的独立产出，不覆盖其他方案。\n\n"
+                          "\n用户已确认下面的方案（可能包含人工修改），请将其作为此任务后续工作的正式依据，记录确认并整理交付；保留其他已确认方案的独立产出，不覆盖其他方案。\n\n")
+                        (:text proposal)
+                        (when (:image-path proposal) (str "\n方案图片：" (:image-path proposal)))
+                        (when (coll/not-empty (:files proposal))
+                          (str "\n附件：\n" (coll/join-to-string "\n" (mapv #(or (:source %) (:path %) (:name %)) (:files proposal))))))})))
 
 (defn edit-state [state id fields]
   (let [before (:canvas state)
@@ -150,7 +155,7 @@
         downstream (:to (coll/first-where #(= id (:from %)) (:edges model)))
         _ (when (contains? (:producing state) downstream)
             (throw (ex-info "此方案正在生成交付资源，请完成后再确认新版本" {})))
-        confirmation (confirmation model id)
+        confirmation (confirmation model id (:review-mode state))
         person (tasks/person-id model (:action-id confirmation))
         queued (tasks/enqueue-confirmation state person confirmation)]
     (if (identical? state queued)

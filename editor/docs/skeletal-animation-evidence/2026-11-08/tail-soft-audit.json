@@ -1,0 +1,27 @@
+{
+  "schema": "ogs.skin-audit/1",
+  "technicalStatus": "PASS",
+  "inputSHA256": "d0fed3c321c71a65bcd10f09809ef959cdf252fbfeedaae94ea6bde5d69d37d9",
+  "samples": 85,
+  "sampleRate": 60,
+  "maxLengthError": 0.0,
+  "maxScaleOrShearError": 4.85722573273506e-16,
+  "maxLoopVertexResidual": 0.0,
+  "maxLoopBonePositionResidual": 0.0,
+  "maxLoopBoneMatrixResidual": 0.0,
+  "meshes": {
+    "05_tail": {
+      "badTriangles": 0,
+      "visibleBadUVPixels": 0,
+      "sourceSHA256": "353a9fce79c7c45c5a743580bab68876849dc97c793690cde56f3f950fd0aa42"
+    }
+  },
+  "loopsChecked": 1,
+  "contactIntervalsChecked": 0,
+  "errors": [],
+  "characterAccepted": false,
+  "limitations": [
+    "Declared trace scope only; exporter correctness is not inferred.",
+    "Visual anatomy, head/body ratios, switch continuity, shoe pixels and native action coverage require independent review."
+  ]
+}

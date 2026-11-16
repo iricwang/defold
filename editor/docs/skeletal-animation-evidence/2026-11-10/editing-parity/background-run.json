@@ -1,0 +1,16 @@
+{
+  "jar": "/Users/applemima1111/Documents/Dev/Defold/tmp/spine-parity-update/payload/Contents/Resources/packages/defold-871d419fe7ad8f81d5d988f58afa153df5ca818f.jar",
+  "sha256": "9c957256bdc5d0f7c3126e912ceee8433c06902812105efb1f21e1598b729ab4",
+  "project_source": "../tmp/background-skeletal-final/project",
+  "project_copy": "/private/tmp/spine-four/packaged-background/project",
+  "scenario": "/Users/applemima1111/Documents/Dev/Defold/editor/test/headless/skeletal_animation_parity.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

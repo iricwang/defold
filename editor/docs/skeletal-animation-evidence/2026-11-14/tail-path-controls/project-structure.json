@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "errors": [],
+  "legacy_dynamic_ui_files": [
+    "game/gameplay/source_ui_soft_clip.lua",
+    "game/gameplay/ui.lua"
+  ],
+  "scope": "static paths, Context co-location, domain imports, new dynamic GUI creation; not runtime proof"
+}

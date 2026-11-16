@@ -1,0 +1,491 @@
+--- a/editor/src/clj/editor/skeletal_animation_view.clj
++++ b/editor/src/clj/editor/skeletal_animation_view.clj
+@@ -258,13 +258,24 @@
+                (= doc (get-in state [:mixer-state :document])))
+       (:mixer-sample state))))
+ 
++(defn- preview-value [context kind source key produce]
++  (if-let [cache (:preview-cache context)]
++    (if-let [entry (coll/first-where #(and (identical? source (:source %)) (= key (:key %))) (get @cache kind))]
++      (:value entry)
++      (let [value (produce)]
++        ;; Keep only the current draft and its gesture baseline per category.
++        (swap! cache update kind #(coll/into-> % [{:source source :key key :value value}] (take 1)))
++        value))
++    (produce)))
++
+ (defn- sampled-slots [context doc]
+   (or (:sampled-slots context)
+       (mixed-preview context doc)
+-      (let [state @(:state context)]
+-        (if (= "animate" (:mode state))
+-          (slots/sample-slots doc (:id (animation context doc)) (:time state))
+-          (slots/sample-slots doc nil 0.0)))))
++      (let [state @(:state context)
++            animation-id (when (= "animate" (:mode state)) (:id (animation context doc)))
++            time (if animation-id (:time state) 0.0)]
++        (preview-value context :slots doc [animation-id time]
++                       (fn sample-preview-slots [] (slots/sample-slots doc animation-id time))))))
+ 
+ (defn- editable-preview-attachment [context doc]
+   (or (not= "animate" (:mode @(:state context)))
+@@ -326,14 +337,18 @@
+               (commit! context (f (document context))))))
+ 
+ (defn- evaluated-pose [context doc]
+-  (let [{:keys [mode time]} @(:state context)]
++  (let [{:keys [mode time]} @(:state context)
++        animation-id (when (= "animate" mode) (:id (animation context doc)))
++        time (if animation-id time 0.0)]
+     (or (:evaluated-pose context)
+         (:pose (mixed-preview context doc))
+-        (if-let [cache (:pose-cache context)]
+-          (let [evaluated (data/evaluate-pose-with-slots-state doc (when (= "animate" mode) (:id (animation context doc))) time @cache slots/sample-slots)]
+-            (reset! cache (:state evaluated))
+-            (:pose evaluated))
+-          (data/evaluate-pose-with-slots doc (when (= "animate" mode) (:id (animation context doc))) time slots/sample-slots)))))
++        (preview-value context :pose doc [animation-id time]
++                       (fn evaluate-preview-pose []
++                         (if-let [cache (:pose-cache context)]
++                           (let [evaluated (data/evaluate-pose-with-slots-state doc animation-id time @cache slots/sample-slots)]
++                             (reset! cache (:state evaluated))
++                             (:pose evaluated))
++                           (data/evaluate-pose-with-slots doc animation-id time slots/sample-slots)))))))
+ 
+ (defn- pose [context doc]
+   (:bones (evaluated-pose context doc)))
+@@ -485,12 +500,13 @@
+       (let [transforms (:transforms (evaluated-pose context doc))
+             points (vec (partitionv 2 (attachment-points context doc slot transforms)))
+             selection (or (coll/not-empty (:vertices state)) (set (range (count points))))
+-            boundary (when-not (coll/not-empty (:vertices state))
+-                       (coll/into-> (partitionv 3 (get-in slot [:attachment :triangles])) []
+-                         (mapcat (fn [[a b c]] [(vec (sort [a b])) (vec (sort [b c])) (vec (sort [c a]))]))))
+-            center-indices (if boundary
+-                             (coll/into-> (frequencies boundary) #{} (comp (filter #(= 1 (val %))) (mapcat key)))
+-                             selection)
++            center-indices (if (coll/not-empty (:vertices state)) selection
++                               (let [triangles (get-in slot [:attachment :triangles])]
++                                 (preview-value context :mesh-boundary triangles nil
++                                                (fn mesh-boundary []
++                                                  (let [edges (coll/into-> (partitionv 3 triangles) []
++                                                                (mapcat (fn [[a b c]] [(vec (sort [a b])) (vec (sort [b c])) (vec (sort [c a]))])))]
++                                                    (coll/into-> (frequencies edges) #{} (comp (filter #(= 1 (val %))) (mapcat key))))))))
+             center-indices (or (coll/not-empty center-indices) selection)
+             center (mapv #(/ % (count center-indices)) (reduce (fn [sum index] (mapv + sum (points index))) [0.0 0.0] center-indices))
+             token [(:selected state) (:preview-attachment-key slot) (:mode state) (:animation state) (:time state) selection]
+@@ -3526,9 +3542,9 @@
+                              (select-keys (entity (:slots (sampled-slots context doc)) (:selected state))
+                                           [:preview-attachment-key :preview-editable-attachment]))
+         inspector-token [doc preview-attachment (:selected-kind state) (:selected state) (:vertex state) (:vertices state) (:weight-bone state) (:weight-bones state) (:mesh-mode state) (:brush-mode state) (:rigging-panel state) (:binding state) (:locked-bones state) (:mode state) (:animation state) (when-not (:playing state) (:time state))]]
+-    (when doc-changed
++    (when (and (nil? (:drag state)) (not= doc (:compatibility-document state)))
+       (let [issues (coll/into-> (project/documents doc) [] (mapcat #(animation-io/export-compatibility (:document %))))]
+-        (swap! (:state context) assoc :export-compatibility issues)
++        (swap! (:state context) assoc :export-compatibility issues :compatibility-document doc)
+         (when-let [^Label status (:export-compatibility-label context)]
+           (.setText status (coll/join-to-string "\n" (coll/into-> issues [] (map :code) (distinct) (map #(tr context (case % :default-material-dark "compat-default-dark")))))))))
+     (when-let [^Label breadcrumb (:selection-path context)]
+@@ -3602,11 +3618,15 @@
+             (.scrollTo tree (.getRow tree item)))
+           (swap! (:state context) assoc :refreshing false :tree-selection-token token))))
+     (when (and (not= inspector-token (:inspector-token state)) (nil? (:drag state))
++               ;; During continuous seeking, rebuild on the first stationary
++               ;; frame. Selection and attachment edits remain immediate.
++               (or (not= (pop inspector-token) (:inspector-context-token state))
++                   (= (:time state) (:inspector-sample-time state)))
+                ;; Preserve open pickers while preview updates the document.
+                (coll/not-any? #(.isShowing ^javafx.scene.control.ComboBoxBase %)
+                               (.lookupAll ^VBox (:inspector context) ".combo-box-base")))
+       (.setAll (.getChildren ^VBox (:inspector context)) ^java.util.Collection (entity-inspector context doc))
+-      (swap! (:state context) assoc :inspector-token inspector-token))
++      (swap! (:state context) assoc :inspector-token inspector-token :inspector-context-token (pop inspector-token)))
+     (let [^Canvas canvas (:canvas context) ^StackPane viewport (:viewport context)
+           width (max 1.0 (.getWidth viewport)) height (max 1.0 (.getHeight viewport))]
+       (when (or (not= width (.getWidth canvas)) (not= height (.getHeight canvas)))
+@@ -3637,9 +3657,11 @@
+             sampled (if frame (mesh-palette-values context doc frame) (displayed-bone context doc bone))]
+         (doseq [[property ^TextField field] (:palette-fields context)]
+           (.setDisable field (or (nil? bone) (and (= "animate" (:mode state)) (boolean (or (:mixer-enabled state) (:mix-enabled state) (:mix-transition state))))))
+-          (.setTooltip field (when frame (Tooltip. (if (#{"x" "y"} property)
+-                                                     "网格选中顶点的中心位置（当前坐标空间）"
+-                                                     "对选中顶点应用增量变形；旋转/倾斜为角度，缩放为倍率，应用后归零/一。"))))
++          (let [text (when frame (if (#{"x" "y"} property)
++                                   "网格选中顶点的中心位置（当前坐标空间）"
++                                   "对选中顶点应用增量变形；旋转/倾斜为角度，缩放为倍率，应用后归零/一。"))]
++            (when (not= text (some-> (.getTooltip field) .getText))
++              (.setTooltip field (when text (Tooltip. text)))))
+           (when-not (= field (.getFocusOwner (.getScene field)))
+             (let [value (double (get sampled (keyword property) 0.0))
+                   text (format "%.2f" value)]
+@@ -3713,7 +3735,7 @@
+       (when (not= timeline-token (:timeline-token state))
+         (draw-timeline! context)
+         (swap! (:state context) assoc :timeline-token timeline-token)))
+-    (swap! (:state context) assoc :last-document doc :last-animation (:id animation))))
++    (swap! (:state context) assoc :last-document doc :last-animation (:id animation) :inspector-sample-time (:time @(:state context)))))
+ 
+ (g/defnode SkeletalAnimationView
+   (inherits view/WorkbenchView)
+@@ -3818,7 +3840,7 @@
+         context-base {:resource-node resource-node :workspace workspace :localization localization :state state
+                       :project-root (workspace/project-directory workspace) :root root :canvas canvas :background background :renderer renderer :viewport viewport
+                       :tree tree :inspector inspector :status status :event-log event-log :timeline timeline :timeline-pane timeline-pane
+-                      :time-label time-label :selection-outlines (atom {}) :images (atom {}) :pose-cache (atom nil) :mix-cache (atom nil) :ghost-cache (atom nil) :workspace-cache (atom nil)
++                      :time-label time-label :selection-outlines (atom {}) :images (atom {}) :preview-cache (atom {}) :pose-cache (atom nil) :mix-cache (atom nil) :ghost-cache (atom nil) :workspace-cache (atom nil)
+                       :audio (audio/make-player (workspace/project-directory workspace) (fn report-audio-error [text] (.setText ^Label status text)))}
+         context-ref (atom context-base)
+         context #(deref context-ref)
+--- a/editor/src/clj/editor/skeletal_animation_mesh.clj
++++ b/editor/src/clj/editor/skeletal_animation_mesh.clj
+@@ -60,7 +60,7 @@
+     (when constrained-edges
+       (require-value! (and (vector? constrained-edges)
+                            (coll/every? #(and (vector? %) (= 2 (count %)) (not= (% 0) (% 1))
+-                                             (coll/every? (fn [index] (and (integer? index) (<= 0 index (dec n)))) %)) constrained-edges))
++                                              (coll/every? (fn [index] (and (integer? index) (<= 0 index (dec n)))) %)) constrained-edges))
+                       "Constrained edges need two existing, distinct vertex indices." {}))
+     (when weights
+       (require-value! (and (vector? weights) (= n (count weights)))
+@@ -236,10 +236,10 @@
+     (into []
+           (keep (fn [bone]
+                   (let [[weight x y] (reduce (fn [[weight x y] [index coefficient]]
+-                                              (let [influence (coll/first-where #(= bone (:bone %)) (weights index))
+-                                                    contribution (* coefficient (:weight influence 0.0))]
+-                                                [(+ weight contribution) (+ x (* contribution (:x influence 0.0))) (+ y (* contribution (:y influence 0.0)))]))
+-                                            [0.0 0.0 0.0] sources)]
++                                               (let [influence (coll/first-where #(= bone (:bone %)) (weights index))
++                                                     contribution (* coefficient (:weight influence 0.0))]
++                                                 [(+ weight contribution) (+ x (* contribution (:x influence 0.0))) (+ y (* contribution (:y influence 0.0)))]))
++                                             [0.0 0.0 0.0] sources)]
+                     (when (pos? weight) {:bone bone :weight weight :x (/ x weight) :y (/ y weight)})))) bones)))
+ 
+ (defn- interpolate-pair [points sources]
+@@ -249,8 +249,8 @@
+ (defn- append-vertex [mesh sources triangles]
+   (let [index (quot (count (:vertices mesh)) 2)
+         updated (cond-> (assoc mesh :vertices (into (:vertices mesh) (interpolate-pair (pairs (:vertices mesh)) sources))
+-                                   :uvs (into (:uvs mesh) (interpolate-pair (pairs (:uvs mesh)) sources))
+-                                   :triangles (into [] cat triangles))
++                               :uvs (into (:uvs mesh) (interpolate-pair (pairs (:uvs mesh)) sources))
++                               :triangles (into [] cat triangles))
+                   (:weights mesh) (update :weights conj (interpolate-influences (:weights mesh) sources))
+                   (and (:constrained-edges mesh) (= 2 (count sources)))
+                   (update :constrained-edges (fn [edges]
+@@ -295,19 +295,19 @@
+         n (quot (count (:vertices mesh)) 2)]
+     (require-value! (>= (- n (count selection)) 3) "A mesh must retain at least three vertices." {})
+     (let [triangles (reduce (fn [triangles index]
+-                             (let [incident (filterv #(contains? (set %) index) triangles)
+-                                   boundary (when (pos? (count incident)) (neighbor-boundary incident index))
+-                                   replacements (if (< (count boundary) 3) [] (into [] (partition-all 3) (triangulate-polygon (pairs (:vertices mesh)) boundary)))]
+-                               (into (filterv #(not (contains? (set %) index)) triangles) replacements)))
+-                           (faces mesh) (sort > selection))
++                              (let [incident (filterv #(contains? (set %) index) triangles)
++                                    boundary (when (pos? (count incident)) (neighbor-boundary incident index))
++                                    replacements (if (< (count boundary) 3) [] (into [] (partition-all 3) (triangulate-polygon (pairs (:vertices mesh)) boundary)))]
++                                (into (filterv #(not (contains? (set %) index)) triangles) replacements)))
++                            (faces mesh) (sort > selection))
+           retained (into [] (remove selection) (range n))
+           indices (into {} (map-indexed (fn [index original] [original index])) retained)
+           updated (cond-> (assoc mesh :vertices (into [] (mapcat #(subvec (:vertices mesh) (* 2 %) (+ 2 (* 2 %)))) retained)
+-                                     :uvs (into [] (mapcat #(subvec (:uvs mesh) (* 2 %) (+ 2 (* 2 %)))) retained)
+-                                     :triangles (into [] (comp cat (map indices)) triangles))
++                                 :uvs (into [] (mapcat #(subvec (:uvs mesh) (* 2 %) (+ 2 (* 2 %)))) retained)
++                                 :triangles (into [] (comp cat (map indices)) triangles))
+                     (:weights mesh) (assoc :weights (mapv (:weights mesh) retained))
+                     (:constrained-edges mesh) (update :constrained-edges (fn [edges]
+-                                                                          (into [] (comp (remove #(coll/any? selection %)) (map #(mapv indices %))) edges))))]
++                                                                           (into [] (comp (remove #(coll/any? selection %)) (map #(mapv indices %))) edges))))]
+       (result updated #{} (mapv #(hash-map % 1.0) retained) :barycentric))))
+ 
+ (defn rebuild-uvs
+@@ -317,12 +317,12 @@
+   (validate-mesh! mesh)
+   (let [points (pairs (:vertices mesh))
+         [min-x min-y max-x max-y :as bounds] (or bounds [(reduce min (mapv first points)) (reduce min (mapv second points))
+-                                                       (reduce max (mapv first points)) (reduce max (mapv second points))])]
++                                                         (reduce max (mapv first points)) (reduce max (mapv second points))])]
+     (require-value! (and (= 4 (count bounds)) (coll/every? geometry/finite-number? bounds) (< min-x max-x) (< min-y max-y))
+                     "UV projection needs nonzero finite image bounds." {})
+     (result (assoc mesh :uvs (into [] (mapcat (fn [[x y]]
+-                                               (let [v (/ (- y min-y) (- max-y min-y))]
+-                                                 [(/ (- x min-x) (- max-x min-x)) (if-not flip-y v (- 1.0 v))]))) points))
++                                                (let [v (/ (- y min-y) (- max-y min-y))]
++                                                  [(/ (- x min-x) (- max-x min-x)) (if-not flip-y v (- 1.0 v))]))) points))
+             #{} (identity-map mesh) :identity)))
+ 
+ (defn remap-deform
+@@ -348,7 +348,7 @@
+       (let [old-offsets (:values (reduce (fn [{:keys [cursor values]} influences]
+                                            {:cursor (+ cursor (* 2 (count influences)))
+                                             :values (conj values (into {} (map-indexed (fn [index influence]
+-                                                                                       [(:bone influence) (subvec offsets (+ cursor (* 2 index)) (+ cursor (* 2 index) 2))])) influences))})
++                                                                                         [(:bone influence) (subvec offsets (+ cursor (* 2 index)) (+ cursor (* 2 index) 2))])) influences))})
+                                          {:cursor 0 :values []} (:weights before)))]
+         (into []
+               (mapcat (fn [[new-index sources]]
+@@ -460,16 +460,16 @@
+     (let [updated (cond-> (assoc mesh :vertices (into [] cat updated-points))
+                     (:weights mesh)
+                     (assoc :weights (mapv (fn [index influences]
+-                                           (if-not (contains? selection index)
+-                                             influences
+-                                             (let [[ox oy] (geometry/transform-point (:slot-transform context) (points index))
+-                                                   [nx ny] (geometry/transform-point (:slot-transform context) (updated-points index))]
+-                                               (mapv (fn [{:keys [bone x y] :as influence}]
+-                                                       (let [world (get (:bone-transforms context) bone)
+-                                                             [wx wy] (geometry/transform-point world [x y])
+-                                                             [x y] (geometry/inverse-transform-point world [(+ wx (- nx ox)) (+ wy (- ny oy))])]
+-                                                         (assoc influence :x x :y y))) influences))))
+-                                         (range (count points)) (:weights mesh))))]
++                                            (if-not (contains? selection index)
++                                              influences
++                                              (let [[ox oy] (geometry/transform-point (:slot-transform context) (points index))
++                                                    [nx ny] (geometry/transform-point (:slot-transform context) (updated-points index))]
++                                                (mapv (fn [{:keys [bone x y] :as influence}]
++                                                        (let [world (get (:bone-transforms context) bone)
++                                                              [wx wy] (geometry/transform-point world [x y])
++                                                              [x y] (geometry/inverse-transform-point world [(+ wx (- nx ox)) (+ wy (- ny oy))])]
++                                                          (assoc influence :x x :y y))) influences))))
++                                          (range (count points)) (:weights mesh))))]
+       (result updated selection (identity-map mesh) :identity))))
+ 
+ (defn- normalize-locked [influences locked-bones]
+@@ -494,8 +494,8 @@
+   (require-weighted! mesh)
+   (let [selection (validate-selection! mesh selection)]
+     (result (update mesh :weights (fn [weights] (mapv (fn [index influences]
+-                                                       (if-not (contains? selection index) influences (normalize-locked influences locked-bones)))
+-                                                     (range (count weights)) weights)))
++                                                        (if-not (contains? selection index) influences (normalize-locked influences locked-bones)))
++                                                      (range (count weights)) weights)))
+             selection (identity-map mesh) :bone-identity)))
+ 
+ (defn- segment-distance [point a b]
+@@ -730,10 +730,10 @@
+   (validate-context! context [bone-id])
+   (let [selection (validate-selection! mesh selection) points (pairs (:vertices mesh))]
+     (result (update mesh :weights (fn [weights]
+-                                   (mapv (fn [index influences]
+-                                           (if-not (contains? selection index) influences
+-                                                   (paint-vertex influences (points index) bone-id 0.0 weight context locked-bones)))
+-                                         (range (count weights)) weights)))
++                                    (mapv (fn [index influences]
++                                            (if-not (contains? selection index) influences
++                                                    (paint-vertex influences (points index) bone-id 0.0 weight context locked-bones)))
++                                          (range (count weights)) weights)))
+             selection (identity-map mesh) :bone-identity)))
+ 
+ (defn- smooth-vertex [weights neighbors index point amount context locked-bones]
+@@ -741,16 +741,16 @@
+     (if (or (zero? amount) (zero? (count adjacent)))
+       original
+       (let [averages (reduce (fn [totals neighbor]
+-                              (reduce (fn [totals {:keys [bone weight]}] (update totals bone (fnil + 0.0) (/ weight (count adjacent)))) totals (weights neighbor))) {} adjacent)
++                               (reduce (fn [totals {:keys [bone weight]}] (update totals bone (fnil + 0.0) (/ weight (count adjacent)))) totals (weights neighbor))) {} adjacent)
+             original-by-bone (into {} (map (juxt :bone identity)) original)
+             bones (into (mapv :bone original) (remove #(or (contains? original-by-bone %) (contains? locked-bones %) (zero? (get averages %)))) (sort (into [] (coll/keys averages))))
+             influences (mapv (fn [bone]
+-                                (let [previous (get original-by-bone bone)]
+-                                  (if (contains? locked-bones bone)
+-                                    previous
+-                                    (let [weight (+ (* (- 1.0 amount) (:weight previous 0.0)) (* amount (get averages bone 0.0)))
+-                                          [x y] (if previous [(:x previous) (:y previous)] (bind-point point bone context))]
+-                                      (assoc (or previous {:bone bone :x x :y y}) :weight weight))))) bones)]
++                               (let [previous (get original-by-bone bone)]
++                                 (if (contains? locked-bones bone)
++                                   previous
++                                   (let [weight (+ (* (- 1.0 amount) (:weight previous 0.0)) (* amount (get averages bone 0.0)))
++                                         [x y] (if previous [(:x previous) (:y previous)] (bind-point point bone context))]
++                                     (assoc (or previous {:bone bone :x x :y y}) :weight weight))))) bones)]
+         (normalize-locked influences locked-bones)))))
+ 
+ (defn smooth-weights [mesh selection amount context locked-bones]
+@@ -759,9 +759,9 @@
+   (let [selection (validate-selection! mesh selection) points (pairs (:vertices mesh)) neighbors (adjacency mesh) weights (:weights mesh)]
+     (validate-context! context (into #{} (comp cat (map :bone)) weights))
+     (result (assoc mesh :weights (mapv (fn [index point]
+-                                        (if-not (contains? selection index) (weights index)
+-                                                (smooth-vertex weights neighbors index point amount context locked-bones)))
+-                                      (range (count points)) points))
++                                         (if-not (contains? selection index) (weights index)
++                                                 (smooth-vertex weights neighbors index point amount context locked-bones)))
++                                       (range (count points)) points))
+             selection (identity-map mesh) :bone-identity)))
+ 
+ (defn brush-weights
+@@ -800,7 +800,7 @@
+     (result (assoc mesh :weights updated) selection (identity-map mesh) :bone-identity)))
+ 
+ (defn prune-weights [mesh selection {:keys [threshold max-influences locked-bones]
+-                                    :or {threshold 0.01 max-influences 4 locked-bones #{}}}]
++                                     :or {threshold 0.01 max-influences 4 locked-bones #{}}}]
+   (require-weighted! mesh)
+   (require-value! (and (geometry/finite-number? threshold) (<= 0.0 threshold 1.0)
+                        (integer? max-influences) (<= 1 max-influences 64)) "Invalid pruning options." {})
+@@ -931,7 +931,7 @@
+   (result (update mesh :constrained-edges (fn [edges] (filterv #(not= (canonical-edge edge) (canonical-edge %)) edges)))
+           (set edge) (identity-map mesh) :identity))
+ 
+-(defn spine-export-layout
++(defn- spine-export-layout-impl
+   "Return a hull-first vertex permutation for a temporary export document.
+   :hull is the boundary vertex count. :edges contains encoded XY indices for
+   boundary and explicit constrained edges. The caller must apply :vertex-map
+@@ -955,9 +955,9 @@
+           uv-points (pairs (:uvs mesh))
+           boundary-pairs (mapv vector boundary (conj (subvec boundary 1) (first boundary)))
+           area (transduce (map (fn [[a b]]
+-                                (let [[ax ay] (uv-points a)
+-                                      [bx by] (uv-points b)]
+-                                  (- (* ax by) (* bx ay))))) + 0.0 boundary-pairs)]
++                                 (let [[ax ay] (uv-points a)
++                                       [bx by] (uv-points b)]
++                                   (- (* ax by) (* bx ay))))) + 0.0 boundary-pairs)]
+       (require-value! (and (geometry/finite-number? area) (not (zero? area)))
+                       "The exported mesh needs a nonzero UV boundary." {})
+       (doseq [[a b] boundary-pairs
+@@ -971,14 +971,26 @@
+             remap-flat (fn [values] (into [] (mapcat (pairs values)) order))
+             remap-edge (fn [edge] (canonical-edge (mapv indices edge)))
+             updated (cond-> (assoc mesh :vertices (remap-flat (:vertices mesh))
+-                                        :uvs (remap-flat (:uvs mesh))
+-                                        :triangles (mapv indices (:triangles mesh)))
++                                   :uvs (remap-flat (:uvs mesh))
++                                   :triangles (mapv indices (:triangles mesh)))
+                       (:weights mesh) (assoc :weights (mapv (:weights mesh) order))
+                       (:constrained-edges mesh) (assoc :constrained-edges (into [] (sort (mapv remap-edge (:constrained-edges mesh))))))
+             edges (into #{} (map remap-edge) (into constraints boundary-edges))]
+         (assoc (result updated #{} (mapv #(hash-map % 1.0) order) :identity)
+-               :hull (count boundary)
+-               :edges (into [] (comp cat (map #(* 2 %))) (sort edges)))))))
++          :hull (count boundary)
++          :edges (into [] (comp cat (map #(* 2 %))) (sort edges)))))))
++
++(def ^:private export-layout-cache (atom []))
++
++(defn spine-export-layout
++  "Validate and order an immutable mesh for Spine export. Reuse only the exact
++  mesh object, so topology, UV or weight edits always repeat validation."
++  [mesh]
++  (if-let [entry (coll/first-where #(identical? mesh (:mesh %)) @export-layout-cache)]
++    (:layout entry)
++    (let [layout (spine-export-layout-impl mesh)]
++      (swap! export-layout-cache #(coll/into-> % [{:mesh mesh :layout layout}] (take 31)))
++      layout)))
+ 
+ (defn mirror-weights
+   "Mirror selected source weights onto unique existing symmetric vertices.
+@@ -1010,8 +1022,8 @@
+                                 updated (if (>= (transduce (map :weight) + 0.0 locked) (- 1.0 1.0e-9))
+                                           target
+                                           (normalize-locked (into locked (map (fn [influence]
+-                                                                               (let [[x y] (bind-point (points target-index) (:bone influence) context)]
+-                                                                                 (assoc influence :x x :y y)))) free) locked-bones))]
++                                                                                (let [[x y] (bind-point (points target-index) (:bone influence) context)]
++                                                                                  (assoc influence :x x :y y)))) free) locked-bones))]
+                             (assoc weights target-index updated))) (:weights mesh) transfers)]
+     (result (assoc mesh :weights weights) (into #{} (map second) transfers) (identity-map mesh) :bone-identity)))
+ 
+@@ -1019,7 +1031,7 @@
+   (assoc (result (-> mesh
+                      (dissoc :weights :spine-export-hull :spine-export-edges)
+                      (assoc :spine-topology-edited true)) #{} [] :reset)
+-         :clear-weights true :clear-deforms true))
++    :clear-weights true :clear-deforms true))
+ 
+ (defn- validate-bounds! [[x0 y0 x1 y1 :as bounds]]
+   (require-value! (and (= 4 (count bounds)) (coll/every? geometry/finite-number? bounds) (< x0 x1) (< y0 y1))
+@@ -1031,8 +1043,8 @@
+   [attachment [x0 y0 x1 y1 :as bounds]]
+   (validate-bounds! bounds)
+   (reset-result (assoc attachment :type "mesh" :vertices [x0 y0 x1 y0 x1 y1 x0 y1]
+-                                 :uvs [0.0 1.0 1.0 1.0 1.0 0.0 0.0 0.0]
+-                                 :triangles [0 1 2 0 2 3] :constrained-edges [])))
++                       :uvs [0.0 1.0 1.0 1.0 1.0 0.0 0.0 0.0]
++                       :triangles [0 1 2 0 2 3] :constrained-edges [])))
+ 
+ (defn generate
+   "Subdivide every face into four, sharing edge midpoints. Repeated calls
+@@ -1057,12 +1069,12 @@
+                     (require-value! (coll/every? #(contains? indices (canonical-edge %)) (:constrained-edges mesh))
+                                     "A constrained edge is missing from the mesh." {})
+                     (assoc mesh
+-                           :vertices (into (:vertices mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (points a) (points b)))) edges)
+-                           :uvs (into (:uvs mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (uvs a) (uvs b)))) edges)
+-                           :triangles (into [] (mapcat (fn [[a b c]]
+-                                                        (let [ab (indices (canonical-edge [a b])) bc (indices (canonical-edge [b c])) ca (indices (canonical-edge [c a]))]
+-                                                          [a ab ca ab b bc ca bc c ab bc ca]))) triangles)
+-                           :constrained-edges (into [] (mapcat (fn [[a b :as edge]] (let [mid (indices (canonical-edge edge))] [[a mid] [mid b]]))) (:constrained-edges mesh)))))
++                      :vertices (into (:vertices mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (points a) (points b)))) edges)
++                      :uvs (into (:uvs mesh) (mapcat (fn [[a b]] (mapv #(* 0.5 (+ %1 %2)) (uvs a) (uvs b)))) edges)
++                      :triangles (into [] (mapcat (fn [[a b c]]
++                                                    (let [ab (indices (canonical-edge [a b])) bc (indices (canonical-edge [b c])) ca (indices (canonical-edge [c a]))]
++                                                      [a ab ca ab b bc ca bc c ab bc ca]))) triangles)
++                      :constrained-edges (into [] (mapcat (fn [[a b :as edge]] (let [mid (indices (canonical-edge edge))] [[a mid] [mid b]]))) (:constrained-edges mesh)))))
+                 (dissoc mesh :weights) (range iterations))]
+     (reset-result updated)))
+ 
+@@ -1075,15 +1087,15 @@
+           (when (< x width)
+             (aset-boolean horizontal (+ x (* y width)) (pos? count))
+             (recur (inc x) (long (+ count
+-                                   (if (and (< (+ x padding 1) width) (aget mask (+ x padding 1 (* y width)))) 1 0)
+-                                   (if (and (>= (- x padding) 0) (aget mask (+ (- x padding) (* y width)))) -1 0)))))))
++                                    (if (and (< (+ x padding 1) width) (aget mask (+ x padding 1 (* y width)))) 1 0)
++                                    (if (and (>= (- x padding) 0) (aget mask (+ (- x padding) (* y width)))) -1 0)))))))
+       (dotimes [x width]
+         (loop [y 0 count (long (transduce (map #(if (aget horizontal (+ x (* % width))) 1 0)) + 0 (range (min height (inc padding)))))]
+           (when (< y height)
+             (aset-boolean result (+ x (* y width)) (pos? count))
+             (recur (inc y) (long (+ count
+-                                   (if (and (< (+ y padding 1) height) (aget horizontal (+ x (* (+ y padding 1) width)))) 1 0)
+-                                   (if (and (>= (- y padding) 0) (aget horizontal (+ x (* (- y padding) width)))) -1 0)))))))
++                                    (if (and (< (+ y padding 1) height) (aget horizontal (+ x (* (+ y padding 1) width)))) 1 0)
++                                    (if (and (>= (- y padding) 0) (aget horizontal (+ x (* (- y padding) width)))) -1 0)))))))
+       result)))
+ 
+ (defn- mask-outline [^booleans mask width height]
+@@ -1123,8 +1135,8 @@
+       (require-value! (zero? (count holes)) "A single Spine mesh cannot contain holes. Split this image into separate attachments before tracing." {:kind :holes :holes (count holes)})
+       (let [points (first outer) n (count points)]
+         (into [] (keep (fn [index]
+-                        (when-not (zero? (cross (points (mod (dec index) n)) (points index) (points (mod (inc index) n))))
+-                          (points index)))) (range n))))))
++                         (when-not (zero? (cross (points (mod (dec index) n)) (points index) (points (mod (inc index) n))))
++                           (points index)))) (range n))))))
+ 
+ (defn- simplify-outline [points tolerance]
+   (let [n (count points)
+@@ -1183,5 +1195,5 @@
+         uvs (mapv (fn [[x y]] [(/ (double x) width) (/ (double y) height)]) outline)
+         points (mapv (fn [[u v]] [(+ x0 (* u (- x1 x0))) (- y1 (* v (- y1 y0)))]) uvs)
+         mesh (assoc attachment :type "mesh" :vertices (into [] cat points) :uvs (into [] cat uvs)
+-                               :triangles (triangulate-polygon points (vec (range (count points)))) :constrained-edges [])]
++                    :triangles (triangulate-polygon points (vec (range (count points)))) :constrained-edges [])]
+     (assoc (reset-result mesh) :trace {:threshold threshold :simplify simplify :padding padding :components 1 :holes 0})))
+--- a/editor/src/clj/editor/skeletal_animation_io.clj
++++ b/editor/src/clj/editor/skeletal_animation_io.clj
+@@ -346,12 +346,16 @@
+ (defn export-compatibility
+   "Report target differences before opening a save dialog or writing files."
+   [document]
+-  (let [source (json/read-str (data/export-spine-json document))
+-        two-color (or (coll/any? #(get % "dark") (get source "slots"))
++  (let [document (data/validate-document document)
++        ;; The preview warning only depends on two-color slot data. Exporting
++        ;; every mesh and animation here makes mouse release unnecessarily slow.
++        source (if-let [text (:spine-source document)] (json/read-str text) {})
++        slot-ids (mapv :id (:slots document))
++        two-color (or (coll/any? :dark-color (:slots document))
+                       (coll/any? (fn [animation]
+                                    (coll/any? #(or (get % "rgba2") (get % "rgb2"))
+-                                              (coll/vals (get animation "slots"))))
+-                                 (coll/vals (get source "animations"))))]
++                                              (coll/vals (select-keys (get-in source ["animations" (:id animation) "slots"]) slot-ids))))
++                                 (:animations document)))]
+     (cond-> []
+       two-color (conj {:target :defold :severity :warning :code :default-material-dark}))))
+ 

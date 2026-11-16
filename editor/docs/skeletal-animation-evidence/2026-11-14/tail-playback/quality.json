@@ -1,0 +1,22 @@
+{
+  "frames": 121,
+  "units": "world units at scale 1",
+  "maximum_motion": 11.62058772047139,
+  "variants": [
+    {
+      "influences": 1,
+      "maximum_error": 1.7662194775793234,
+      "rms_error": 0.6281137488014006
+    },
+    {
+      "influences": 2,
+      "maximum_error": 1.7383113266870578,
+      "rms_error": 0.35831551142559437
+    },
+    {
+      "influences": 3,
+      "maximum_error": 0.8946426424835404,
+      "rms_error": 0.19788626169746584
+    }
+  ]
+}

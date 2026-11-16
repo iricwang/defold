@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-parity-four/build/editor.jar",
+  "sha256": "a2edd06054fe5d5a322394a187389f3864f1a6a5f3db77bf6dd0bd8e03308495",
+  "project_source": "editor/test/resources/skeletal-animation/performance-project",
+  "project_copy": "/private/tmp/spine-parity-four/interaction-verified/project",
+  "scenario": "/private/tmp/spine-parity-four/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

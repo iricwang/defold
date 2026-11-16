@@ -1,0 +1,26 @@
+11月 14, 2026 4:06:48 下午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @4d847d32'
+Reflection warning, /Users/applemima1111/Documents/Dev/Defold/editor/src/clj/editor/skeletal_animation_properties.clj:72:18 - call to method updateItem can't be resolved (target class is unknown).
+
+Testing editor.skeletal-animation-constraints-test
+
+Testing editor.skeletal-animation-data-test
+
+Testing editor.skeletal-animation-attachments-test
+
+Testing editor.skeletal-animation-view-workflow-test
+
+Testing editor.skeletal-animation-drag-test
+
+Testing editor.skeletal-animation-mesh-transform-test
+
+Testing editor.skeletal-animation-view-test
+
+Testing editor.skeletal-animation-tools-test
+
+Testing editor.skeletal-animation-navigation-test
+
+Testing editor.skeletal-animation-toolbar-test
+
+Ran 225 tests containing 3341 assertions.
+0 failures, 0 errors.

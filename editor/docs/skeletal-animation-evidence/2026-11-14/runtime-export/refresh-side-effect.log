@@ -1,0 +1,4 @@
+{'id': 'patch', 'ns': 'user', 'session': 'eb5db0c1-e136-4130-bb1d-0c64b198b378', 'value': 'nil'}
+{'id': 'patch', 'out': ':final {:document-preserved true, :undo-count 0, :undo-labels [], :version "4.2.0", :failed-handlers 0, :stopped-timers 0}\n', 'session': 'eb5db0c1-e136-4130-bb1d-0c64b198b378'}
+{'id': 'patch', 'ns': 'user', 'session': 'eb5db0c1-e136-4130-bb1d-0c64b198b378', 'value': 'nil'}
+{'id': 'patch', 'session': 'eb5db0c1-e136-4130-bb1d-0c64b198b378', 'status': ['done']}

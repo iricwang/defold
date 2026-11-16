@@ -1,0 +1,5 @@
+{'id': 'patch', 'ns': 'user', 'session': '85ef9f4e-80f2-4601-b92d-90d5db811806', 'value': 'nil'}
+{'id': 'patch', 'out': ':ui {:tabs ["属性" "权重" "皮肤"], :panel :properties, :styles ["file:/Users/applemima1111/Documents/Dev/Defold/editor/resources/skeletal-animation-inspector.css"], :stopped-timers 0}\n', 'session': '85ef9f4e-80f2-4601-b92d-90d5db811806'}
+{'id': 'patch', 'ns': 'user', 'session': '85ef9f4e-80f2-4601-b92d-90d5db811806', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '85ef9f4e-80f2-4601-b92d-90d5db811806', 'value': 'nil'}
+{'id': 'patch', 'session': '85ef9f4e-80f2-4601-b92d-90d5db811806', 'status': ['done']}

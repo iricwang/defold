@@ -1,0 +1,22 @@
+{
+  "animations": [
+    "attack",
+    "death",
+    "hit",
+    "idle",
+    "stagger",
+    "walk",
+    "idle_soft_tail"
+  ],
+  "animation-count-matches": true,
+  "tail-key-count": 29,
+  "tail-roundtrip-max-error": 0.0,
+  "status": "已导出 /game/assets/spine_validation/soft_tail_export/basement_rat_smart_mesh.spinescene",
+  "tests": 8,
+  "assertions": 59,
+  "failures": 0,
+  "errors": 0,
+  "atlas_images_existing": 13,
+  "runtime_build_tested": false,
+  "delivery": "editor hotload only"
+}

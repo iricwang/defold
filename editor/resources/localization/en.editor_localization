@@ -3411,3 +3411,397 @@ notification.play-build.preparing = Preparing Play in the background...
 notification.play-build.ready = Play is ready. Unchanged content starts without rebuilding.
 notification.play-build.failed = Play preparation failed. Run or Compile to view the errors and retry.
 notification.play-build.changed = Content changed during preparation. Wait for preparation or run again; the previous build was not launched.
+
+skeletal.add-event = New Event
+skeletal.event-defaults = Default values
+skeletal.event-int = Integer
+skeletal.event-float = Float
+skeletal.event-string = String
+skeletal.event-key = Key event at playhead
+skeletal.event-key-values = Key values
+skeletal.event-log = Event Log
+skeletal.clear-event-log = Clear
+skeletal.event-log-notice = Events fire during playback. Scrubbing does not fire events. Latest 100 entries.
+skeletal.event-audio-notice = Audio event metadata is preserved on export. Preview lists events without playing audio.
+skeletal.hidden-attachment = (Hidden)
+skeletal.slot-animation = Slot Animation
+skeletal.slot-color-animation = Color and Opacity
+skeletal.move-up = Move Up
+skeletal.move-down = Move Down
+skeletal.skin-membership = Skin membership
+skeletal.skin-required = Requires skin membership
+skeletal.skin-included = Include in current skin
+skeletal.mix-preview = Mix Preview
+skeletal.mix-overlay-enable = Enable second track
+skeletal.mix-overlay = Second track / From
+skeletal.mix-alpha = Track alpha
+skeletal.mix-duration = Mix duration (s)
+skeletal.mix-transition = Transition to current animation
+skeletal.mix-reset = Return to single animation
+skeletal.mix-notice = Preview settings do not change exported animations. Physics is paused while mixing.
+skeletal.mix-readonly = Return to single-animation preview before editing the pose or keys.
+
+skeletal.audio-volume = Volume
+skeletal.audio-balance = Balance
+skeletal.audio-file = Audio file
+skeletal.import-audio = Import audio…
+skeletal.preview-audio = Preview audio
+skeletal.skeletons = Workspace skeletons
+skeletal.add-skeleton = Add skeleton
+skeletal.remove-skeleton = Remove skeleton
+skeletal.export-preview = Export frames…
+skeletal.view-settings = View
+skeletal.ghosting = Onion skins (paused)
+skeletal.mute-audio = Mute event audio
+skeletal.reference-image = Reference image (project path)
+skeletal.opacity = Opacity
+skeletal.save-view = Save view in document
+skeletal.mixer-tracks = Multi-track playback
+skeletal.mixer-index = Track index (0-based)
+skeletal.mixer-speed = Track speed
+skeletal.mixer-delay = Queue delay
+skeletal.mixer-set = Set track
+skeletal.mixer-queue = Queue clip
+skeletal.mixer-clear = Clear track
+skeletal.mixer-stop = Exit mixer
+skeletal.attachment-manager = Attachments
+skeletal.attachment-name = Placeholder name
+skeletal.attachment-type = Attachment type
+skeletal.attachment-use = Use as setup attachment and edit
+skeletal.attachment-parent = Parent mesh / skin
+skeletal.attachment-end = Clipping end slot
+skeletal.attachment-vertices = Vertices / weights
+skeletal.attachment-save = Save attachment
+skeletal.rename-placeholder = Rename placeholder
+skeletal.sequence = Image sequence
+skeletal.sequence-count = Frame count
+skeletal.sequence-start = Start number
+skeletal.sequence-digits = Padding digits
+skeletal.sequence-setup = Setup index
+skeletal.sequence-apply = Update sequence
+skeletal.sequence-index = Index
+skeletal.sequence-delay = Frame delay
+skeletal.skin-compose = Compose skins
+skeletal.dark-color = Dark tint
+skeletal.slot-blend = Slot blend
+skeletal.apply = Apply
+skeletal.match-keys = Match keys
+skeletal.repeat-count = Copies
+skeletal.repeat-interval = Interval
+skeletal.repeat-keys = Repeat keys
+skeletal.edit-vertices = Edit vertices
+skeletal.import-reference = Import reference…
+skeletal.attachment-inherit-deform = Inherit parent mesh timelines
+
+skeletal.workspace-peers = Show other skeletons (setup)
+
+skeletal.smart-mesh = Smart Mesh · Trace
+
+skeletal.mode-setup = Setup
+skeletal.mode-animate = Animate
+
+skeletal.curve-linear = Linear
+skeletal.curve-stepped = Stepped
+skeletal.curve-bezier = Bezier
+skeletal.curve-smooth = Smooth tangents
+skeletal.curve-flat = Flat tangents
+skeletal.curve-ease-in = Ease in
+skeletal.curve-ease-out = Ease out
+skeletal.curve-frame = Frame
+skeletal.curve-auto = Auto
+skeletal.curve-filter = Filter channels
+skeletal.curve-x = Translate X
+skeletal.curve-y = Translate Y
+skeletal.curve-rotation = Rotate
+skeletal.curve-scale-x = Scale X
+skeletal.curve-scale-y = Scale Y
+skeletal.curve-shear-x = Shear X
+skeletal.curve-shear-y = Shear Y
+skeletal.current-frame = Current
+
+skeletal.property-transform = Transform
+
+skeletal.property-shear = Shear
+
+skeletal.property-bone-setup = Bone setup
+
+skeletal.property-mesh-selection = Mesh and weights
+
+skeletal.raw-attachment-data = Advanced attachment data
+
+skeletal.property-constraint-setup = Constraint setup
+
+skeletal.property-constraint-offset = Offsets
+
+skeletal.property-physics-solver = Solver settings
+
+skeletal.color-rgba = Color + opacity
+
+skeletal.color-rgb = Color
+
+skeletal.color-alpha = Opacity
+
+skeletal.color-rgba2 = Two-color + opacity
+
+skeletal.color-rgb2 = Two-color
+
+skeletal.interpolation-linear = Linear
+
+skeletal.interpolation-stepped = Stepped
+
+skeletal.type-region = Image
+
+skeletal.type-mesh = Mesh
+
+skeletal.type-linkedmesh = Linked mesh
+
+skeletal.type-clipping = Clipping
+
+skeletal.type-boundingbox = Bounding box
+
+skeletal.type-path = Path
+
+skeletal.type-point = Point
+
+skeletal.blend-normal = Normal
+
+skeletal.blend-additive = Additive
+
+skeletal.blend-multiply = Multiply
+
+skeletal.blend-screen = Screen
+
+skeletal.skin-delete-target = Skin to delete
+
+skeletal.skin-delete = Delete skin
+
+skeletal.smart-mesh-help = Smart mesh transfers existing weights and deformation keys to the new topology. New boundary vertices may use approximate transfer; undo restores the complete original mesh.
+
+skeletal.smart-remesh = Rebuild smart mesh
+
+skeletal.remesh-preserved = Deform keys retained
+
+skeletal.remesh-boundary = Approximate boundary vertices
+skeletal.trace-title = Trace
+skeletal.trace-detail = Detail
+skeletal.trace-concavity = Concavity
+skeletal.trace-refinement = Refinement
+skeletal.trace-uniform = Uniform
+skeletal.trace-alpha = Alpha
+skeletal.trace-refresh = Trace / Refresh
+skeletal.trace-triangles = Triangles
+skeletal.trace-working = Calculating…
+skeletal.trace-clipped = Clipped pixels
+skeletal.trace-noise = Noise pixels
+skeletal.trace-image-error = Unable to read the attachment image.
+skeletal.trace-document-changed = Document changed. Cancel and reopen Trace.
+skeletal.confirm = Apply
+skeletal.cancel = Cancel
+skeletal.trace-adjust = ✥ Adjust
+skeletal.trace-manual = Manual adjustment
+skeletal.trace-detail-help = Target contour vertex count; retain curve and corner detail.
+skeletal.trace-concavity-help = Preserve concave regions and limit added transparent area.
+skeletal.trace-refinement-help = Increase outline simplification search passes.
+skeletal.trace-uniform-help = Subdivide long boundary edges at regular intervals.
+skeletal.trace-alpha-help = Ignore pixels below this alpha threshold.
+skeletal.trace-padding-help = Expand the contour in source image pixels.
+
+skeletal.mesh-animation = Mesh deform
+skeletal.edit-deform = Edit mesh deformation
+skeletal.key-deform = Key deformation
+skeletal.deform-help = Drag vertices at the current frame. With Auto Key off, use Key deformation to save the pose.
+
+skeletal.cut-keys = Cut keys
+skeletal.last-frame = Last frame
+skeletal.toolbar-frame = Frame
+skeletal.toolbar-auto-frame = Auto fit
+skeletal.toolbar-auto-key = Auto key
+
+skeletal.all-nodes = All nodes
+
+skeletal.create-attachment-unsupported = This attachment type cannot be moved by the Create tool.
+
+skeletal.create-alternate-attachments = Create cannot yet migrate alternate skin attachments. Use a slot with a single attachment.
+
+skeletal.bind-mesh = Bind
+
+skeletal.finish-binding = Finish binding
+
+skeletal.binding-incomplete = Choose a mesh and at least one bone. Restart binding if the document changed.
+
+skeletal.binding-select-mesh = Select a mesh or bones, then click Bind.
+
+skeletal.binding-pick-help = Click bones in the canvas or tree. Space finishes; Esc cancels.
+
+skeletal.unbind-bone = Remove bone
+
+skeletal.weight-percent = Weight %
+
+skeletal.weight-direct = Direct
+
+skeletal.weight-add = Add
+
+skeletal.weight-subtract = Remove
+
+skeletal.weight-replace = Replace
+
+skeletal.weight-advanced = Advanced weights
+
+skeletal.skin-new-name = New skin name
+
+skeletal.skin-new = New skin
+
+skeletal.active-skin = Active skin
+
+skeletal.weight-mode = Mode
+skeletal.weight-strength = Strength
+skeletal.weight-size = Size
+skeletal.weight-feather = Feather
+skeletal.weight-pies = Pies
+skeletal.weight-overlay = Overlay
+skeletal.weight-selected-only = Selected
+skeletal.weight-threshold = Threshold %
+skeletal.prune-removed = Removed influences:
+skeletal.update-bindings = Update
+skeletal.weight-preview-stale = The document changed during preview. Retry pruning.
+
+skeletal.weight-influences = Influences
+skeletal.copy-weights = Copy weights
+skeletal.paste-weights = Paste weights
+skeletal.swap-weights = Swap weights
+skeletal.weld-weights = Weld
+skeletal.weld-overlap = Overlapping vertices only
+skeletal.weld-no-target = Welding needs another mesh bound to the same two or more bones.
+
+skeletal.weight-bones-label = Bones:
+
+skeletal.compensate-bones = Bone compensation
+skeletal.compensate-images = Image compensation
+skeletal.compensate-bones-help = Keep descendants in place while moving a parent. Turn off to move the whole bone chain.
+skeletal.compensate-images-help = Keep images in place while transforming bones. Turn off to deform bound meshes with their bones.
+
+skeletal.ik-setup-only = Create IK constraints in Setup mode.
+skeletal.ik-select-chain = Select one bone or a direct parent-child pair. A root bone cannot be constrained.
+skeletal.ik-pick-target = IK: click a target bone or empty space. Click a constrained bone to create a target at its tip. Escape cancels.
+skeletal.ik-selection-changed = The document changed while choosing an IK target. Start again.
+
+skeletal.toolbar-filter = Filter curves
+skeletal.toolbar-lock = Lock displayed nodes
+skeletal.toolbar-refresh = Refresh locked nodes
+skeletal.toolbar-select = Select shown bones
+skeletal.toolbar-shift = Shift
+skeletal.toolbar-offset = Offset
+skeletal.toolbar-bias = Favor previous/next key
+skeletal.toolbar-store = Store
+skeletal.toolbar-swap = Swap stored curves
+skeletal.offset-bone-curves = Loop offset supports bone transform curves with matching start and end keys.
+
+skeletal.setup-edit-only = Edit structure and binding in Setup mode.
+skeletal.property-physics-animation = Physics animation
+
+skeletal.mixer-start = Start time (s)
+skeletal.mixer-end = End time (s)
+skeletal.mixer-end-auto = Blank: animation end
+skeletal.mixer-reverse = Reverse
+skeletal.mixer-hold = Hold previous
+skeletal.mixer-shortest = Shortest rotation
+skeletal.mixer-fade = Fade out track
+skeletal.compat-default-dark = The default Defold Spine material does not display dark tint. Editor preview and JSON retain this data.
+
+skeletal.property-rig-control = Control and constraints
+skeletal.rig-ik-mode = Configure IK · 1–2 bones
+skeletal.rig-path-mode = Configure path · bone chain
+skeletal.rig-controller-role = This bone: controller
+skeletal.rig-driven-role = This bone: constraint driven
+skeletal.rig-fk-role = No IK / path binding
+skeletal.rig-mode-help = IK controls one or two bones; use a path for a tail chain. Open a binding below to configure it.
+skeletal.rig-create-ik = Create IK constraint…
+skeletal.rig-create-path = Create path constraint…
+skeletal.rig-select-controller = Select controller
+skeletal.rig-setup-help = Select bones in Setup, then create a constraint. For IK, choose its target in the viewport.
+skeletal.rig-animation-help = Animate by dragging controllers. Switch to Setup to change bindings.
+skeletal.rig-ik-controller = IK control
+skeletal.rig-path-controller = Path control
+
+skeletal.property-bone-length = Bone length
+
+skeletal.rig-allow-stretch = Allow stretching
+
+skeletal.rig-allow-compress = Allow compression (one bone)
+
+skeletal.rig-ik-length-help = Applies to this IK constraint. Turn stretching off to keep the original reach; an unreachable target stays out of reach. Stretch/compress can be keyed in animation mode.
+
+skeletal.rig-path-length = Path bone length
+
+skeletal.rig-path-length-fixed = Keep bone length
+
+skeletal.rig-path-length-fit = Scale to fit path
+
+skeletal.rig-path-length-custom = Custom (advanced settings)
+
+skeletal.rig-path-length-help = Applies to all bones in this constraint. Keep length uses Chain + Length spacing 0. Fit uses Chain Scale + Proportional spacing 100%. A fixed-length chain may not reach the path end.
+
+skeletal.rig-path-length-setup-help = Switch to Setup to change length mode. Existing spacing animation keys still control spacing; this setting does not remove them.
+
+skeletal.auto-rig = Auto mesh and bones…
+
+skeletal.auto-rig-tail = Tail / tentacle
+
+skeletal.auto-rig-reverse = Reverse root and tip
+
+skeletal.auto-rig-help = Drag numbered controls to adjust the rest rig. Fixed bone lengths. Apply is one undo step; existing bones remain.
+
+skeletal.auto-rig-complete = Rig created. Drag the controls; undo restores the original attachment.
+
+skeletal.trace-bone-count = Bones
+
+skeletal.trace-control-count = Controls
+
+skeletal.trace-bone-count-help = 2–32 deform bones along the silhouette centerline.
+
+skeletal.trace-control-count-help = 2–8 controls; changing the count resets manual control placement.
+
+skeletal.trace-uniform-percent = Uniform (%)
+skeletal.trace-uniform-percent-help = Subdivide long boundary edges at regular intervals (0–100%).
+
+skeletal.texture-output = Texture resolution
+skeletal.texture-help = Output pixels only (1–100%). Original images, rig size and animations stay unchanged. Applies to this skeleton, including all skins and image sequences.
+skeletal.texture-apply = Apply to preview and export
+skeletal.texture-estimate = %d images · RGBA8 pixels %.2f MiB (before atlas padding)
+skeletal.texture-reading = Reading image sizes…
+skeletal.texture-applied = Applied. Save the document, then export game resources to update the build.
+
+skeletal.rig-control-index = Control
+skeletal.rig-control-picker = Select control
+skeletal.rig-bone-count = driven bones
+skeletal.rig-control-count = controls
+skeletal.rig-ik-settings = IK settings
+skeletal.rig-path-settings = Path follow settings
+skeletal.rig-path-shape = Path shape
+skeletal.rig-path-shape-help = The path stores the curve driven by controls. Usually, edit the controls.
+skeletal.rig-path-follow-help = Positions the driven bones along the path; their weights move the mesh.
+skeletal.rig-advanced-path = Advanced · path vertices
+skeletal.rig-advanced-follow = Advanced · follow and mix
+skeletal.rig-identity = Advanced · node name
+skeletal.rig-driven-group = Driven bones
+skeletal.rig-path-data = Advanced · path data
+skeletal.rig-path-group = Path controls
+
+skeletal.rig-path-length-short-help = Keep length prevents stretching. Choose Fit to stretch along the whole path.
+
+skeletal.inspector-lock = Lock property editing
+
+skeletal.inspector-collapse = Collapse sections
+
+skeletal.inspector-expand = Expand sections
+
+skeletal.inspector-key-legend = ◇ Not keyed    ◆ Keyed · Right-click a key to remove it
+
+skeletal.interpolation = Interpolation
+
+skeletal.restore-image = Restore image
+skeletal.restore-image-help = Restore an undeformed image; remove this attachment’s mesh weights and deform keys. Undo restores everything.
+skeletal.property-mesh-tools = Mesh tools
+skeletal.size = Size
+skeletal.axis-width = W
+skeletal.axis-height = H

@@ -18,6 +18,7 @@
             [editor.skeletal-animation-data :as data]
             [editor.skeletal-animation-geometry :as geometry]
             [editor.skeletal-animation-mesh :as mesh]
+            [editor.skeletal-animation-skin :as skin]
             [editor.skeletal-animation-slots :as slots]
             [util.coll :as coll]))
 
@@ -134,10 +135,12 @@
         imported (data/import-spine-json (data/export-spine-json doc))]
     (is (= weights (get-in imported [:slots 0 :attachment :weights])))
     (is (= [1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0] (get (data/sample-deforms imported "default" 0.0) "image")))
-    (is (thrown? clojure.lang.ExceptionInfo (data/remove-bone doc "tip")))
+    (let [removed (data/remove-bone doc "tip")]
+      (is (= ["root" "joint"] (mapv :bone (get-in removed [:slots 0 :attachment :weights 1]))))
+      (is (= removed (data/validate-document removed))))
     (is (thrown? clojure.lang.ExceptionInfo (data/set-deform-keyframe doc "default" "image" 0.0 [1 2 3 4 5 6] "linear")))))
 
-;; Unsupported features remain byte-equivalent as parsed data, with an explicit preview warning.
+;; Preserved fields and editable events survive overlay export as parsed data.
 (deftest unsupported-content-preserved-test
   (let [source (-> (json/read-str (data/export-spine-json (mesh-document)))
                    (assoc "events" {"footstep" {"audio" "step.wav"}})
@@ -146,8 +149,8 @@
                    (assoc-in ["animations" "default" "bones" "root" "shear"] [{"time" 0.0 "x" 2 "y" 3}])
                    (update "skins" conj {"name" "alternate" "attachments" {"image" {"other" {"width" 32 "height" 32}}}}))
         imported (data/import-spine-json (json/write-str source))
-        output (json/read-str (data/export-spine-json (data/update-bone imported "root" {:x 20.0}))) ]
-    (is (pos? (count (:warnings imported))))
+        output (json/read-str (data/export-spine-json (data/update-bone imported "root" {:x 20.0})))]
+    (is (= [] (:warnings imported)))
     (doseq [path [["events"] ["animations" "default" "events"] ["skins" 1]]]
       (is (= (get-in source path) (get-in output path))))
     (is (= [2.0 3.0] ((juxt :shear-x :shear-y) (first (data/sample-pose (data/import-spine-json (json/write-str output)) "default" 0.0)))))
@@ -278,7 +281,7 @@
                       [{"name" "later" "bones" ["tip"] "target" "target" "order" 3}
                        {"name" "first" "bones" ["joint"] "target" "target" "order" 0}])
         doc (data/import-spine-json (json/write-str source))
-        output (json/read-str (data/export-spine-json (data/add-ik doc {:id "new" :bones ["tip"] :target "target"}))) ]
+        output (json/read-str (data/export-spine-json (data/add-ik doc {:id "new" :bones ["tip"] :target "target"})))]
     (is (= ["first" "later"] (mapv :id (:ik doc))))
     (is (= [0 1 2] (mapv #(get % "order") (get output "ik"))))))
 
@@ -446,7 +449,7 @@
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"cannot mix stepped"
                             (data/export-spine-json (data/set-ik-keyframe imported "default" "reach" 0.0 0.4 false interpolation)))))
     (let [changed (data/set-ik-keyframe imported "default" "reach" 0.0 0.4 false
-                                      {:type "bezier" :curve [0.3 0.4 0.8 0.9]})
+                                        {:type "bezier" :curve [0.3 0.4 0.8 0.9]})
           frame (get-in (json/read-str (data/export-spine-json changed)) ["animations" "default" "ik" "reach" 0])]
       (is (= 0.4 (get frame "mix")))
       (is (false? (get frame "bendPositive")))
@@ -454,7 +457,7 @@
       (is (= [0.3 0.4 0.8 0.9 0.25 4.0 0.75 8.0] (get frame "curve"))))
     (doseq [interpolation ["linear" "stepped"]]
       (is (= interpolation (get-in (data/set-ik-keyframe doc "default" "reach" 0.0 0.4 false interpolation)
-                                  [:animations 0 :ik-tracks 0 :keys 0 :interpolation]))))))
+                                   [:animations 0 :ik-tracks 0 :keys 0 :interpolation]))))))
 
 ;; Shear is an independent axis angle, not a rotation or scale approximation.
 ;; Both setup and keyed values must survive an export and be used in geometry.
@@ -462,7 +465,7 @@
   (let [source {"skeleton" {"spine" "4.2.43"}
                 "bones" [{"name" "root" "shearX" 10 "shearY" -20}]
                 "animations" {"bend" {"bones" {"root" {"shear" [{"x" 0 "y" 0}
-                                                                                {"time" 1 "x" 20 "y" 40}]}}}}}
+                                                                {"time" 1 "x" 20 "y" 40}]}}}}}
         doc (data/import-spine-json (json/write-str source))
         sampled (first (data/sample-pose doc "bend" 0.5))
         matrix (get (data/world-transforms [sampled]) "root")
@@ -600,7 +603,7 @@
 
 (defn- transform-document []
   (data/add-transform (mesh-document) {:id "follow" :bones ["tip"] :target "target" :order 2
-                                      :mix-rotate 0.0 :mix-scale-x 0.0 :mix-scale-y 0.0 :mix-shear-y 0.0}))
+                                       :mix-rotate 0.0 :mix-scale-x 0.0 :mix-scale-y 0.0 :mix-shear-y 0.0}))
 
 ;; Transform setup, arbitrary source metadata and animated six-channel Bezier curves survive editing and serialization.
 (deftest transform-roundtrip-and-edit-test
@@ -665,9 +668,10 @@
     (is (< (:rotation (nth (:bones last-pose) 1)) 40.0))
     (is (= [0.0 100.0] (subvec (get-in first-pose [:transforms "target"]) 4 6)))
     (is (= [0.0 100.0] (subvec (get-in last-pose [:transforms "target"]) 4 6))))
-  (is (thrown-with-msg? clojure.lang.ExceptionInfo #"normal inheritance"
-                       (-> (mesh-document) (data/update-bone "joint" {:inherit "onlyTranslation"})
-                           (data/add-ik {:id "reach" :bones ["joint" "tip"] :target "target"})))))
+  (let [document (-> (mesh-document) (data/update-bone "joint" {:inherit "onlyTranslation"}))
+        constrained (data/add-ik document {:id "reach" :bones ["joint" "tip"] :target "target"})]
+    (is (= (:transforms (data/evaluate-pose document nil 0.0))
+           (:transforms (data/evaluate-pose constrained nil 0.0))))))
 
 ;; A topology split migrates all active FFD keys and exported mesh arrays to the same new vertex count.
 (deftest mesh-edit-deform-integration-test
@@ -680,7 +684,7 @@
     (is (= [5.0 10.0] (subvec (get (data/sample-deforms edited "default" 0.0) "image") 6 8)))
     (let [layout (mesh/spine-export-layout (get-in edited [:slots 0 :attachment]))]
       (is (= (mesh/remap-deform (get-in edited [:slots 0 :attachment]) (:mesh layout) (:vertex-map layout)
-                               (get (data/sample-deforms edited "default" 0.0) "image"))
+                                (get (data/sample-deforms edited "default" 0.0) "image"))
              (get (data/sample-deforms roundtrip "default" 0.0) "image"))))))
 
 ;; Saved documents from the previous editor kept transform/inheritance only in source JSON; loading must materialize them without resetting authored values.
@@ -775,8 +779,8 @@
         vertex-map (fn [document]
                      (let [attachment (get-in document [:slots 0 :attachment])
                            vertices (geometry/mesh-world-vertices attachment (data/local-transform (first (:bones document)))
-                                                                   (data/world-transforms (:bones document))
-                                                                   (get (data/sample-deforms document "default" 0.0) "image"))]
+                                                                  (data/world-transforms (:bones document))
+                                                                  (get (data/sample-deforms document "default" 0.0) "image"))]
                        (zipmap (into [] (partition-all 2) (:uvs attachment)) (into [] (partition-all 2) vertices))))]
     (is (= 4 (get attachment "hull")))
     (is (= 12 (count (get attachment "triangles"))))
@@ -889,18 +893,18 @@
     (is (thrown? clojure.lang.ExceptionInfo (data/set-path-keyframe doc "default" "follow" "bad" 0.0 1.0 "linear")))
     (is (thrown? clojure.lang.ExceptionInfo (data/set-path-keyframe doc "default" "follow" "position" (json/read-str "null") 1.0 "linear")))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"cannot mix stepped and smooth"
-                         (data/export-spine-json (-> doc
-                                                    (data/set-path-keyframe "default" "follow" "mix-x" 0.0 0.0 "stepped")
-                                                    (data/set-path-keyframe "default" "follow" "mix-x" 1.0 1.0 "linear")
-                                                    (data/set-path-keyframe "default" "follow" "mix-y" 0.0 0.0 "linear")
-                                                    (data/set-path-keyframe "default" "follow" "mix-y" 1.0 1.0 "linear")))))))
+                          (data/export-spine-json (-> doc
+                                                      (data/set-path-keyframe "default" "follow" "mix-x" 0.0 0.0 "stepped")
+                                                      (data/set-path-keyframe "default" "follow" "mix-x" 1.0 1.0 "linear")
+                                                      (data/set-path-keyframe "default" "follow" "mix-y" 0.0 0.0 "linear")
+                                                      (data/set-path-keyframe "default" "follow" "mix-y" 1.0 1.0 "linear")))))))
 
 ;; Documents saved before Path editing hydrate newly supported attachments and FFD instead of dropping the original deformation on export.
 (deftest legacy-path-document-upgrade-test
   (let [imported (data/import-spine-json (data/export-spine-json
-                                         (-> (path-document)
-                                             (data/set-path-keyframe "default" "follow" "position" 0.0 0.2 "linear")
-                                             (data/set-deform-keyframe "default" "curve-slot" 0.0 [0 7 0 7 0 7 0 7 0 7 0 7] "linear"))))
+                                           (-> (path-document)
+                                               (data/set-path-keyframe "default" "follow" "position" 0.0 0.2 "linear")
+                                               (data/set-deform-keyframe "default" "curve-slot" 0.0 [0 7 0 7 0 7 0 7 0 7 0 7] "linear"))))
         legacy (-> imported (dissoc :path)
                    (update-in [:slots 0] #(assoc (dissoc % :attachment) :unsupported-attachment true))
                    (update-in [:animations 0] #(dissoc % :path-tracks :deforms)))
@@ -995,7 +999,7 @@
 ;; Physics migration restores newly editable source tracks, while invalid masses, references and numeric values fail explicitly.
 (deftest physics-upgrade-validation-test
   (let [imported (data/import-spine-json (data/export-spine-json
-                                         (data/set-physics-keyframe (physics-document) "default" "spring" "strength" 0.0 50.0 "linear")))
+                                           (data/set-physics-keyframe (physics-document) "default" "spring" "strength" 0.0 50.0 "linear")))
         legacy (-> imported (dissoc :physics :reference-scale) (update-in [:animations 0] dissoc :physics-tracks :physics-order))
         upgraded (data/read-json (json/write-str legacy))]
     (is (= (:physics imported) (:physics upgraded)))
@@ -1016,7 +1020,7 @@
       (is (= 2.0 (get-in imported [:animations 0 :duration])))
       (doseq [time [0.0 0.25 0.5 1.0 2.0]]
         (is (coll/every? true? (mapv near? (get-in (data/evaluate-pose doc "default" time) [:transforms "root"])
-                                       (get-in (data/evaluate-pose imported "default" time) [:transforms "root"]))))))))
+                                     (get-in (data/evaluate-pose imported "default" time) [:transforms "root"]))))))))
 
 ;; Renaming a newly authored slot freezes its existing attachment name so every deformation still targets the exported attachment.
 (deftest slot-rename-default-attachment-test
@@ -1141,3 +1145,119 @@
         (data/evaluate-pose (assoc-in doc [:bones 0 :x] value) "default" 0.5))
       (data/evaluate-pose doc "default" 0.5)
       (is (= 9 (count @validated))))))
+
+;; Skin membership is a reference to clean up, not a reason to forbid deletion.
+;; Retain source indices for reindexing inactive meshes on export.
+(deftest remove-skin-required-bone-test
+  (let [doc (-> (data/new-document "skin-delete")
+                (data/add-bone {:id "joint" :parent "root"})
+                (data/add-bone {:id "child" :parent "joint"}))
+        source (-> (json/read-str (data/export-spine-json doc))
+                   (assoc "skins" [{"name" "default" "bones" ["joint" "child"] "attachments" {}}]))
+        doc (assoc doc :spine-source (json/write-str source))
+        removed (data/remove-bone doc "joint")
+        exported (json/read-str (data/export-spine-json removed))]
+    (is (= ["root"] (mapv :id (:bones (data/validate-document removed)))))
+    (is (= [] (get-in exported ["skins" 0 "bones"])))
+    (is (= ["root"] (mapv :id (:bones (data/import-spine-json (json/write-str exported))))))
+    (is (thrown? clojure.lang.ExceptionInfo (data/remove-bone doc "root")))))
+
+;; Deleted influences move to their surviving ancestor without changing setup
+;; geometry or FFD offsets, including inactive skins and serialized round trips.
+(deftest delete-weighted-bone-preserves-mesh-test
+  (let [doc (-> (mesh-document)
+                (data/update-slot "image" {:attachment {:weights
+                                                        [[{:bone "tip" :x -100.0 :y 0.0 :weight 1.0}]
+                                                         [{:bone "joint" :x 100.0 :y 0.0 :weight 0.25}
+                                                          {:bone "tip" :x 0.0 :y 0.0 :weight 0.75}]
+                                                         [{:bone "root" :x 0.0 :y 100.0 :weight 1.0}]]}})
+                (data/set-deform-keyframe "default" "image" 0.0 [1 2 3 4 5 6 7 8] "linear"))
+        source (json/read-str (data/export-spine-json doc))
+        source (-> source
+                   (update "skins" conj (assoc (first (get source "skins")) "name" "hidden"))
+                   (assoc-in ["animations" "default" "attachments" "hidden"]
+                             (get-in source ["animations" "default" "attachments" "default"])))
+        doc (assoc doc :spine-source (json/write-str source))
+        removed (data/remove-bone doc "tip")
+        imported (data/import-spine-json (data/export-spine-json removed))
+        world-vertices (fn world-vertices [document]
+                         (geometry/mesh-world-vertices (get-in document [:slots 0 :attachment])
+                                                       (get (data/world-transforms (:bones document)) "root")
+                                                       (data/world-transforms (:bones document))
+                                                       (get (data/sample-deforms document "default" 0.0) "image")))
+        expected (world-vertices doc)]
+    (is (coll/every? true? (mapv near? expected (world-vertices removed))))
+    (is (coll/every? true? (mapv near? expected (world-vertices imported))))
+    (let [exported (json/read-str (data/export-spine-json removed))]
+      (is (coll/every? true?
+                       (mapv near? [1.0 2.0 4.5 5.5 7.0 8.0]
+                             (get-in exported ["animations" "default" "attachments" "hidden" "image" "image" "deform" 0 "vertices"])))))))
+
+;; Merged parent/child influences can sum to 1 + epsilon. Deleting either
+;; bone must normalize the result before validation, including hidden skins.
+(deftest delete-bound-bone-floating-point-normalization-test
+  (let [doc (-> (mesh-document)
+                (data/update-slot "image" {:attachment
+                                           {:weights (vec (repeat 3 [{:bone "joint" :weight 0.251434132404433 :x 2.0 :y 3.0}
+                                                                     {:bone "tip" :weight 0.7485658675955672 :x 4.0 :y 5.0}]))}})
+                (data/set-deform-keyframe "default" "image" 0.0 (vec (repeat 12 2.0)) "linear"))
+        source (json/read-str (data/export-spine-json doc))
+        source (update source "skins" conj (assoc (first (get source "skins")) "name" "hidden"))
+        doc (assoc doc :spine-source (json/write-str source))]
+    (doseq [[id survivor] [["tip" "joint"] ["joint" "root"]]]
+      (let [removed (data/remove-bone doc id)
+            imported (data/import-spine-json (data/export-spine-json removed))]
+        (is (= removed (data/validate-document removed)))
+        (doseq [document [removed imported]
+                influences (get-in document [:slots 0 :attachment :weights])]
+          (is (= [survivor] (mapv :bone influences)))
+          (is (= [1.0] (mapv :weight influences))))
+        (is (= 6 (count (get (data/sample-deforms imported "default" 0.0) "image"))))))))
+
+;; Reusing a deleted name must not resurrect skin flags or old animation keys.
+;; Source indices stay stable for retained inactive attachment data.
+(deftest recreated-bone-has-fresh-source-identity-test
+  (let [doc (data/add-bone (data/new-document "recreate") {:id "bone1" :parent "root"})
+        source (-> (json/read-str (data/export-spine-json doc))
+                   (assoc-in ["bones" 1 "skin"] true)
+                   (assoc-in ["animations" "default" "bones" "bone1" "rotate"] [{"time" 0 "value" 80}]))
+        removed (data/remove-bone (assoc doc :spine-source (json/write-str source)) "bone1")
+        fresh (data/add-bone removed {:id "bone1" :parent "root" :length 50.0})
+        exported (json/read-str (data/export-spine-json fresh))]
+    (is (contains? (:bone-ids (skin/activation fresh)) "bone1"))
+    (is (false? (skin/required? fresh :bone "bone1")))
+    (is (= ["root" "bone1"] (mapv #(get % "name") (get (json/read-str (:spine-source fresh)) "bones"))))
+    (is (not (get-in exported ["bones" 1 "skin"])))
+    (is (nil? (get-in exported ["animations" "default" "bones" "bone1" "rotate"])))
+    (is (= 50.0 (:length (last (:bones (data/import-spine-json (json/write-str exported)))))))))
+
+;; Cached valid documents must not hide invalid edits, and ordinary movement
+;; must retain shared mesh and animation data instead of remapping references.
+(deftest movement-validation-cache-test
+  (let [doc (mesh-document)
+        moved (data/update-bone doc "joint" {:x 42.0 :y -12.0})]
+    (is (identical? doc (data/validate-document doc)))
+    (is (identical? (:slots doc) (:slots moved)))
+    (is (identical? (:animations doc) (:animations moved)))
+    (doseq [bad [(assoc-in doc [:bones 1 :x] ##NaN)
+                 (assoc-in doc [:slots 0 :attachment :triangles] [0 1 999])
+                 (assoc-in doc [:animations 0 :duration] -1.0)
+                 nil]]
+      (is (thrown? clojure.lang.ExceptionInfo (data/validate-document bad)))
+      (is (thrown? clojure.lang.ExceptionInfo (data/validate-document bad))))
+    (is (thrown? clojure.lang.ExceptionInfo (data/update-bone doc "joint" {:parent "tip"})))
+    (is (thrown? clojure.lang.ExceptionInfo (data/update-bone doc "joint" {:length -1.0})))))
+
+;; Official spine-core 4.2.120 samples the curve as ten line segments. Exact
+;; cubic inversion looked smoother but made the 05_tail idle and IK exports drift.
+(deftest authored-bezier-runtime-sampling-test
+  (let [doc (-> (data/new-document "runtime-curve")
+                (data/set-keyframe "default" "root" "rotation" 0.7 2.5 "linear")
+                (data/set-keyframe "default" "root" "rotation" 0.0 0.0
+                                   {:type "bezier" :curve [(/ 0.7 3.0) (/ 2.5 3.0) (/ 1.4 3.0) 2.5]}))]
+    (doseq [[time expected] [[(/ 1.0 60.0) 0.06488095409154486]
+                             [0.1 0.4042857100312809]
+                             [0.3333333333333 1.4857143075995805]
+                             [(/ 2.0 3.0) 2.4773810081133103]
+                             [0.7 2.5]]]
+      (is (< (abs (- expected (:rotation (first (data/sample-pose doc "default" time))))) 1.0e-6)))))

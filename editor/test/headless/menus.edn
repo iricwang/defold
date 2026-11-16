@@ -1,0 +1,4 @@
+{:steps [{:op :click :selector {:fx.plorer/style-classes #{"label"} :text "Help"}}
+         {:op :wait :window-index 1 :selector {:fx.plorer/style-classes #{"label"} :text "Check for Updates"} :property :visible :equals true}
+         {:op :keys :window-index 1 :keys [:escape]}
+         {:op :assert :selector "#workbench" :property :visible :equals true}]}

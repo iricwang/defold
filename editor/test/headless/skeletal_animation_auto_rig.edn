@@ -1,0 +1,62 @@
+{:viewport [2400 1400]
+ :steps [{:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail.skeleton"}}
+         {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-tree-search"}
+         {:op :keys :keys [:t]} {:op :keys :keys [:a]} {:op :keys :keys [:i]} {:op :keys :keys [:l]}
+         {:op :click :selector "#skeletal-tree-attachment-05_tail"}
+         {:op :click :selector "#skeletal-auto-rig"}
+         {:op :assert :selector "#skeletal-trace-number-bone-count" :property :text :equals "8"}
+         {:op :assert :selector "#skeletal-trace-number-control-count" :property :text :equals "3"}
+         {:op :wait :selector "#skeletal-trace-confirm" :property :disabled :equals false :timeout-ms 60000}
+         {:op :assert :selector "#skeletal-trace-preview" :context-key :editor.skeletal-animation-trace-view/state :state-path [:result :report "bones"] :equals 8}
+         {:op :assert :selector "#skeletal-trace-loading" :property :visible :equals false}
+         {:op :snapshot}
+         {:op :click :selector "#skeletal-trace-number-bone-count"}
+         {:op :keys :keys [:meta :a]} {:op :keys :keys [:digit1]} {:op :keys :keys [:digit2]} {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-trace-confirm" :property :disabled :equals false :timeout-ms 60000}
+         {:op :assert :selector "#skeletal-trace-preview" :context-key :editor.skeletal-animation-trace-view/state :state-path [:result :report "bones"] :equals 12}
+         {:op :click :selector "#skeletal-trace-number-control-count"}
+         {:op :keys :keys [:meta :a]} {:op :keys :keys [:digit4]} {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-trace-confirm" :property :disabled :equals false :timeout-ms 60000}
+         {:op :assert :selector "#skeletal-trace-preview" :context-key :editor.skeletal-animation-trace-view/state :state-path [:result :report "controls"] :equals 4}
+         {:op :click :selector "#skeletal-rig-reverse"}
+         {:op :wait :selector "#skeletal-trace-confirm" :property :disabled :equals false :timeout-ms 60000}
+         {:op :click :selector "#skeletal-rig-reverse"}
+         {:op :wait :selector "#skeletal-trace-confirm" :property :disabled :equals false :timeout-ms 60000}
+         {:op :snapshot}
+         {:op :click :selector "#skeletal-trace-confirm"}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :selected] :equals "05_tail_auto1_control4"}
+         {:op :click :selector "#skeletal-rig-configure-path-05_tail_auto1_follow"}
+         {:op :assert :selector "#skeletal-rig-path-05_tail_auto1_follow-length-mode" :property :value :equals "Keep bone length"}
+         {:op :click :selector "#skeletal-rig-controller-05_tail_auto1_control4"}
+         {:op :keys :keys [:meta :z]}
+         {:op :click :selector "#skeletal-tree-attachment-05_tail"}
+         {:op :keys :keys [:meta :shift :z]}
+         {:op :click :selector "#skeletal-tree-bone-05_tail_auto1_control4"}
+         {:op :remember :selector "#skeletal-palette-x" :property :text :as :before}
+         {:op :drag :button :primary :path [{:selector "#skeletal-canvas" :at [0.9 0.12]} {:selector "#skeletal-canvas" :at [0.86 0.15]}]}
+         {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :before}
+         {:op :remember :selector "#skeletal-palette-x" :property :text :as :dragged}
+         {:op :keys :keys [:meta :z]}
+         {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :dragged}
+         {:op :click :selector "#skeletal-mode"}
+         {:op :keys :window-index 1 :keys [:down]} {:op :keys :window-index 1 :keys [:enter]}
+         {:op :assert :selector "#skeletal-mode" :property :value :equals "animate"}
+         {:op :drag :button :primary :path [{:selector "#skeletal-canvas" :at [0.9 0.12]} {:selector "#skeletal-canvas" :at [0.86 0.15]}]}
+         {:op :keys :keys [:meta :s]}
+         {:op :keys :keys [:space]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals true}
+         {:op :keys :keys [:space]}
+         {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals false}
+         {:op :snapshot}
+         {:op :keys :keys [:meta :w]}
+         {:op :keys :keys [:meta :shift :t]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-tree-search"}
+         {:op :keys :keys [:meta :a]} {:op :keys :keys [:t]} {:op :keys :keys [:a]} {:op :keys :keys [:i]} {:op :keys :keys [:l]}
+         {:op :click :selector "#skeletal-tree-bone-05_tail_auto1_control4"}
+         {:op :click :selector "#skeletal-rig-configure-path-05_tail_auto1_follow"}
+         {:op :assert :selector "#skeletal-rig-path-05_tail_auto1_follow-length-mode" :property :value :equals "Keep bone length"}
+         {:op :click :selector "#skeletal-rig-controller-05_tail_auto1_control4"}
+         {:op :snapshot}]}

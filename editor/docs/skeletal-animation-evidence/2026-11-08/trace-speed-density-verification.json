@@ -1,0 +1,273 @@
+{
+  "benchmark": [
+    {
+      "file": "03_front_left.png",
+      "settings": {
+        "detail": 2.1,
+        "concavity": 59.7,
+        "refinement": 50,
+        "uniform": 0.3,
+        "alpha": 8,
+        "padding": 0
+      },
+      "before": {
+        "median_ms": 1070.2624580007978,
+        "report": {
+          "vertices": 54,
+          "triangles": 52,
+          "hull": 54,
+          "clipped_pixels": 0,
+          "ignored_noise_pixels": 14,
+          "islands_bridged": 0,
+          "added_area_ratio": 0.07676049142320518,
+          "outline_error_px": 55.45635273577682,
+          "algorithm": "OpenCV alpha / GEOS outer hull / constrained Delaunay"
+        }
+      },
+      "after": {
+        "median_ms": 74.63941599417012,
+        "report": {
+          "vertices": 19,
+          "triangles": 17,
+          "hull": 19,
+          "clipped_pixels": 0,
+          "ignored_noise_pixels": 14,
+          "islands_bridged": 0,
+          "added_area_ratio": 0.12948481602623163,
+          "outline_error_px": 60.91111653132643,
+          "algorithm": "OpenCV alpha / GEOS outer hull / constrained Delaunay"
+        }
+      }
+    },
+    {
+      "file": "05_tail.png",
+      "settings": {
+        "detail": 2.1,
+        "concavity": 59.7,
+        "refinement": 50,
+        "uniform": 0.3,
+        "alpha": 8,
+        "padding": 0
+      },
+      "before": {
+        "median_ms": 2497.377499996219,
+        "report": {
+          "vertices": 56,
+          "triangles": 54,
+          "hull": 56,
+          "clipped_pixels": 0,
+          "ignored_noise_pixels": 7,
+          "islands_bridged": 2,
+          "added_area_ratio": 0.07569437629277842,
+          "outline_error_px": 14.026092029144145,
+          "algorithm": "OpenCV alpha / GEOS outer hull / constrained Delaunay"
+        }
+      },
+      "after": {
+        "median_ms": 75.15362500271294,
+        "report": {
+          "vertices": 26,
+          "triangles": 24,
+          "hull": 26,
+          "clipped_pixels": 0,
+          "ignored_noise_pixels": 7,
+          "islands_bridged": 2,
+          "added_area_ratio": 0.14054940348523037,
+          "outline_error_px": 29.17567505514327,
+          "algorithm": "OpenCV alpha / GEOS outer hull / constrained Delaunay"
+        }
+      }
+    }
+  ],
+  "all_parts": [
+    {
+      "file": "01_head.png",
+      "detail": 2.1,
+      "vertices": 40,
+      "ms": 137.27875000040513,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01_head.png",
+      "detail": 100,
+      "vertices": 402,
+      "ms": 172.31312500371132,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01a_eye_closed.png",
+      "detail": 2.1,
+      "vertices": 18,
+      "ms": 13.4189590025926,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01a_eye_closed.png",
+      "detail": 100,
+      "vertices": 393,
+      "ms": 14.417207989026792,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01a_eye_near.png",
+      "detail": 2.1,
+      "vertices": 19,
+      "ms": 5.330290994606912,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01a_eye_near.png",
+      "detail": 100,
+      "vertices": 401,
+      "ms": 6.675500000710599,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01b_eye_closed.png",
+      "detail": 2.1,
+      "vertices": 19,
+      "ms": 9.70075000077486,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01b_eye_closed.png",
+      "detail": 100,
+      "vertices": 425,
+      "ms": 10.796582995681092,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01b_eye_far.png",
+      "detail": 2.1,
+      "vertices": 19,
+      "ms": 3.31258300866466,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01b_eye_far.png",
+      "detail": 100,
+      "vertices": 328,
+      "ms": 4.698624994489364,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01c_jaw.png",
+      "detail": 2.1,
+      "vertices": 19,
+      "ms": 14.870375001919456,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01c_jaw.png",
+      "detail": 100,
+      "vertices": 412,
+      "ms": 15.42091699957382,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01d_whiskers_near.png",
+      "detail": 2.1,
+      "vertices": 76,
+      "ms": 70.99070900585502,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01d_whiskers_near.png",
+      "detail": 100,
+      "vertices": 1110,
+      "ms": 79.28091700887308,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01e_whiskers_far.png",
+      "detail": 2.1,
+      "vertices": 111,
+      "ms": 84.48741601023357,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "01e_whiskers_far.png",
+      "detail": 100,
+      "vertices": 1140,
+      "ms": 87.52029099559877,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "02_front_right.png",
+      "detail": 2.1,
+      "vertices": 17,
+      "ms": 13.065084000118077,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "02_front_right.png",
+      "detail": 100,
+      "vertices": 409,
+      "ms": 13.436666995403357,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "03_front_left.png",
+      "detail": 2.1,
+      "vertices": 19,
+      "ms": 73.6316669936059,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "03_front_left.png",
+      "detail": 100,
+      "vertices": 428,
+      "ms": 82.60824999888428,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "04_hind_left.png",
+      "detail": 2.1,
+      "vertices": 19,
+      "ms": 43.409332996816374,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "04_hind_left.png",
+      "detail": 100,
+      "vertices": 409,
+      "ms": 43.41825000301469,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "05_tail.png",
+      "detail": 2.1,
+      "vertices": 26,
+      "ms": 75.0138750008773,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "05_tail.png",
+      "detail": 100,
+      "vertices": 564,
+      "ms": 118.71933400107082,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "06_body.png",
+      "detail": 2.1,
+      "vertices": 18,
+      "ms": 109.14012500143144,
+      "clipped_pixels": 0
+    },
+    {
+      "file": "06_body.png",
+      "detail": 100,
+      "vertices": 400,
+      "ms": 133.10262499726377,
+      "clipped_pixels": 0
+    }
+  ],
+  "editor_refresh_ms": 682.638041,
+  "python_tests": {
+    "tests": 6,
+    "failures": 0,
+    "errors": 0
+  },
+  "delivery": "Live resource loaded; no package; runtime unchanged; preview only; game document unchanged."
+}

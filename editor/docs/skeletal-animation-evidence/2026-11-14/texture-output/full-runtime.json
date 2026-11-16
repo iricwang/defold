@@ -1,0 +1,173 @@
+{
+  "label": "full",
+  "build": {
+    "build_id": "0450dfdbff8a49319e9be1963da1059f",
+    "project_id": "0f5e55759dc1c068",
+    "project": "/private/tmp/spine-texture-scale/runtime-evidence/full/builds/0450dfdbff8a49319e9be1963da1059f/project",
+    "compiled_project": "/private/tmp/spine-texture-scale/runtime-evidence/full/builds/0450dfdbff8a49319e9be1963da1059f/project/build/default/game.projectc",
+    "source_policy": "existing_compiled",
+    "resource_fingerprint": "f1e1e141803b07bc5d997f8e60623cef366f06428364b22ef2e81c555f072af8",
+    "native_extensions_detected": false,
+    "engine": "/private/tmp/spine-texture-scale/runtime-evidence/full/builds/0450dfdbff8a49319e9be1963da1059f/engine/dmengine",
+    "engine_sha256": "b01571448c869ab2623a9ea81201d6675d95ddc48b951204d953a9bb7ca7be11",
+    "symbols_sha256": null,
+    "cache_hit": false,
+    "copied_resource_bytes": 39271386,
+    "reused_resource_files": 0,
+    "import_seconds": 0.13234762498177588,
+    "freshness": "existing compiled resources; source changes are not rebuilt"
+  },
+  "session": {
+    "session_id": "5b740a2297f14ec6ac53bf23be174df0",
+    "lease_id": "f3da222323e74140bacf536cb78a86f0",
+    "lease_seconds": 60,
+    "ownership": "owned",
+    "build_id": "0450dfdbff8a49319e9be1963da1059f",
+    "preview": null,
+    "port": 64128,
+    "width": 1280,
+    "height": 720,
+    "alive": true,
+    "device_revision": 1,
+    "input_sequence": 0,
+    "pid": 67116,
+    "protocol_version": 1,
+    "render_sequence": 10
+  },
+  "capture": {
+    "device_revision": 1,
+    "width": 1280,
+    "height": 720,
+    "input_sequence": 0,
+    "render_sequence": 123,
+    "capture_sequence": 2,
+    "coordinate_space": "frame_pixels_top_left",
+    "geometry_precision": "unavailable",
+    "image_path": "/private/tmp/spine-texture-scale/runtime-evidence/full/sessions/5b740a2297f14ec6ac53bf23be174df0/0ed44cc65e1846608a5df402577ced71.png",
+    "session_id": "5b740a2297f14ec6ac53bf23be174df0",
+    "observation_id": "0ed44cc65e1846608a5df402577ced71",
+    "source": "runtime",
+    "artifact_kind": "runtime_frame",
+    "build_id": "0450dfdbff8a49319e9be1963da1059f",
+    "temporal_consistency": "image_and_bridge_metadata",
+    "device": {
+      "width": 1280,
+      "height": 720
+    },
+    "image_sha256": "4e4c01f3e728064fd4e3ea2f76f341f1337363a7e263427c681ef877fa5ad133",
+    "project_id": "0f5e55759dc1c068",
+    "source_policy": "existing_compiled",
+    "resource_fingerprint": "f1e1e141803b07bc5d997f8e60623cef366f06428364b22ef2e81c555f072af8",
+    "project_config": {},
+    "gui_projection_profile": "default_gui",
+    "artifact_id": "0ed44cc65e1846608a5df402577ced71",
+    "uri": "defold://artifacts/0ed44cc65e1846608a5df402577ced71/frame.png",
+    "inline_preview": {
+      "width": 960,
+      "height": 540,
+      "to_frame_scale": [
+        1.3333333333333333,
+        1.3333333333333333
+      ],
+      "to_frame_offset": [
+        0,
+        0
+      ],
+      "source_observation_id": "0ed44cc65e1846608a5df402577ced71"
+    }
+  },
+  "logs": [
+    {
+      "text": "ERROR:PROFILER: Failed to initialize Remotery: 5",
+      "cursor": 1
+    },
+    {
+      "text": "INFO:DLIB: Log server started on port 64127",
+      "cursor": 2
+    },
+    {
+      "text": "INFO:ENGINE: Target listening with name: macmini.local - 127.0.0.1 - Darwin",
+      "cursor": 3
+    },
+    {
+      "text": "INFO:ENGINE: Engine service started on port 64128",
+      "cursor": 4
+    },
+    {
+      "text": "INFO:ENGINE: OpenAPI: http://127.0.0.1:64128/openapi.json",
+      "cursor": 5
+    },
+    {
+      "text": "INFO:GRAPHICS: Installed graphics device 'ADAPTER_FAMILY_METAL'",
+      "cursor": 6
+    },
+    {
+      "text": "INFO:ENGINE: Defold Engine 1.14.2 (13bb123)",
+      "cursor": 7
+    },
+    {
+      "text": "INFO:DEFOLDEDITORGAMEBRIDGE: Editor Game bridge connected (native extensions)",
+      "cursor": 8
+    },
+    {
+      "text": "INFO:ENGINE: Editor automation bridge protocol 1 (macOS HID)",
+      "cursor": 9
+    },
+    {
+      "text": "INFO:ENGINE: Loading data from: archive:build/default/game.dmanifest",
+      "cursor": 10
+    },
+    {
+      "text": "INFO:SPINEEXT: Registered spine extension",
+      "cursor": 11
+    },
+    {
+      "text": "",
+      "cursor": 12
+    },
+    {
+      "text": "INFO:SOUND:   DSP backend: Fallback",
+      "cursor": 13
+    },
+    {
+      "text": "INFO:SOUND: Sound",
+      "cursor": 14
+    },
+    {
+      "text": "INFO:SOUND:   nSamplesPerSec:   48000",
+      "cursor": 15
+    },
+    {
+      "text": "INFO:SOUND:        useThread:   1",
+      "cursor": 16
+    },
+    {
+      "text": "INFO:ENGINE: Initialised sound device 'default'",
+      "cursor": 17
+    },
+    {
+      "text": "INFO:RENDER: Render execution: inline (threaded rendering excluded by build)",
+      "cursor": 18
+    },
+    {
+      "text": "INFO:PHYSICS: Created physics context: Box2D v2.2.1",
+      "cursor": 19
+    },
+    {
+      "text": "WARNING:RENDER: RenderListAlloc() is deprecated. Use NewRenderItem() and the render item setters.",
+      "cursor": 20
+    },
+    {
+      "text": "WARNING:RENDER: RenderListMakeDispatch() is deprecated. Use RegisterRenderListDispatch() and SubmitRenderListDispatch().",
+      "cursor": 21
+    },
+    {
+      "text": "WARNING:RENDER: RenderListSubmit() is deprecated. Use Enable() and SubmitRenderListDispatch().",
+      "cursor": 22
+    },
+    {
+      "text": "DEBUG:SCRIPT: TEXTURE_READY",
+      "cursor": 23
+    }
+  ]
+}

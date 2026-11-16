@@ -1,0 +1,15 @@
+images { image: "/images/01b_eye_closed.png" }
+images { image: "/images/01b_eye_far.png" }
+images { image: "/images/01c_jaw.png" }
+images { image: "/images/01d_whiskers_near.png" }
+images { image: "/images/01e_whiskers_far.png" }
+images { image: "/images/03_front_left.png" }
+images { image: "/images/01_head.png" }
+images { image: "/images/05_tail.png" }
+images { image: "/images/04_hind_left.png" }
+images { image: "/images/06_body.png" }
+images { image: "/images/02_front_right.png" }
+images { image: "/images/01a_eye_closed.png" }
+images { image: "/images/01a_eye_near.png" }
+extrude_borders: 2
+inner_padding: 0

@@ -31,6 +31,10 @@ import javax.imageio.ImageIO;
 public final class RemoteRuntime implements AutoCloseable {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final AutomationWorker worker;
+    private final Path audioPath;
+    private final Object audioReaderLock = new Object();
+    private volatile HttpExchange audioStream;
+    private volatile long audioWritingSince;
     private final HttpServer server;
     private final String token = UUID.randomUUID().toString() + UUID.randomUUID();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
@@ -46,6 +50,8 @@ public final class RemoteRuntime implements AutoCloseable {
     private RemoteRuntime(Path directory) throws IOException {
         System.setProperty("sun.net.httpserver.nodelay", "true");
         worker = new AutomationWorker(directory);
+        audioPath = System.getProperty("os.name").startsWith("Mac") ? RemoteAudioFile.path(directory.resolve("runtime.shared")) : null;
+        if (audioPath != null) RemoteAudioFile.create(directory.resolve("runtime.shared"));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 16);
         server.createContext("/", this::request);
         server.setExecutor(executor);
@@ -54,6 +60,8 @@ public final class RemoteRuntime implements AutoCloseable {
             try {
                 synchronized (this) {
                     if (down && System.nanoTime() - lastInput > 1_000_000_000L) release();
+                    if (audioStream != null && audioWritingSince != 0 && System.nanoTime() - audioWritingSince > 250_000_000L)
+                        closeAudio();
                     if (stream != null && writingSince != 0 && System.nanoTime() - writingSince > 1_500_000_000L)
                         closeStream();
                 }
@@ -69,6 +77,11 @@ public final class RemoteRuntime implements AutoCloseable {
     private synchronized void closeStream() {
         HttpExchange old = stream; stream = null; writingSince = 0; codec = "none";
         try { release(); } catch (IOException ignored) { }
+        if (old != null) Thread.ofVirtual().start(old::close);
+    }
+
+    private synchronized void closeAudio() {
+        HttpExchange old = audioStream; audioStream = null; audioWritingSince = 0;
         if (old != null) Thread.ofVirtual().start(old::close);
     }
 
@@ -97,12 +110,12 @@ public final class RemoteRuntime implements AutoCloseable {
                 }
                 reply(exchange, 200, Map.of("ok", true));
             } else if (route.equals("/release") && exchange.getRequestMethod().equals("POST")) {
-                synchronized (this) { lease = ""; closeStream(); }
+                synchronized (this) { lease = ""; closeStream(); closeAudio(); }
                 reply(exchange, 200, Map.of("ok", true));
             } else if (route.equals("/lease") && exchange.getRequestMethod().equals("POST")) {
                 String value = new String(exchange.getRequestBody().readNBytes(64), StandardCharsets.UTF_8);
                 if (!value.matches("[A-Za-z0-9_-]{43}")) throw new IllegalArgumentException("Invalid lease");
-                synchronized (this) { closeStream(); lease = value; }
+                synchronized (this) { closeStream(); closeAudio(); lease = value; }
                 reply(exchange, 200, Map.of("ok", true));
             } else if (route.equals("/status") && exchange.getRequestMethod().equals("GET")) {
                 reply(exchange, 200, status());
@@ -112,6 +125,8 @@ public final class RemoteRuntime implements AutoCloseable {
                 exchange.getResponseHeaders().set("Content-Type", "image/jpeg");
                 exchange.sendResponseHeaders(200, bytes.length);
                 exchange.getResponseBody().write(bytes); exchange.close();
+            } else if (route.equals("/audio") && exchange.getRequestMethod().equals("GET")) {
+                audio(exchange);
             } else if ((route.equals("/video") || route.equals("/stream")) && exchange.getRequestMethod().equals("GET")) {
                 video(exchange, route.equals("/video"));
             } else reply(exchange, 404, Map.of("error", "Not found"));
@@ -176,6 +191,53 @@ public final class RemoteRuntime implements AutoCloseable {
         }
     }
 
+    private void audio(HttpExchange exchange) throws Exception {
+        synchronized (this) {
+            if (lease.isEmpty() || !lease.equals(exchange.getRequestHeaders().getFirst("X-Remote-Lease"))) {
+                reply(exchange, 403, Map.of("error", "Control lease expired")); return;
+            }
+            if (audioPath == null) { reply(exchange, 503, Map.of("error", "Audio unavailable on this platform")); return; }
+            if (!Boolean.TRUE.equals(worker.status().get("alive"))) { reply(exchange, 409, Map.of("error", "Game stopped")); return; }
+            closeAudio(); audioStream = exchange;
+        }
+        // Finish the previous reader before enabling its replacement. Otherwise the
+        // old reader's close() can disable the new reader's mixer subscription.
+        synchronized (audioReaderLock) {
+            try {
+                if (closed || audioStream != exchange) { exchange.close(); return; }
+                RemoteAudioFile reader;
+                try { reader = new RemoteAudioFile(audioPath); }
+                catch (IOException | java.nio.channels.OverlappingFileLockException unavailable) {
+                    reply(exchange, 503, Map.of("error", "Audio mixer unavailable")); return;
+                }
+                try (reader; DataOutputStream output = new DataOutputStream(exchange.getResponseBody())) {
+                    exchange.getResponseHeaders().set("Content-Type", "application/x-defold-pcm");
+                    exchange.getResponseHeaders().set("Cache-Control", "no-store");
+                    synchronized (this) { if (audioStream != exchange) return; audioWritingSince = System.nanoTime(); }
+                    exchange.sendResponseHeaders(200, 0);
+                    output.writeInt(RemoteAudioFile.MAGIC); output.writeInt(reader.rate); output.writeInt(2); output.writeInt(16); output.flush();
+                    synchronized (this) { if (audioStream == exchange) audioWritingSince = 0; }
+                    long sent = System.nanoTime();
+                    while (!closed && audioStream == exchange && Boolean.TRUE.equals(worker.status().get("alive"))) {
+                        RemoteAudioFile.Packet packet = reader.next();
+                        if (packet == null && System.nanoTime() - sent < 250_000_000L) { Thread.sleep(3); continue; }
+                        synchronized (this) { if (audioStream != exchange) break; audioWritingSince = System.nanoTime(); }
+                        try {
+                            output.writeInt(packet == null ? 0 : packet.pcm().length);
+                            output.writeInt(packet == null ? 0 : packet.sequence());
+                            if (packet != null) output.write(packet.pcm());
+                            output.flush();
+                        } finally { synchronized (this) { if (audioStream == exchange) audioWritingSince = 0; } }
+                        sent = System.nanoTime();
+                    }
+                }
+            } finally {
+                synchronized (this) { if (audioStream == exchange) closeAudio(); }
+                exchange.close();
+            }
+        }
+    }
+
     private static byte[] jpeg(AutomationWorker.LiveFrame frame, int edge) throws IOException {
         double scale = Math.min(1.0, (double)edge / Math.max(frame.width(), frame.height()));
         int w = Math.max(1, (int)(frame.width() * scale)), h = Math.max(1, (int)(frame.height() * scale));
@@ -195,13 +257,14 @@ public final class RemoteRuntime implements AutoCloseable {
 
     private Map<String, Object> status() {
         Map<String, Object> state = new LinkedHashMap<>(worker.status());
+        state.put("audio", audioPath != null);
         state.put("frames_sent", frames); state.put("stream_codec", codec);
         state.put("endpoint", "http://127.0.0.1:" + server.getAddress().getPort()); state.put("token", token);
         return state;
     }
 
     @Override public void close() throws Exception {
-        closed = true; closeStream(); server.stop(0); timer.shutdownNow(); worker.close(); executor.shutdownNow();
+        closed = true; closeStream(); closeAudio(); server.stop(0); timer.shutdownNow(); worker.close(); executor.shutdownNow();
     }
 
     public static void main(String[] args) throws Exception {

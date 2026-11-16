@@ -1,0 +1,8 @@
+{
+  "baseline": "/Applications/Defold.app/Contents/Resources/packages/defold-871d419fe7ad8f81d5d988f58afa153df5ca818f.jar",
+  "candidate": "/tmp/spine-runtime-fixes/build/editor.jar",
+  "candidate_sha256": "d09c9b6b94ec139ab5ad42245b222011bfd9ba2fb68e207f25387223478e51a0",
+  "changed_entries": 3831,
+  "unexpected_noneditor_changes": [],
+  "installed": false
+}

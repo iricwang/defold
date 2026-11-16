@@ -32,6 +32,30 @@
            [javafx.scene Scene]
            [javafx.scene.control Button TextField]))
 
+;; PM input keeps the planning contract without repeating full staff profiles.
+(deftest compact-planning-input-test
+  (let [staff [{:id "planning-1" :title "策划甲" :role-type "custom-planning" :enabled true
+                :responsibilities (.repeat "项目专属职责" 1000) :deliverables "完整项目交付要求"}
+               {:id "disabled" :title "已停用" :enabled false}]
+        instructions (pm/instructions staff)
+        roster (json/read-str (second (re-find #"可用职员（包括自定义职能）：\n([^\n]+)" instructions)) :key-fn keyword)
+        context {:pm-planning true :project-staff staff :staff (first staff)
+                 :workflow :document :template "ai-pm" :canvasCard {:type "pm"}
+                 :pm-current-tasks [{:id "task-1" :title "已分配任务" :depends-on []}]
+                 :acceptance-feedback {:notes "保持已验收内容"}}
+        text (workbench/message-text "规划当前游戏" context)]
+    (is (= [{:id "planning-1" :title "策划甲" :role-type "custom-planning"}] roster))
+    (is (string/includes? text "/ai-workspace/config/project-roles.aicanvas"))
+    (is (string/includes? text "策划甲"))
+    (is (string/includes? text "已分配任务"))
+    (is (string/includes? text "保持已验收内容"))
+    (doseq [omitted ["\\u" "项目专属职责" "完整项目交付要求" "[方案创作]" "方案类型：" "职责说明：" "[工作指派]"]]
+      (is (not (string/includes? text omitted))))
+    (doseq [required ["ai-pm-plan" "depends-on" "existing-task-id" "不能虚构职员" "人工确认" "engineering"]]
+      (is (string/includes? text required)))
+    (is (< (count text) 1800))
+    (is (not (string/includes? (workbench/message-text "新规划" (assoc context :pm-current-tasks [])) "已有分配记录")))))
+
 (defn fixture []
   (let [staff [(roles/new-role "pm" #{}) (roles/new-role "planning" #{})]
         manager (roles/assign-staff {:id "pm" :kind :pm :title "AI-PM" :prompt "设计战斗结算奖励系统" :x 0.0 :y 0.0} (first staff))

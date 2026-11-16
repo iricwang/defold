@@ -1,3 +1,17 @@
+// Copyright 2020-2026 The Defold Foundation
+// Copyright 2014-2020 King
+// Copyright 2009-2014 Ragnar Svensson, Christian Murray
+// Licensed under the Defold License version 1.0 (the "License"); you may not use
+// this file except in compliance with the License.
+//
+// You may obtain a copy of the License, together with FAQs at
+// https://www.defold.com/license
+//
+// Unless required by applicable law or agreed to in writing, software distributed
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations under the License.
+
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{io::{BufRead, BufReader, Write}, path::PathBuf, process::{Child, ChildStdin, ChildStdout, Command, Stdio}, sync::Mutex};
 use serde_json::{json, Value};
@@ -83,10 +97,22 @@ mod tests {
     }
 }
 #[tauri::command]
-fn hide(app: tauri::AppHandle) { if let Some(w)=app.get_webview_window("main"){let _=w.hide();} }
+fn hide(app: tauri::AppHandle) {
+    if let Some(w)=app.get_webview_window("main") {
+        if w.hide().is_ok() { window_visibility(&w, false); }
+    }
+}
 #[tauri::command]
 fn quit(app: tauri::AppHandle) { app.exit(0); }
-fn show(app:&tauri::AppHandle){if let Some(w)=app.get_webview_window("main"){let _=w.show();let _=w.unminimize();let _=w.set_focus();}}
+fn window_visibility(window: &tauri::WebviewWindow, visible: bool) {
+    // WebKit need not change document.hidden when its native window is hidden.
+    let _=window.eval(format!("window.__REMOTE_WINDOW_VISIBLE__={visible};window.dispatchEvent(new CustomEvent('remote-window-visibility',{{detail:{visible}}}));"));
+}
+fn show(app:&tauri::AppHandle){
+    if let Some(w)=app.get_webview_window("main"){
+        if w.show().is_ok() { let _=w.unminimize();window_visibility(&w, true);let _=w.set_focus(); }
+    }
+}
 fn main() {
     let app=tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app,_,_|show(app)))
@@ -100,16 +126,35 @@ fn main() {
             let show_item=MenuItem::with_id(app,"show","打开 Remote Manager",true,None::<&str>)?;
             let quit_item=MenuItem::with_id(app,"quit","停止全部游戏并退出",true,None::<&str>)?;
             let menu=Menu::with_items(app,&[&show_item,&quit_item])?;
-            let mut pixels=vec![0u8;32*32*4];
-            for y in 3..29 {for x in 3..29 {let i=(y*32+x)*4;pixels[i..i+4].copy_from_slice(if x>10&&x<22&&y>9&&y<23 {&[245,248,255,255]}else{&[59,121,211,255]});}}
-            TrayIconBuilder::new().icon(tauri::image::Image::new_owned(pixels,32,32)).tooltip("Defold Remote Manager").menu(&menu).show_menu_on_left_click(false)
+            let icon = app.default_window_icon().ok_or("Missing Remote application icon")?.clone();
+            TrayIconBuilder::new().icon(icon).tooltip("Defold Remote Manager").menu(&menu).show_menu_on_left_click(false)
                 .on_menu_event(|app,e|match e.id.as_ref(){"show"=>show(app),"quit"=>app.exit(0),_=>{}})
                 .on_tray_icon_event(|tray,event|if matches!(event,TrayIconEvent::Click{button:MouseButton::Left,button_state:MouseButtonState::Up,..}){show(tray.app_handle())}).build(app)?;
             Ok(())
         })
-        .on_window_event(|window,event|if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _=window.hide();})
+        .on_page_load(|webview,payload| {
+            if payload.event()==tauri::webview::PageLoadEvent::Finished {
+                if let Some(w)=webview.app_handle().get_webview_window("main") {
+                    window_visibility(&w, w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false));
+                }
+            }
+        })
+        .on_window_event(|window,event|match event {
+            tauri::WindowEvent::CloseRequested{api,..} => {api.prevent_close();hide(window.app_handle().clone());}
+            tauri::WindowEvent::Focused(_) | tauri::WindowEvent::Resized(_) => {
+                if let Some(w)=window.app_handle().get_webview_window("main") {
+                    window_visibility(&w, w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false));
+                }
+            }
+            _ => {}
+        })
         .build(tauri::generate_context!()).expect("Cannot start Defold Remote Manager");
-    app.run(|app,event|if let tauri::RunEvent::Exit=event {
-        if let Some(state)=app.try_state::<Backend>() { if let Ok(mut service)=state.0.lock(){let _=writeln!(service.input,"{{\"method\":\"quit\"}}");let _=service.input.flush();let _=service.child.wait();} }
+    app.run(|app,event|match event {
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen {..} => show(app),
+        tauri::RunEvent::Exit => {
+            if let Some(state)=app.try_state::<Backend>() { if let Ok(mut service)=state.0.lock(){let _=writeln!(service.input,"{{\"method\":\"quit\"}}");let _=service.input.flush();let _=service.child.wait();} }
+        }
+        _ => {}
     });
 }

@@ -1,0 +1,41 @@
+{
+  "skill": "defold-spine-authoring",
+  "delivery": "skill + local nREPL adapter; no new MCP server",
+  "adapter_tests": {
+    "tests": 4,
+    "assertions": 25,
+    "failures": 0,
+    "errors": 0
+  },
+  "python_tests": {
+    "tests": 2,
+    "failures": 0
+  },
+  "clj_kondo": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "cljfmt": "passed",
+  "skill_validator": "passed",
+  "live": {
+    "inspect_ok": true,
+    "dry_run_ok": true,
+    "revision_unchanged": true,
+    "bone_count": 29,
+    "slot_count": 13
+  },
+  "live_resource": "/docs/source/spine_smart_mesh_validation/tail_path_example.skeleton",
+  "runtime_engine_changed": false,
+  "files_sha256": {
+    "SKILL.md": "da9d77d2a3279f562c21ee7e3a93a270c49f27e7c9f8d0bcc2f20ad2907ada2c",
+    "agents/openai.yaml": "0ca77504d50271a82597c185cafdc4c51a64e5ba05c785d8bb6d50b521eb32a2",
+    "references/connection.md": "ed1ee9cc2f78299a0ac34bd0924a273196f9c7947af46c4de638f1105ac578b0",
+    "references/authoring.md": "037033c4d6b0da6b9d0b5a2a5e425b429bee8a94d46346cf41aba070e8c821d8",
+    "references/advanced.md": "1519b86d6f95524e64c6760db43b953a365c0436a06c226d0bc4dbba74e6a178",
+    "references/verification.md": "0007fe66af9e5330ab443f5e1f173bd9c909b410be98c2b1e26058eaf0070f29",
+    "scripts/spine_editor.py": "75fb3662cd15abed9870be11096fbd62f86fc72ddc1807d5d4ca9fcff72b48df",
+    "scripts/defold_spine_agent.clj": "1bd727dfd85276eb0efe846c743c6cc0ece0e2eae56a1de2ee4b17dd601036bf",
+    "scripts/defold_spine_agent_test.clj": "44473382d6b8fac7f82e4e3706727f5e55eac3730b9cc7dbbbdbab5912b37e82",
+    "scripts/test_client.py": "a01f2cd9344f2d2b7c251ae39f7f54eca0176e11eb8e34ede07af639383645ba"
+  }
+}

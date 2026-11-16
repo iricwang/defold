@@ -1,0 +1,9 @@
+{
+  "validationJar": "/tmp/spine-mesh-transform/build/editor.jar",
+  "sha256": "1fd4c087fb3f31899e2b3e599a13a3c7a0c153a897575a491cab1e2148b709bf",
+  "changedEntries": 1822,
+  "onlySkeletalAnimationView": true,
+  "runtimeEngineChanged": false,
+  "installedAppUpdated": false,
+  "hotReload": "canvas events only; reopen skeletal tab for newly constructed palette callbacks and render timer"
+}

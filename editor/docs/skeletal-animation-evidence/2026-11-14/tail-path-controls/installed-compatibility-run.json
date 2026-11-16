@@ -1,0 +1,16 @@
+{
+  "jar": "/Applications/Defold.app/Contents/Resources/packages/defold-871d419fe7ad8f81d5d988f58afa153df5ca818f.jar",
+  "sha256": "496eecdb20b3d31b67b6a357f96338541e23d875159f5b0cddf7987414f15f36",
+  "project_source": "/tmp/spine-tail-path/project",
+  "project_copy": "/private/tmp/spine-tail-path/installed-background-4/project",
+  "scenario": "/private/tmp/spine-tail-path/installed-interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-weight-selection/build/editor.jar",
+  "sha256": "c0a81280f9b9347dcf5f7768a99e80cfcf547eb7f4d8fbbfd229d36b17eab065",
+  "project_source": "/tmp/spine-rig-ui/project",
+  "project_copy": "/private/tmp/spine-weight-selection/interaction/project",
+  "scenario": "/private/tmp/spine-weight-selection/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

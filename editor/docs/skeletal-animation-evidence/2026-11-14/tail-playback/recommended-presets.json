@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "scope": "tail_path_example guidance; not applied to live document or editor defaults",
+  "stretch": false,
+  "primary": {
+    "tail_bones": 8,
+    "control_bones": 2,
+    "optional_control_bones_for_midpoint_editing": 3,
+    "tail_vertices_min": 64,
+    "tail_vertices_max": 100,
+    "max_weights_per_vertex": 4
+  },
+  "crowd_candidate": {
+    "tail_bones": 6,
+    "control_bones": 3,
+    "tail_vertices_min": 40,
+    "tail_vertices_max": 60,
+    "max_weights_per_vertex": 2,
+    "requires_deformation_review": true
+  },
+  "trace_starting_point": {
+    "detail": 20,
+    "concavity": 50,
+    "refinement": 50,
+    "uniform_percent": 30,
+    "alpha_threshold": 8,
+    "padding": 0
+  },
+  "review_thresholds": {
+    "tail_bones_above": 12,
+    "control_bones_above": 4,
+    "tail_vertices_above": 128
+  },
+  "same_machine_regression_alerts": {
+    "native_64_instances_batch_p50_ms_above": 0.15,
+    "engine_64_instances_process_cpu_ms_per_frame_above": 3.0,
+    "engine_64_minus_empty_cpu_ms_per_frame_above": 1.5,
+    "median_relative_regression_percent": 20,
+    "required_native_trials": 3,
+    "required_engine_rounds": 2,
+    "hard_ci_gate": false
+  }
+}

@@ -181,3 +181,40 @@
         (is (not (.exists target)))
         (is (not (.exists (.getParentFile target)))))
       (finally (fs/delete-directory! directory {:fail :silently})))))
+
+
+;; Spine retains ./audio on silent projects. Export must ignore that unused
+;; directory, and resolve leading ./ correctly when event sounds do exist.
+(deftest export-spine-current-directory-audio-test
+  (let [directory (fs/create-temp-directory! "skeleton-dot-audio")]
+    (try
+      (let [{:keys [project file]} (fixture! directory)
+            document (:document (skeletal-io/read-spine-file! file project))
+            source (json/read-str (:spine-source document))
+            with-audio (fn with-audio [directory events]
+                         (data/import-spine-json
+                           (json/write-str (-> source
+                                               (assoc-in ["skeleton" "audio"] directory)
+                                               (assoc "events" events)))))
+            sound (io/file project "audio" "step.wav")]
+        (is (= [] (:warnings (skeletal-io/export-project! (with-audio "./audio" {}) project "silent"))))
+        (fs/create-parent-directories! sound)
+        (spit sound "fixture")
+        (doseq [directory ["audio" "./audio" "././audio"]]
+          (is (= [] (:warnings (skeletal-io/export-project!
+                                 (with-audio directory {"step" {"audio" "step.wav"}}) project "sound")))))
+        (doseq [directory ["" "." "./"]]
+          (is (= [] (:warnings (skeletal-io/export-project!
+                                 (with-audio directory {"step" {"audio" "audio/step.wav"}}) project "root")))))
+        (is (= ["Missing event audio: absent.wav."]
+               (:warnings (skeletal-io/export-project!
+                            (with-audio "./audio" {"step" {"audio" "absent.wav"}}) project "missing"))))
+        (doseq [directory ["../outside" "./../outside" "/outside" "C:/outside" "audio\\outside"]]
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (skeletal-io/export-project!
+                         (with-audio directory {"step" {"audio" "step.wav"}}) project "rejected"))))
+        (is (not (.exists (io/file project "rejected"))))
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (skeletal-io/export-project!
+                       (with-audio "./audio" {"step" {"audio" "../escape.wav"}}) project "rejected-reference"))))
+      (finally (fs/delete-directory! directory {:fail :silently})))))

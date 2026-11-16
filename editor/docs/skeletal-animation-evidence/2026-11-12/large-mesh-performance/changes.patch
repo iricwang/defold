@@ -1,0 +1,431 @@
+--- before/editor/src/clj/editor/skeletal_animation_view.clj
++++ after/editor/src/clj/editor/skeletal_animation_view.clj
+@@ -376,12 +376,14 @@
+     (cond
+       (or (nil? attachment) (not (#{"region" "mesh" "path" "boundingbox" "clipping" "point"} (get attachment :type "region")))) []
+       (#{"mesh" "path" "boundingbox" "clipping"} (:type attachment))
+-      (geometry/mesh-world-vertices attachment matrix transforms
+-                                    (when (= "animate" (:mode @(:state context)))
+-                                      (get (if (contains? context :sampled-deforms)
+-                                             (:sampled-deforms context)
+-                                             (:deforms (sampled-slots context doc)))
+-                                           (:id slot))))
++      (let [deform (when (= "animate" (:mode @(:state context)))
++                     (get (if (contains? context :sampled-deforms)
++                            (:sampled-deforms context)
++                            (:deforms (sampled-slots context doc)))
++                          (:id slot)))]
++        (preview-value context :mesh-points attachment [matrix transforms deform]
++                       (fn mesh-world-points []
++                         (geometry/mesh-world-vertices attachment matrix transforms deform))))
+       (= "point" (:type attachment))
+       (coll/into-> (:points (geometry/attachment-world-geometry attachment transforms (:bone slot) nil)) [] cat)
+       :else
+@@ -415,7 +417,12 @@
+         active-bones (get evaluated :active-bone-ids (set (mapv :id (:bones evaluated))))]
+     (mapv (fn [slot]
+             (let [attachment (:attachment slot)
+-                  type (get attachment :type "region")]
++                  type (get attachment :type "region")
++                  topology (when (#{"region" "mesh"} type)
++                             (preview-value context :render-topology attachment nil
++                                            (fn render-topology []
++                                              {:uvs (vec (partitionv 2 (if (= "mesh" type) (:uvs attachment) [0.0 0.0 1.0 0.0 1.0 1.0 0.0 1.0])))
++                                               :triangles (vec (partitionv 3 (if (= "mesh" type) (:triangles attachment) [0 1 2 0 2 3])))})))]
+               (cond
+                 (or (not (contains? active-bones (:bone slot))) (nil? attachment))
+                 {:id (:id slot) :marker true}
+@@ -427,8 +434,8 @@
+                 (#{"region" "mesh"} type)
+                 {:id (:id slot)
+                  :points (mapv #(screen context %) (partitionv 2 (attachment-points context doc slot transforms)))
+-                 :uvs (vec (partitionv 2 (if (= "mesh" type) (:uvs attachment) [0.0 0.0 1.0 0.0 1.0 1.0 0.0 1.0])))
+-                 :triangles (vec (partitionv 3 (if (= "mesh" type) (:triangles attachment) [0 1 2 0 2 3])))
++                 :uvs (:uvs topology)
++                 :triangles (:triangles topology)
+                  :image (image! context (:path attachment))
+                  :tint (mapv * (subvec (get attachment :color [1.0 1.0 1.0 1.0]) 0 3)
+                              (subvec (get slot :color [1.0 1.0 1.0 1.0]) 0 3))
+@@ -498,22 +505,29 @@
+                (editable-preview-attachment context doc)
+                (#{"move" "rotate" "scale" "shear"} (:tool state)))
+       (let [transforms (:transforms (evaluated-pose context doc))
+-            points (vec (partitionv 2 (attachment-points context doc slot transforms)))
+-            selection (or (coll/not-empty (:vertices state)) (set (range (count points))))
+-            center-indices (if (coll/not-empty (:vertices state)) selection
+-                               (let [triangles (get-in slot [:attachment :triangles])]
+-                                 (preview-value context :mesh-boundary triangles nil
+-                                                (fn mesh-boundary []
+-                                                  (let [edges (coll/into-> (partitionv 3 triangles) []
+-                                                                (mapcat (fn [[a b c]] [(vec (sort [a b])) (vec (sort [b c])) (vec (sort [c a]))])))]
+-                                                    (coll/into-> (frequencies edges) #{} (comp (filter #(= 1 (val %))) (mapcat key))))))))
+-            center-indices (or (coll/not-empty center-indices) selection)
+-            center (mapv #(/ % (count center-indices)) (reduce (fn [sum index] (mapv + sum (points index))) [0.0 0.0] center-indices))
+-            token [(:selected state) (:preview-attachment-key slot) (:mode state) (:animation state) (:time state) selection]
+-            bone (entity (:bones doc) (:bone slot))]
+-        {:points points :selection selection :center center :token token
+-         :pivot (if (= token (get-in state [:mesh-pivot :token])) (get-in state [:mesh-pivot :point]) center)
+-         :axes (tools/axes bone transforms (:coordinate-space state "parent") (:tool state))}))))
++            deforms (when (= "animate" (:mode state))
++                      (if (contains? context :sampled-deforms)
++                        (:sampled-deforms context)
++                        (:deforms (sampled-slots context doc))))]
++        (preview-value context :mesh-manipulator doc
++                       [slot transforms (get deforms (:id slot)) (select-keys state [:vertices :selected :mode :animation :time :tool :coordinate-space :mesh-pivot])]
++                       (fn mesh-frame []
++                         (let [points (vec (partitionv 2 (attachment-points context doc slot transforms)))
++                               selection (or (coll/not-empty (:vertices state)) (set (range (count points))))
++                               center-indices (if (coll/not-empty (:vertices state)) selection
++                                                  (let [triangles (get-in slot [:attachment :triangles])]
++                                                    (preview-value context :mesh-boundary triangles nil
++                                                                   (fn mesh-boundary []
++                                                                     (let [edges (coll/into-> (partitionv 3 triangles) []
++                                                                                   (mapcat (fn [[a b c]] [(vec (sort [a b])) (vec (sort [b c])) (vec (sort [c a]))])))]
++                                                                       (coll/into-> (frequencies edges) #{} (comp (filter #(= 1 (val %))) (mapcat key))))))))
++                               center-indices (or (coll/not-empty center-indices) selection)
++                               center (mapv #(/ % (count center-indices)) (reduce (fn [sum index] (mapv + sum (points index))) [0.0 0.0] center-indices))
++                               token [(:selected state) (:preview-attachment-key slot) (:mode state) (:animation state) (:time state) selection]
++                               bone (entity (:bones doc) (:bone slot))]
++                           {:points points :selection selection :center center :token token
++                            :pivot (if (= token (get-in state [:mesh-pivot :token])) (get-in state [:mesh-pivot :point]) center)
++                            :axes (tools/axes bone transforms (:coordinate-space state "parent") (:tool state))})))))))
+ 
+ (defn- mesh-transform-matrix [frame tool start target axis snap]
+   (let [[px py] (:pivot frame)
+@@ -686,7 +700,7 @@
+       (when (and editing-mesh (= "weights" (:tool state)))
+         (draw-weight-overlay! gc state points triangles (get-in (selected-slot context doc) [:attachment :weights])))
+       (when mesh-selected
+-        (let [{:keys [boundary interior]} (selection/wireframe-edges triangles)]
++        (let [{:keys [boundary interior]} (preview-value context :wireframe triangles nil (fn mesh-wireframe [] (selection/wireframe-edges triangles)))]
+           (.setLineWidth gc 1.0)
+           (doseq [[edges color] [[interior "#85eceb55"] [boundary "#85eceb"]]]
+             (.setStroke gc (Color/web color))
+@@ -1087,9 +1101,11 @@
+                        (vec (repeat (data/deform-size attachment) 0.0)))
+             deltas (coll/into-> offsets [] (mapcat #(coll/into-> % [] cat)))
+             values (mapv + values deltas)
+-            track (slots/deform-track doc (:id (animation context doc)) (:id slot) (:time state))]
+-        (slots/set-deform-keyframe doc (:id (animation context doc)) (:id slot) (:time state) values
+-                                   (interpolation-at (:keys track) (:time state) (:interpolation state)))))))
++            animation-id (:id (animation context doc))
++            track (preview-value context :deform-track doc [animation-id (:id slot) (:time state)]
++                                 (fn selected-deform-track [] (slots/deform-track doc animation-id (:id slot) (:time state))))]
++        (slots/set-deform-track-keyframe doc animation-id track (:time state) values
++                                         (interpolation-at (:keys track) (:time state) (:interpolation state)))))))
+ 
+ (defn- drag-vertices [context doc selection start target]
+   (let [[dx dy] (mapv - target start)]
+--- before/editor/src/clj/editor/skeletal_animation_slots.clj
++++ after/editor/src/clj/editor/skeletal_animation_slots.clj
+@@ -18,8 +18,8 @@
+   (:require [clojure.data.json :as json]
+             [editor.skeletal-animation-data :as data]
+             [editor.skeletal-animation-geometry :as geometry]
++            [editor.skeletal-animation-inherit :as inherit]
+             [editor.skeletal-animation-interpolation :as interpolation]
+-            [editor.skeletal-animation-inherit :as inherit]
+             [editor.skeletal-animation-sequence :as sequence]
+             [util.coll :as coll])
+   (:import [java.util Map]
+@@ -28,6 +28,19 @@
+ (set! *warn-on-reflection* true)
+ 
+ (defonce ^:private document-cache (atom []))
++(def ^:private parsed-source-cache (atom []))
++
++(defn- parsed-source [text]
++  (if-not text
++    {:source {} :ordered nil}
++    (if-let [entry (coll/first-where #(identical? text (:text %)) @parsed-source-cache)]
++      (:parsed entry)
++      (let [parsed {:source (json/read-str text)
++                    :ordered (.readValue (ObjectMapper.) ^String text Map)}]
++        ;; FFD drafts share the original JSON. Preserve its channel ordering,
++        ;; without decoding the entire source again for every mouse move.
++        (swap! parsed-source-cache #(coll/into-> % [{:text text :parsed parsed}] (take 3)))
++        parsed))))
+ 
+ (defn- require-value! [value message]
+   (when-not value (throw (ex-info message {}))))
+@@ -144,8 +157,7 @@
+ (defn- compile-document [document]
+   (data/validate-document document)
+   (let [text (:spine-source document)
+-        source (if text (json/read-str text) {})
+-        ordered (when text (.readValue (ObjectMapper.) ^String text Map))
++        {:keys [source ordered]} (parsed-source text)
+         slots (:slots document) worlds (data/world-transforms (:bones document))
+         bones (if text (mapv #(hash-map :id (get % "name")) (get source "bones")) (:bones document))
+         raw-slots (into {} (map (juxt #(get % "name") identity)) (get source "slots" []))
+@@ -299,19 +311,24 @@
+ (defonce ^:private authoring-source-cache (atom []))
+ 
+ (defn- source-data [document]
+-  (if-let [entry (coll/first-where #(identical? document (:document %)) @authoring-source-cache)]
+-    (:source entry)
+-    (let [source (json/read-str (or (:spine-source document) (data/export-spine-json document)))]
+-      (swap! authoring-source-cache #(coll/into-> % [{:document document :source source}] (take 3)))
+-      source)))
++  ;; Writers still need a full source for the first authored preserved track.
++  ;; Read-only timeline queries below inspect preserved data directly instead.
++  (if-let [text (:spine-source document)]
++    (:source (parsed-source text))
++    (if-let [entry (coll/first-where #(identical? document (:document %)) @authoring-source-cache)]
++      (:source entry)
++      (let [source (json/read-str (data/export-spine-json document))]
++        (swap! authoring-source-cache #(coll/into-> % [{:document document :source source}] (take 3)))
++        source))))
+ 
+ (defn attachment-names
+   "Available names in the current/default skins and edited setup attachment."
+   [document slot-id]
++  (data/validate-document document)
+   (let [slot (coll/first-where #(= slot-id (:id %)) (:slots document))
+         _ (require-value! slot "Unknown animation slot.")
+         active (get document :active-skin "default")
+-        skins (get (source-data document) "skins" [])]
++        skins (get (:source (parsed-source (:spine-source document))) "skins" [])]
+     (vec (sort (coll/into-> skins
+                  (if-let [attachment (:attachment slot)] #{(get attachment :name slot-id)} #{})
+                  (filter #(contains? (conj #{"default"} active) (get % "name")))
+@@ -334,9 +351,10 @@
+ (defn tracks
+   "Editable slot tracks, with complete curves retained in :spine-frame-source."
+   [document animation-id slot-id]
++  (data/validate-document document)
+   (animation-index document animation-id)
+   (require-value! (coll/any? #(= slot-id (:id %)) (:slots document)) "Unknown animation slot.")
+-  (coll/into-> (get-in (source-data document) ["animations" animation-id "slots" slot-id] {}) []
++  (coll/into-> (get-in (:source (parsed-source (:spine-source document))) ["animations" animation-id "slots" slot-id] {}) []
+     (keep (fn [[property frames]]
+             (when (contains? editable-properties property)
+               {:slot slot-id :property property :keys (mapv #(decoded-key property %) frames)})))))
+@@ -351,9 +369,10 @@
+ (defn draw-order-track
+   "Global draw-order keys as complete slot-ID permutations."
+   [document animation-id]
++  (data/validate-document document)
+   (animation-index document animation-id)
+   (decoded-draw-order-track document
+-                            (get-in (source-data document) ["animations" animation-id "drawOrder"] [])))
++                            (get-in (:source (parsed-source (:spine-source document))) ["animations" animation-id "drawOrder"] [])))
+ 
+ (defn- source-sequence-tracks [source animation-id]
+   (coll/into-> (get-in source ["animations" animation-id "attachments"]) []
+@@ -380,7 +399,7 @@
+                        (not= "linkedmesh" (get-in setup [:attachment :type])))
+         _ (require-value! (:preview-deform-editable slot) "The visible attachment has no deformable vertices.")
+         animation (get-in document [:animations (animation-index document animation-id)])
+-        raw (get-in (source-data document) ["animations" animation-id "attachments" skin slot-id name "deform"] [])]
++        raw (get-in (:source (parsed-source (:spine-source document))) ["animations" animation-id "attachments" skin slot-id name "deform"] [])]
+     (if canonical
+       (or (coll/first-where #(= slot-id (:slot %)) (:deforms animation))
+           {:slot slot-id :skin skin :attachment name :keys []})
+@@ -401,7 +420,7 @@
+     (:attachment entry)))
+ 
+ (defn- alternate-deform-tracks [document animation-id]
+-  (coll/into-> (get-in (source-data document) ["animations" animation-id "attachments"]) []
++  (coll/into-> (get-in (:source (parsed-source (:spine-source document))) ["animations" animation-id "attachments"]) []
+     (mapcat (fn [[skin slots]]
+               (coll/into-> slots []
+                 (mapcat (fn [[slot entries]]
+@@ -427,7 +446,7 @@
+   "Expose preserved slot/draw-order keys to batch editing temporarily."
+   [document]
+   (data/validate-document document)
+-  (let [source (source-data document)]
++  (let [source (:source (parsed-source (:spine-source document)))]
+     (update document :animations
+             (fn [animations]
+               (mapv (fn [animation]
+--- before/editor/test/editor/skeletal_animation_performance_test.clj
++++ after/editor/test/editor/skeletal_animation_performance_test.clj
+@@ -18,6 +18,7 @@
+             [editor.skeletal-animation-data :as data]
+             [editor.skeletal-animation-io :as animation-io]
+             [editor.skeletal-animation-mesh :as mesh]
++            [editor.skeletal-animation-render :as render]
+             [editor.skeletal-animation-slots :as slots]
+             [editor.skeletal-animation-view :as view]))
+ 
+@@ -125,3 +126,115 @@
+         #_{:clj-kondo/ignore [:discouraged-var]}
+         (with-redefs [data/export-spine-json (fn unexpected-export [_] (throw (ex-info "Unexpected full export" {})))]
+           (is (= expected-warning (animation-io/export-compatibility doc))))))))
++
++;; Repeated overlays must share world vertices, but never reuse coordinates
++;; after animation deforms, poses, attachments or setup/animate mode change.
++(deftest mesh-world-points-cache-invalidation-test
++  (doseq [weighted [false true]]
++    (let [attachment (cond-> {:type "mesh" :vertices [0.0 0.0 10.0 0.0 0.0 10.0]}
++                       weighted (assoc :weights [[{:bone "root" :weight 1.0 :x 0.0 :y 0.0}]
++                                                 [{:bone "root" :weight 1.0 :x 10.0 :y 0.0}]
++                                                 [{:bone "root" :weight 1.0 :x 0.0 :y 10.0}]]))
++          slot {:id "mesh" :bone "root" :attachment attachment}
++          state (atom {:mode "animate"})
++          context {:state state :preview-cache (atom {}) :sampled-deforms {"mesh" [1.0 2.0 3.0 4.0 5.0 6.0]}}
++          transforms {"root" [1.0 0.0 0.0 1.0 0.0 0.0]}
++          points (#'view/attachment-points context {} slot transforms)]
++      (is (= [1.0 2.0 13.0 4.0 5.0 16.0] points))
++      (is (identical? points (#'view/attachment-points context {} slot transforms)))
++      (is (= [8.0 11.0 20.0 13.0 12.0 25.0]
++             (#'view/attachment-points context {} slot {"root" [1.0 0.0 0.0 1.0 7.0 9.0]})))
++      (is (= (:vertices attachment) (#'view/attachment-points (assoc context :sampled-deforms {}) {} slot transforms)))
++      (is (thrown? clojure.lang.ExceptionInfo
++                   (#'view/attachment-points (assoc context :sampled-deforms {"mesh" [1.0]}) {} slot transforms)))
++      (swap! state assoc :mode "setup")
++      (is (= (:vertices attachment) (#'view/attachment-points context {} slot transforms)))
++      (let [edited (if weighted (assoc-in attachment [:weights 0 0 :x] 2.0)
++                       (assoc-in attachment [:vertices 0] 2.0))]
++        (is (= 2.0 (first (#'view/attachment-points context {} (assoc slot :attachment edited) transforms)))))
++      (doseq [x (range 20)] (#'view/attachment-points context {} slot {"root" [1.0 0.0 0.0 1.0 (double x) 0.0]}))
++      (is (= 2 (count (:mesh-points @(:preview-cache context))))))))
++
++;; Handlers, the numeric palette and drawing share one manipulator frame.
++;; Pointer-only updates preserve it; selection, pivot and document edits do not.
++(deftest mesh-manipulator-cache-invalidation-test
++  (let [attachment {:type "mesh" :path "/mesh.png" :width 10.0 :height 10.0
++                    :vertices [0.0 0.0 10.0 0.0 0.0 10.0] :uvs [0.0 0.0 1.0 0.0 0.0 1.0] :triangles [0 1 2]}
++        doc (data/add-slot (data/new-document "frame-cache") {:id "mesh" :bone "root" :attachment attachment})
++        state (atom {:mode "setup" :selected-kind :slot :selected "mesh" :tool "move" :vertices #{}})
++        context {:state state :preview-cache (atom {}) :pose-cache (atom nil)}
++        frame (#'view/mesh-manipulator context doc)]
++    (swap! state assoc :pointer [4.0 5.0])
++    (is (identical? frame (#'view/mesh-manipulator context doc)))
++    (swap! state assoc :vertices #{1})
++    (let [selected (#'view/mesh-manipulator context doc)]
++      (is (= [10.0 0.0] (:center selected)))
++      (swap! state assoc :mesh-pivot {:token (:token selected) :point [30.0 40.0]})
++      (is (= [30.0 40.0] (:pivot (#'view/mesh-manipulator context doc)))))
++    (let [edited (data/update-bone doc "root" {:x 20.0})]
++      (is (= [30.0 0.0] (:center (#'view/mesh-manipulator context edited)))))
++    ;; Blended/explicit FFD samples can change without changing time or bones.
++    (swap! state assoc :mode "animate" :animation "default" :time 0.0 :mesh-pivot nil)
++    (let [sampled (slots/sample-slots doc "default" 0.0)
++          base (assoc context :sampled-slots sampled :sampled-deforms {"mesh" [0.0 0.0 0.0 0.0 0.0 0.0]})
++          deformed (assoc base :sampled-deforms {"mesh" [0.0 0.0 5.0 3.0 0.0 0.0]})]
++      (is (= [10.0 0.0] (:center (#'view/mesh-manipulator base doc))))
++      (is (= [15.0 3.0] (:center (#'view/mesh-manipulator deformed doc)))))
++    (is (= 2 (count (:mesh-manipulator @(:preview-cache context)))))))
++
++;; Screen movement must not rebuild fixed UV/triangle lists, while a real
++;; topology edit must invalidate them before rendering or drawing wireframes.
++(deftest render-topology-cache-invalidation-test
++  (let [attachment {:type "mesh" :path "" :vertices [0.0 0.0 10.0 0.0 0.0 10.0]
++                    :uvs [0.0 0.0 1.0 0.0 0.0 1.0] :triangles [0 1 2]}
++        doc {:slots [{:id "mesh" :bone "root" :attachment attachment}]}
++        state (atom {:mode "setup" :zoom 1.0 :pan-x 0.0 :pan-y 0.0})
++        context {:state state :preview-cache (atom {})}
++        pose {:transforms {"root" [1.0 0.0 0.0 1.0 0.0 0.0]} :active-bone-ids #{"root"}}
++        first-slot (first (#'view/render-slots context doc doc pose))]
++    (is (= [0.0 0.0 1.0 0.0 0.0 1.0] (mapv double (render/uv-buffer (:uvs first-slot)))))
++    (is (= [0 0 1 1 2 2] (vec (render/face-buffer (:triangles first-slot) 3))))
++    (swap! state assoc :pan-x 10.0)
++    (let [moved (first (#'view/render-slots context doc doc pose))]
++      (is (identical? (:triangles first-slot) (:triangles moved)))
++      (is (identical? (:uvs first-slot) (:uvs moved)))
++      (is (not= (:points first-slot) (:points moved))))
++    (let [edited (assoc-in doc [:slots 0 :attachment :triangles] [2 1 0])]
++      (is (= [[2 1 0]] (:triangles (first (#'view/render-slots context edited edited pose))))))))
++
++;; Timeline reads must not export fresh meshes. A mesh can have editable UVs
++;; that are not exportable yet; querying FFD lanes must still work normally.
++(deftest fresh-mesh-timeline-without-export-test
++  (let [attachment {:type "mesh" :path "/mesh.png" :width 10.0 :height 10.0
++                    :vertices [0.0 0.0 10.0 0.0 10.0 10.0 0.0 10.0]
++                    :uvs [0.0 0.0 1.0 1.0 1.0 0.0 0.0 1.0] :triangles [0 1 2 0 2 3]}
++        offsets [1.0 2.0 0.0 0.0 0.0 0.0 0.0 0.0]
++        doc (-> (data/new-document "unexported-mesh")
++                (data/add-slot {:id "mesh" :bone "root" :attachment attachment})
++                (data/set-deform-keyframe "default" "mesh" 0.0 offsets "linear"))]
++    (is (thrown? clojure.lang.ExceptionInfo (data/export-spine-json doc)))
++    (let [invalid (assoc-in doc [:slots 0 :bone] "missing")]
++      (is (thrown? clojure.lang.ExceptionInfo (slots/tracks invalid "default" "mesh")))
++      (is (thrown? clojure.lang.ExceptionInfo (slots/draw-order-track invalid "default"))))
++    (is (= ["mesh"] (slots/attachment-names doc "mesh")))
++    (is (= [] (slots/tracks doc "default" "mesh")))
++    (is (= [] (:keys (slots/draw-order-track doc "default"))))
++    (is (= offsets (get-in (slots/deform-track doc "default" "mesh" 0.0) [:keys 0 :vertices])))
++    (let [materialized (slots/materialize-tracks doc)]
++      (is (= offsets (get-in materialized [:animations 0 :deforms 0 :keys 0 :vertices])))
++      (is (= [] (get-in materialized [:animations 0 :sequence-tracks]))))))
++
++;; Parsed source caching must preserve Spine channel order, remain bounded
++;; across source edits, and never retain failed JSON decodes.
++(deftest parsed-spine-source-cache-test
++  #_{:clj-kondo/ignore [:discouraged-var]}
++  (with-redefs-fn {#'slots/parsed-source-cache (atom [])}
++    (fn verify-parsed-source-cache []
++      (let [text "{\"z\":1,\"a\":2}"
++            parsed (#'slots/parsed-source text)]
++        (is (identical? parsed (#'slots/parsed-source text)))
++        (is (= ["z" "a"] (vec (.keySet ^java.util.Map (:ordered parsed)))))
++        (doseq [i (range 20)] (#'slots/parsed-source (json/write-str {"version" i})))
++        (is (= 4 (count @@#'slots/parsed-source-cache)))
++        (is (thrown? Exception (#'slots/parsed-source "{")))
++        (is (= 4 (count @@#'slots/parsed-source-cache)))))))
+--- before/editor/test/editor/skeletal_animation_slots_test.clj
++++ after/editor/test/editor/skeletal_animation_slots_test.clj
+@@ -24,18 +24,18 @@
+   {"skeleton" {"spine" "4.2.43"}
+    "bones" [{"name" "root"}]
+    "slots" [{"name" "a" "bone" "root" "attachment" "one"}
+-             {"name" "b" "bone" "root" "attachment" "b"}
+-             {"name" "c" "bone" "root" "attachment" "c"}
+-             {"name" "d" "bone" "root" "attachment" "d"}]
++            {"name" "b" "bone" "root" "attachment" "b"}
++            {"name" "c" "bone" "root" "attachment" "c"}
++            {"name" "d" "bone" "root" "attachment" "d"}]
+    "skins" [{"name" "default" "attachments" {"a" {"one" {"path" "one" "width" 20 "height" 20}
+-                                                       "two" {"path" "two" "width" 16 "height" 16}}
+-                                                "b" {"b" {"path" "b"}}
+-                                                "c" {"c" {"path" "c"}}
+-                                                "d" {"d" {"path" "d"}}}}
+-              {"name" "winter" "attachments" {"a" {"one" {"path" "winter" "width" 30 "height" 30}}}}]
++                                                  "two" {"path" "two" "width" 16 "height" 16}}
++                                             "b" {"b" {"path" "b"}}
++                                             "c" {"c" {"path" "c"}}
++                                             "d" {"d" {"path" "d"}}}}
++            {"name" "winter" "attachments" {"a" {"one" {"path" "winter" "width" 30 "height" 30}}}}]
+    "animations" {"move" {"slots" {"a" {"attachment" [{"time" 0.25 "name" "two"} {"time" 0.75} {"time" 1 "name" "one"}]}}
+-                             "drawOrder" [{"time" 0.5 "offsets" [{"slot" "a" "offset" 2} {"slot" "d" "offset" -2}]}
+-                                          {"time" 1}]}}})
++                         "drawOrder" [{"time" 0.5 "offsets" [{"slot" "a" "offset" 2} {"slot" "d" "offset" -2}]}
++                                      {"time" 1}]}}})
+ 
+ (defn- document [source] (data/import-spine-json (json/write-str source)))
+ 
+@@ -154,18 +154,20 @@
+   (is (thrown? clojure.lang.ExceptionInfo (slots/sample-slots (document (source)) "absent" 0.0)))
+   (is (thrown? clojure.lang.ExceptionInfo (slots/sample-slots (document (source)) "move" ##NaN))))
+ 
+-;; Immutable-document caching parses JSON once across frames, while a newly
+-;; edited document invalidates the compiled attachment and timeline cache.
++;; FFD and setup edits retain parsed source JSON while rebuilding attachment
++;; data. Replacing the source text must invalidate both values and key order.
+ (deftest document-cache-test
+-  (let [doc (document (source)) reads (atom 0) read-json json/read-str]
+-    (with-redefs [json/read-str (fn [& args] (swap! reads inc) (apply read-json args))]
+-      (slots/sample-slots doc "move" 0.1)
+-      (slots/sample-slots doc "move" 0.2)
+-      (slots/sample-slots doc "move" 0.3)
+-      (is (= 1 @reads))
+-      (let [updated (data/update-slot doc "a" {:attachment {:width 44.0}})]
+-        (is (= 44.0 (get-in (sampled-slot (slots/sample-slots updated "move" 0.0) "a") [:attachment :width])))
+-        (is (= 2 @reads))))))
++  (let [doc (document (source))
++        parsed (#'slots/parsed-source (:spine-source doc))]
++    (slots/sample-slots doc "move" 0.1)
++    (slots/sample-slots doc "move" 0.2)
++    (let [updated (data/update-slot doc "a" {:attachment {:width 44.0}})]
++      (is (= 44.0 (get-in (sampled-slot (slots/sample-slots updated "move" 0.0) "a") [:attachment :width])))
++      (is (identical? parsed (#'slots/parsed-source (:spine-source updated))))
++      (let [changed (assoc updated :spine-source
++                           (json/write-str (assoc-in (source) ["animations" "move" "slots" "a" "alpha"] [{"time" 0 "value" 0.25}])))]
++        (is (= 0.25 (peek (:color (sampled-slot (slots/sample-slots changed "move" 0.0) "a")))))
++        (is (not (identical? parsed (#'slots/parsed-source (:spine-source changed)))))))))
+ 
+ ;; Authored switches and hide keys must preview, export and save correctly;
+ ;; replacing an imported key preserves its unknown/custom fields.

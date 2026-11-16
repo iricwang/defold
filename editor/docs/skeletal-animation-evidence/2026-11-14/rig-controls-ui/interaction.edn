@@ -1,0 +1,84 @@
+{:viewport [2400 1400]
+ :steps [{:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail_path.skeleton"}}
+ {:op :keys :keys [:enter]}
+ {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+ {:op :click :selector "#skeletal-tree-search"}
+ {:op :keys :keys [:p]} {:op :keys :keys [:a]} {:op :keys :keys [:t]} {:op :keys :keys [:h]}
+ {:op :click :selector "#skeletal-tree-bone-tail_path_tip"}
+ {:op :assert :selector "#skeletal-rig-role" :property :text :equals "This bone: controller"}
+ {:op :assert :selector "#skeletal-rig-create-ik" :property :disabled :equals false}
+ {:op :click :selector "#skeletal-rig-configure-path-tail_follow_path"}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :selected-kind] :equals :path}
+ {:op :snapshot}
+ {:op :click :selector "#skeletal-rig-controller-tail_path_mid"}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :selected] :equals "tail_path_mid"}
+ {:op :snapshot}
+ {:op :scroll :selector "#skeletal-tool-dock" :delta [-1200 0]}
+ {:op :click :selector "#skeletal-space-parent"}
+ {:op :scroll :selector "#skeletal-tool-dock" :delta [1200 0]}
+ {:op :click :selector "#skeletal-tool-move"}
+ {:op :click :selector "#skeletal-tree-bone-tail_path_tip"}
+ {:op :remember :selector "#skeletal-palette-x" :property :text :as :before}
+ {:op :drag :button :primary :path [{:selector "#skeletal-canvas" :at [0.9 0.12]} {:selector "#skeletal-canvas" :at [0.84 0.16]}]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :before}
+ {:op :snapshot}
+ {:op :keys :keys [:meta :z]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :equals "-44.82"}
+ {:op :click :selector "#skeletal-tree-bone-tail_path_mid"}
+ {:op :remember :selector "#skeletal-palette-x" :property :text :as :before}
+ {:op :drag :button :primary :path [{:selector "#skeletal-canvas" :at [0.9 0.12]} {:selector "#skeletal-canvas" :at [0.84 0.16]}]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :before}
+ {:op :snapshot}
+ {:op :keys :keys [:meta :z]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :equals "46.75"}
+ {:op :click :selector "#skeletal-mode"}
+ {:op :keys :window-index 1 :keys [:down]}
+ {:op :keys :window-index 1 :keys [:enter]}
+ {:op :assert :selector "#skeletal-mode" :property :value :equals "animate"}
+ {:op :assert :selector "#skeletal-rig-create-ik" :property :disabled :equals true}
+ {:op :click :selector "#skeletal-tree-bone-tail_path_mid"}
+ {:op :remember :selector "#skeletal-palette-x" :property :text :as :before}
+ {:op :drag :button :primary :path [{:selector "#skeletal-canvas" :at [0.9 0.12]} {:selector "#skeletal-canvas" :at [0.86 0.15]}]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :before}
+ {:op :keys :keys [:meta :z]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :equals "46.75"}
+ {:op :keys :keys [:meta :shift :z]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :before}
+ {:op :snapshot}
+ {:op :click :selector "#skeletal-tree-bone-tail_path_tip"}
+ {:op :remember :selector "#skeletal-palette-x" :property :text :as :before}
+ {:op :drag :button :primary :path [{:selector "#skeletal-canvas" :at [0.9 0.12]} {:selector "#skeletal-canvas" :at [0.86 0.15]}]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :before}
+ {:op :keys :keys [:meta :z]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :equals "-44.82"}
+ {:op :keys :keys [:meta :shift :z]}
+ {:op :assert :selector "#skeletal-palette-x" :property :text :differs-from :before}
+ {:op :snapshot}
+ {:op :keys :keys [:meta :s]}
+ {:op :keys :keys [:space]}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals true}
+ {:op :keys :keys [:space]}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :playing] :equals false}
+ {:op :snapshot}
+ {:op :click :selector "#skeletal-mode"}
+ {:op :keys :window-index 1 :keys [:up]}
+ {:op :keys :window-index 1 :keys [:enter]}
+ {:op :assert :selector "#skeletal-mode" :property :value :equals "setup"}
+ {:op :click :selector "#skeletal-tree-search"}
+ {:op :keys :keys [:meta :a]}
+ {:op :keys :keys [:back-space]}
+ {:op :keys :keys [:h]} {:op :keys :keys [:e]} {:op :keys :keys [:a]} {:op :keys :keys [:d]}
+ {:op :click :selector "#skeletal-tree-bone-head"}
+ {:op :assert :selector "#skeletal-rig-role" :property :text :equals "No IK / path binding"}
+ {:op :click :selector "#skeletal-rig-create-ik"}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :ik-pick :bones] :equals ["head"]}
+ {:op :keys :keys [:escape]}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :ik-pick] :equals nil}
+ {:op :click :selector "#skeletal-rig-create-ik"}
+ {:op :click :selector "#skeletal-canvas" :at [0.3 0.12]}
+ {:op :assert :selector "#skeletal-rig-role" :property :text :equals "This bone: controller"}
+ {:op :click :selector "#skeletal-rig-configure-ik-ik1"}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :selected-kind] :equals :ik}
+ {:op :click :selector "#skeletal-ik-select-target"}
+ {:op :assert :selector "#skeletal-workspace" :context-key :editor.skeletal-animation-view/context :state-path [:state :selected] :equals "ik_target1"}
+ {:op :snapshot}]}

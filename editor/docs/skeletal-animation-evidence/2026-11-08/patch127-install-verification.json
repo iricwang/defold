@@ -1,0 +1,38 @@
+{
+  "version": "1.14.2-patch.127",
+  "baseline": "1.14.2-patch.126",
+  "feed": "local loopback :18407",
+  "package": "/Users/applemima1111/Documents/Dev/Defold/tmp/animation-local-update/Defold-arm64-macos-patch-126-to-127.zip",
+  "sha256": "58e1e81ed703ebc14919ac372dd9e8dc6707e5cc8c4e285d7a74afd2735c1e65",
+  "installed_app": "/Applications/Defold.app",
+  "inventory_files": 169,
+  "inventory_mismatches": [],
+  "source_tests": {
+    "tests": 55,
+    "assertions": 351
+  },
+  "packaged_targeted_tests": {
+    "tests": 12,
+    "assertions": 121
+  },
+  "package_tests": {
+    "tests": 48,
+    "skipped": 15
+  },
+  "cold_restart": "passed; installed JAR only, no source overrides",
+  "ui_checks": [
+    "smooth Bezier preset and undo restore",
+    "curve graph right-drag and wheel navigation",
+    "dopesheet right-drag and wheel: zoom 11.2529 -> 14.8890, pan 0 -> -444.4411",
+    "independent hierarchy and properties panes",
+    "four 34x26 menus open",
+    "empty slot selection shows hint without exception"
+  ],
+  "document_unchanged_after_checks": true,
+  "runtime_engine_changed": false,
+  "packaging_notes": [
+    "Preserved ZIP entry timestamps to avoid source/AOT classloader mismatch",
+    "Included root skeletal_animation namespace and all companion classes; failed initial candidate rolled back before corrected reinstall",
+    "Full AOT test suite is not equivalent to source tests because direct linking bypasses with-redefs; targeted release checks plus live cold-start UI used"
+  ]
+}

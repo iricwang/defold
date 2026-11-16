@@ -1,0 +1,197 @@
+{
+  "label": "current-final",
+  "build": {
+    "build_id": "24d197fe33a14942b521643c21f46dfd",
+    "project_id": "a735c4724c9c7b9c",
+    "project": "/private/tmp/spine-runtime-export/runtime-evidence/current-final/builds/24d197fe33a14942b521643c21f46dfd/project",
+    "compiled_project": "/private/tmp/spine-runtime-export/runtime-evidence/current-final/builds/24d197fe33a14942b521643c21f46dfd/project/build/default/game.projectc",
+    "source_policy": "existing_compiled",
+    "resource_fingerprint": "c6fc4de15788db8f635025d9a9a30ec6a9fb8eef1d955d8a038b49d5205a0ac1",
+    "native_extensions_detected": false,
+    "engine": "/private/tmp/spine-runtime-export/runtime-evidence/current-final/builds/24d197fe33a14942b521643c21f46dfd/engine/dmengine",
+    "engine_sha256": "b01571448c869ab2623a9ea81201d6675d95ddc48b951204d953a9bb7ca7be11",
+    "symbols_sha256": null,
+    "cache_hit": false,
+    "copied_resource_bytes": 2935043,
+    "reused_resource_files": 0,
+    "import_seconds": 0.02521566697396338,
+    "freshness": "existing compiled resources; source changes are not rebuilt"
+  },
+  "session": {
+    "session_id": "b69f8252376c4061810bbe2e623b8ae3",
+    "lease_id": "3ea99ffb00ce4177a3db4dec144a13a2",
+    "lease_seconds": 60,
+    "ownership": "owned",
+    "build_id": "24d197fe33a14942b521643c21f46dfd",
+    "preview": null,
+    "device_revision": 1,
+    "alive": true,
+    "height": 720,
+    "width": 1280,
+    "port": 61125,
+    "render_sequence": 6,
+    "protocol_version": 1,
+    "pid": 74181,
+    "input_sequence": 0
+  },
+  "capture": {
+    "capture_sequence": 2,
+    "render_sequence": 181,
+    "input_sequence": 0,
+    "height": 720,
+    "width": 1280,
+    "device_revision": 1,
+    "geometry_precision": "unavailable",
+    "coordinate_space": "frame_pixels_top_left",
+    "image_path": "/private/tmp/spine-runtime-export/runtime-evidence/current-final/sessions/b69f8252376c4061810bbe2e623b8ae3/a6bcb8c6ca3a4b41a25905b1717d5325.png",
+    "session_id": "b69f8252376c4061810bbe2e623b8ae3",
+    "observation_id": "a6bcb8c6ca3a4b41a25905b1717d5325",
+    "source": "runtime",
+    "artifact_kind": "runtime_frame",
+    "build_id": "24d197fe33a14942b521643c21f46dfd",
+    "temporal_consistency": "image_and_bridge_metadata",
+    "device": {
+      "width": 1280,
+      "height": 720
+    },
+    "image_sha256": "6d3873faba0001bcd31c97f5a7118545d60fbbc13f8553199cfcb84e7aa61fc8",
+    "project_id": "a735c4724c9c7b9c",
+    "source_policy": "existing_compiled",
+    "resource_fingerprint": "c6fc4de15788db8f635025d9a9a30ec6a9fb8eef1d955d8a038b49d5205a0ac1",
+    "project_config": {},
+    "gui_projection_profile": "default_gui",
+    "artifact_id": "a6bcb8c6ca3a4b41a25905b1717d5325",
+    "uri": "defold://artifacts/a6bcb8c6ca3a4b41a25905b1717d5325/frame.png",
+    "inline_preview": {
+      "width": 960,
+      "height": 540,
+      "to_frame_scale": [
+        1.3333333333333333,
+        1.3333333333333333
+      ],
+      "to_frame_offset": [
+        0,
+        0
+      ],
+      "source_observation_id": "a6bcb8c6ca3a4b41a25905b1717d5325"
+    }
+  },
+  "logs": [
+    {
+      "cursor": 1,
+      "text": "ERROR:PROFILER: Failed to initialize Remotery: 5"
+    },
+    {
+      "cursor": 2,
+      "text": "INFO:DLIB: Log server started on port 61124"
+    },
+    {
+      "cursor": 3,
+      "text": "INFO:ENGINE: Target listening with name: macmini.local - 127.0.0.1 - Darwin"
+    },
+    {
+      "cursor": 4,
+      "text": "INFO:ENGINE: Engine service started on port 61125"
+    },
+    {
+      "cursor": 5,
+      "text": "INFO:ENGINE: OpenAPI: http://127.0.0.1:61125/openapi.json"
+    },
+    {
+      "cursor": 6,
+      "text": "INFO:GRAPHICS: Installed graphics device 'ADAPTER_FAMILY_METAL'"
+    },
+    {
+      "cursor": 7,
+      "text": "INFO:ENGINE: Defold Engine 1.14.2 (13bb123)"
+    },
+    {
+      "cursor": 8,
+      "text": "INFO:DEFOLDEDITORGAMEBRIDGE: Editor Game bridge connected (native extensions)"
+    },
+    {
+      "cursor": 9,
+      "text": "INFO:ENGINE: Editor automation bridge protocol 1 (macOS HID)"
+    },
+    {
+      "cursor": 10,
+      "text": "INFO:ENGINE: Loading data from: archive:build/default/game.dmanifest"
+    },
+    {
+      "cursor": 11,
+      "text": "INFO:SPINEEXT: Registered spine extension"
+    },
+    {
+      "cursor": 12,
+      "text": ""
+    },
+    {
+      "cursor": 13,
+      "text": "INFO:SOUND:   DSP backend: Fallback"
+    },
+    {
+      "cursor": 14,
+      "text": "INFO:SOUND: Sound"
+    },
+    {
+      "cursor": 15,
+      "text": "INFO:SOUND:   nSamplesPerSec:   48000"
+    },
+    {
+      "cursor": 16,
+      "text": "INFO:SOUND:        useThread:   1"
+    },
+    {
+      "cursor": 17,
+      "text": "INFO:ENGINE: Initialised sound device 'default'"
+    },
+    {
+      "cursor": 18,
+      "text": "INFO:RENDER: Render execution: inline (threaded rendering excluded by build)"
+    },
+    {
+      "cursor": 19,
+      "text": "INFO:PHYSICS: Created physics context: Box2D v2.2.1"
+    },
+    {
+      "cursor": 20,
+      "text": "WARNING:RENDER: RenderListAlloc() is deprecated. Use NewRenderItem() and the render item setters."
+    },
+    {
+      "cursor": 21,
+      "text": "WARNING:RENDER: RenderListMakeDispatch() is deprecated. Use RegisterRenderListDispatch() and SubmitRenderListDispatch()."
+    },
+    {
+      "cursor": 22,
+      "text": "WARNING:RENDER: RenderListSubmit() is deprecated. Use Enable() and SubmitRenderListDispatch()."
+    },
+    {
+      "cursor": 23,
+      "text": "DEBUG:SCRIPT: ORIGINAL_CURSOR\t30\t0.24166676402092"
+    },
+    {
+      "cursor": 24,
+      "text": "DEBUG:SCRIPT: ORIGINAL_CURSOR\t60\t0.49166652560234"
+    },
+    {
+      "cursor": 25,
+      "text": "DEBUG:SCRIPT: ORIGINAL_CURSOR\t90\t0.74166631698608"
+    },
+    {
+      "cursor": 26,
+      "text": "DEBUG:SCRIPT: ORIGINAL_CURSOR\t120\t0.9916660785675"
+    },
+    {
+      "cursor": 27,
+      "text": "DEBUG:SCRIPT: ORIGINAL_CURSOR\t150\t0.24166584014893"
+    },
+    {
+      "cursor": 28,
+      "text": "DEBUG:SCRIPT: ORIGINAL_CURSOR\t180\t0.49166560173035"
+    },
+    {
+      "cursor": 29,
+      "text": "DEBUG:SCRIPT: TEXTURE_READY"
+    }
+  ]
+}

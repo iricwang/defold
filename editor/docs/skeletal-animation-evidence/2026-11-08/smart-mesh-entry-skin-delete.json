@@ -1,0 +1,22 @@
+{
+  "delivery": "source and local editor hot reload; no new package",
+  "tests": 70,
+  "assertions": 467,
+  "failed": 0,
+  "live": {
+    "smart_mesh_entry_visible_for_mesh": true,
+    "existing_mesh_generation_disabled_with_explanation": true,
+    "removed_skin": "combined",
+    "after_delete": [
+      "default"
+    ],
+    "active_after_delete": "default",
+    "undo_restored_exact_document": true,
+    "skins_after_undo": [
+      "default",
+      "combined"
+    ],
+    "active_after_undo": "combined"
+  },
+  "runtime_changed": false
+}

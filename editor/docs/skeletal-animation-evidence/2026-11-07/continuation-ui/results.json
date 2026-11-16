@@ -1,0 +1,87 @@
+{
+  "date": "2026-11-07",
+  "platform": "macOS Apple Silicon",
+  "interaction_driver": "cljfx.plorer via running Defold REPL",
+  "persistent_package_installed": false,
+  "runtime_engine_changed": false,
+  "game_assets_changed": false,
+  "full_regression": {
+    "tests": 376,
+    "assertions": 7586,
+    "failures": 0,
+    "errors": 0,
+    "scope": "all 30 skeletal test namespaces before final compact-label adjustment"
+  },
+  "final_label_regression": {
+    "tests": 12,
+    "assertions": 134,
+    "failures": 0,
+    "errors": 0,
+    "scope": "workspace view + view workflow after final compact-label adjustment; overlaps full regression, do not sum"
+  },
+  "mixed_preview": {
+    "base_rotation": -20.0,
+    "overlay_rotation": 90.0,
+    "overlay_alpha": 0.5,
+    "observed_rotation": 35.0,
+    "initial_pending_events": [
+      "sound"
+    ],
+    "played_seconds": 21.520276374999995,
+    "observed_events": 22,
+    "pause_succeeded": true,
+    "status": ""
+  },
+  "audio": {
+    "source": "project-local WAV",
+    "volume": 0.0,
+    "scope": "real AudioClip load and silent playback without errors; not a subjective listening or all-codec test"
+  },
+  "workspace": {
+    "before": "hero",
+    "clicked_label": "companion",
+    "after": "companion",
+    "mode": "setup",
+    "mixer_enabled": false,
+    "labels_fully_visible": true,
+    "status": ""
+  },
+  "cleanup": {
+    "fixture_windows_closed": true,
+    "fixture_graph_nodes_deleted": true,
+    "only_fixture_undo_entries_removed": true,
+    "current_session_resource_type_registered": true
+  },
+  "source_sha256": {
+    "src/clj/editor/skeletal_animation.clj": "5493aea91d1dfc91b6ec7d0f4970b99c4d16901ecdad5cb44d0e83e9bb588a5f",
+    "src/clj/editor/skeletal_animation_atlas.clj": "a6d9388e0bd6d9bb93bd0ea4c947b40ee6f245e840e7093f8ee119b39558eeba",
+    "src/clj/editor/skeletal_animation_attachments.clj": "89159588aa75759f801d6d54daf52d378559a66b48e72711403e42294976a92d",
+    "src/clj/editor/skeletal_animation_audio.clj": "2ddada66dc7cb8bbfcd282b35a84f0c0c88a50075e6ee7fbdf0a9549cc06d30a",
+    "src/clj/editor/skeletal_animation_clipping.clj": "0fea52ef87acbdcf26ac9d370bc852c5d80c1fdff6f575e68556cb42a8b30874",
+    "src/clj/editor/skeletal_animation_constraints.clj": "5ba0b663a74c0ab2d93739cbbcf3e4730f51f87717e2789d7661cedea36c6b0e",
+    "src/clj/editor/skeletal_animation_curve_view.clj": "bc07d3f2780d39e96d412920b3d91b7a985fb13ce958bbbb78b8af5a0b480220",
+    "src/clj/editor/skeletal_animation_data.clj": "3a7ebe3dbb8e6115ae4500a6442d2b89fe80304b0de7a2ed10376423f06ce2ea",
+    "src/clj/editor/skeletal_animation_events.clj": "4655091f8e078574c762a981d0a6066dbda92bb994bbc28280ebf3bb8c2a91f6",
+    "src/clj/editor/skeletal_animation_geometry.clj": "71b5a21fffa0b0207a4e3f932ac5a9c9141e56af36648d4fc933049e76b0a813",
+    "src/clj/editor/skeletal_animation_gpu.clj": "28250a72fcb7b095b81e6efa3000517c2cc0542cb7b7b0256fb9ec73ef8a4279",
+    "src/clj/editor/skeletal_animation_interpolation.clj": "331020b2d7895aebc35d935277d8e0dd4290a42d2edccc83ae842f9c64657dac",
+    "src/clj/editor/skeletal_animation_io.clj": "bb3364786503c1bab1d35aa964921b6fb7c1362b8cfb7cd34cccb455ceab9909",
+    "src/clj/editor/skeletal_animation_mesh.clj": "de4620bdba6eb919ae199a4c5ef9129deef470c318870a266404d2a2107d7473",
+    "src/clj/editor/skeletal_animation_mixing.clj": "bae0ee99e20b4091541ee06a903e2b3f363aab507842b19dda09d4a456cbb505",
+    "src/clj/editor/skeletal_animation_native.clj": "7c1eedee56c7d3d29726c7971eaf8e98d6b0504fa3e60a187773803408afb66a",
+    "src/clj/editor/skeletal_animation_physics.clj": "6a5623037e5491ba3be33c28418aa37a2c577f7fc901eb3f9f0dad3f730d3cfa",
+    "src/clj/editor/skeletal_animation_playback.clj": "796d655f9bc404b1ea35fdb4e4389a5270efc35f849782eac9be5285abaa14ab",
+    "src/clj/editor/skeletal_animation_preview_export.clj": "a9c71a5d3646418b9ee056fe6011a26a5a8f415974af356881d1c2cfc25c2612",
+    "src/clj/editor/skeletal_animation_project.clj": "5372f2964ccc5fd048c864c83980920cca8107b5b23f60a547d6abfe4af5d4ee",
+    "src/clj/editor/skeletal_animation_render.clj": "35a714e6fff05feb4f4d19adb67c9facb5387005aa27a7bcc193cdeed30b719c",
+    "src/clj/editor/skeletal_animation_sequence.clj": "a2b33a0d2e14c7119ca6e9ec2b9f8844578d463ef979adc53f7de95a4137991e",
+    "src/clj/editor/skeletal_animation_skin.clj": "5a4111d96ad3aae485a485119236e3799ccd19b07e88380025331f67b717dd78",
+    "src/clj/editor/skeletal_animation_slot_view.clj": "968974dfd14390d2763a5d27bd985f6d2c81ed48e5f800529e2593d66c74eedf",
+    "src/clj/editor/skeletal_animation_slots.clj": "d1fbb8176d3b63a557a527930ad6e992fb1e4ac6c6fbcd2f087fdff8b924f4dd",
+    "src/clj/editor/skeletal_animation_spine.clj": "8be0198bd03329145000c612cb43506b2669bd073cf1ea8aafbaa920a243d462",
+    "src/clj/editor/skeletal_animation_timeline.clj": "fb4cb3254b21efebf4c176c3e975cc377e25abbea3091ddcc20905506b9197a6",
+    "src/clj/editor/skeletal_animation_tools.clj": "24f90c98d1814db92f6b9d8c0cf4ca4e7817fa5e4cc1b5971478e53862c4e6b8",
+    "src/clj/editor/skeletal_animation_view.clj": "017b7336fbbba4cb3ae9608f497cbf05ca0239e2cd01080b11f969f03f91e240",
+    "src/clj/editor/skeletal_animation_workspace_view.clj": "994a805ab3b44bdb30c7a1f2f6f9b26ecf06c64107819009893e0016bab64048"
+  }
+}

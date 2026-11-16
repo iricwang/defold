@@ -1,0 +1,9 @@
+{
+  "export": 0,
+  "bob-build": 0,
+  "sha256": {
+    "bob": "b683edf5d4e53c0c5f67eb18d8d77fc92bcf78c820d42f44107f93fa62651c57",
+    "engine": "df218b63ceea8cc7ca3ce9249bdbd4326bba68bf08f11796178011c9912c71de",
+    "plugin": "267b40d5175c0d47a9b98db80d17137f1eed70739d880ea79cb3688ec4eec8a2"
+  }
+}

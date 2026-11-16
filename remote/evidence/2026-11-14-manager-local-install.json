@@ -1,0 +1,31 @@
+{
+  "version": "0.2.7",
+  "runtimeRevision": "117692a17f61e22e",
+  "installedApp": "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-manager-delivery/Defold Remote Manager.app",
+  "backup": "/Users/applemima1111/Documents/Dev/Defold/tmp/remote-manager-backup-0.2.6-20261114",
+  "signatureAndManifestHashes": "passed",
+  "isolatedStartAndRestart": [
+    {
+      "restart": 0,
+      "projects": 2,
+      "devices": 1,
+      "revision": "117692a17f61e22e",
+      "engineError": ""
+    },
+    {
+      "restart": 1,
+      "projects": 2,
+      "devices": 1,
+      "revision": "117692a17f61e22e",
+      "engineError": ""
+    }
+  ],
+  "nativeWindow": {
+    "loaded": true,
+    "projects": 2,
+    "devices": 1,
+    "launchMethod": "direct executable from authorized tool process"
+  },
+  "remainingIssue": "Launch Services cold start blocked in RemoteEngineInstallation.requireSdk -> RemoteManager.hash -> UnixNativeDispatcher.open0. Direct executable launch works; cause not proven and not resolved.",
+  "modifiedRuntimeEngine": false
+}

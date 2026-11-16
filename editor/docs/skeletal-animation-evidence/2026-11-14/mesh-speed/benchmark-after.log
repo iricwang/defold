@@ -1,0 +1,8 @@
+{:label "after", :round 0, :bones 8, :controls 3, :ms 4363.9305, :vertices 68}
+{:label "after", :round 0, :bones 12, :controls 4, :ms 1975.632375, :vertices 76}
+{:label "after", :round 0, :bones 12, :controls 5, :ms 1178.706541, :vertices 76}
+{:label "after", :round 0, :bones 12, :controls 5, :ms 0.066292, :vertices 76}
+{:label "after", :round 1, :bones 8, :controls 3, :ms 3375.122292, :vertices 68}
+{:label "after", :round 1, :bones 12, :controls 4, :ms 1901.818792, :vertices 76}
+{:label "after", :round 1, :bones 12, :controls 5, :ms 1384.545209, :vertices 76}
+{:label "after", :round 1, :bones 12, :controls 5, :ms 0.076417, :vertices 76}

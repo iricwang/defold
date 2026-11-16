@@ -1,0 +1,22 @@
+{:viewport [2000 1200]
+ :steps [{:op :click :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail.skeleton"}}
+         {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-workspace" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :selector "#skeletal-texture-output-menu"}
+         {:op :wait :window-index 1 :selector "#skeletal-texture-scale-apply" :property :disabled :equals false :timeout-ms 30000}
+         {:op :assert :window-index 1 :selector "#skeletal-texture-scale-percent" :property :text :equals "30.0"}
+         {:op :click :window-index 1 :selector "#skeletal-texture-scale-percent"}
+         {:op :keys :window-index 1 :keys [:meta :a]}
+         {:op :keys :window-index 1 :keys [:digit3]} {:op :keys :window-index 1 :keys [:digit1]}
+         {:op :click :window-index 1 :selector "#skeletal-texture-scale-apply"}
+         {:op :keys :window-index 1 :keys [:escape]}
+         {:op :click :selector "#skeletal-project-menu"}
+         {:op :wait :window-index 1 :selector "#skeletal-export" :property :visible :equals true :timeout-ms 30000}
+         {:op :click :window-index 1 :selector "#skeletal-export"}
+         {:op :keys :window-index 1 :keys [:escape]}
+         {:op :click :selector "#skeletal-canvas" :at [0.95 0.95]}
+         {:op :keys :keys [:meta :z]}
+         {:op :click :selector "#skeletal-texture-output-menu"}
+         {:op :wait :window-index 1 :selector "#skeletal-texture-scale-apply" :property :disabled :equals false :timeout-ms 30000}
+         {:op :assert :window-index 1 :selector "#skeletal-texture-scale-percent" :property :text :equals "30.0"}
+         {:op :snapshot}]}

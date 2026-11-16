@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "date": "2026-11-07",
+  "timezone": "Asia/Shanghai",
+  "scope": "Desktop Remote Manager on Apple Silicon macOS. Isolated current-source runtime and UI; no application installation or publication.",
+  "overallStatus": "backend-and-rust-checks-passed-with-native-extension-environment-blocker",
+  "runtimeRevision": "b583734ca321cdd3",
+  "testArtifacts": "/tmp/remote-regression-20261107",
+  "checks": {
+    "hostPython": {
+      "status": "passed",
+      "tests": 10,
+      "command": "python -m unittest discover -s remote/tests -v",
+      "log": "host-tests.log"
+    },
+    "prepareAndLocalExtensionsPython": {
+      "status": "passed",
+      "tests": 16,
+      "command": "python -m unittest remote.manager.test_prepare patch.test_local_extensions -v",
+      "log": "prepare-tests.log",
+      "scope": "Unit tests, not a successful native-extension build"
+    },
+    "pairing": {
+      "status": "passed",
+      "checks": [
+        "a recommended current LAN address is selected",
+        "compact QR keeps full certificate identity",
+        "compact QR keeps full one-use secret",
+        "compact QR keeps selected origin and port",
+        "compact QR is shorter without shortening credentials",
+        "waiting feedback is non-secret",
+        "actual TLS certificate matches full QR pin",
+        "manual refresh invalidates original code",
+        "actual TLS certificate matches full QR pin",
+        "actual TLS pair succeeds and returns computer identity",
+        "paired feedback names the accepted phone",
+        "actual TLS certificate matches full QR pin",
+        "accepted credential is single-use",
+        "adding another phone returns to waiting",
+        "actual TLS certificate matches full QR pin",
+        "address reselection invalidates prior QR"
+      ],
+      "log": "pairing.log",
+      "scope": "Real local TLS, full certificate pin and one-use credentials; no physical camera/Wi-Fi test"
+    },
+    "resolver": {
+      "status": "passed",
+      "unitChecks": 21,
+      "integration": "Real HTTPS completes while reverse DNS remains blocked; certificate pin and authorization verified",
+      "log": "resolver.log"
+    },
+    "managerCore": {
+      "status": "passed",
+      "checks": [
+        "one selected connection address is persisted",
+        "catalog rejects unpaired clients",
+        "QR uses only the selected address",
+        "address selection invalidates previous QR",
+        "pairing secret is single use",
+        "phone connection starts automatic build 6b40596e-cf79-4014-9537-4f0e1a66db07",
+        "phone connection starts automatic build a8c42463-58ff-43f2-af59-3da6dfde0735",
+        "two independent games running without editor",
+        "real GPU thumbnail 6b40596e-cf79-4014-9537-4f0e1a66db07",
+        "stream uses top-left image coordinates 6b40596e-cf79-4014-9537-4f0e1a66db07",
+        "pointer accepted 6b40596e-cf79-4014-9537-4f0e1a66db07",
+        "Lua button callback received 6b40596e-cf79-4014-9537-4f0e1a66db07",
+        "hardware video connects 6b40596e-cf79-4014-9537-4f0e1a66db07",
+        "video dimensions valid 6b40596e-cf79-4014-9537-4f0e1a66db07",
+        "60 H264 frames 6b40596e-cf79-4014-9537-4f0e1a66db07: 62.0 fps",
+        "real GPU thumbnail a8c42463-58ff-43f2-af59-3da6dfde0735",
+        "stream uses top-left image coordinates a8c42463-58ff-43f2-af59-3da6dfde0735",
+        "pointer accepted a8c42463-58ff-43f2-af59-3da6dfde0735",
+        "Lua button callback received a8c42463-58ff-43f2-af59-3da6dfde0735",
+        "hardware video connects a8c42463-58ff-43f2-af59-3da6dfde0735",
+        "video dimensions valid a8c42463-58ff-43f2-af59-3da6dfde0735",
+        "60 H264 frames a8c42463-58ff-43f2-af59-3da6dfde0735: 62.0 fps",
+        "old project control revoked after switch",
+        "switching did not stop either game",
+        "another device requires explicit takeover",
+        "explicit takeover succeeds",
+        "takeover rejects old controller",
+        "stale device dimensions rejected",
+        "unshared project removed from catalog",
+        "revoked host credential rejected",
+        "both sessions stopped"
+      ],
+      "log": "manager-core.log",
+      "scope": "Two actual macOS GPU games, TLS, H.264, input callbacks, sharing and authorization; native-extension-free fixtures"
+    },
+    "engineSelectionAndCache": {
+      "status": "passed",
+      "checks": [
+        "real game uses the selected packaged engine",
+        "compiler and build inputs are pinned separately from Manager revision",
+        "same installation contents retain running session",
+        "invalid selection leaves active session and directory unchanged",
+        "repeat start reuses original build and timestamp",
+        "owned Manager exits normally",
+        "chosen engine directory survives restart",
+        "restart restores the cached project as ready",
+        "restart launches cached resources without compiling",
+        "all three starts created only one build directory",
+        "engine identity remains unchanged after restart",
+        "owned Manager exits normally",
+        "Manager-only revision update preserves compatible cache",
+        "Manager-only upgrade runs without another build"
+      ],
+      "firstBuildAndFrameSeconds": 11.757,
+      "cachedStartAndFrameSeconds": 3.562,
+      "restartCachedStartAndFrameSeconds": 1.038,
+      "forcedCleanup": false,
+      "log": "fast-start.log",
+      "scope": "Actual macOS directory selection, GPU frames and cache reuse; fixture timing is not representative of every game"
+    },
+    "lifecycle": {
+      "status": "passed",
+      "checks": [
+        "cancel terminates owned builder and child processes",
+        "unchanged reconnect reuses built resources"
+      ],
+      "log": "lifecycle.log"
+    },
+    "streaming": {
+      "status": "passed",
+      "dimensions": [
+        320,
+        240
+      ],
+      "frames": 1306,
+      "uniqueFrames": 1306,
+      "maxGapSeconds": 0.24985008296789601,
+      "elapsedSeconds": 30.017043542000465,
+      "streamErrors": [],
+      "sentTaps": 300,
+      "inputRoundTripMs": {
+        "median": 31.542417011223733,
+        "p95": 39.84599997056648,
+        "maximum": 246.51575001189485
+      },
+      "clickCallbacks": 300,
+      "releaseCallbacks": 300,
+      "forcedOwnedCleanup": false,
+      "extraGuiNodes": 800,
+      "tapHz": 10,
+      "log": "streaming.log",
+      "scope": "Actual macOS GPU and loopback TLS; input timings are HTTP round-trip times, not phone-to-display latency"
+    },
+    "snapshot": {
+      "status": "passed",
+      "checks": 25,
+      "scope": "Real file I/O with controlled compiler and launch substitutes",
+      "log": "RemoteSnapshotTest.log"
+    },
+    "pairingConcurrency": {
+      "status": "passed",
+      "behavior": "Accepted pairing blocks QR rotation and address changes until persistence completes",
+      "log": "RemotePairingStateTest.log"
+    },
+    "guiMigration": {
+      "status": "passed",
+      "behavior": "Legacy resources migrate without changing unrelated node/layout data; repeat migration is a no-op",
+      "log": "RemoteGuiMigrationTest.log"
+    },
+    "rust": {
+      "status": "passed",
+      "tests": 1,
+      "behavior": "QR quiet zone, integer module coordinates and oversized-input rejection",
+      "debugShellBuild": "passed after reopen/window-visibility changes",
+      "logs": [
+        "cargo-test.log",
+        "cargo-build.log"
+      ],
+      "artifact": "/tmp/remote-regression-20261107/shell/defold-remote-manager"
+    },
+    "browserUI": {
+      "status": "passed",
+      "viewport": [
+        780,
+        540
+      ],
+      "checks": [
+        "add isolated project",
+        "build/start and real GPU preview",
+        "stop",
+        "search/no matching results",
+        "share toggle",
+        "project log dialog",
+        "remove cancel and confirm preserves files",
+        "pair QR standard/compatibility/refresh",
+        "real TLS paired client visible and revoke",
+        "settings session limit and auto-prepare",
+        "quit confirmation cancel",
+        "dark/light theme at minimum window size"
+      ],
+      "scope": "Real frontend against isolated Manager RPC; browser chooser returns known fixture directories and browser QR renderer uses ZXing. Native picker and native QR checked separately. No physical phone or clipboard confirmation.",
+      "screenshots": [
+        "2026-11-07-manager-dark.png",
+        "2026-11-07-manager-light.png"
+      ]
+    },
+    "nativeUI": {
+      "status": "passed-under-controlled-launch",
+      "passed": [
+        "native project directory chooser",
+        "native Rust QR dialog",
+        "project add/start/real GPU preview/stop",
+        "single-instance window restore",
+        "in-app quit gracefully exits game and Manager",
+        "final build starts and restores saved project",
+        "hide then reopen existing app restores window",
+        "final cached game starts and displays real preview",
+        "stop then immediately open settings leaves engine picker enabled",
+        "final in-app quit exits native app and Java backend normally"
+      ],
+      "remaining": [],
+      "scope": "Isolated native macOS app, final build launched from the authorized tool parent process. Installed Manager was not replaced."
+    },
+    "frontendTests": {
+      "status": "passed",
+      "tests": 15,
+      "command": "node --test remote/manager/test_ui.js",
+      "scope": "Node VM behavior tests for displayed-state changes, request concurrency, stale previews, window visibility, pending settings, polling and error recovery"
+    }
+  },
+  "blocked": [
+    {
+      "feature": "Event native-extension end-to-end build",
+      "status": "blocked-by-sdk-mismatch",
+      "bobRevision": "871d419fe7ad8f81d5d988f58afa153df5ca818f",
+      "engineRevision": "13bb1233b1a9b2f1ea96b594c68dd09628cf300a",
+      "observedError": "Installed Bob and engine SDK revisions differ",
+      "managerClassification": "environment",
+      "failedStage": "准备本地原生扩展工具链",
+      "log": "manager.log",
+      "note": "Existing SDK inconsistency. The Extender export lacks Bob and a base engine executable required by the Manager Builder. No shared SDK modification, SHA substitution, or validation bypass was performed."
+    }
+  ],
+  "notCovered": [
+    "Windows execution and Windows-only artifact suites",
+    "Physical Android phone, Wi-Fi and camera scanning",
+    "Native-extension success/cache/recovery on a matching SDK"
+  ],
+  "cleanup": "Own browser bridge, Manager, final native test and game processes exited. One earlier isolated Java process blocked during SDK file opening was terminated after diagnosis. Cargo intermediates removed; screenshots, reports and final isolated test binaries retained. Original installed Manager restarted; installation and original project registry were not modified.",
+  "observations": [
+    {
+      "feature": "Temporary app launched through Launch Services",
+      "status": "environment-dependent-startup-block",
+      "observed": "Java constructor blocked opening the existing shared SDK dmengine file in RemoteManager.hash; native Quit waited for Java. File was a regular file, not a FIFO. Only the isolated Java process was terminated, no running test game existed.",
+      "resolutionForTest": "Launching the identical final app binary from the authorized tool process initialized normally; subsequent reopen/start/preview/stop/quit passed.",
+      "limit": "Suspected temporary app launch permissions/identity difference is not proven. No system permissions or shared SDK files changed.",
+      "logs": [
+        "native-freeze-sample.txt",
+        "native-freeze-java.txt"
+      ]
+    }
+  ]
+}

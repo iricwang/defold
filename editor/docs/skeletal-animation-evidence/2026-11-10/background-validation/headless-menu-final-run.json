@@ -1,0 +1,16 @@
+{
+  "jar": "/Users/applemima1111/Documents/Dev/Defold/tmp/skeletal-local-update/packaged-editor.jar",
+  "sha256": "8e758c1237f772bd3c6ab58153ae78864c668a343578a959798548dc737afbdc",
+  "project_source": null,
+  "project_copy": "/Users/applemima1111/Documents/Dev/Defold/tmp/headless-menu-final/project",
+  "scenario": "/Users/applemima1111/Documents/Dev/Defold/editor/test/headless/menus.edn",
+  "backend": "headless",
+  "allow_no_gl": true,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

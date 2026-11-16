@@ -1,0 +1,6 @@
+{
+  "editor/src/clj/editor/skeletal_animation_view.clj": "66e534a2130fa89098fd73fc7542b72449cf2074f23550d9fa5522c415f84d99",
+  "editor/src/clj/editor/skeletal_animation_constraints.clj": "ec0a7761c5d233184d5552a0c8fb2d847be96b25a6c9aabee9e99d71c5e1be43",
+  "editor/src/clj/editor/skeletal_animation_attachments.clj": "9031a3c471de25138bf01c93d20beade6a94c4cff27f3051d26a2c44e6ecd714",
+  "editor/test/editor/skeletal_animation_drag_test.clj": "56d48956bcfb1ea1c58e3ebbfa34ec517666012cd4282bb7c8bc46c0eb28fb93"
+}

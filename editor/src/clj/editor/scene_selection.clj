@@ -79,10 +79,36 @@
         (render-util/render-color-line-loop! gl render-args ::selection-box-outline color positions)
         (render-util/render-color-quad! gl render-args ::selection-box-fill (conj color 0.2) positions)))))
 
-(defn- select [controller op-seq mode toggle?]
+(defn cycle-exclusions
+  "Only continue a click cycle at the same position and selection."
+  [previous point selection]
+  (if (and previous
+           (= [(:selected previous)] (vec selection))
+           (<= (Math/abs (- (double (first point)) (double (first (:point previous))))) 4.0)
+           (<= (Math/abs (- (double (second point)) (double (second (:point previous))))) 4.0))
+    (:excluded previous)
+    #{}))
+
+(defn- select [controller op-seq mode toggle? cycle?]
   (let [select-fn (g/node-value controller :select-fn)
-        selection (g/node-value controller :picking-selection)
         contextual? (g/node-value controller :contextual?)
+        cycling (and cycle? (= :single mode) (not toggle?) (not contextual?))
+        point (g/node-value controller :current)
+        excluded (if cycling
+                   (cycle-exclusions (g/user-data controller ::cycle) point
+                                     (g/node-value controller :prev-selection))
+                   #{})
+        _ (g/transact {:undoable false}
+            (g/set-property controller :excluded-node-ids excluded))
+        selection (g/node-value controller :picking-selection)
+        _ (if cycling
+            (let [selected (first selection)]
+              (g/user-data! controller ::cycle
+                            (when selected
+                              {:point point :selected selected
+                               :excluded (conj (if (contains? excluded selected) #{} excluded) selected)})))
+            (when (or (not= :single mode) toggle? contextual?)
+              (g/user-data! controller ::cycle nil)))
         mode-filter-fn (case mode
                          :single (fn [selection] (if-let [sel (first selection)] [sel] []))
                          :multi identity)
@@ -184,7 +210,7 @@
                            (g/set-property self :prev-selection (g/node-value self :selection))))
                        nil)
       :mouse-released (do
-                        (when start (select self op-seq mode toggle?))
+                        (when start (select self op-seq mode toggle? true))
                         (g/transact
                           {:undoable false}
                           (concat
@@ -214,7 +240,7 @@
                            (concat
                              (when (not= new-mode mode) (g/set-property self :mode new-mode))
                              (g/set-property self :current cursor-pos)))
-                         (select self op-seq new-mode toggle?))
+                         (select self op-seq new-mode toggle? false))
                        nil)
                      action)
       action)))
@@ -246,12 +272,15 @@
   (property toggle? g/Bool)
   (property contextual? g/Bool)
   (property prev-selection g/Any)
+  (property excluded-node-ids g/Any (default #{}))
 
   (input selection g/Any)
   (input picking-selection g/Any)
   (input root-id g/NodeID)
 
-  (output picking-rect Rect :cached (g/fnk [start current] (calc-picking-rect start current)))
+  (output picking-rect Rect :cached (g/fnk [start current excluded-node-ids]
+                                      (assoc (calc-picking-rect start current)
+                                        :excluded-node-ids excluded-node-ids)))
   (output renderable pass/RenderData :cached (g/fnk [start current] {pass/overlay [{:world-transform (Matrix4d. geom/Identity4d)
                                                                                     :render-fn render-selection-box
                                                                                     :user-data {:start start :current current}}]}))

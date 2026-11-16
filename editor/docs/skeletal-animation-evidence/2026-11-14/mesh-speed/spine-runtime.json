@@ -1,0 +1,192 @@
+{
+  "runtime": "@esotericsoftware/spine-core",
+  "version": "4.2.120",
+  "fixture": "/private/tmp/spine-mesh-speed/animated.skeleton",
+  "exportSha256": "985860c724e2cad75b793bfa2ead252b1887fb840c11cafa6c05c04efee55c1a",
+  "fps": 60,
+  "tolerance": 0.0001,
+  "frames": 738,
+  "passed": true,
+  "clips": [
+    {
+      "animation": "attack",
+      "frames": 88,
+      "boneError": 0.00006116896574326347,
+      "vertexError": 0.0000610535807368251,
+      "worstBone": {
+        "time": 0.8833333333333333,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": 128.73493927778526,
+        "expected": 128.735000446751
+      },
+      "worstVertex": {
+        "time": 0.8833333333333333,
+        "index": 134,
+        "actual": 128.73493927778523,
+        "expected": 128.73500033136597
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "death",
+      "frames": 79,
+      "boneError": 0.00006303342220803643,
+      "vertexError": 0.00006226169692524763,
+      "worstBone": {
+        "time": 0.3,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": -67.08852419452606,
+        "expected": -67.08846116110385
+      },
+      "worstVertex": {
+        "time": 0.3,
+        "index": 134,
+        "actual": -67.08852419452606,
+        "expected": -67.08846193282913
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "hit",
+      "frames": 19,
+      "boneError": 0.00005874908077885266,
+      "vertexError": 0.00005858101681610606,
+      "worstBone": {
+        "time": 0.05,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": 122.97889529622395,
+        "expected": 122.97895404530473
+      },
+      "worstVertex": {
+        "time": 0.05,
+        "index": 134,
+        "actual": 122.97889529622394,
+        "expected": 122.97895387724076
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "idle",
+      "frames": 85,
+      "boneError": 0.00005959430961866019,
+      "vertexError": 0.00006220230926601289,
+      "worstBone": {
+        "time": 0.6333333333333333,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": 126.0851258578567,
+        "expected": 126.08518545216631
+      },
+      "worstVertex": {
+        "time": 1.15,
+        "index": 134,
+        "actual": 129.38185642413524,
+        "expected": 129.3819186264445
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "stagger",
+      "frames": 67,
+      "boneError": 0.00005868502793759944,
+      "vertexError": 0.000058516962894827884,
+      "worstBone": {
+        "time": 1.1,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": 117.14556196289064,
+        "expected": 117.14562064791858
+      },
+      "worstVertex": {
+        "time": 1.1,
+        "index": 134,
+        "actual": 117.14556196289064,
+        "expected": 117.14562047985353
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "walk",
+      "frames": 73,
+      "boneError": 0.000060345941648165535,
+      "vertexError": 0.00006017787659118312,
+      "worstBone": {
+        "time": 1.2,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": 117.14556196289064,
+        "expected": 117.14562230883229
+      },
+      "worstVertex": {
+        "time": 1.2,
+        "index": 134,
+        "actual": 117.14556196289064,
+        "expected": 117.14562214076723
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "idle_soft_tail",
+      "frames": 85,
+      "boneError": 0.000059364859339439136,
+      "vertexError": 0.00006252285263030899,
+      "worstBone": {
+        "time": 0.6833333333333333,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": 126.03289431310476,
+        "expected": 126.0329536779641
+      },
+      "worstVertex": {
+        "time": 1.05,
+        "index": 134,
+        "actual": 126.53452922702498,
+        "expected": 126.5345917498776
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "tail_ik_demo",
+      "frames": 121,
+      "boneError": 0.00005737176226716656,
+      "vertexError": 0.00005542667391011946,
+      "worstBone": {
+        "time": 1.9166666666666667,
+        "name": "bone8",
+        "component": 4,
+        "actual": 117.79002990653451,
+        "expected": 117.79008727829678
+      },
+      "worstVertex": {
+        "time": 0,
+        "index": 134,
+        "actual": 117.14556196289064,
+        "expected": 117.14561738956455
+      },
+      "stateErrors": 0
+    },
+    {
+      "animation": "auto_tail_demo",
+      "frames": 121,
+      "boneError": 0.000059164557285384944,
+      "vertexError": 0.00005624105962453996,
+      "worstBone": {
+        "time": 1.5,
+        "name": "05_tail_auto1_control3",
+        "component": 4,
+        "actual": 93.14556196289064,
+        "expected": 93.14562112744792
+      },
+      "worstVertex": {
+        "time": 1.2833333333333334,
+        "index": 134,
+        "actual": 105.26039212878489,
+        "expected": 105.26044836984451
+      },
+      "stateErrors": 0
+    }
+  ]
+}

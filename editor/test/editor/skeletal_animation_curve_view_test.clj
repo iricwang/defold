@@ -103,3 +103,90 @@
     (is (< (:low bounds) -100.0))
     (is (> (:high bounds) 300.0))
     (is (= bounds (curve/graph-bounds 800.0 250.0 (assoc state :active-track "y"))))))
+
+;; Multi-channel selection commits interpolation and tangents together,
+;; preserving one undo transaction and leaving end keys unchanged.
+(deftest batch-selection-commit-test
+  (ui/run-now
+    (let [source (atom {:duration 1.0 :selected-time 0.0
+                        :channels [{:property "x" :keys (:keys (state))}
+                                   {:property "y" :keys [{:time 0.0 :value 100.0 :interpolation "bezier" :curve [0.25 100.0 0.75 140.0]}
+                                                         {:time 1.0 :value 140.0 :interpolation "linear"}]}]})
+          calls (atom [])
+          editor (curve/make-batch-view #(deref source) #(swap! calls conj %))]
+      (.resize ^StackPane (:node editor) 600.0 200.0)
+      ((:select-all! editor))
+      (is (= 4 (count ((:selected-refs editor)))))
+      ((:tangents! editor) :flat)
+      (is (= 1 (count @calls)))
+      (is (= ["x" "y"] (mapv #(get-in % [:key :track]) (first @calls))))
+      (is (= [20.0 80.0] (mapv #(nth (get-in @calls [0 0 :curve]) %) [1 3])))
+      ((:set-selection! editor) [["y" 0.0]])
+      ((:interpolate! editor) "stepped")
+      (is (= 2 (count @calls)))
+      (is (= [{:key (assoc (get-in @source [:channels 1 :keys 0]) :track "y") :curve "stepped"}] (second @calls))))))
+
+;; Zoom keeps the cursor's time/value fixed; panning is independent of key data.
+(deftest graph-navigation-test
+  (let [bounds (curve/graph-bounds 800.0 300.0 (state))
+        point [300.0 120.0]
+        anchor (curve/point->value bounds point)
+        range (curve/zoom-range bounds point [2.0 3.0])
+        zoomed (curve/graph-bounds 800.0 300.0 (assoc (state) :view-range range))]
+    (is (coll/every? true? (mapv near? anchor (curve/point->value zoomed point))))
+    (is (near? (/ (:duration bounds) 2.0) (:duration zoomed)))
+    (is (near? (/ (- (:high bounds) (:low bounds)) 3.0) (- (:high zoomed) (:low zoomed))))
+    (let [panned (curve/graph-bounds 800.0 300.0 (assoc (state) :view-range (curve/pan-range bounds [70.0 25.0])))]
+      (is (coll/every? true? (mapv near? [370.0 145.0] (curve/value->point panned anchor)))))))
+
+;; Smooth commits real Bezier controls in one batch, including flat-valued keys.
+(deftest smooth-tangent-test
+  (ui/run-now
+    (let [source (atom {:duration 2.0 :selected-time 1.0
+                        :keys [{:time 0.0 :value 0.0 :interpolation "linear"}
+                               {:time 1.0 :value 1.0 :interpolation "linear"}
+                               {:time 2.0 :value 0.0 :interpolation "linear"}]})
+          calls (atom []) editor (curve/make-batch-view #(deref source) #(swap! calls conj %))]
+      ((:set-selection! editor) [[nil 0.0] [nil 1.0]])
+      ((:tangents! editor) :smooth)
+      (is (= 1 (count @calls)))
+      (is (= 2 (count (first @calls))))
+      (is (near? 1.0 (nth (get-in @calls [0 0 :curve]) 3)))
+      (is (near? 1.0 (nth (get-in @calls [0 1 :curve]) 1)))
+      (is (< (nth (get-in @calls [0 0 :curve]) 0) (nth (get-in @calls [0 0 :curve]) 2))))))
+
+;; Right-drag changes the view only and commits no curve/key edits.
+(deftest graph-right-pan-test
+  (ui/run-now
+    (let [source (atom (state)) calls (atom [])
+          {:keys [canvas] :as editor} (make-editor source calls)
+          event (fn event [type x y]
+                  (MouseEvent. type x y x y MouseButton/SECONDARY 1 false false false false
+                               false false true false false false nil))]
+      (.handle (.getOnMousePressed ^Canvas canvas) (event MouseEvent/MOUSE_PRESSED 200.0 100.0))
+      (.handle (.getOnMouseDragged ^Canvas canvas) (event MouseEvent/MOUSE_DRAGGED 250.0 120.0))
+      (.handle (.getOnMouseReleased ^Canvas canvas) (event MouseEvent/MOUSE_RELEASED 250.0 120.0))
+      (is (vector? ((:view-range editor))))
+      (is (= [] @calls))
+      (is (= (state) @source)))))
+
+;; A key drag is preview-only until release, then reports a single batch.
+(deftest graph-key-drag-test
+  (ui/run-now
+    (let [edits (atom [])
+          source (atom {:duration 2.0 :fps 60.0 :selected-time 0.5
+                        :keys [{:time 0.5 :value 20.0 :interpolation "linear"}
+                               {:time 1.5 :value 80.0 :interpolation "linear"}]
+                        :on-edit-keys! (fn record-key-edit [changes] (swap! edits conj changes))})
+          calls (atom []) {:keys [canvas]} (make-editor source calls)
+          bounds (curve/graph-bounds 600.0 200.0 @source)
+          [x y] (curve/value->point bounds [0.5 20.0])
+          [tx ty] (curve/value->point bounds [0.75 30.0])]
+      (.handle (.getOnMousePressed ^Canvas canvas) (mouse-event MouseEvent/MOUSE_PRESSED x y))
+      (.handle (.getOnMouseDragged ^Canvas canvas) (mouse-event MouseEvent/MOUSE_DRAGGED tx ty))
+      (is (= [] @edits))
+      (.handle (.getOnMouseReleased ^Canvas canvas) (mouse-event MouseEvent/MOUSE_RELEASED tx ty))
+      (is (= 1 (count @edits)))
+      (is (near? 0.75 (get-in @edits [0 0 :time])))
+      (is (near? 30.0 (get-in @edits [0 0 :value])))
+      (is (= [] @calls)))))

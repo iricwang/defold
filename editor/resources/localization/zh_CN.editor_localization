@@ -2425,7 +2425,7 @@ skeletal.vertex = 选中顶点
 skeletal.weight-bone = 影响骨骼
 skeletal.weight = 权重（0–1）
 skeletal.assign-weight = 应用顶点权重
-skeletal.weights = 顶点权重分配
+skeletal.weights = 权重
 skeletal.mesh-help = 网格工具：拖动顶点。动画模式下会记录变形关键帧。
 skeletal.target = 目标骨骼
 skeletal.mix = 混合（0–1）
@@ -2454,7 +2454,7 @@ skeletal.loop = 循环
 skeletal.warnings = 导入兼容说明
 skeletal.ik-root = 请先选择非根骨骼，再添加 IK。
 skeletal.timeline = 摄影表
-skeletal.curves = 曲线
+skeletal.curves = 图表
 
 skeletal.save-spine = 另存为 .spine…
 
@@ -2482,7 +2482,7 @@ skeletal.brush-strength = 强度（0–1）
 skeletal.lock-weight-bone = 锁定当前骨骼权重
 skeletal.auto-weights = 自动权重
 skeletal.smooth-weights = 平滑
-skeletal.prune-weights = 剪枝
+skeletal.prune-weights = 修剪
 skeletal.normalize-weights = 归一化
 skeletal.inherit = 继承模式
 skeletal.constrained-bones = 受约束骨骼（逗号分隔）
@@ -2546,7 +2546,7 @@ skeletal.generate-mesh = 生成
 skeletal.reset-mesh = 重置
 skeletal.trace-threshold = 透明度阈值
 skeletal.trace-simplify = 简化
-skeletal.trace-padding = 扩边
+skeletal.trace-padding = 填充
 skeletal.trace-mesh = 描摹轮廓
 skeletal.mesh-rebuild-notice = 生成、重置和描摹会清除权重及变形关键帧，可撤销恢复。重置会将图像矩形恢复到插槽原点。
 skeletal.add-physics = 物理
@@ -2608,3 +2608,397 @@ notification.play-build.preparing = 正在后台准备运行资源…
 notification.play-build.ready = 运行已就绪，内容未修改时可直接启动。
 notification.play-build.failed = 运行准备失败，请点击运行或编译查看错误并重试。
 notification.play-build.changed = 准备期间内容发生变化，请等待准备完成或再次运行；未启动旧版本。
+
+skeletal.add-event = 新建事件
+skeletal.event-defaults = 事件默认值
+skeletal.event-int = 整数
+skeletal.event-float = 浮点数
+skeletal.event-string = 字符串
+skeletal.event-key = 在播放头添加事件
+skeletal.event-key-values = 当前关键帧参数
+skeletal.event-log = 事件记录
+skeletal.clear-event-log = 清空
+skeletal.event-log-notice = 播放时记录触发事件，拖动播放头不触发。保留最近 100 条。
+skeletal.event-audio-notice = 音频事件参数随导出保留；预览记录事件，不播放音频。
+skeletal.hidden-attachment = 隐藏附件
+skeletal.slot-animation = 插槽动画
+skeletal.slot-color-animation = 颜色与透明度
+skeletal.move-up = 上移
+skeletal.move-down = 下移
+skeletal.skin-membership = 蒙皮归属
+skeletal.skin-required = 仅在所属蒙皮中启用
+skeletal.skin-included = 加入当前蒙皮
+skeletal.mix-preview = 混合预览
+skeletal.mix-overlay-enable = 启用第二轨
+skeletal.mix-overlay = 第二轨／过渡起始动画
+skeletal.mix-alpha = 轨道权重
+skeletal.mix-duration = 过渡时长（秒）
+skeletal.mix-transition = 过渡到当前动画
+skeletal.mix-reset = 返回单动画预览
+skeletal.mix-notice = 预览设置不会修改导出的动画。混合预览期间暂停物理约束。
+skeletal.mix-readonly = 请先返回单动画预览，再编辑姿态或关键帧。
+
+skeletal.audio-volume = 音量
+skeletal.audio-balance = 声道平衡
+skeletal.audio-file = 音频文件
+skeletal.import-audio = 导入音频…
+skeletal.preview-audio = 试听音频
+skeletal.skeletons = 工作区骨架
+skeletal.add-skeleton = 新增骨架
+skeletal.remove-skeleton = 删除骨架
+skeletal.export-preview = 导出动画画面…
+skeletal.view-settings = 视图
+skeletal.ghosting = 残影（暂停时）
+skeletal.mute-audio = 静音事件音频
+skeletal.reference-image = 参考图（项目内路径）
+skeletal.opacity = 不透明度
+skeletal.save-view = 保存文档视图
+skeletal.mixer-tracks = 多轨混合播放
+skeletal.mixer-index = 轨道索引（从 0 起）
+skeletal.mixer-speed = 轨道速度
+skeletal.mixer-delay = 队列延迟
+skeletal.mixer-set = 设置轨道
+skeletal.mixer-queue = 追加队列
+skeletal.mixer-clear = 清除轨道
+skeletal.mixer-stop = 退出混合预览
+skeletal.attachment-manager = 附件管理
+skeletal.attachment-name = 占位符名称
+skeletal.attachment-type = 附件类型
+skeletal.attachment-use = 设为默认附件并编辑
+skeletal.attachment-parent = 父网格 / 蒙皮
+skeletal.attachment-end = 裁剪结束插槽
+skeletal.attachment-vertices = 顶点 / 权重数据
+skeletal.attachment-save = 保存附件
+skeletal.rename-placeholder = 重命名占位符
+skeletal.sequence = 序列帧
+skeletal.sequence-count = 帧数
+skeletal.sequence-start = 起始编号
+skeletal.sequence-digits = 补零位数
+skeletal.sequence-setup = 默认帧
+skeletal.sequence-apply = 更新序列
+skeletal.sequence-index = 索引
+skeletal.sequence-delay = 帧间隔
+skeletal.skin-compose = 组合皮肤
+skeletal.dark-color = 暗部颜色
+skeletal.slot-blend = 插槽混合
+skeletal.apply = 应用
+skeletal.match-keys = 匹配关键帧
+skeletal.repeat-count = 重复次数
+skeletal.repeat-interval = 重复间隔
+skeletal.repeat-keys = 重复关键帧
+skeletal.edit-vertices = 编辑顶点
+skeletal.import-reference = 导入参考图…
+skeletal.attachment-inherit-deform = 继承父网格时间线
+
+skeletal.workspace-peers = 显示其他骨架（设置姿势）
+
+skeletal.smart-mesh = 智能布网 · 描绘
+
+skeletal.mode-setup = 设置
+skeletal.mode-animate = 动画
+
+skeletal.curve-linear = 线性
+skeletal.curve-stepped = 阶梯
+skeletal.curve-bezier = 贝塞尔曲线
+skeletal.curve-smooth = 圆滑切线
+skeletal.curve-flat = 平坦切线
+skeletal.curve-ease-in = 缓入
+skeletal.curve-ease-out = 缓出
+skeletal.curve-frame = 适应曲线
+skeletal.curve-auto = 自动
+skeletal.curve-filter = 筛选通道
+skeletal.curve-x = 移动 X
+skeletal.curve-y = 移动 Y
+skeletal.curve-rotation = 旋转
+skeletal.curve-scale-x = 缩放 X
+skeletal.curve-scale-y = 缩放 Y
+skeletal.curve-shear-x = 倾斜 X
+skeletal.curve-shear-y = 倾斜 Y
+skeletal.current-frame = 当前帧
+
+skeletal.property-transform = 变换
+
+skeletal.property-shear = 倾斜
+
+skeletal.property-bone-setup = 骨骼结构
+
+skeletal.property-mesh-selection = 网格与权重
+
+skeletal.raw-attachment-data = 高级附件数据
+
+skeletal.property-constraint-setup = 约束关系
+
+skeletal.property-constraint-offset = 偏移参数
+
+skeletal.property-physics-solver = 求解设置
+
+skeletal.color-rgba = 颜色与透明度
+
+skeletal.color-rgb = 颜色
+
+skeletal.color-alpha = 透明度
+
+skeletal.color-rgba2 = 双色与透明度
+
+skeletal.color-rgb2 = 双色
+
+skeletal.interpolation-linear = 线性
+
+skeletal.interpolation-stepped = 阶梯
+
+skeletal.type-region = 图片
+
+skeletal.type-mesh = 网格
+
+skeletal.type-linkedmesh = 链接网格
+
+skeletal.type-clipping = 裁剪
+
+skeletal.type-boundingbox = 碰撞框
+
+skeletal.type-path = 路径
+
+skeletal.type-point = 标记点
+
+skeletal.blend-normal = 正常
+
+skeletal.blend-additive = 叠加
+
+skeletal.blend-multiply = 正片叠底
+
+skeletal.blend-screen = 滤色
+
+skeletal.skin-delete-target = 要删除的皮肤
+
+skeletal.skin-delete = 删除皮肤
+
+skeletal.smart-mesh-help = 重新布网会迁移原权重与变形关键帧；新增边界顶点可能近似迁移，可一次撤销恢复原网格。
+
+skeletal.smart-remesh = 重新智能布网
+
+skeletal.remesh-preserved = 保留变形关键帧
+
+skeletal.remesh-boundary = 边界近似顶点
+skeletal.trace-title = 描绘
+skeletal.trace-detail = 细节
+skeletal.trace-concavity = 凹度
+skeletal.trace-refinement = 精度
+skeletal.trace-uniform = 统一
+skeletal.trace-alpha = Alpha 阈值
+skeletal.trace-refresh = 描绘 / 刷新
+skeletal.trace-triangles = 三角线
+skeletal.trace-working = 正在计算…
+skeletal.trace-clipped = 遗漏像素
+skeletal.trace-noise = 过滤噪点
+skeletal.trace-image-error = 无法读取附件图片。
+skeletal.trace-document-changed = 文档已改变，请取消后重新打开描绘。
+skeletal.confirm = 确定
+skeletal.cancel = 取消
+skeletal.trace-adjust = ✥ 调整
+skeletal.trace-manual = 手动调整
+skeletal.trace-detail-help = 增加轮廓目标顶点数；曲线和尖角处优先保留顶点。
+skeletal.trace-concavity-help = 提高凹陷保留程度，限制跨过透明区域。
+skeletal.trace-refinement-help = 增加轮廓减点优化的搜索次数。
+skeletal.trace-uniform-help = 在过长边上均匀补点，保持弯曲时的点间距。
+skeletal.trace-alpha-help = 忽略透明度低于阈值的像素。
+skeletal.trace-padding-help = 向外增加留边，单位为贴图像素。
+
+skeletal.mesh-animation = 网格变形
+skeletal.edit-deform = 编辑网格变形
+skeletal.key-deform = 记录变形关键帧
+skeletal.deform-help = 在当前帧拖动顶点。关闭自动关键帧时，点击“记录变形关键帧”保存姿势。
+
+skeletal.cut-keys = 剪切关键帧
+skeletal.last-frame = 最后一帧
+skeletal.toolbar-frame = 帧
+skeletal.toolbar-auto-frame = 自动
+skeletal.toolbar-auto-key = 自动录帧
+
+skeletal.all-nodes = 全部节点
+
+skeletal.create-attachment-unsupported = 创建工具暂不支持迁移此附件类型。
+
+skeletal.create-alternate-attachments = 创建工具暂不支持迁移多蒙皮或备用附件，请使用只有单个附件的插槽。
+
+skeletal.bind-mesh = 绑定
+
+skeletal.finish-binding = 完成绑定
+
+skeletal.binding-incomplete = 请选择一个网格和至少一根骨骼；文档变化后请重新绑定。
+
+skeletal.binding-select-mesh = 选择网格或骨骼，然后点击绑定。
+
+skeletal.binding-pick-help = 在画布或层级树中点选骨骼；空格完成，Esc 取消。
+
+skeletal.unbind-bone = 移除骨骼
+
+skeletal.weight-percent = 权重 %
+
+skeletal.weight-direct = 直接
+
+skeletal.weight-add = 添加
+
+skeletal.weight-subtract = 减少
+
+skeletal.weight-replace = 替换
+
+skeletal.weight-advanced = 高级权重
+
+skeletal.skin-new-name = 新皮肤名称
+
+skeletal.skin-new = 新建皮肤
+
+skeletal.active-skin = 活动皮肤
+
+skeletal.weight-mode = 模式
+skeletal.weight-strength = 强度
+skeletal.weight-size = 大小
+skeletal.weight-feather = 羽化
+skeletal.weight-pies = 饼图
+skeletal.weight-overlay = 叠加
+skeletal.weight-selected-only = 已选
+skeletal.weight-threshold = 阈值 %
+skeletal.prune-removed = 移除影响数：
+skeletal.update-bindings = 更新绑定
+skeletal.weight-preview-stale = 预览期间文档已更改，请重新修剪。
+
+skeletal.weight-influences = 影响
+skeletal.copy-weights = 复制权重
+skeletal.paste-weights = 粘贴权重
+skeletal.swap-weights = 交换权重
+skeletal.weld-weights = 焊接
+skeletal.weld-overlap = 仅重合顶点
+skeletal.weld-no-target = 焊接需要另一个绑定了相同两根或更多骨骼的网格。
+
+skeletal.weight-bones-label = 骨骼：
+
+skeletal.compensate-bones = 骨骼补偿
+skeletal.compensate-images = 图片补偿
+skeletal.compensate-bones-help = 开启时，移动父骨骼会让子孙骨骼留在原位。关闭后整条骨骼链一起移动。
+skeletal.compensate-images-help = 开启时，变换骨骼会让图片留在原位。关闭后绑定网格随骨骼变形。
+
+skeletal.ik-setup-only = 请在设置模式下创建 IK 约束。
+skeletal.ik-select-chain = 请选择一节骨骼，或相邻的父子两节骨骼；根骨骼不能作为 IK 链。
+skeletal.ik-pick-target = IK：点击目标骨骼，或点击空白创建目标；点击受控骨骼可在末端创建目标。Esc 取消。
+skeletal.ik-selection-changed = IK 创建期间文档已变化，请重新选择骨骼创建。
+
+skeletal.toolbar-filter = 筛选曲线
+skeletal.toolbar-lock = 锁定显示的节点
+skeletal.toolbar-refresh = 刷新锁定节点
+skeletal.toolbar-select = 选中显示的骨骼
+skeletal.toolbar-shift = 移位
+skeletal.toolbar-offset = 偏移
+skeletal.toolbar-bias = 偏好：向前后关键帧调整
+skeletal.toolbar-store = 存储
+skeletal.toolbar-swap = 交换存储曲线
+skeletal.offset-bone-curves = 循环偏移当前支持骨骼变换曲线，请选择首尾相同的完整循环。
+
+skeletal.setup-edit-only = 请在设置模式中修改结构和绑定。
+skeletal.property-physics-animation = 物理动画
+
+skeletal.mixer-start = 起始时间（秒）
+skeletal.mixer-end = 结束时间（秒）
+skeletal.mixer-end-auto = 留空使用动画结尾
+skeletal.mixer-reverse = 倒放
+skeletal.mixer-hold = 保持上一动画
+skeletal.mixer-shortest = 最短旋转
+skeletal.mixer-fade = 淡出此轨道
+skeletal.compat-default-dark = Defold 默认 Spine 材质不显示双色暗色通道；编辑器预览和 JSON 会保留该数据。
+
+skeletal.property-rig-control = 控制与约束
+skeletal.rig-ik-mode = 配置 IK · 1–2 根骨骼
+skeletal.rig-path-mode = 配置路径 · 整条骨链
+skeletal.rig-controller-role = 当前骨骼：控制点
+skeletal.rig-driven-role = 当前骨骼：由约束驱动
+skeletal.rig-fk-role = 尚未绑定 IK / 路径约束
+skeletal.rig-mode-help = IK 用于一至两根骨骼；尾巴整链使用路径约束。点击下方绑定查看设置。
+skeletal.rig-create-ik = 新建 IK 约束…
+skeletal.rig-create-path = 新建路径约束…
+skeletal.rig-select-controller = 选择控制点
+skeletal.rig-setup-help = 设置模式下选择骨骼，再创建约束。IK 创建后在画布选择目标位置。
+skeletal.rig-animation-help = 拖动控制点制作动画；更改绑定请切回设置模式。
+skeletal.rig-ik-controller = IK 控制点
+skeletal.rig-path-controller = 路径控制点
+
+skeletal.property-bone-length = 骨骼长度
+
+skeletal.rig-allow-stretch = 允许拉伸
+
+skeletal.rig-allow-compress = 允许压缩（单骨骼）
+
+skeletal.rig-ik-length-help = 作用于此 IK 约束。关闭拉伸后保持原有可达长度，目标过远时不会强行伸长。动画模式可为拉伸／压缩记录关键帧。
+
+skeletal.rig-path-length = 路径骨骼长度
+
+skeletal.rig-path-length-fixed = 保持骨骼长度
+
+skeletal.rig-path-length-fit = 伸缩以贴合路径
+
+skeletal.rig-path-length-custom = 自定义（高级设置）
+
+skeletal.rig-path-length-help = 作用于此约束的全部骨骼。保持长度：链式旋转、按骨长排列、间距 0；贴合路径：链式缩放、比例间距 100%。保持长度时尾尖可能无法到达路径末端。
+
+skeletal.rig-path-length-setup-help = 切回设置模式修改长度模式。已有间距动画关键帧仍会控制排列，不会被此设置删除。
+
+skeletal.auto-rig = 自动布网与骨骼…
+
+skeletal.auto-rig-tail = 尾巴／触手
+
+skeletal.auto-rig-reverse = 交换根部与末端
+
+skeletal.auto-rig-help = 拖动编号控制点调整骨架。默认保持骨长；确认后可整体撤销，原骨骼保留。
+
+skeletal.auto-rig-complete = 骨架已生成。拖动控制点即可调整；撤销可恢复原附件。
+
+skeletal.trace-bone-count = 骨骼数量
+
+skeletal.trace-control-count = 控制点数量
+
+skeletal.trace-bone-count-help = 沿部位中轴生成 2–32 根变形骨骼。
+
+skeletal.trace-control-count-help = 2–8 个控制点；改变数量会重置手动控制点位置。
+
+skeletal.trace-uniform-percent = 统一 (%)
+skeletal.trace-uniform-percent-help = 在过长边上均匀补点，范围为 0–100%。
+
+skeletal.texture-output = 贴图分辨率
+skeletal.texture-help = 仅调整输出像素（1–100%），保留原图、骨架尺寸和动画。统一作用于当前骨架的全部皮肤和序列帧。
+skeletal.texture-apply = 应用到预览与导出
+skeletal.texture-estimate = %d 张图片 · RGBA8 像素 %.2f MiB（不含图集留白）
+skeletal.texture-reading = 正在读取图片尺寸…
+skeletal.texture-applied = 已应用。保存文档后，导出游戏资源即可更新打包尺寸。
+
+skeletal.rig-control-index = 控制点
+skeletal.rig-control-picker = 选择控制点
+skeletal.rig-bone-count = 根驱动骨骼
+skeletal.rig-control-count = 个控制点
+skeletal.rig-ik-settings = IK 设置
+skeletal.rig-path-settings = 路径跟随设置
+skeletal.rig-path-shape = 路径形状
+skeletal.rig-path-shape-help = 路径保存弯曲轨迹，由控制点驱动。通常只需调整控制点。
+skeletal.rig-path-follow-help = 沿路径排列驱动骨骼，再通过权重带动网格。
+skeletal.rig-advanced-path = 高级 · 路径点数据
+skeletal.rig-advanced-follow = 高级 · 跟随与混合
+skeletal.rig-identity = 高级 · 节点名称
+skeletal.rig-driven-group = 驱动骨骼
+skeletal.rig-path-data = 高级 · 路径数据
+skeletal.rig-path-group = 路径控制
+
+skeletal.rig-path-length-short-help = 保持长度不会拉伸骨骼；需要贴合整条路径时可切换为伸缩。
+
+skeletal.inspector-lock = 锁定属性编辑
+
+skeletal.inspector-collapse = 收起全部分组
+
+skeletal.inspector-expand = 展开全部分组
+
+skeletal.inspector-key-legend = ◇ 未记录    ◆ 已记录 · 右键菱形删除关键帧
+
+skeletal.interpolation = 插值
+
+skeletal.restore-image = 恢复为图片
+skeletal.restore-image-help = 恢复未变形图片，移除该附件的网格、权重和变形关键帧；可通过撤销完整恢复。
+skeletal.property-mesh-tools = 网格工具
+skeletal.size = 尺寸
+skeletal.axis-width = 宽
+skeletal.axis-height = 高

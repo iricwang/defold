@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-auto-rig/build/editor.jar",
+  "sha256": "aa96f89d7661eb7b453cdc11bcc53e16fde22d3d8d7e9a0646833d9413446608",
+  "project_source": "/tmp/spine-auto-rig/project",
+  "project_copy": "/private/tmp/spine-auto-rig/background-final/project",
+  "scenario": "/private/tmp/spine-auto-rig/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

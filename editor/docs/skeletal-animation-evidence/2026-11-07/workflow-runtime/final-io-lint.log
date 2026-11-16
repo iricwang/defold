@@ -1,0 +1,5 @@
+src/clj/editor/skeletal_animation_io.clj:363:17: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_io.clj:367:16: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_io.clj:369:16: warning: Use util.coll/into-> for three-argument into.
+src/clj/editor/skeletal_animation_io.clj:371:23: warning: Use util.coll/into-> for three-argument into.
+linting took 177ms, errors: 0, warnings: 4

@@ -1,0 +1,37 @@
+{
+  "new-mixer-controls": {
+    "mixer-reverse": true,
+    "mixer-hold": true,
+    "mixer-shortest": true,
+    "mixer-start": true,
+    "mixer-end": true,
+    "mixer-fade": true
+  },
+  "skeletal-editor-open": true,
+  "document-loaded": true,
+  "compiled-class-resource": "jar:file:/Applications/Defold.app/Contents/Resources/packages/defold-871d419fe7ad8f81d5d988f58afa153df5ca818f.jar!/editor/skeletal_animation_mixing$create_state.class",
+  "disabled-handlers": 0,
+  "tabs": [
+    [
+      "combatˍhud.gui",
+      "adventure.gui",
+      "tailˍikˍexample.skeleton"
+    ],
+    [
+      "控制台",
+      "曲线编辑",
+      "构建错误",
+      "查找结果",
+      "断点"
+    ]
+  ],
+  "title": "Lastlight District - Defold 1.14.2-patch.130",
+  "version": "1.14.2-patch.130",
+  "stopped-timers": 0,
+  "bone-count": 18,
+  "original_tail_file_unchanged": true,
+  "local_feed_verified": true,
+  "installed_inventory_files": 169,
+  "installed_inventory_mismatches": [],
+  "published_to_github": false
+}

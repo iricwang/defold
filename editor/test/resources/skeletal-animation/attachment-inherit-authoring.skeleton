@@ -1,0 +1,175 @@
+{
+  "animations": [
+    {
+      "physics-order": [],
+      "event-tracks": [],
+      "path-tracks": [],
+      "tracks": [
+        {
+          "bone": "tail",
+          "property": "rotation",
+          "keys": [
+            {
+              "time": 0,
+              "value": 20,
+              "interpolation": "linear"
+            },
+            {
+              "time": 2,
+              "value": 30,
+              "interpolation": "linear"
+            }
+          ]
+        }
+      ],
+      "duration": 2.0,
+      "transform-tracks": [],
+      "physics-tracks": [],
+      "deforms": [
+        {
+          "slot": "05_tail",
+          "attachment": "base",
+          "skin": "default",
+          "keys": [
+            {
+              "time": 0.0,
+              "vertices": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "interpolation": "linear"
+            },
+            {
+              "time": 1.0,
+              "vertices": [
+                9,
+                9,
+                9,
+                9,
+                9,
+                9
+              ],
+              "interpolation": "linear"
+            }
+          ]
+        }
+      ],
+      "id": "test",
+      "ik-tracks": []
+    }
+  ],
+  "path": [],
+  "schema": "defold.skeleton",
+  "active-skin": "default",
+  "transform": [],
+  "bones": [
+    {
+      "y": 0.0,
+      "shear-x": 0.0,
+      "inherit": "normal",
+      "rotation": 35,
+      "parent": null,
+      "id": "root",
+      "scale-y": 0.7,
+      "length": 0.0,
+      "shear-y": 0.0,
+      "x": 0.0,
+      "scale-x": 1.4
+    },
+    {
+      "y": 8,
+      "shear-x": 0.0,
+      "inherit": "normal",
+      "rotation": 20,
+      "parent": "root",
+      "id": "tail",
+      "scale-y": 1.0,
+      "length": 0.0,
+      "shear-y": 0.0,
+      "x": 5,
+      "scale-x": 1.0
+    }
+  ],
+  "slots": [
+    {
+      "id": "05_tail",
+      "bone": "tail",
+      "spine-skin": "default",
+      "attachment": {
+        "y": 0.0,
+        "path": "/base.png",
+        "vertices": [
+          0,
+          0,
+          10,
+          0,
+          0,
+          10
+        ],
+        "rotation": 0.0,
+        "color": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "uvs": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          1
+        ],
+        "name": "base",
+        "width": 100.0,
+        "weights": null,
+        "type": "mesh",
+        "scale-y": 1.0,
+        "x": 0.0,
+        "scale-x": 1.0,
+        "triangles": [
+          0,
+          1,
+          2
+        ],
+        "height": 100.0
+      }
+    },
+    {
+      "id": "body",
+      "bone": "root",
+      "spine-skin": "default",
+      "attachment": {
+        "y": 0.0,
+        "path": "/body.png",
+        "rotation": 0.0,
+        "color": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "name": "body",
+        "width": 10,
+        "type": "region",
+        "scale-y": 1.0,
+        "x": 0.0,
+        "scale-x": 1.0,
+        "height": 10
+      }
+    }
+  ],
+  "name": "Imported skeleton",
+  "events": [],
+  "warnings": [],
+  "physics": [],
+  "ik": [],
+  "version": 1,
+  "reference-scale": 100.0,
+  "spine-source": "{\"skeleton\":{\"spine\":\"4.2.43\"},\"bones\":[{\"name\":\"root\",\"rotation\":35,\"scaleX\":1.4,\"scaleY\":0.7},{\"name\":\"tail\",\"parent\":\"root\",\"x\":5,\"y\":8,\"rotation\":20}],\"slots\":[{\"name\":\"05_tail\",\"bone\":\"tail\",\"attachment\":\"base\"},{\"name\":\"body\",\"bone\":\"root\",\"attachment\":\"body\"}],\"skins\":[{\"name\":\"default\",\"attachments\":{\"05_tail\":{\"base\":{\"type\":\"mesh\",\"uvs\":[0,0,1,0,0,1],\"vertices\":[0,0,10,0,0,10],\"triangles\":[0,1,2]},\"alternate\":{\"type\":\"mesh\",\"uvs\":[0,0,1,0,1,1,0,1],\"vertices\":[0,0,10,0,10,10,0,10],\"triangles\":[0,1,2,0,2,3]},\"shared\":{\"type\":\"linkedmesh\",\"parent\":\"base\"},\"private\":{\"type\":\"linkedmesh\",\"parent\":\"base\",\"timelines\":false}},\"body\":{\"body\":{\"width\":10,\"height\":10}}}}],\"animations\":{\"test\":{\"bones\":{\"tail\":{\"rotate\":[{\"time\":0,\"value\":0},{\"time\":2,\"value\":10}],\"inherit\":[{\"time\":0.25,\"inherit\":\"normal\"},{\"time\":0.5,\"inherit\":\"onlyTranslation\"},{\"time\":0.75,\"inherit\":\"noRotationOrReflection\"},{\"time\":1.0,\"inherit\":\"noScale\"},{\"time\":1.25,\"inherit\":\"noScaleOrReflection\"}]}},\"slots\":{\"05_tail\":{\"attachment\":[{\"time\":0.5,\"name\":\"alternate\"},{\"time\":1,\"name\":\"shared\"},{\"time\":1.5,\"name\":\"private\"}]}},\"attachments\":{\"default\":{\"05_tail\":{\"alternate\":{\"deform\":[{\"time\":0.5,\"vertices\":[8,7,6,5,4,3,2,1]},{\"time\":0.75,\"vertices\":[1,2,3,4,5,6,7,8]}]},\"private\":{\"deform\":[{\"time\":1.5,\"vertices\":[3,3,3,3,3,3]}]}}}}}}}"
+}

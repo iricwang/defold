@@ -1,0 +1,303 @@
+{
+  "skeleton": {
+    "spine": "4.2.43"
+  },
+  "bones": [
+    {
+      "name": "root"
+    }
+  ],
+  "slots": [
+    {
+      "name": "clip",
+      "bone": "root",
+      "attachment": "clip"
+    },
+    {
+      "name": "body",
+      "bone": "root",
+      "attachment": "body",
+      "dark": "2060ff"
+    },
+    {
+      "name": "linked",
+      "bone": "root",
+      "attachment": "copy"
+    },
+    {
+      "name": "sequence",
+      "bone": "root",
+      "attachment": "pulse"
+    },
+    {
+      "name": "additive",
+      "bone": "root",
+      "attachment": "additive",
+      "blend": "additive"
+    },
+    {
+      "name": "multiply",
+      "bone": "root",
+      "attachment": "multiply",
+      "blend": "multiply"
+    },
+    {
+      "name": "screen",
+      "bone": "root",
+      "attachment": "screen",
+      "blend": "screen"
+    },
+    {
+      "name": "point",
+      "bone": "root",
+      "attachment": "anchor"
+    },
+    {
+      "name": "bbox",
+      "bone": "root",
+      "attachment": "bounds"
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "clip": {
+          "clip": {
+            "type": "clipping",
+            "vertexCount": 4,
+            "vertices": [
+              -140,
+              -60,
+              140,
+              -60,
+              140,
+              60,
+              -140,
+              60
+            ],
+            "end": "sequence"
+          }
+        },
+        "body": {
+          "body": {
+            "type": "mesh",
+            "path": "images/gray",
+            "uvs": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0,
+              0,
+              0
+            ],
+            "triangles": [
+              0,
+              1,
+              2,
+              0,
+              2,
+              3
+            ],
+            "vertices": [
+              -180,
+              -80,
+              -20,
+              -80,
+              -20,
+              80,
+              -180,
+              80
+            ]
+          }
+        },
+        "linked": {
+          "parent": {
+            "type": "mesh",
+            "path": "images/gray",
+            "uvs": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0,
+              0,
+              0
+            ],
+            "triangles": [
+              0,
+              1,
+              2,
+              0,
+              2,
+              3
+            ],
+            "vertices": [
+              20,
+              -80,
+              180,
+              -80,
+              180,
+              80,
+              20,
+              80
+            ]
+          },
+          "copy": {
+            "type": "linkedmesh",
+            "parent": "parent",
+            "skin": "default",
+            "path": "images/grid",
+            "timelines": true
+          }
+        },
+        "sequence": {
+          "pulse": {
+            "path": "images/pulse",
+            "width": 70,
+            "height": 70,
+            "sequence": {
+              "count": 3,
+              "start": 1,
+              "digits": 2
+            }
+          }
+        },
+        "additive": {
+          "additive": {
+            "path": "images/tint",
+            "x": -120,
+            "y": -135,
+            "width": 100,
+            "height": 70
+          }
+        },
+        "multiply": {
+          "multiply": {
+            "path": "images/tint",
+            "x": 0,
+            "y": -135,
+            "width": 100,
+            "height": 70
+          }
+        },
+        "screen": {
+          "screen": {
+            "path": "images/tint",
+            "x": 120,
+            "y": -135,
+            "width": 100,
+            "height": 70
+          }
+        },
+        "point": {
+          "anchor": {
+            "type": "point",
+            "x": 10,
+            "y": 20,
+            "rotation": 30
+          }
+        },
+        "bbox": {
+          "bounds": {
+            "type": "boundingbox",
+            "vertexCount": 4,
+            "vertices": [
+              -200,
+              -180,
+              200,
+              -180,
+              200,
+              100,
+              -200,
+              100
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "events": {
+    "start": {
+      "int": 7,
+      "float": 1.25,
+      "string": "setup-start"
+    },
+    "pulse": {
+      "int": 11,
+      "float": 2.5,
+      "string": "default-pulse"
+    }
+  },
+  "animations": {
+    "default": {
+      "bones": {
+        "root": {
+          "rotate": [
+            {
+              "value": 0
+            },
+            {
+              "time": 1.2,
+              "value": 0
+            }
+          ]
+        }
+      },
+      "slots": {
+        "body": {
+          "rgba2": [
+            {
+              "light": "ffffffff",
+              "dark": "2060ff"
+            },
+            {
+              "time": 0.6,
+              "light": "ff8080ff",
+              "dark": "40ff20"
+            },
+            {
+              "time": 1.2,
+              "light": "ffffffff",
+              "dark": "2060ff"
+            }
+          ]
+        }
+      },
+      "attachments": {
+        "default": {
+          "sequence": {
+            "pulse": {
+              "sequence": [
+                {
+                  "mode": "loop",
+                  "index": 0,
+                  "delay": 0.2
+                }
+              ]
+            }
+          }
+        }
+      },
+      "events": [
+        {
+          "name": "start"
+        },
+        {
+          "time": 0.4,
+          "name": "pulse",
+          "int": 31,
+          "float": 4.5,
+          "string": "override-pulse"
+        },
+        {
+          "time": 0.8,
+          "name": "pulse"
+        }
+      ]
+    }
+  }
+}

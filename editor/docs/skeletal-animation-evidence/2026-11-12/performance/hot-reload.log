@@ -1,0 +1,7 @@
+{"id": "smart-mesh", "ns": "user", "session": "18de815f-e35a-4949-bde6-21e9282c1d2f", "value": "nil"}
+{"id": "smart-mesh", "ns": "user", "session": "18de815f-e35a-4949-bde6-21e9282c1d2f", "value": "#'editor.skeletal-animation-mesh/trace-alpha"}
+{"id": "smart-mesh", "ns": "user", "session": "18de815f-e35a-4949-bde6-21e9282c1d2f", "value": "#'editor.skeletal-animation-io/export-project!"}
+{"id": "smart-mesh", "ns": "user", "session": "18de815f-e35a-4949-bde6-21e9282c1d2f", "value": "#'editor.skeletal-animation-view/register-view-types"}
+{"id": "smart-mesh", "out": "{:namespaces-reloaded true, :handlers-rebound true, :document-preserved true, :existing-compiled-timer-replaced false, :full-update-requires-new-view-or-package true, :disabled-handlers 0, :stopped-timers 0}\n", "session": "18de815f-e35a-4949-bde6-21e9282c1d2f"}
+{"id": "smart-mesh", "ns": "user", "session": "18de815f-e35a-4949-bde6-21e9282c1d2f", "value": "nil"}
+{"id": "smart-mesh", "session": "18de815f-e35a-4949-bde6-21e9282c1d2f", "status": ["done"]}

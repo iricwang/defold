@@ -23,6 +23,7 @@
             [editor.ui :as ui]
             [util.coll :as coll])
   (:import [javafx.beans.value ChangeListener]
+           [javafx.event Event]
            [javafx.scene Node Parent]
            [javafx.scene.canvas Canvas GraphicsContext]
            [javafx.scene.control Control Tab]
@@ -125,7 +126,7 @@
       keep-appearance
       (into (into [[node-id :position
                     (mapv + position (local-delta->parent (g/node-value node-id :rotation evaluation-context)
-                                                        (g/node-value node-id :scale evaluation-context) delta))]]
+                                                          (g/node-value node-id :scale evaluation-context) delta))]]
                   (child-compensation node-id delta evaluation-context))))))
 
 (defn- message [localization-state suffix]
@@ -177,10 +178,10 @@
           [position size])
         entries (:properties (g/node-value node-id :_properties evaluation-context))]
     (cond-> (into [[node-id :rect-transform true]
-                  [node-id :rect-anchor-min anchor-min] [node-id :rect-anchor-max anchor-max]
-                  [node-id :rect-reference parent] [node-id :position position]
-                  [node-id :manual-size size] [node-id :pivot pivot]]
-                 (child-compensation node-id delta evaluation-context))
+                   [node-id :rect-anchor-min anchor-min] [node-id :rect-anchor-max anchor-max]
+                   [node-id :rect-reference parent] [node-id :position position]
+                   [node-id :manual-size size] [node-id :pivot pivot]]
+                  (child-compensation node-id delta evaluation-context))
       (contains? entries :size-mode) (conj [node-id :size-mode :size-mode-manual]))))
 
 (defn- rect-preset-graphic [anchor-min anchor-max]
@@ -202,7 +203,7 @@
                  :center-y (+ 4.0 (* 17.0 (- 1.0 (double y)))) :radius 2.0
                  :style "-fx-fill: -df-defold-blue-lighter;"}))
          (into [] (distinct) [[(first anchor-min) (second anchor-min)] [(first anchor-min) (second anchor-max)]
-                    [(first anchor-max) (second anchor-min)] [(first anchor-max) (second anchor-max)]]))})
+                              [(first anchor-max) (second anchor-min)] [(first anchor-max) (second anchor-max)]]))})
 
 (defn- rect-preset-popup [node-id app-view localization-state render-grid]
   (let [enabled (g/node-value node-id :rect-transform)
@@ -399,8 +400,8 @@
                              :on-action (fn [_]
                                           (when-not (animation-preview-active? app-view)
                                             (g/transact {:undoable false}
-                                                        (g/set-property app-view :active-tool
-                                                                        (if (= :gui-rect (g/node-value app-view :active-tool)) :move :gui-rect)))))}]}
+                                              (g/set-property app-view :active-tool
+                                                (if (= :gui-rect (g/node-value app-view :active-tool)) :move :gui-rect)))))}]}
                 {:fx/type fxui/horizontal :spacing :small
                  :children
                  (into
@@ -434,42 +435,42 @@
                             (if (= :anchor kind)
                               [(rect-preset-popup (first node-ids) app-view localization-state render-grid)]
                               [{:fx/type :custom-menu-item :hide-on-click false
-                              :style-class ["menu-item" "custom-menu-item" "gui-layout-preset-popup"]
-                              :content
-                              {:fx/type fxui/vertical :spacing :small :padding :small
-                               :children
-                               (cond->
-                                 [{:fx/type fxui/label :text (message localization-state (name kind))}
-                                  {:fx/type fxui/grid :spacing :small
-                                   :children
-                                   (into []
-                                         (map-indexed
-                                           (fn [index pivot]
-                                             (let [[x y] (pivot-points pivot)
-                                                   x-anchor (case x 0.0 :xanchor-left 1.0 :xanchor-right :xanchor-none)
-                                                   y-anchor (case y 0.0 :yanchor-bottom 1.0 :yanchor-top :yanchor-none)]
-                                               {:fx/type fxui/toggle-button
-                                                :id (str "gui-layout-" (name kind) "-" (name pivot))
-                                                :style-class "gui-layout-preset-cell"
-                                                :content-display :top :graphic (preset-graphic pivot)
-                                                :text (preset-label kind pivot)
-                                                :selected (= pivot selected)
-                                                :grid-pane/column (mod (long index) 3) :grid-pane/row (quot (long index) 3)
-                                                :on-action
-                                                (fn [event]
-                                                  (when-not (animation-preview-active? app-view)
-                                                    (commit! (if (= :pivot kind)
-                                                               (pivot-changes (first node-ids) pivot @keep-appearance (g/make-evaluation-context))
-                                                               [[(first node-ids) :x-anchor x-anchor] [(first node-ids) :y-anchor y-anchor]])
-                                                             (localization/message "gui-layout.operation")))
-                                                  (.hide (.getWindow (.getScene ^Node (.getSource ^javafx.event.ActionEvent event)))))})))
-                                         presets)}]
-                                 render-property-grid
-                                 (conj (render-grid (if (= :pivot kind) [:pivot] [:x-anchor :y-anchor])))
-                                 (= :pivot kind)
-                                 (conj {:fx/type fxui/check-box :id "gui-layout-keep-appearance"
-                                        :text (message localization-state "keep-appearance")
-                                        :selected @keep-appearance :on-selected-changed #(reset! keep-appearance %)}))}}])}))
+                                :style-class ["menu-item" "custom-menu-item" "gui-layout-preset-popup"]
+                                :content
+                                {:fx/type fxui/vertical :spacing :small :padding :small
+                                 :children
+                                 (cond->
+                                   [{:fx/type fxui/label :text (message localization-state (name kind))}
+                                    {:fx/type fxui/grid :spacing :small
+                                     :children
+                                     (into []
+                                           (map-indexed
+                                             (fn [index pivot]
+                                               (let [[x y] (pivot-points pivot)
+                                                     x-anchor (case x 0.0 :xanchor-left 1.0 :xanchor-right :xanchor-none)
+                                                     y-anchor (case y 0.0 :yanchor-bottom 1.0 :yanchor-top :yanchor-none)]
+                                                 {:fx/type fxui/toggle-button
+                                                  :id (str "gui-layout-" (name kind) "-" (name pivot))
+                                                  :style-class "gui-layout-preset-cell"
+                                                  :content-display :top :graphic (preset-graphic pivot)
+                                                  :text (preset-label kind pivot)
+                                                  :selected (= pivot selected)
+                                                  :grid-pane/column (mod (long index) 3) :grid-pane/row (quot (long index) 3)
+                                                  :on-action
+                                                  (fn [event]
+                                                    (when-not (animation-preview-active? app-view)
+                                                      (commit! (if (= :pivot kind)
+                                                                 (pivot-changes (first node-ids) pivot @keep-appearance (g/make-evaluation-context))
+                                                                 [[(first node-ids) :x-anchor x-anchor] [(first node-ids) :y-anchor y-anchor]])
+                                                               (localization/message "gui-layout.operation")))
+                                                    (.hide (.getWindow (.getScene ^Node (.getSource ^javafx.event.ActionEvent event)))))})))
+                                           presets)}]
+                                   render-property-grid
+                                   (conj (render-grid (if (= :pivot kind) [:pivot] [:x-anchor :y-anchor])))
+                                   (= :pivot kind)
+                                   (conj {:fx/type fxui/check-box :id "gui-layout-keep-appearance"
+                                          :text (message localization-state "keep-appearance")
+                                          :selected @keep-appearance :on-selected-changed #(reset! keep-appearance %)}))}}])}))
                        [:anchor :pivot])}]
                    (keep identity)
                    [(if rect-enabled
@@ -549,13 +550,18 @@
                      (+ (double x) 8.0) (- (double y) 10.0)))))))
 
 (defn- selection-data [view-id resource-node app-view]
-  (when (and (= :gui-rect (g/node-value app-view :active-tool))
+  (when (and app-view view-id resource-node
+             (g/node-by-id app-view)
+             (g/node-by-id view-id)
+             (g/node-by-id resource-node)
+             (= :gui-rect (g/node-value app-view :active-tool))
              (not (g/node-value view-id :animation-preview-active)))
     (g/with-auto-evaluation-context ec
       (let [selection (g/node-value view-id :selection ec)
             id (when (= 1 (count selection)) (first selection))
             ids (g/node-value resource-node :node-ids ec)]
-        (when (coll/any? #(= id %) (coll/vals ids))
+        (when (and id (g/node-by-id (:basis ec) id)
+                   (coll/any? #(= id %) (coll/vals ids)))
           (let [entries (:properties (g/node-value id :_properties ec))]
             (when (and (contains? entries :manual-size) (contains? entries :pivot)
                        (not (properties/read-only? (:manual-size entries))))
@@ -563,7 +569,7 @@
                     transform (:world-transform renderable)
                     overrides (get-in (g/node-value view-id :preview-overrides ec) [id :graph-properties])
                     size (get overrides :manual-size
-                                 (node-size id entries ec))
+                              (node-size id entries ec))
                     pivot (get overrides :pivot (g/node-value id :pivot ec))
                     camera (g/node-value view-id :camera ec)
                     viewport (g/node-value view-id :viewport ec)
@@ -640,7 +646,8 @@
                       (let [point (.sceneToLocal pane (.getSceneX event) (.getSceneY event))]
                         [(.getX point) (.getY point)]))
         pressed (ui/event-handler event
-                  (when (and (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
+                  (when (and (not (:replaying @state))
+                             (= MouseButton/PRIMARY (.getButton ^MouseEvent event))
                              (not (.isAltDown ^MouseEvent event))
                              (not (control-target? (.getTarget ^MouseEvent event) pane)))
                     (let [data (:data @state)
@@ -659,7 +666,7 @@
                                      (and data (inside-rect? (rect-corners (:pivot-value data) (:size data)) local)) :move)]
                       (when kind
                         (.requestFocus pane)
-                        (swap! state assoc :drag (assoc data :kind kind :handle (:direction handle) :start local))
+                        (swap! state assoc :drag (assoc data :kind kind :handle (:direction handle) :start local :press-event event))
                         (.consume ^MouseEvent event)))))
         dragged (ui/event-handler event
                   (when-let [{:keys [id camera viewport transform start handle pivot-value size position rotation scale size-mode kind] :as drag} (:drag @state)]
@@ -711,6 +718,14 @@
                        (commit! (:changes drag) (localization/message "gui-layout.operation"))
                        (finally (clear!)))
                      (refresh!)
+                     (when (and (= :move (:kind drag)) (nil? (:changes drag)))
+                       ;; The overlay owns drags; replay a stationary click
+                       ;; through the ordinary scene selection pipeline.
+                       (swap! state assoc :replaying true)
+                       (try
+                         (Event/fireEvent pane (.copyFor ^MouseEvent (:press-event drag) pane pane))
+                         (Event/fireEvent pane (.copyFor ^MouseEvent event pane pane))
+                         (finally (swap! state dissoc :replaying))))
                      (.consume ^MouseEvent event)))
         key-pressed (ui/event-handler event
                       (when (and (:drag @state) (= KeyCode/ESCAPE (.getCode ^KeyEvent event)))

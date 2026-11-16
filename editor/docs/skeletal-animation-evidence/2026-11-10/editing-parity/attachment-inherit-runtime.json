@@ -1,0 +1,32 @@
+{
+  "runtime": "@esotericsoftware/spine-core",
+  "version": "4.2.120",
+  "fixture": "/private/tmp/spine-four/authoring.skeleton",
+  "exportSha256": "a5c39e6c0d3f5d8e5bebda3c79404514826f2a818caa33e9a28c451ac07595b7",
+  "fps": 60,
+  "tolerance": 0.0001,
+  "frames": 121,
+  "passed": true,
+  "clips": [
+    {
+      "animation": "test",
+      "frames": 121,
+      "boneError": 1.8407645674400896e-7,
+      "vertexError": 0.000001020448819666342,
+      "worstBone": {
+        "time": 0,
+        "name": "tail",
+        "component": 4,
+        "actual": 2.5220362664570843,
+        "expected": 2.5220360823806276
+      },
+      "worstVertex": {
+        "time": 0.48333333333333334,
+        "index": 4,
+        "actual": -5.297247011385986,
+        "expected": -5.297248031834806
+      },
+      "stateErrors": 0
+    }
+  ]
+}

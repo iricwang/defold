@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-rig-ui/build/editor.jar",
+  "sha256": "e26dba44d1cb1436a59efbad931c3d93f3c63b08e12e0aa80c06a3a1c41ec462",
+  "project_source": "/tmp/spine-tail-path/project",
+  "project_copy": "/private/tmp/spine-rig-ui/background-verified/project",
+  "scenario": "/private/tmp/spine-rig-ui/interaction.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

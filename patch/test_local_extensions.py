@@ -24,6 +24,18 @@ spec.loader.exec_module(local)
 
 
 class LocalExtensionsTest(unittest.TestCase):
+    # Keep the configured path spelling; realpath/PATH changes invalidate Ninja core commands.
+    def test_configured_cmake_path_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root/'cmake'
+            binary.write_bytes(b'test')
+            (root/'CMakeCache.txt').write_text('CMAKE_COMMAND:INTERNAL=' + str(binary) + '\n')
+            self.assertEqual(str(binary), local.configured_cmake(root))
+            binary.unlink()
+            with self.assertRaisesRegex(ValueError, 'Configured SDK CMake is missing'):
+                local.configured_cmake(root)
+
     # macOS consumes its own framework context and library format; Windows must ignore it.
     def test_macos_manifest_context(self):
         previous = local.PLATFORM

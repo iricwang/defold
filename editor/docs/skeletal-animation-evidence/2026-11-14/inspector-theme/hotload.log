@@ -1,0 +1,10 @@
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': "#'user/theme-contexts"}
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': "#'user/theme-result"}
+{'id': 'patch', 'out': ':hotload {:undo-preserved true, :documents-preserved true, :selections-preserved true, :backgrounds ["0x45464aff"], :stopped-timers 0, :disabled-handlers 0}\n', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1'}
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': 'nil'}
+{'id': 'patch', 'ns': 'user', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'value': 'nil'}
+{'id': 'patch', 'session': '197adf02-e124-4067-866b-197f2bdbe2f1', 'status': ['done']}

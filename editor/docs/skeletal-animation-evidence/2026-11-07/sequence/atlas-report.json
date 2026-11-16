@@ -1,0 +1,17 @@
+{
+  "runtime": "@esotericsoftware/spine-core 4.2.120",
+  "pages": [
+    {
+      "name": "page-001.png",
+      "width": 24,
+      "height": 24
+    },
+    {
+      "name": "page-002.png",
+      "width": 12,
+      "height": 12
+    }
+  ],
+  "regions": 5,
+  "mismatches": 0
+}

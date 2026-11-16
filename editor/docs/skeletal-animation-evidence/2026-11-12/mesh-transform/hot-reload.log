@@ -1,0 +1,6 @@
+{"id": "smart-mesh", "ns": "user", "session": "608ecd7c-7f70-4034-8fff-12305c87c5f2", "value": "nil"}
+{"id": "smart-mesh", "ns": "user", "session": "608ecd7c-7f70-4034-8fff-12305c87c5f2", "value": "#'editor.skeletal-animation-view/register-view-types"}
+{"id": "smart-mesh", "out": "{:unchanged-since-inspection true, :state {:selected \"05_tail\", :selected-kind :slot, :mode \"animate\", :animation \"attack\", :time 0.33885449999970674, :tool \"move\"}}\n", "session": "608ecd7c-7f70-4034-8fff-12305c87c5f2"}
+{"id": "smart-mesh", "out": "{:canvas-events-hot-reloaded true, :document-preserved true, :disabled-handlers 0, :stopped-timers 0}\n", "session": "608ecd7c-7f70-4034-8fff-12305c87c5f2"}
+{"id": "smart-mesh", "ns": "user", "session": "608ecd7c-7f70-4034-8fff-12305c87c5f2", "value": "nil"}
+{"id": "smart-mesh", "session": "608ecd7c-7f70-4034-8fff-12305c87c5f2", "status": ["done"]}

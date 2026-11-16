@@ -1,0 +1,4 @@
+[project]
+title = Headless Skeletal Verification
+[bootstrap]
+main_collection = /main.collection

@@ -1,0 +1,8 @@
+{
+  "cases": 10,
+  "samples": 200,
+  "numericValues": 3128,
+  "tolerance": 1e-06,
+  "maxAbsoluteError": 1.1920928910669204e-08,
+  "mismatches": 0
+}

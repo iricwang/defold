@@ -14,6 +14,7 @@
 
 (ns editor.ai-results-test
   (:require [clojure.java.io :as io]
+            [clojure.string :as string]
             [clojure.test :refer [deftest is]]
             [editor.ai-canvas :as canvas]
             [editor.ai-graph :as graph]
@@ -141,7 +142,7 @@
       (is (nil? (.lookup root "#action-task-save")))
       (.setText ^javafx.scene.control.TextArea (.lookup root "#ai-result-text") "手工版本")
       (.fire ^javafx.scene.control.Button (.lookup root "#ai-result-confirm"))
-      (is (= [[:confirm-result "result-1" {:text "手工版本"}]] @events))
+      (is (= [[:confirm-result "result-1" {:text "手工版本" :review-mode :human}]] @events))
       (is (= "手工版本" (get-in @state [:result-drafts "result-1" :text])))
       (swap! state results/confirm-state "result-1")
       ((:refresh! details)) (.applyCss root)
@@ -214,3 +215,26 @@
     (is (= base (:canvas restored)))
     (is (= 1 (count (:canvas-undo moved))))
     (is (= (:sessions state) (:sessions moved)))))
+
+;; Automated confirmation is attributed truthfully; a later human confirmation
+;; of the same bytes stays distinct; repeated automation remains idempotent.
+(deftest automated-confirmation-identity-test
+  (let [state (assoc (fixture) :review-mode :automation)
+        id (:id (first (results/cards (:canvas state) "action-1")))
+        queued (results/confirm-state state id)
+        confirmation (get-in queued [:sessions id :confirmation])
+        done (-> queued (tasks/claim-next (:person state))
+                 (assoc-in [:sessions id :execution] {:status "completed"}) tasks/reconcile)
+        human (results/confirm-state (assoc done :review-mode :human) id)]
+    (is (= "automation" (:actor confirmation)))
+    (is (= "automation-verification" (:trigger confirmation)))
+    (is (= "pending" (:user-visual-approval confirmation)))
+    (is (string/includes? (:draft confirmation) "[自动化核验方案]"))
+    (is (string/includes? (:draft confirmation) "用户最终视觉验收未完成"))
+    (is (not (string/includes? (:draft confirmation) "用户已确认下面的方案")))
+    (is (identical? done (results/confirm-state done id)))
+    (is (= "local-human" (get-in human [:sessions id :confirmation :actor])))
+    (is (= [id] (get-in human [:sessions (:person state) :queue :remaining])))
+    (let [legacy (update-in (assoc done :review-mode :human) [:sessions id :confirmation]
+                            dissoc :actor :trigger :user-visual-approval)]
+      (is (identical? legacy (results/confirm-state legacy id))))))

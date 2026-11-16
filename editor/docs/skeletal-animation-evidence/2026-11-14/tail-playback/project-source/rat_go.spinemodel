@@ -1,0 +1,5 @@
+spine_scene: "/rat.spinescene"
+default_animation: "benchmark_sway"
+material: "/defold-spine/assets/spine.material"
+create_go_bones: true
+skin: ""

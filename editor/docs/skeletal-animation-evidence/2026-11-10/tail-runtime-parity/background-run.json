@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/tail-parity/build/editor.jar",
+  "sha256": "c1d22e15a1298b7b56c18c2d6bfc51d2207fbcc08ecbc41db8a557d289d65969",
+  "project_source": "tmp/background-skeletal-final/project",
+  "project_copy": "/private/tmp/tail-parity/background-verified/project",
+  "scenario": "/private/tmp/tail-parity/final-modes.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

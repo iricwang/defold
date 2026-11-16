@@ -1,0 +1,19 @@
+{
+  "05_tail_path_controls.spinescene": "7fe21d7196846625c52c797799734343c07e1b2fb9c9c999a88da351b92eb2b6",
+  "05_tail_path_controls.atlas": "75d21ad79e4ecb09f172c7013c2e017625600d25fca59ab66e7d1b767776316f",
+  "05_tail_path_controls.spinejson": "bfc1f270636e7aa8a5e525de70319d891efe51775fb129c89351163789f4905d",
+  "05_tail_path_controls.spinemodel": "b145f80f41c42a76c064c829d54d745f2561f657c1347d1f5f6dc88c3bd328bd",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/02_front_right.png": "28377dc91d91e54c510a6018668725e523f2dc2bc220229fba1afeb6af32a2ad",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/03_front_left.png": "8a06d0a798b0723bc25dfe7faa94324dbe9800890bba7f842cad9f78ae6fedc5",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01b_eye_far.png": "51624702c6d27173115fc7f2fd98eeda3b488f3fa18beb3f698652de8aff500a",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01a_eye_near.png": "18af82d2aeedcc3b9024fb729088724c2e0b872e953f8aababede3532eac24d5",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/04_hind_left.png": "2960ec65cc13e23f6bd142cc4decce861055145c9b61039c6023530857c01e88",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01_head.png": "80d72c54bcfe9a5342fd203adee107d5a4e45ade25afe4f12bc87d258abf3fef",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01b_eye_closed.png": "652500eabf297369a285f107672be1af08e787f4bb0deab78f7a6be9aaec2cef",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/05_tail.png": "a3fd114b853eea0e064e1823136ef7073dc878eddc21b8c68f194b69f00d7f09",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01a_eye_closed.png": "929d696e86bad167909991c101c9ab96be14e624d3afbda04e150a8d6ce3826e",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01c_jaw.png": "60e2184a893d5f11d4008f64f3988f00f6e72f72553e127afea8fe34a7f9c3a5",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01e_whiskers_far.png": "b0a1259827da18b17bc72c43a057e00f42a37120679dcc33d925a541b48dd8a0",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/06_body.png": "8fca877d95251f183aa7540065ff21e9315fc1cc8bdf525b116d201be5399a89",
+  "05_tail_path_controls_textures/docs/source/spine_smart_mesh_validation/imported_images/01d_whiskers_near.png": "4a6e982dfa655abf12956125aadd86bda7d3cec8d94e4854bebcafd9c672e98d"
+}

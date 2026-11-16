@@ -1,0 +1,35 @@
+{
+  "date": "2026-11-07",
+  "platform": "Darwin",
+  "architecture": "arm64",
+  "java": "Defold packaged JDK 25.0.4.1+1",
+  "official_spine_editor": "4.2.43",
+  "official_spine_core_oracle": "4.2.120",
+  "decoder": "imageio_ffmpeg 0.6.0 bundled FFmpeg 7.1",
+  "native_tests": {
+    "tests": 52,
+    "assertions": 708,
+    "failures": 0,
+    "errors": 0
+  },
+  "gpu_tests": {
+    "tests": 14,
+    "assertions": 264,
+    "failures": 0,
+    "errors": 0
+  },
+  "native_kondo": {
+    "errors": 0,
+    "warnings": 79,
+    "baseline_warnings": 81,
+    "new_warnings": 0
+  },
+  "source_sha256": {
+    "editor/src/clj/editor/skeletal_animation_native.clj": "7c1eedee56c7d3d29726c7971eaf8e98d6b0504fa3e60a187773803408afb66a",
+    "editor/src/clj/editor/skeletal_animation_render.clj": "35a714e6fff05feb4f4d19adb67c9facb5387005aa27a7bcc193cdeed30b719c",
+    "editor/src/clj/editor/skeletal_animation_gpu.clj": "28250a72fcb7b095b81e6efa3000517c2cc0542cb7b7b0256fb9ec73ef8a4279",
+    "editor/src/clj/editor/skeletal_animation_clipping.clj": "0fea52ef87acbdcf26ac9d370bc852c5d80c1fdff6f575e68556cb42a8b30874",
+    "editor/src/clj/editor/skeletal_animation_geometry.clj": "71b5a21fffa0b0207a4e3f932ac5a9c9141e56af36648d4fc933049e76b0a813",
+    "editor/src/clj/editor/skeletal_animation_preview_export.clj": "a9c71a5d3646418b9ee056fe6011a26a5a8f415974af356881d1c2cfc25c2612"
+  }
+}

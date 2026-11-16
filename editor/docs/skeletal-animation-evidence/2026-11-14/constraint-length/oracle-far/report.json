@@ -1,0 +1,32 @@
+{
+  "runtime": "@esotericsoftware/spine-core",
+  "version": "4.2.120",
+  "fixture": "/private/tmp/spine-length-controls/tail_fixed_far.skeleton",
+  "exportSha256": "685a1d07a0be69d0d3d82f33d785c12bc68229541c53d0d4a0669b669c72aa11",
+  "fps": 60,
+  "tolerance": 0.0001,
+  "frames": 121,
+  "passed": true,
+  "clips": [
+    {
+      "animation": "tail_path_demo",
+      "frames": 121,
+      "boneError": 0.00005835895350969622,
+      "vertexError": 0.00006689288167649465,
+      "worstBone": {
+        "time": 1.5,
+        "name": "tail_path_tip",
+        "component": 4,
+        "actual": 93.22946844396891,
+        "expected": 93.22952680292242
+      },
+      "worstVertex": {
+        "time": 0.36666666666666664,
+        "index": 44,
+        "actual": 150.33814698763942,
+        "expected": 150.3382138805211
+      },
+      "stateErrors": 0
+    }
+  ]
+}

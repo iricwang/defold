@@ -21,10 +21,13 @@
             [editor.fs :as fs]
             [editor.skeletal-animation-data :as data]
             [editor.skeletal-animation-native :as native]
+            [editor.skeletal-animation-runtime-export :as runtime-export]
+            [editor.skeletal-animation-sequence :as sequence]
             [editor.skeletal-animation-spine :as spine]
+            [editor.skeletal-animation-textures :as textures]
             [util.coll :as coll])
   (:import [java.io File]
-           [java.nio.file CopyOption Files]
+           [java.nio.file CopyOption Files OpenOption]
            [java.util Base64]
            [javax.imageio ImageIO]))
 
@@ -54,8 +57,8 @@
                  (not (string/starts-with? path "/"))
                  (not (string/includes? path "\\"))
                  (not (string/includes? path ":"))
-                 (not (coll/any? #{"" "." ".."} (string/split path #"/" -1))))
-    (throw (ex-info "Image paths must be relative and cannot contain traversal components." {:path path})))
+                 (coll/not-any? #{"" "." ".."} (string/split path #"/" -1)))
+    (throw (ex-info "Asset paths must be relative and cannot contain traversal components." {:path path})))
   path)
 
 (defn- project-file
@@ -69,25 +72,21 @@
   (str "/" (string/replace (str (.relativize (.toPath root) (.toPath file))) "\\" "/")))
 
 (defn- image-references [source]
-  (into []
-        (mapcat (fn [skin-index]
-                  (let [attachments (get-in source ["skins" skin-index "attachments"] {})]
-                    (into []
-                          (mapcat (fn [[slot entries]]
-                                    (into []
-                                          (keep (fn [[name attachment]]
-                                                  (when (contains? #{"region" "mesh" "linkedmesh"} (get attachment "type" "region"))
-                                                    (when (get attachment "sequence")
-                                                      (throw (ex-info "Image-sequence attachments require a sequence-aware asset export; no files were written."
-                                                                      {:slot slot :attachment name})))
-                                                    (let [path (safe-relative-path (get attachment "path" (get attachment "name" name)))
-                                                          png-path (if (string/ends-with? (string/lower-case path) ".png") path (str path ".png"))]
-                                                      {:key-path ["skins" skin-index "attachments" slot name "path"]
-                                                       :path path
-                                                       :png-path png-path}))))
-                                          entries)))
-                          attachments))))
-        (range (count (get source "skins" [])))))
+  (coll/into-> (range (count (get source "skins" []))) []
+    (mapcat (fn [skin-index]
+              (coll/into-> (get-in source ["skins" skin-index "attachments"] {}) []
+                (mapcat (fn [[slot entries]]
+                          (coll/into-> entries []
+                            (mapcat (fn [[name attachment]]
+                                      (when (contains? #{"region" "mesh" "linkedmesh"} (get attachment "type" "region"))
+                                        (let [base (safe-relative-path (get attachment "path" (get attachment "name" name)))
+                                              paths (if-let [value (sequence/decode (get attachment "sequence"))]
+                                                      (sequence/frame-paths base value) [base])]
+                                          (mapv (fn [path]
+                                                  {:key-path ["skins" skin-index "attachments" slot name "path"]
+                                                   :base-path base :path path
+                                                   :png-path (if (string/ends-with? (string/lower-case path) ".png") path (str path ".png"))})
+                                                paths)))))))))))))
 
 (defn- validate-png! [^File file]
   (when-not (and (.isFile file)
@@ -109,18 +108,67 @@
       (throw (ex-info "Could not find an image next to the Spine JSON or in its images folder."
                       {:path png-path :searched (mapv str candidates)})))))
 
-(defn- available-image-directory
-  ^File [^File root stem]
+(defn- available-asset-directory
+  ^File [^File root stem kind]
   (loop [index 1]
-    (let [directory (project-file root (str stem "_images" (when (> index 1) (str "_" index))))]
+    (let [directory (project-file root (str stem "_" kind (when (> index 1) (str "_" index))))]
       (if (.exists directory)
         (recur (inc index))
         directory))))
 
+(defn- audio-references [source]
+  (into
+    (coll/into-> (get source "events") []
+      (keep (fn [[name event]]
+              (when-not (string/blank? (get event "audio"))
+                {:key-path ["events" name "audio"] :path (safe-relative-path (get event "audio"))}))))
+    (coll/into-> (get source "animations") []
+      (mapcat (fn [[animation value]]
+                (coll/into-> (vec (get value "events")) []
+                  (keep-indexed (fn [index event]
+                                  (when-not (string/blank? (get event "audio"))
+                                    {:key-path ["animations" animation "events" index "audio"]
+                                     :path (safe-relative-path (get event "audio"))})))))))))
+
+(defn- audio-import-plan [^File source-root ^File project-root stem source]
+  (let [references (audio-references source)
+        audio-path (get-in source ["skeleton" "audio"] "")
+        audio-root (io/file audio-path)
+        audio-root (.getCanonicalFile (if (.isAbsolute audio-root) audio-root (io/file source-root audio-path)))
+        directory (available-asset-directory project-root stem "audio")
+        files (coll/into-> references {}
+                (map (fn [{:keys [path]}]
+                       [path {:source (project-file audio-root path)
+                              :target (project-file directory path)}])))
+        missing (filterv (fn [[_ {:keys [source]}]] (not (.isFile ^File source))) files)]
+    {:directory directory
+     :project-relative (pos? (count references))
+     :files (coll/into-> files {} (remove (fn [[_ {:keys [source]}]] (not (.isFile ^File source)))))
+     :warnings (mapv (fn [[path _]] (str "Missing event audio: " path " (searched " audio-root ").")) missing)
+     ;; A project-relative identity is shared by preview and the exported game.
+     :source (if (coll/empty? references) source
+                 (reduce (fn [source {:keys [key-path path]}]
+                           (assoc-in source key-path (subs (project-path project-root (project-file directory path)) 1)))
+                         (assoc-in source ["skeleton" "audio"] "") references))}))
+
+(defn- project-audio-warnings [^File root source]
+  ;; Spine commonly writes ./audio even when no event uses audio. Only resolve
+  ;; a directory when it has dependencies, and accept its leading current-dir
+  ;; components without weakening attachment or parent-traversal validation.
+  (if-let [references (coll/not-empty (audio-references source))]
+    (let [directory (string/replace (get-in source ["skeleton" "audio"] "") #"^(?:\./)+" "")
+          audio-root (if (contains? #{"" "."} directory) root (project-file root directory))]
+      (coll/into-> references []
+        (keep (fn [{:keys [path]}]
+                (let [file (project-file audio-root path)]
+                  (when-not (.isFile file) (str "Missing event audio: " path ".")))))
+        (distinct)))
+    []))
+
 (defn- read-spine-source-impl!
-  "Read Spine JSON and copy its referenced PNGs into a fresh project folder.
+  "Read Spine JSON and copy PNG/audio dependencies into fresh project folders.
   Returns {:document doc :warnings [...] :files [File ...]}. Existing assets
-  are never overwritten. All source images are validated before any copy."
+  are never overwritten. Check all paths and images before copying."
   [file project-root source]
   (let [file (.getCanonicalFile (io/file file))
         root (.getCanonicalFile (io/file project-root))
@@ -128,41 +176,42 @@
         references (image-references source)
         images-path (get-in source ["skeleton" "images"] "")
         stem (-> (.getName file) (string/replace #"\.[^.]+$" "") (string/replace #"[^\p{L}\p{N}_-]" "_"))
-        directory (available-image-directory root stem)
-        paths (into #{} (map :png-path) references)
-        files (into {}
-                    (map (fn [path]
-                           [path {:source (import-image-file source-root root images-path path)
-                                  :target (project-file directory path)}]))
-                    paths)
-        source (reduce (fn [source {:keys [key-path png-path]}]
-                         (let [target-path (project-path root (:target (get files png-path)))]
+        directory (available-asset-directory root stem "images")
+        paths (coll/into-> references #{} (map :png-path))
+        image-files (coll/into-> paths {}
+                      (map (fn [path]
+                             [path {:source (import-image-file source-root root images-path path)
+                                    :target (project-file directory path)}])))
+        audio (audio-import-plan source-root root stem source)
+        files (into (vec (coll/vals image-files)) (coll/vals (:files audio)))
+        source (reduce (fn [source {:keys [key-path base-path]}]
+                         (let [base-png (if (string/ends-with? (string/lower-case base-path) ".png") base-path (str base-path ".png"))
+                               target-path (project-path root (project-file directory base-png))]
                            (assoc-in source key-path (subs target-path 1 (- (count target-path) 4)))))
-                       (assoc-in source ["skeleton" "images"] "")
+                       (assoc-in (:source audio) ["skeleton" "images"] "")
                        references)
         document (data/import-spine-json (json/write-str source :escape-slash false))
-        document (if-not (= "Imported skeleton" (:name document))
-                   document
-                   (assoc document :name stem))]
+        document (cond-> (update document :warnings #(into (vec %) (:warnings audio)))
+                   (:project-relative audio) (assoc :audio-project-relative true))
+        document (if-not (= "Imported skeleton" (:name document)) document (assoc document :name stem))]
     (try
-      (run! (fn [[_ {:keys [source target]}]]
+      (run! (fn [{:keys [source target]}]
               (fs/create-parent-directories! target)
               (Files/copy (.toPath ^File source) (.toPath ^File target) ^CopyOption/1 (make-array CopyOption 0)))
             files)
-      {:document document
-       :warnings (get document :warnings [])
-       :files (mapv :target (coll/vals files))}
+      {:document document :warnings (get document :warnings []) :files (mapv :target files)}
       (catch Exception exception
-        (when (.exists directory)
+        (doseq [^File directory [directory (:directory audio)] :when (.exists directory)]
           (fs/delete-directory! directory {:fail :silently}))
         (throw exception)))))
 
 (defn read-spine-source!
   "Import a JSON source whose image directory is relative to its source file."
   [file project-root source]
-  (let [images-path (get-in source ["skeleton" "images"] "")]
-    (when (or (.isAbsolute (io/file images-path)) (string/includes? images-path "\\"))
-      (throw (ex-info "The Spine images directory must be relative to the JSON file." {:images images-path}))))
+  (doseq [field ["images" "audio"]
+          :let [directory (get-in source ["skeleton" field] "")]]
+    (when (or (.isAbsolute (io/file directory)) (string/includes? directory "\\"))
+      (throw (ex-info "Spine asset directories must be relative to the JSON file." {:field field :directory directory}))))
   (read-spine-source-impl! file project-root source))
 
 (defn read-spine-file!
@@ -208,20 +257,30 @@
     (update-in result [:document :native-project] assoc
                :codec "independent-4.2.43" :packed (:packed project) :selected-index index)))
 
+(defn native-audio-root
+  "Resolve native audio roots, preserving unarchived source directories."
+  [document project-root source]
+  (let [audio (io/file (get-in source ["skeleton" "audio"] "./audio"))
+        source-file (get-in document [:native-project :file])
+        root (if (and source-file (not (:audio-project-relative document)))
+               (.getParentFile (.getCanonicalFile (io/file source-file)))
+               (io/file project-root))]
+    (.getCanonicalFile (if (.isAbsolute audio) audio (io/file root (str audio))))))
+
 (defn write-independent-project!
   "Encode the edited skeleton into its preserved native graph without Spine.
   Save As never replaces an original or an existing destination."
   [document project-root target]
+  (when (string/starts-with? (get-in (json/read-str (or (:spine-source document) "{}")) ["skeleton" "spine"] "") "4.3.")
+    (throw (ex-info "Spine 4.3 projects must be saved with the matching Spine CLI, not the 4.2 codec." {})))
   (let [target (.getCanonicalFile (io/file target))
         _ (when (or (.exists target) (not (string/ends-with? (string/lower-case (.getName target)) ".spine")))
             (throw (ex-info "Choose a new .spine file. Existing projects are not overwritten." {:file (str target)})))
         source (assoc-in (json/read-str (data/export-spine-json document)) ["skeleton" "images"]
                          (string/replace (.getCanonicalPath (io/file project-root)) "\\" "/"))
         metadata (:native-project document)
-        audio (io/file (get-in source ["skeleton" "audio"] "./audio"))
-        audio-root (if-let [file (:file metadata)] (.getParentFile (.getCanonicalFile (io/file file))) (io/file project-root))
         source (assoc-in source ["skeleton" "audio"]
-                         (string/replace (.getCanonicalPath (if (.isAbsolute audio) audio (io/file audio-root (str audio)))) "\\" "/"))
+                         (string/replace (.getPath ^File (native-audio-root document project-root source)) "\\\\" "/"))
         graph (if (= "independent-4.2.43" (:codec metadata))
                 (let [graph (native/decode-graph (native/decode (.decode (Base64/getDecoder) ^String (:packed metadata))))
                       directory (.getParentFile (.getCanonicalFile (io/file (:file metadata))))
@@ -254,16 +313,22 @@
                           (:skeletons metadata)))))
         packed (native/encode-graph graph)]
     (fs/create-parent-directories! target)
-    (with-open [input (java.io.ByteArrayInputStream. packed)]
-      (Files/copy input (.toPath target) ^CopyOption/1 (make-array CopyOption 0)))
-    target))
+    (let [staging (Files/createTempFile (.toPath (.getParentFile target)) ".spine-save-" ".tmp"
+                                        (make-array java.nio.file.attribute.FileAttribute 0))]
+      (try
+        (Files/write staging ^bytes packed ^OpenOption/1 (make-array OpenOption 0))
+        (Files/move staging (.toPath target) ^CopyOption/1 (make-array CopyOption 0))
+        target
+        (finally (Files/deleteIfExists staging))))))
 
 (defn write-native-project!
   "Save As through the installed Spine bridge. Other skeletons from an opened
   project are retained. Native project-only settings are not roundtrip-safe."
   [document project-root target config]
   (let [source (json/read-str (data/export-spine-json document))
-        source (assoc-in source ["skeleton" "images"] (string/replace (.getCanonicalPath (io/file project-root)) "\\" "/"))
+        source (-> source
+                   (assoc-in ["skeleton" "images"] (string/replace (.getCanonicalPath (io/file project-root)) "\\" "/"))
+                   (assoc-in ["skeleton" "audio"] (string/replace (.getCanonicalPath (io/file project-root)) "\\" "/")))
         native (:native-project document)
         source-directory (some-> (:file native) io/file .getParentFile)
         skeletons (if-not native
@@ -280,6 +345,30 @@
                           (:skeletons native)))]
     (spine/write-project! skeletons target config)))
 
+(defn export-compatibility
+  "Report target differences before opening a save dialog or writing files."
+  [document]
+  (let [document (data/validate-document document)
+        ;; The preview warning only depends on two-color slot data. Exporting
+        ;; every mesh and animation here makes mouse release unnecessarily slow.
+        source (if-let [text (:spine-source document)] (json/read-str text) {})
+        slot-ids (mapv :id (:slots document))
+        two-color (or (coll/any? :dark-color (:slots document))
+                      (coll/any? (fn [animation]
+                                   (coll/any? #(or (get % "rgba2") (get % "rgb2"))
+                                              (coll/vals (select-keys (get-in source ["animations" (:id animation) "slots"]) slot-ids))))
+                                 (:animations document)))]
+    (cond-> []
+      two-color (conj {:target :defold :severity :warning :code :default-material-dark}))))
+
+(defn texture-inventory
+  "All skins and sequence frames, deduplicated; reads PNG headers only."
+  [document project-root]
+  (let [root (.getCanonicalFile (io/file project-root))
+        images (coll/into-> (image-references (json/read-str (data/export-spine-json document))) (sorted-set) (map :png-path))]
+    (mapv (fn [path]
+            {:path path :size (textures/image-size (project-file root path))}) images)))
+
 (defn export-project!
   "Write a .spinejson plus matching Defold atlas, scene and model inside the
   project. Returns their project paths and absolute File objects. Requires the
@@ -293,19 +382,36 @@
         stem (string/replace (:name document) #"[^\p{L}\p{N}_-]" "_")
         _ (when (string/blank? stem)
             (throw (ex-info "An export needs a nonempty document name." {})))
-        spine-json (data/export-spine-json document)
-        references (image-references (json/read-str spine-json))
+        source (runtime-export/for-runtime (data/export-spine-data document))
+        spine-json (json/write-str source :escape-slash false)
+        references (image-references source)
+        audio-warnings (project-audio-warnings root source)
+        inherit-blend (coll/any? #(not= "normal" (get % "blend" "normal")) (get source "slots"))
+        two-color (or (coll/any? #(get % "dark") (get source "slots"))
+                      (coll/any? (fn [animation]
+                                   (coll/any? #(or (get % "rgba2") (get % "rgb2")) (coll/vals (get animation "slots"))))
+                                 (coll/vals (get source "animations"))))
+        warnings (cond-> audio-warnings
+                   two-color (conj "Two-color slot tint is preserved in Spine JSON, but the default Defold Spine material does not render dark channels. A runtime extension and material exposing two-color vertex data are required."))
+        factor (textures/scale document)
         images (into (sorted-map) (map (juxt :path :png-path)) references)
         _ (run! #(validate-png! (project-file root %)) (coll/vals images))
         _ (when (zero? (count images))
             (throw (ex-info "Add at least one image attachment before exporting game resources." {})))
+        derived (if (= 1.0 factor) {}
+                    (coll/into-> (set (coll/vals images)) (sorted-map)
+                      (map (fn [image]
+                             [image (project-file directory (str stem "_textures/" image))]))))
+        sources (set (mapv #(project-file root %) (coll/vals images)))
+        _ (when (coll/any? sources (coll/vals derived))
+            (throw (ex-info "Texture output would overwrite a source image. Choose another export directory." {})))
         files (into {} (map (fn [extension] [(keyword extension) (project-file directory (str stem "." extension))]))
                     ["spinejson" "atlas" "spinescene" "spinemodel"])
         paths (into {} (map (fn [[extension file]] [extension (project-path root file)])) files)
         atlas (str (coll/join-to-string
                      (into []
                            (map (fn [[path image]]
-                                  (str "animations {\n  id: " (pr-str path) "\n  images { image: " (pr-str (str "/" image)) " }\n  playback: PLAYBACK_ONCE_FORWARD\n  fps: 0\n}\n")))
+                                  (str "animations {\n  id: " (pr-str path) "\n  images { image: " (pr-str (if-let [file (get derived image)] (project-path root file) (str "/" image))) " }\n  playback: PLAYBACK_ONCE_FORWARD\n  fps: 0\n}\n")))
                            images))
                    "extrude_borders: 2\ninner_padding: 2\n")
         contents {:spinejson spine-json
@@ -313,10 +419,13 @@
                   :spinescene (str "spine_json: " (pr-str (:spinejson paths)) "\natlas: " (pr-str (:atlas paths)) "\n")
                   :spinemodel (str "spine_scene: " (pr-str (:spinescene paths)) "\ndefault_animation: " (pr-str (or (:id (first (:animations document))) ""))
                                    "\nskin: " (pr-str (let [skin (get document :active-skin "default")] (if (= "default" skin) "" skin)))
-                                   "\nmaterial: \"/defold-spine/assets/spine.material\"\ncreate_go_bones: true\n")}]
+                                   "\nmaterial: \"/defold-spine/assets/spine.material\"\ncreate_go_bones: true\n"
+                                   (when inherit-blend "blend_mode: BLEND_MODE_INHERIT\n"))}]
     ;; Resolve every target and validate every image before touching outputs.
+    (run! (fn [[image file]] (textures/write-scaled! (project-file root image) file factor)) derived)
     (run! (fn [[extension file]]
             (fs/create-parent-directories! file)
             (spit file (get contents extension)))
           files)
-    (assoc paths :files (mapv files [:spinejson :atlas :spinescene :spinemodel]))))
+    (assoc paths :warnings warnings :texture-scale factor :texture-files (vec (coll/vals derived))
+           :files (mapv files [:spinejson :atlas :spinescene :spinemodel]))))

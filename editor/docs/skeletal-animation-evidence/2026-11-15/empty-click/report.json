@@ -1,0 +1,19 @@
+{
+  "tests": 74,
+  "assertions": 561,
+  "failures": 0,
+  "errors": 0,
+  "live_checks": [
+    "setup",
+    "animate",
+    "bone_from_tree",
+    "image_from_canvas",
+    "blank_click_clears_tree_and_canvas",
+    "right_click_retains_selection"
+  ],
+  "documents_and_undo_preserved": true,
+  "disabled_handlers": 0,
+  "stopped_timers": 0,
+  "delivery": "session hot reload; source persisted; no package installation",
+  "runtime_engine_changed": false
+}

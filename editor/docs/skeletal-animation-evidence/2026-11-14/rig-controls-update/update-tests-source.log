@@ -1,0 +1,9 @@
+11月 14, 2026 2:45:03 下午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @25c5e994'
+
+Testing editor.patch-test
+
+Testing editor.docking-test
+
+Ran 24 tests containing 185 assertions.
+0 failures, 0 errors.

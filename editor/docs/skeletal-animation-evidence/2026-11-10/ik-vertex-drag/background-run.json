@@ -1,0 +1,16 @@
+{
+  "jar": "/private/tmp/spine-drag-fix/build/editor.jar",
+  "sha256": "7aa21ff9c3241635f426e6bd422b9ff28aac61d248d171b1e921ad577cdea734",
+  "project_source": "tmp/background-skeletal-final/project",
+  "project_copy": "/private/tmp/spine-drag-fix/background-final/project",
+  "scenario": "/Users/applemima1111/Documents/Dev/Defold/editor/test/headless/skeletal_animation_runtime_gaps.edn",
+  "backend": "background",
+  "allow_no_gl": false,
+  "copy_excludes": [
+    ".git",
+    ".internal",
+    "build",
+    ".DS_Store",
+    "symlinks"
+  ]
+}

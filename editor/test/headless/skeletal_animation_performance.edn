@@ -1,0 +1,7 @@
+;; Opens the isolated tail fixture for the CPU/pulse benchmark runner.
+{:viewport [3000 1800]
+ :steps [{:op :click
+          :selector {:fx.plorer/style-classes #{"tree-cell"} :text "tail.skeleton"}}
+         {:op :keys :keys [:enter]}
+         {:op :wait :selector "#skeletal-workspace"
+          :property :visible :equals true :timeout-ms 30000}]}

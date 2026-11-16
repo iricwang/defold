@@ -1,0 +1,445 @@
+{
+  "action": "edit",
+  "revision": "8fe1011f-70bd-4095-967c-b38262ea689e:70bbb094c1988483a192fb13664aacc7cd5230dc72322f67df54f1afd965f0eb",
+  "operations": [
+    {
+      "op": "animation.add",
+      "values": {
+        "id": "tail_sway_skill",
+        "duration": 2.4
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 0.0,
+      "value": -59.32813327447063,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.09999999999999999,
+          -46.44409031157549,
+          0.2,
+          -33.42060258452228
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 0.3,
+      "value": -24.12918298979782,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.39999999999999997,
+          -14.83776339507336,
+          0.5,
+          -9.404842935673543
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 0.6,
+      "value": -9.404842935673543,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.7,
+          -9.404842935673543,
+          0.8,
+          -14.837763395073353
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 0.9,
+      "value": -24.129182989797812,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.0,
+          -33.42060258452227,
+          1.0999999999999999,
+          -46.444090311575486
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 1.2,
+      "value": -59.32813327447062,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.3,
+          -72.21217623736575,
+          1.4,
+          -84.75216232538244
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 1.5,
+      "value": -93.51389006134085,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.6,
+          -102.27561779729925,
+          1.7,
+          -107.22814774535716
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 1.8,
+      "value": -107.22814774535716,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.9000000000000001,
+          -107.22814774535716,
+          2.0,
+          -102.27561779732767
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 2.1,
+      "value": -93.51389006134085,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          2.2,
+          -84.75216232535402,
+          2.3,
+          -72.2121762373871
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "x",
+      "time": 2.4,
+      "value": -59.328133274470645
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 0.0,
+      "value": -251.24694233470373,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.09999999999999999,
+          -254.0144449596236,
+          0.2,
+          -255.6345069448767
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 0.3,
+      "value": -256.34043815661727,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.39999999999999997,
+          -257.04636936835783,
+          0.5,
+          -257.0435475243288
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 0.6,
+      "value": -257.0435475243288,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.7,
+          -257.0435475243288,
+          0.8,
+          -257.04636936835783
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 0.9,
+      "value": -256.34043815661727,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.0,
+          -255.6345069448767,
+          1.0999999999999999,
+          -254.0144449596236
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 1.2,
+      "value": -251.24694233470373,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.3,
+          -248.47943970978386,
+          1.4,
+          -244.6084472885105
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 1.5,
+      "value": -241.43654816628845,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.6,
+          -238.2646490440664,
+          1.7,
+          -236.0310242334165
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 1.8,
+      "value": -236.0310242334165,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.9000000000000001,
+          -236.0310242334165,
+          2.0,
+          -238.2646490440522
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 2.1,
+      "value": -241.43654816628845,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          2.2,
+          -244.6084472885247,
+          2.3,
+          -248.47943970978386
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control2",
+      "property": "y",
+      "time": 2.4,
+      "value": -251.24694233470373
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 0.0,
+      "value": 1.3048966023336908,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.09999999999999999,
+          2.012106094679508,
+          0.2,
+          2.574327981034574
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 0.3,
+      "value": 2.8328379927775034,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.39999999999999997,
+          3.091348004520433,
+          0.5,
+          3.0429624347878717
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 0.6,
+      "value": 2.7013413070580308,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          0.7,
+          2.35972017932819,
+          0.8,
+          1.7290707640340925
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 0.9,
+      "value": 0.9874355202626267,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.0,
+          0.24580027649116098,
+          1.0999999999999999,
+          -0.5976871099879846
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 1.2,
+      "value": -1.3048966023336908,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.3,
+          -2.012106094679397,
+          1.4,
+          -2.574327981034796
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 1.5,
+      "value": -2.8328379927775034,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.6,
+          -3.091348004520211,
+          1.7,
+          -3.0429624347878717
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 1.8,
+      "value": -2.7013413070580308,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          1.9000000000000001,
+          -2.35972017932819,
+          2.0,
+          -1.7290707640353695
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 2.1,
+      "value": -0.987435520262627,
+      "interpolation": {
+        "type": "bezier",
+        "curve": [
+          2.2,
+          -0.24580027648988456,
+          2.3,
+          0.5976871099868739
+        ]
+      }
+    },
+    {
+      "op": "key.set",
+      "animation": "tail_sway_skill",
+      "bone": "05_tail_auto1_control1",
+      "property": "rotation",
+      "time": 2.4,
+      "value": 1.3048966023336903
+    }
+  ]
+}
