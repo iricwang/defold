@@ -592,6 +592,13 @@ namespace dmGameSystem
         DM_PROFILE("StepWorld2D");
         dmPhysics::StepWorld2D(world->m_World2D, *step_ctx);
 
+        if (g_NumPhysicsTransformsUpdated > 0)
+        {
+            dmGameObject::UpdateTransforms(collection);
+        }
+
+        BroadcastPhysicsPostStepEvent(physics_context->m_BaseContext.m_ContextRegistry, dmPhysics::GetWorldContext2D(world->m_World2D), step_ctx->m_DT);
+
         if (collision_user_data->m_Count >= physics_context->m_BaseContext.m_MaxCollisionCount && physics_context->m_BaseContext.m_MaxCollisionCount > 0)
         {
             if (!g_CollisionOverflowWarning)
@@ -619,11 +626,6 @@ namespace dmGameSystem
 
         dmMessage::HSocket socket = dmGameObject::GetMessageSocket(collection);
         dmGameObject::DispatchMessages(collection, &socket, 1);
-
-        if (g_NumPhysicsTransformsUpdated > 0)
-        {
-            dmGameObject::UpdateTransforms(collection);
-        }
     }
 
     static dmGameObject::UpdateResult CompCollisionObjectUpdateInternal(const dmGameObject::ComponentsUpdateParams& params, dmGameObject::ComponentsUpdateResult& update_result)
@@ -678,6 +680,7 @@ namespace dmGameSystem
         contact_user_data.m_Count = 0;
 
         dmPhysics::StepWorldContext step_world_context;
+        step_world_context.m_ContactCallbacksReadOnly = world->m_BaseWorld.m_CallbackInfo && world->m_BaseWorld.m_CallbackInfoBatched;
         step_world_context.m_CollisionCallback = (event_mask & EVENT_MASK_COLLISION) ? CollisionCallback : 0;
         step_world_context.m_CollisionUserData = &collision_user_data;
         step_world_context.m_ContactPointCallback = (event_mask & EVENT_MASK_CONTACT) ? ContactPointCallback : 0;

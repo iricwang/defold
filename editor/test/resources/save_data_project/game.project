@@ -202,6 +202,7 @@ max_count = 32
 max_tile_count = 1024
 
 [engine]
+datastore = 1
 run_while_iconified = 1
 fixed_update_frequency = 30
 max_time_step = 0.1
@@ -260,6 +261,7 @@ max_fixed_timesteps = 3
 velocity_iterations = 1
 position_iterations = 2
 sub_step_count = 3
+worker_count = 3
 
 [profiler]
 track_cpu = 1

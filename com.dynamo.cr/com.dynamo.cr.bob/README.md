@@ -15,6 +15,13 @@ Full Bob also needs these tools for the other desktop hosts; install them with
 platforms. `build_bob` uses the installed tools without extracting their packages
 again.
 
+In CI, Bob build and test jobs first try to restore the exact dependency cache
+used by the Linux x86-64 engine job. A cache hit needs the prepackaged tools
+and Python dependencies installed before copying the cached native files. The
+prepackaged tools include `strip_android` for use when host LLVM is unavailable.
+A cache miss, restore failure, or disabled caching uses the
+normal CMake and Clang setup and dependency build instead.
+
 Full Bob uses engines and builtins from `$DYNAMO_HOME/archive/<revision>/engine`
 when available, otherwise from the local engine build. Compiler libraries and
 helper JARs prefer local builds, with the archive as a fallback. Gradle reads
@@ -22,16 +29,31 @@ artifacts from their build or archive locations without staging them in the Bob
 source tree's `lib` and `libexec` directories. Console shader compiler plugins,
 where needed, are built separately from Bob.
 
+Before packaging, Bob copies its Linux compiler libraries, LuaJIT executables,
+Ogg tools, Linux `zipalign`, and Linux and macOS `lipo` tools to `tmp` and removes
+their debug information; the original binaries remain available for debugging.
+Windows `lipo.exe` is left unchanged: stripping its debug sections with LLVM
+produces a binary that Windows cannot load.
+The build uses the host's `llvm-strip` (`llvm-strip.exe` on Windows) from `PATH`.
+If it is unavailable, the build falls back to the host's packaged `strip_android`
+tool in `$DYNAMO_HOME/ext/bin/<host>`. Despite its name, this is LLVM strip and
+supports the Linux and macOS binaries packaged by Bob as well as Android binaries.
+Set `LLVM_STRIP` to an absolute executable path to override both choices; an
+invalid override fails the build. Linux ARM64 has no packaged `strip_android`
+and uses host LLVM. See the [LLVM strip setup instructions](../../README_SETUP.md#required-software---llvm-strip).
+
 `scripts/update-editor-binaries.sh` installs Bob with `-Pprefer-local-engines` so
 local engine binaries and `classes.dex` take precedence over a synced archive.
 Platforms without a local engine still use the archive. The local preference also
 includes available headless engines and local platforms omitted from
 `archive-artifacts.json`.
 
-`./scripts/build.py sync_archive` downloads Bob's engine inputs from S3. The public
-paths in `archive-artifacts.json` are shared with Gradle's artifact selection;
-update that list when adding an archived input. Private-platform archive folders
-retain their existing download filters.
+`./scripts/build.py sync_archive` downloads Bob's public engine inputs through
+CloudFront at `https://d.defold.com`. S3 is used to list available files, and private
+archive buckets retain authenticated S3 downloads. The public paths in
+`archive-artifacts.json` are shared with Gradle's artifact selection; update that
+list when adding an archived input. Private-platform archive folders retain their
+existing download filters.
 
 Tool packaging is defined by two additional manifests:
 
@@ -46,7 +68,9 @@ Compiler libraries resolve from local engine builds or archive paths listed in
 into their usual `$DYNAMO_HOME/ext/bin/<platform>` and `ext/lib/<platform>` paths,
 preserving locally built tools for the current host and selected target.
 Full Bob requires them for all desktop hosts; Bob Light requires the current
-host's LuaJIT executable and Ogg libraries.
+host's LuaJIT executable, Ogg libraries, and DXC compiler library. CMake stages
+DXC alongside the shader compiler before building Bob Light, without requiring
+an engine install first.
 Independent desktop-editor CI jobs set `DEFOLD_BOB_TOOL_SCOPE=host`: all tools
 needed on the build host remain mandatory, while tools for other desktop hosts
 are optional (the final editor JAR excludes them). Standalone Bob CI defaults to
@@ -89,6 +113,9 @@ Resource keep XML is separate from the Java `.keep` configuration. Projects with
 Bob builds content for the editor and engine tests. `build_engine` builds host
 tools and `bob-light.jar` before CMake uses Bob Light to compile engine test
 content and built-in resources.
+
+DX12 is still a work in progress. When switching to the SM6/DXC shader compiler,
+clear the project's build caches and rebuild its content.
 
 ### GUI custom node callbacks
 

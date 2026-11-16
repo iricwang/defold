@@ -44,6 +44,8 @@ defold_target_link_libraries(test_graphics "${TARGET_PLATFORM}"
   platform_null
   graphics_null
   graphics_transcoder_null)
+target_link_libraries(test_graphics PRIVATE graphics_test)
+add_dependencies(test_graphics graphics_test_sdk_headers)
 defold_target_link_socket(test_graphics "${TARGET_PLATFORM}" PRIVATE)
 if(TARGET_PLATFORM MATCHES "arm64-linux|x86_64-linux")
   find_package(Threads REQUIRED)
@@ -74,16 +76,48 @@ defold_register_test_target(test_transcoder ON "${GRAPHICS_TEST_SRC_DIR}")
 
 # Headless WARP tests; require the Windows Graphics Tools debug layer.
 if(TARGET graphics_dx12 AND TARGET_PLATFORM STREQUAL "x86_64-win32")
-  defold_add_executable(test_graphics_dx12 "${GRAPHICS_TEST_SRC_DIR}/test_graphics_dx12.cpp")
+  include(shaderc_dxc)
+  shaderc_import_dxc()
+  # These tests only need the DXC wrapper, not the full SPIRV/Java shader pipeline.
+  defold_add_executable(test_graphics_dx12
+    "${GRAPHICS_TEST_SRC_DIR}/test_graphics_dx12.cpp"
+    "${DEFOLD_HOME}/engine/shaderc/src/shaderc_dxc.cpp")
+  target_include_directories(test_graphics_dx12 PRIVATE "${DEFOLD_HOME}/engine/shaderc/src")
   target_include_directories(test_graphics_dx12 PRIVATE "${GRAPHICS_SRC_DIR}" "${GRAPHICS_PROTO_ROOT}")
   defold_target_link_libraries(test_graphics_dx12 "${TARGET_PLATFORM}"
     testmain ddf dlib profile_null graphics_dx12 graphics_transcoder_null)
   defold_target_link_platform(test_graphics_dx12 "${TARGET_PLATFORM}" SCOPE PRIVATE)
   defold_target_link_glfw(test_graphics_dx12 "${TARGET_PLATFORM}" SCOPE PRIVATE)
-  target_link_libraries(test_graphics_dx12 PRIVATE d3d12 dxgi d3dcompiler)
+  target_link_libraries(test_graphics_dx12 PRIVATE d3d12 dxgi d3dcompiler shaderc_dxcompiler)
+  shaderc_stage_dxc(test_graphics_dx12)
   defold_target_link_socket(test_graphics_dx12 "${TARGET_PLATFORM}" PRIVATE)
   option(DEFOLD_RUN_DX12_TESTS "Run the WARP/debug-layer DX12 suite in run_tests" OFF)
   defold_register_test_target(test_graphics_dx12 ${DEFOLD_RUN_DX12_TESTS})
+endif()
+
+# Real Windows windows and swap chains, with independent targets for each adapter.
+if(TARGET_PLATFORM STREQUAL "x86_64-win32")
+  option(DEFOLD_RUN_WINDOW_RESIZE_TESTS "Run window-backed DX12/Vulkan resize tests in run_tests" OFF)
+  foreach(_resize_backend dx12 vulkan)
+    if(TARGET graphics_${_resize_backend})
+      set(_resize_target test_graphics_window_resize_${_resize_backend})
+      defold_add_executable(${_resize_target} "${GRAPHICS_TEST_SRC_DIR}/test_graphics_window_resize.cpp")
+      target_include_directories(${_resize_target} PRIVATE "${GRAPHICS_SRC_DIR}" "${GRAPHICS_PROTO_ROOT}")
+      if(_resize_backend STREQUAL "dx12")
+        target_compile_definitions(${_resize_target} PRIVATE DM_TEST_WINDOW_DX12=1)
+        target_link_libraries(${_resize_target} PRIVATE d3d12 dxgi d3dcompiler)
+      else()
+        target_link_libraries(${_resize_target} PRIVATE vulkan-1)
+      endif()
+      # SDK adapters exist even when WITH_DX12/WITH_VULKAN are off. Link the
+      # tested adapter explicitly, including its headers and platform dependency.
+      defold_target_link_libraries(${_resize_target} "${TARGET_PLATFORM}"
+        testmain ddf dlib profile_null graphics_${_resize_backend} graphics_transcoder_null)
+      defold_target_link_glfw(${_resize_target} "${TARGET_PLATFORM}" SCOPE PRIVATE)
+      defold_target_link_socket(${_resize_target} "${TARGET_PLATFORM}" PRIVATE)
+      defold_register_test_target(${_resize_target} ${DEFOLD_RUN_WINDOW_RESIZE_TESTS})
+    endif()
+  endforeach()
 endif()
 
 if(WITH_METAL AND TARGET graphics_metal)
@@ -96,6 +130,21 @@ if(WITH_METAL AND TARGET graphics_metal)
     target_link_libraries(test_graphics_metal PRIVATE "-framework IOKit")
   endif()
   defold_register_test_target(test_graphics_metal OFF)
+endif()
+
+# Headless descriptor-lifetime checks; WITH_ASAN makes expired stack descriptors fail reliably.
+# wasm ASan builds run this with the existing nightly test suite.
+if(TARGET graphics_webgpu AND
+    (TARGET_PLATFORM STREQUAL "arm64-macos" OR (WITH_ASAN AND TARGET_PLATFORM STREQUAL "wasm-web")))
+  defold_add_executable(test_graphics_webgpu_pipeline
+    "${GRAPHICS_TEST_SRC_DIR}/test_graphics_webgpu_pipeline.cpp")
+  target_include_directories(test_graphics_webgpu_pipeline PRIVATE "${GRAPHICS_SRC_DIR}" "${GRAPHICS_PROTO_ROOT}")
+  defold_target_link_libraries(test_graphics_webgpu_pipeline "${TARGET_PLATFORM}"
+    testmain ddf dlib profile_null graphics_webgpu graphics_transcoder_null)
+  defold_target_link_platform(test_graphics_webgpu_pipeline "${TARGET_PLATFORM}" SCOPE PRIVATE)
+  defold_target_link_glfw(test_graphics_webgpu_pipeline "${TARGET_PLATFORM}" SCOPE PRIVATE)
+  defold_target_link_socket(test_graphics_webgpu_pipeline "${TARGET_PLATFORM}" PRIVATE)
+  defold_register_test_target(test_graphics_webgpu_pipeline ON "${GRAPHICS_TEST_SRC_DIR}")
 endif()
 
 if(NOT TARGET_PLATFORM MATCHES "^(x86_64-ps4|x86_64-ps5)$")

@@ -28,7 +28,6 @@
             [util.path :as path])
   (:import [com.defold.editor GamePreview WindowsGameProcess]
            [com.dynamo.bob Platform]
-           [com.dynamo.render.proto Render$Resize]
            [com.dynamo.resource.proto Resource$Reload]
            [com.dynamo.system.proto System$Exit]
            [java.io BufferedReader File IOException InputStream]
@@ -36,6 +35,7 @@
            [java.net HttpURLConnection InetSocketAddress Socket URI]
            [java.nio.file Files LinkOption NoSuchFileException]
            [java.nio.file.attribute BasicFileAttributes]
+           [java.nio.charset StandardCharsets]
            [java.util UUID]
            [java.util.zip ZipEntry ZipFile]))
 
@@ -78,18 +78,15 @@
         (.disconnect conn)))))
 
 (defn change-resolution! [target width height rotate]
-  (let [uri (URI. (str (:url target) "/post/@render/resize"))
+  (let [uri (URI. (str (:url target) "/window/resize"))
         conn ^HttpURLConnection (get-connection uri)]
     (try
+      (.setRequestProperty conn "Content-Type" "application/json")
       (with-open [os (.getOutputStream conn)]
-        (.write os ^bytes (protobuf/map->bytes
-                            Render$Resize
-                            {:width (if rotate
-                                      height
-                                      width)
-                             :height (if rotate
-                                       width
-                                       height)})))
+        (.write os (.getBytes ^String (json/write-str {:width (if rotate height width)
+                                                       :height (if rotate width height)
+                                                       :supersede true})
+                              StandardCharsets/UTF_8)))
       (with-open [is (.getInputStream conn)]
         (ignore-all-output is))
       (finally
@@ -97,10 +94,12 @@
 
 (defn get-engine-state! [target]
   (let [uri (URI. (str (:url target) "/state"))
-        conn ^HttpURLConnection (get-connection uri)]
+        conn ^HttpURLConnection (doto ^HttpURLConnection (get-connection uri)
+                                  (.setDoOutput false)
+                                  (.setRequestMethod "GET"))]
     (try
       (with-open [is (.getInputStream conn)]
-        (json/read-str (slurp is) :key-fn keyword))  ;; Read and return the response
+        (json/read-str (slurp is :encoding "UTF-8") :key-fn keyword))
       (finally
         (.disconnect conn)))))
 
