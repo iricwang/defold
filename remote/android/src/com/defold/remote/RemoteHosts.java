@@ -53,11 +53,43 @@ final class RemoteHosts {
         synchronized(RemoteHosts.class){JSONArray all=all(),next=new JSONArray();for(int i=0;i<all.length();i++)if(!response.optString("host_id").equals(all.getJSONObject(i).optString("host_id"))&&!target.base.equals(all.getJSONObject(i).optString("address")))next.put(all.getJSONObject(i));next.put(response);preferences.edit().putString("hosts",next.toString()).apply();}
         return response;
     }
+    static synchronized JSONArray cloudComputers(String selectedAddress) throws JSONException {
+        JSONArray result=new JSONArray(),hosts=all();
+        for(int i=0;i<hosts.length();i++){
+            JSONObject h=hosts.getJSONObject(i),cloud=h.optJSONObject("cloud");
+            if(cloud==null||!cloud.has("grant"))continue;
+            result.put(new JSONObject(cloud.toString()).put("name",h.optString("computer")).put("selected",h.optString("address").equals(selectedAddress)));
+        }
+        return result;
+    }
+    static String lanAddress(String cloudHost){
+        JSONArray hosts=all();
+        for(int i=0;i<hosts.length();i++){
+            JSONObject h=hosts.optJSONObject(i),cloud=h.optJSONObject("cloud");
+            if(cloud!=null&&!cloudHost.isEmpty()&&cloudHost.equals(cloud.optString("host")))return h.optString("address");
+        }
+        return "";
+    }
+    private static synchronized void rememberCloud(String base,String token,JSONObject catalog)throws JSONException{
+        if(!catalog.has("cloud"))return;
+        JSONArray hosts=all();
+        for(int i=0;i<hosts.length();i++){
+            JSONObject h=hosts.getJSONObject(i);
+            if(!base.equals(h.optString("address"))||!token.equals(h.optString("token"))||!h.optString("host_id").equals(catalog.optString("host_id")))continue;
+            JSONObject cloud=catalog.getJSONObject("cloud");
+            if(!cloud.toString().equals(h.optString("cloud"))){
+                h.put("cloud",cloud);
+                preferences.edit().putString("hosts",hosts.toString()).apply();
+            }
+        }
+    }
     static JSONObject request(String base,String token,String path,JSONObject body)throws Exception{
         HttpURLConnection c=RemoteTls.open(base+path);c.setConnectTimeout(2500);c.setReadTimeout(5000);c.setRequestProperty("Authorization","Bearer "+token);
         try{if(body!=null){c.setRequestMethod("POST");c.setRequestProperty("Content-Type","application/json");c.setDoOutput(true);try(OutputStream out=c.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}}
             int status=c.getResponseCode();InputStream stream=status>=300?c.getErrorStream():c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream();if(stream!=null)try(InputStream in=stream){byte[] b=new byte[8192];for(int n;(n=in.read(b))>=0;){if(out.size()+n>1024*1024)throw new IOException("响应过大");out.write(b,0,n);}}
-            JSONObject result=new JSONObject(new String(out.toByteArray(),StandardCharsets.UTF_8));if(status>=300)throw new IOException(result.optString("error","连接失败 ("+status+")"));return result;
+            JSONObject result=new JSONObject(new String(out.toByteArray(),StandardCharsets.UTF_8));if(status>=300)throw new IOException(result.optString("error","连接失败 ("+status+")"));
+            if(path.equals("/games")){rememberCloud(base,token,result);result.remove("cloud");}
+            return result;
         }finally{c.disconnect();}
     }
 }

@@ -13,8 +13,10 @@
 # specific language governing permissions and limitations under the License.
 
 import argparse,json,subprocess,tempfile,time,threading,queue,urllib.request,uuid,os,shutil,struct,wave,math
+import hashlib,http.client,ssl
+from urllib.parse import parse_qs,urlparse
 from pathlib import Path
-ap=argparse.ArgumentParser();ap.add_argument('--manifest',required=True);ap.add_argument('--relay-source',required=True);ap.add_argument('--node',required=True);ap.add_argument('--probe',required=True);ap.add_argument('--credentials');a=ap.parse_args()
+ap=argparse.ArgumentParser();ap.add_argument('--manifest',required=True);ap.add_argument('--relay-source',required=True);ap.add_argument('--node',required=True);ap.add_argument('--probe',required=True);ap.add_argument('--credentials');ap.add_argument('--paired',action='store_true');a=ap.parse_args()
 root=Path(__file__).resolve().parents[2]
 work=Path(tempfile.mkdtemp(prefix='defold-cloud-test-'));children=[];results=[]
 def check(name,value):
@@ -64,29 +66,67 @@ try:
   time.sleep(1)
  check('fixture game runs in original directory',project['state']=='running' and Path(project['build']).resolve()==game.resolve())
  manager('cloud-login',server=base,username=username,password=password)
- invitation=manager('cloud-invite');phone=post(base,'/v1/defold/claim',{'id':invitation['invitation']},user['token'])
+ viewer_token=user['token']
+ if a.paired:
+  qr=manager('pairing')
+  def lan(path,data=None,token=''):
+   c=http.client.HTTPSConnection('127.0.0.1',state['port'],context=ssl._create_unverified_context(),timeout=5)
+   try:
+    c.connect()
+    assert hashlib.sha256(c.sock.getpeercert(binary_form=True)).hexdigest()==qr['fingerprint']
+    c.request('POST' if data else 'GET',path,body=json.dumps(data) if data else None,headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
+    r=c.getresponse();assert r.status==200,r.status
+    return json.load(r)
+   finally:c.close()
+  paired=lan('/pair',{'code':parse_qs(urlparse(qr['uri']).query)['code'][0],'name':'QR test phone'})
+  phone=paired['cloud'];viewer_token=''
+  catalog=lan('/games',token=paired['token'])
+  check('one QR yields LAN catalog and matching scoped WAN grant',catalog['cloud']==phone and paired['token']!=phone['deviceToken'] and len(catalog['games'])==1)
+ else:
+  invitation=manager('cloud-invite');phone=post(base,'/v1/defold/claim',{'id':invitation['invitation']},user['token'])
+ # Start both old and new viewers just after a warm host reported its online heartbeat.
+ for n in range(160):
+  if manager('cloud-status').get('state')=='online':break
+  time.sleep(.1)
+ else:raise AssertionError('host did not become online')
+ time.sleep(.25)
+ began=time.monotonic()
  for n in range(20):
-  try:access=post(base,'/v1/defold/viewer/token',phone,user['token']);break
+  try:access=post(base,'/v1/defold/viewer/token',phone,viewer_token);break
   except Exception:time.sleep(1)
  def renew():
   while not renew_stop.wait(6):
-   try:post(base,'/v1/defold/viewer/token',phone,user['token'])
+   try:post(base,'/v1/defold/viewer/token',phone,viewer_token)
    except Exception:pass
  threading.Thread(target=renew,daemon=True).start()
- time.sleep(9);probe,pq=spawn([a.probe],'probe.log');write(probe,access);read(pq,'connected')
+ probe,pq=spawn([a.probe],'probe.log');write(probe,access);read(pq,'connected')
  def rpc(action,expected=True,**params):
   write(probe,dict(action=action,project=game_id,lease=access['lease'],requestId=uuid.uuid4().hex,**params));v=read(pq,'reply',30)['result'];assert v['ok']==expected,v;return v.get('result',v)
- check('WebRTC RPC lists shared game',any(p['id']==game_id for p in rpc('games')['games']))
+ for n in range(24):
+  try:games=rpc('games')['games'];break
+  except AssertionError:
+   if n==23:raise
+   time.sleep(.35)
+ check('WebRTC RPC lists shared game',any(p['id']==game_id for p in games))
+ print('Viewer token to visible catalog, including WebRTC: %.3f s'%(time.monotonic()-began),flush=True)
  rpc('claim');device=rpc('device',width=1080,height=2400,top=90,bottom=60,right=0,left=0)
  check('physical device resolution preserved',device['width']==1080 and device['height']==2400)
  rpc('stream');video=read(pq,'video');check('encoded video bounded to 960 pixels',max(video['width'],video['height'])<=960)
- time.sleep(5);write(probe,{'action':'stats'});stats=read(pq,'stats');check('H264 frames decoded through LiveKit',stats['frames']>=30);check('Opus audio decoded and audible',stats['samples']>=48000 and stats['rms']>300)
+ time.sleep(5);write(probe,{'action':'stats'});stats=read(pq,'stats');check('H264 frames decoded through LiveKit',stats['frames']>=30)
+ if os.name == 'nt':
+  check('Windows advertises video-only streaming',project['audio'] is False and stats['samples']==0)
+ else:
+  check('Opus audio decoded and audible',stats['samples']>=48000 and stats['rms']>300)
  rpc('input',x=30,y=30,down=True,sequence=1,deviceRevision=device['device_revision']);rpc('input',x=30,y=30,down=False,sequence=2,deviceRevision=device['device_revision'])
  check('touch round trip completes',True)
  rpc('input',expected=False,x=30,y=30,down=True,sequence=3,deviceRevision=-1);check('stale device revision rejected',True)
  device=rpc('device',width=2400,height=1080,top=0,bottom=60,right=0,left=90);rpc('stream');video=read(pq,'video');check('rotation rebuilds video track',video['width']>video['height'])
  rpc('release');check('release retains catalog access',len(rpc('games')['games'])==1)
- manager('cloud-revoke',id=phone['grant']);time.sleep(2);write(probe,dict(action='games',project=game_id,lease=access['lease'],requestId=uuid.uuid4().hex));read(pq,'rpc-error');check('revocation disconnects existing media participant',True)
+ rpc('claim');rpc('stop')
+ check('stop returns to catalog with game stopped',all(g['state']!='running' for g in rpc('games')['games'] if g['id']==game_id) and manager('status')['projects'][0]['state']!='running')
+ if a.paired:manager('revoke',id=paired['device_id'])
+ else:manager('cloud-revoke',id=phone['grant'])
+ time.sleep(2);write(probe,dict(action='games',project=game_id,lease=access['lease'],requestId=uuid.uuid4().hex));read(pq,'rpc-error');check('revocation disconnects existing media participant',True)
  write(probe,{'action':'close'});probe.wait(timeout=10)
  manager('cloud-logout');check('host removal disables public connection',not manager('cloud-status')['enabled'])
  print(json.dumps({'passed':len(results),'work':str(work),'checks':results}),flush=True)

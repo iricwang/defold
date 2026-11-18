@@ -144,7 +144,7 @@ def run(manifest, adb, serial):
     def tabs_present():
         value = ui()
         names = {n.get('content-desc') for n in ET.fromstring(value).iter('node')}
-        return value if {'游戏', '运行中', '电脑', '设置'} <= names else None
+        return value if {'游戏', '设置', '添加电脑', 'Wi-Fi · 切换到服务器'} <= names and not {'电脑','运行中'} & names else None
 
     def tap_tab(name):
         for attempt in range(3):
@@ -193,16 +193,16 @@ def run(manifest, adb, serial):
         wait(lambda: described('开始游戏 · '+project['name']))
         assert tabs_present()
         capture('00-compact-pair-catalog.png')
-        passed.append('Compact v3 QR payload verifies TLS identity and enters the project list with four fixed tabs')
+        passed.append('Compact v3 QR payload verifies TLS identity and enters the project list with the computer header and two fixed tabs')
         tap_description('搜索游戏')
         device('shell', 'input', 'text', 'Background')
         device('shell', 'input', 'keyevent', '4')
-        for tab in ('运行中', '电脑', '设置', '游戏'):
+        for tab in ('设置', '游戏'):
             tap_tab(tab)
             assert wait(tabs_present)
         assert any(n.get('content-desc') == '搜索游戏' and n.get('text') == 'Background'
                    for n in ET.fromstring(ui()).iter('node'))
-        passed.append('Four tabs retain the game search and paired computer filter')
+        passed.append('Tab changes retain the game search and paired computer filter')
         capture('00-navigation-retains-search.png')
         pair = rpc('pairing')
         address = urlparse(pair['address'])
@@ -249,15 +249,15 @@ def run(manifest, adb, serial):
         wait(lambda: 'BUTTON_CLICKED' in json.dumps(rpc('logs', id=project['id'])))
         capture('05-touch-callback.png')
         passed.append('Android touch reaches the background game Lua callback')
-        tap_description('打开游戏控制')
-        tap(wait(lambda: text_page('返回游戏列表')), '返回游戏列表')
+        tap_description('预览控制')
+        tap(wait(lambda: text_page('返回项目')), '返回项目')
         wait(tabs_present)
         wait(lambda: rpc('status')['projects'][0]['state'] == 'running'
              and not rpc('status')['projects'][0].get('controller'))
         passed.append('Visible player controls return to the list and release control without stopping the game')
-        tap_tab('运行中')
+        tap_tab('游戏')
         wait(lambda: described('继续游戏 · '+project['name']))
-        capture('06-running-tab.png')
+        capture('06-running-project.png')
 
         second_fixture = work/'fixture-b'
         shutil.copytree(ROOT/'scripts/automation/fixture', second_fixture)
@@ -269,8 +269,7 @@ def run(manifest, adb, serial):
         tap_description('开始游戏 · '+second['name'])
         wait(lambda: all(p['state'] == 'running' for p in rpc('status')['projects']), 180)
         wait(presented)
-        tap_description('打开游戏控制')
-        tap(wait(lambda: text_page('停止这款游戏')), '停止这款游戏')
+        tap_description('预览控制')
         tap(wait(lambda: text_page('停止游戏')), '停止游戏')
         wait(tabs_present)
         wait(lambda: next(p for p in rpc('status')['projects'] if p['id'] == second['id'])['state'] == 'ready')
@@ -299,12 +298,12 @@ def run(manifest, adb, serial):
         tap_description('重试')
         wait(lambda: next(p for p in rpc('status')['projects'] if p['id'] == second['id'])['state'] == 'running', 180)
         wait(presented)
-        tap_description('打开游戏控制')
-        tap(wait(lambda: text_page('返回游戏列表')), '返回游戏列表')
+        tap_description('预览控制')
+        tap(wait(lambda: text_page('返回项目')), '返回项目')
         wait(tabs_present)
         passed.append('Real Lua compiler failure retains project context across background/resume; explicit retry rebuilds repaired source')
 
-        tap_tab('电脑')
+        tap_tab('游戏')
         tap_description('添加电脑')
         tap(wait(lambda: text_page('扫描电脑二维码')), '扫描电脑二维码')
         wait(lambda: described('补光'))
@@ -319,7 +318,7 @@ def run(manifest, adb, serial):
                 break
             device('shell', 'input', 'keyevent', '4')
         wait(tabs_present)
-        passed.append('Scanner exposes focus/torch/zoom, album and full-link alternatives with a path back to Computers')
+        passed.append('Scanner exposes focus/torch/zoom, album and full-link alternatives with a path back to the game catalog')
         if serial.startswith('emulator-'):
             original_rotation = {key: device('shell', 'settings', 'get', 'system', key).strip()
                                  for key in ('accelerometer_rotation', 'user_rotation')}
@@ -337,7 +336,7 @@ def run(manifest, adb, serial):
             tap_tab('游戏')
             wait(lambda: described('搜索游戏'))
             capture('11-games-portrait.png')
-            tap_tab('电脑')
+            tap_tab('游戏')
             tap_description('添加电脑')
             tap(wait(lambda: text_page('扫描电脑二维码')), '扫描电脑二维码')
             wait(lambda: described('补光'))

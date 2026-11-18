@@ -49,6 +49,23 @@ final class RemoteCloud implements AutoCloseable {
         guard.scheduleWithFixedDelay(()->{synchronized(this){if(!lease.isEmpty()&&System.nanoTime()>until)disconnectViewer();}},200,200,TimeUnit.MILLISECONDS);
     }
     Map<String,Object> status(){return view;}
+    Map<String,Object> pairedAccess(String id,String lanToken) throws IOException {
+        var current=account;
+        if(current.isEmpty())return Map.of();
+        String host=RemoteManager.str(current,"id");
+        String secret=RemoteManager.hash(("defold-viewer-v1:"+current.get("server")+":"+host+":"+lanToken).getBytes(StandardCharsets.UTF_8));
+        String verifier=RemoteManager.hash(secret.getBytes(StandardCharsets.UTF_8));
+        synchronized(manager){
+            var device=manager.devices.get(id);
+            if(device==null)return Map.of();
+            if(!verifier.equals(device.get("cloudVerifier"))){
+                device.put("cloudVerifier",verifier);device.put("cloudHost",host);manager.save();
+                pairingChanged();
+            }
+        }
+        return Map.of("server",current.get("server"),"host",host,"grant","paired."+host+"."+id,"deviceToken",secret);
+    }
+    void pairingChanged(){heartbeat.execute(this::beat);}
     private Path executable() throws IOException {
         String name=System.getProperty("os.name").startsWith("Windows")?"defold-remote-transport.exe":"defold-remote-transport";
         Path path=manager.runtimeRoot.resolve(name);
@@ -103,7 +120,12 @@ final class RemoteCloud implements AutoCloseable {
     private void beat(){
         Map<String,Object> a=account;if(a.isEmpty())return;
         try{
-            Map<String,Object> response=api(a,"host/heartbeat",Map.of("epoch",epoch),"POST");
+            List<Map<String,String>> paired;
+            synchronized(manager){
+                paired=manager.devices.values().stream().filter(d->a.get("id").equals(d.get("cloudHost")))
+                    .map(d->Map.of("id",RemoteManager.str(d,"id"),"verifier",RemoteManager.str(d,"cloudVerifier"))).toList();
+            }
+            Map<String,Object> response=api(a,"host/heartbeat",Map.of("epoch",epoch,"paired",paired),"POST");
             synchronized(this){
                 if(closed||account!=a)return;
                 String nextRoom=RemoteManager.str(response,"room");
@@ -132,7 +154,18 @@ final class RemoteCloud implements AutoCloseable {
         }catch(IOException ignored){}finally{synchronized(this){if(transport==owned)disconnect();}}});
     }
     private synchronized void send(Object value)throws IOException{if(pipe==null)throw new IOException("公网传输尚未连接");pipe.write(RemoteManager.JSON.writeValueAsString(value));pipe.newLine();pipe.flush();}
-    private void event(Process owned,Map<String,Object> event){synchronized(this){
+    private long lastAdmissionCheck;
+    private void event(Process owned,Map<String,Object> event){
+        boolean refresh;
+        synchronized(this){
+            long now=System.nanoTime();
+            refresh=transport==owned&&!closed&&"rpc".equals(event.get("event"))
+                &&(!Objects.equals(peer,event.get("caller"))||now>=until)
+                &&now-lastAdmissionCheck>TimeUnit.SECONDS.toNanos(3);
+            if(refresh)lastAdmissionCheck=now;
+        }
+        if(refresh)try{heartbeat.submit(this::beat).get(4,TimeUnit.SECONDS);}catch(Exception ignored){}
+        synchronized(this){
         if(transport!=owned||closed)return;
         String kind=RemoteManager.str(event,"event");
         try{
@@ -145,6 +178,7 @@ final class RemoteCloud implements AutoCloseable {
             Object result;
             try{
                 if(lease.isEmpty()||System.nanoTime()>=until||!peer.equals(event.get("caller")))throw new IOException("设备授权已失效");
+                if(peer.startsWith("viewer-paired.")&&!manager.devices.containsKey(peer.substring(peer.lastIndexOf('.')+1)))throw new IOException("电脑已移除此配对");
                 String payload=RemoteManager.str(event,"payload");if(payload.length()>12000)throw new IOException("请求过大");
                 Map<String,Object> command=RemoteManager.JSON.readValue(payload,Map.class);
                 if(!lease.equals(command.get("lease")))throw new IOException("会话已变化");

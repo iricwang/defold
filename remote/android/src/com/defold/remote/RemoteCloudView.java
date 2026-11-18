@@ -14,7 +14,6 @@
 
 package com.defold.remote;
 
-import android.app.Activity;
 import android.os.SystemClock;
 import android.webkit.*;
 import android.view.MotionEvent;
@@ -27,23 +26,58 @@ final class RemoteCloudView extends WebView {
     private static final String ORIGIN="https://localhost/defold-remote/";
     private volatile String metrics="{}";
     private final FourFingerGesture gesture=new FourFingerGesture();
-    private boolean consumed;
-    RemoteCloudView(Activity activity,Runnable close) {
+    private boolean consumed,previewing;
+    boolean isPreviewing(){return previewing;}
+    RemoteCloudView(MainActivity activity,String selectedLan,java.util.function.Consumer<String> close,Runnable previewChanged,Runnable scan) {
         super(activity);
         getSettings().setJavaScriptEnabled(true);getSettings().setDomStorageEnabled(true);
         getSettings().setMediaPlaybackRequiresUserGesture(false);getSettings().setAllowFileAccess(false);getSettings().setAllowContentAccess(false);
         getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         setBackgroundColor(0xff181818);
         addJavascriptInterface(new Object(){
+            @JavascriptInterface public String orbPosition(){
+                android.content.SharedPreferences prefs=activity.getSharedPreferences("preview-orb",0);
+                return (prefs.getBoolean("right",true)?"right":"left")+","+prefs.getFloat("height",0.18f);
+            }
+            @JavascriptInterface public void saveOrbPosition(boolean right,double height){
+                if(!Double.isFinite(height)||height<0||height>1)return;
+                activity.getSharedPreferences("preview-orb",0).edit().putBoolean("right",right).putFloat("height",(float)height).apply();
+            }
+            @JavascriptInterface public void setPreviewing(boolean value){
+                activity.runOnUiThread(()->{if(previewing!=value&&isAttachedToWindow()){previewing=value;previewChanged.run();}});
+            }
+            @JavascriptInterface public void chooseQuality(String current,int request){
+                activity.runOnUiThread(()->{
+                    if(!isAttachedToWindow())return;
+                    activity.showQualityOptions(current,false,choice->{
+                        if(isAttachedToWindow())evaluateJavascript("window.remoteQualityPicked("+request+","+org.json.JSONObject.quote(choice)+")",null);
+                    });
+                });
+            }
+            @JavascriptInterface public boolean keepAwake(){
+                return activity.getSharedPreferences("remote-dashboard",0).getBoolean("keepAwake",true);
+            }
+            @JavascriptInterface public void setKeepAwake(boolean enabled){
+                activity.runOnUiThread(()->{
+                    activity.getSharedPreferences("remote-dashboard",0).edit().putBoolean("keepAwake",enabled).apply();
+                    int flag=android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
+                    if(enabled)activity.getWindow().addFlags(flag);else activity.getWindow().clearFlags(flag);
+                });
+            }
             @JavascriptInterface public String metrics(){return metrics;}
-            @JavascriptInterface public void close(){activity.runOnUiThread(close);}
+            @JavascriptInterface public boolean switchingComputer(){return !selectedLan.isEmpty();}
+            @JavascriptInterface public String pairedComputers(){
+                try{return RemoteHosts.cloudComputers(selectedLan).toString();}catch(Exception e){return "[]";}
+            }
+            @JavascriptInterface public void scan(){activity.runOnUiThread(scan);}
+            @JavascriptInterface public void close(String host){activity.runOnUiThread(()->close.accept(host==null?"":host));}
         },"DefoldRemote");
         setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){return true;}
             @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
                 String url=request.getUrl().toString();if(!url.startsWith(ORIGIN))return null;
                 String file=url.substring(ORIGIN.length());
-                if(!Arrays.asList("index.html","remote.js","remote.css","livekit-client.umd.min.js").contains(file))return new WebResourceResponse("text/plain","UTF-8",404,"Not found",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));
+                if(!Arrays.asList("index.html","remote.js","remote-orb.js","remote.css","livekit-client.umd.min.js").contains(file))return new WebResourceResponse("text/plain","UTF-8",404,"Not found",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));
                 try{return new WebResourceResponse(file.endsWith(".js")?"application/javascript":file.endsWith(".css")?"text/css":"text/html","UTF-8",activity.getAssets().open("cloud/"+file));}
                 catch(IOException e){return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream("Remote resources unavailable".getBytes(StandardCharsets.UTF_8)));}
             }
@@ -62,6 +96,7 @@ final class RemoteCloudView extends WebView {
         loadUrl(ORIGIN+"index.html");
     }
     void metrics(String value){metrics=value;evaluateJavascript("window.remoteMetricsChanged?.()",null);}
+    void back(){evaluateJavascript("window.remoteBack?.()",null);}
     void menu(){evaluateJavascript("window.remoteMenu?.()",null);}
     void pauseRemote(){evaluateJavascript("window.remotePause?.()",null);}
     void resumeRemote(){evaluateJavascript("window.remoteResume?.()",null);}

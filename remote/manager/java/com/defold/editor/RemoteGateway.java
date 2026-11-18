@@ -131,7 +131,7 @@ final class RemoteGateway implements AutoCloseable {
             if(path.equals("/games")&&method.equals("GET")){
                 if(device.isEmpty()){denied(e,403,"请先扫码配对此电脑");return;}
                 seen.put(device,System.nanoTime());
-                reply(e,200,Map.of("host_id",manager.hostId,"computer",manager.computer,"protocol",2,"games",manager.sharedProjects().stream().map(p->{Map<String,Object>s=new LinkedHashMap<>(manager.status(p));s.remove("root");s.remove("build");s.remove("engine");s.remove("builtStamp");return s;}).toList()));return;
+                reply(e,200,Map.of("host_id",manager.hostId,"computer",manager.computer,"protocol",2,"cloud",manager.cloud.pairedAccess(device,token),"games",manager.sharedProjects().stream().map(p->{Map<String,Object>s=new LinkedHashMap<>(manager.status(p));s.remove("root");s.remove("build");s.remove("engine");s.remove("builtStamp");return s;}).toList()));return;
             }
             if(!path.matches("/games/[a-zA-Z0-9-]+/[a-z]+")){denied(e,404,"接口不存在");return;}
             String[] parts=path.split("/");RemoteManager.Project p=manager.project(parts[2]);String action=parts[3];
@@ -180,7 +180,7 @@ final class RemoteGateway implements AutoCloseable {
         String name=RemoteManager.str(values,"name");if(name.isBlank())name="Android Remote";if(name.length()>80)name=name.substring(0,80);
         String id=UUID.randomUUID().toString(),token=secret();
         synchronized(manager){if(manager.devices.size()>=32)throw new IOException("配对设备已达上限，请在电脑端移除旧设备");manager.devices.put(id,new LinkedHashMap<>(Map.of("id",id,"name",name,"tokenHash",RemoteManager.hash(token.getBytes(StandardCharsets.UTF_8)),"pairedAt",Instant.now().toString())));manager.save();}
-        reply(e,200,Map.of("token",token,"device_id",id,"host_id",manager.hostId,"computer",manager.computer,"protocol",2));
+        reply(e,200,Map.of("token",token,"device_id",id,"host_id",manager.hostId,"computer",manager.computer,"protocol",2,"cloud",manager.cloud.pairedAccess(id,token)));
         synchronized(this){pairState="paired";pairedName=name;}
         } catch(Exception failure) { synchronized(this){pairState="error";}throw failure; }
         finally { synchronized(this){pairBusy=false;} }

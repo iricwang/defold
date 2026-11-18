@@ -53,6 +53,7 @@ public final class MainActivity extends Activity {
     private SharedPreferences preferences;
     private FrameLayout root;
     private RemoteCloudView cloudView;
+    private boolean scanningFromCloud;
     private StreamView screen;
     private VideoSurface videoSurface;
     private volatile String videoMode="JPEG";
@@ -70,6 +71,7 @@ public final class MainActivity extends Activity {
     private volatile boolean paused;
     private volatile int inputEpoch;
     private LinearLayout controlPanel;
+    private PreviewOrb previewMenu;
     private TextView fpsLabel,controlStatus;
     private Button runButton,stopButton,qualityButton;
     private volatile String streamQuality="720p";
@@ -138,7 +140,8 @@ public final class MainActivity extends Activity {
         bar.addView(iconButton("back","返回",back),new LinearLayout.LayoutParams(dp(48),dp(48)));
         TextView text=title(name,18);text.setPadding(dp(8),0,0,0);bar.addView(text,new LinearLayout.LayoutParams(0,-2,1));return bar;
     }
-    private Dialog sheet(String heading,LinearLayout content){
+    private Dialog sheet(String heading,LinearLayout content){return sheet(heading,content,560);}
+    private Dialog sheet(String heading,LinearLayout content,int maxWidth){
         if(activeSheet!=null)activeSheet.dismiss();
         Dialog dialog=new Dialog(this);activeSheet=dialog;dialog.setOnDismissListener(d->{if(activeSheet==dialog)activeSheet=null;});dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         LinearLayout surface=column();surface.setPadding(dp(20),dp(10),dp(20),dp(20));surface.setBackground(outlined(PANEL,24));
@@ -146,7 +149,7 @@ public final class MainActivity extends Activity {
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(title(heading,20),new LinearLayout.LayoutParams(0,-2,1));row.addView(iconButton("close","关闭",dialog::dismiss),new LinearLayout.LayoutParams(dp(48),dp(48)));surface.addView(row);gap(surface,8);surface.addView(content);
         ScrollView area=new ScrollView(this);area.setFillViewport(false);area.addView(surface);dialog.setContentView(area);
         Window window=dialog.getWindow();window.setBackgroundDrawableResource(android.R.color.transparent);window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);window.setDimAmount(.6f);
-        dialog.show();window.setGravity(Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);window.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels,dp(560)),-2);
+        dialog.show();window.setGravity(Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);window.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels,dp(maxWidth)),-2);
         return dialog;
     }
 
@@ -169,7 +172,7 @@ public final class MainActivity extends Activity {
     private boolean handleIntent(Intent intent){
         if(intent==null)return false;
         String managerHost=intent.getStringExtra("manager_host");
-        if(managerHost!=null){intent.removeExtra("manager_host");resumeStream=false;showHome("");if(managerHost.isEmpty())dashboard.showTab("computers");else dashboard.showComputer(managerHost);return true;}
+        if(managerHost!=null){intent.removeExtra("manager_host");resumeStream=false;preferences.edit().putString("transportMode","lan").apply();goHome("");if(managerHost.isEmpty())dashboard.showTab("games");else dashboard.showComputer(managerHost);return true;}
         if(intent.getBooleanExtra("manager_scan",false)){intent.removeExtra("manager_scan");resumeStream=false;ui.post(this::scan);return true;}
         String managed=intent.getStringExtra("manager_game");
         if(managed!=null&&managed.equals(internalGame)){internalGame="";intent.removeExtra("manager_game");try{RemoteAddress target=new RemoteAddress(managed,"");resumeStream=false;if(foreground)connect(target);else pendingExternal=target;}catch(Exception e){showHome(e.getMessage());}return true;}
@@ -198,9 +201,10 @@ public final class MainActivity extends Activity {
     @Override public void onDestroy(){if(cloudView!=null){cloudView.destroy();cloudView=null;}if(dashboard!=null)dashboard.close();closeCamera();closeStream();commands.shutdownNow();frames.shutdownNow();discovery.shutdownNow();monitor.shutdownNow();inputs.shutdown();super.onDestroy();}
     @Override public void onConfigurationChanged(android.content.res.Configuration config){super.onConfigurationChanged(config);if(page.equals("home"))renderCards();else if(page.equals("scan"))scan();else if(page.equals("stream")){positionControls();scheduleDeviceSync();}}
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)applySystemBars();}
-    @Override public void onBackPressed(){if(cloudView!=null){cloudView.menu();return;}if(page.equals("stream"))showControls("");else if(page.equals("scan")||page.equals("pairing")){goHome("");dashboard.showTab("computers");}else if(page.equals("failure")){boolean computer=connectionTarget!=null&&connectionTarget.base.startsWith("https:")&&!connectionTarget.base.contains("/games/");goHome("");dashboard.showTab(computer?"computers":"games");}else if(!page.equals("home")||legacyPage)goHome("");else if(dashboard!=null&&!dashboard.currentTab().equals("games"))dashboard.showTab("games");else super.onBackPressed();}
+    @Override public void onBackPressed(){if(cloudView!=null){cloudView.back();return;}if(page.equals("stream")||page.equals("connecting"))returnToProjects("");else if(page.equals("scan")||page.equals("pairing")){returnFromPairing();}else if(page.equals("failure")){returnFromPairing();}else if(!page.equals("home")||legacyPage)goHome("");else if(dashboard!=null&&!dashboard.currentTab().equals("games"))dashboard.showTab("games");else super.onBackPressed();}
+    private boolean immersivePage(){return page.equals("connecting")||page.equals("stream")||(page.equals("cloud")&&cloudView!=null&&cloudView.isPreviewing());}
     private void applySystemBars(){
-        boolean immersive=page.equals("stream")||page.equals("cloud");
+        boolean immersive=immersivePage();
         if(Build.VERSION.SDK_INT>=28){WindowManager.LayoutParams lp=getWindow().getAttributes();lp.layoutInDisplayCutoutMode=immersive?(Build.VERSION.SDK_INT>=30?WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS:WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES):WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;getWindow().setAttributes(lp);}
         if(Build.VERSION.SDK_INT>=30){
             getWindow().setDecorFitsSystemWindows(false);
@@ -208,33 +212,62 @@ public final class MainActivity extends Activity {
             if(c!=null){c.setSystemBarsAppearance(0,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);if(immersive){c.hide(WindowInsets.Type.systemBars());c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);}else c.show(WindowInsets.Type.systemBars());}
         }else getWindow().getDecorView().setSystemUiVisibility(immersive?View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_STABLE:View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }
-    private void newRoot(){if(activeSheet!=null)activeSheet.dismiss();controlPanel=null;fpsLabel=null;root=new FrameLayout(this);root.setBackgroundColor(BG);
-        root.setOnApplyWindowInsetsListener((v,insets)->{boolean full=page.equals("stream")||page.equals("cloud");v.setPadding(full?0:insets.getSystemWindowInsetLeft(),full?0:insets.getSystemWindowInsetTop(),full?0:insets.getSystemWindowInsetRight(),full?0:insets.getSystemWindowInsetBottom());if(full){positionControls();scheduleDeviceSync();updateCloudMetrics();}return insets;});
-        root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot)scheduleDeviceSync();});
+    private void newRoot(){if(activeSheet!=null)activeSheet.dismiss();controlPanel=null;previewMenu=null;fpsLabel=null;root=new FrameLayout(this);root.setBackgroundColor(BG);
+        root.setOnApplyWindowInsetsListener((v,insets)->{boolean full=immersivePage();v.setPadding(full?0:insets.getSystemWindowInsetLeft(),full?0:insets.getSystemWindowInsetTop(),full?0:insets.getSystemWindowInsetRight(),full?0:insets.getSystemWindowInsetBottom());if(full){positionControls();scheduleDeviceSync();updateCloudMetrics();}return insets;});
+        root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot){positionControls();scheduleDeviceSync();}});
         setContentView(root);applySystemBars();}
     private void goHome(String message){if(cloudView!=null){cloudView.pauseRemote();cloudView.destroy();cloudView=null;}endInput();releaseManaged();++generation;session=null;resumeStream=false;paused=false;controlBusy=false;frameRate.reset();closeStream();closeCamera();if(screen!=null)screen.clear();showHome(message);refreshDiscovery();}
     private void releaseManaged(){releaseManaged(session);}
     private void releaseManaged(Session current){if(current!=null&&current.base.startsWith("https:"))try{inputs.execute(()->{try{request(current.base,current.token,"POST","/release",new byte[0]);}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}}
     private void showHome(String message){
-        if("server".equals(preferences.getString("transportMode","lan"))){showCloud();return;}
+        if("server".equals(preferences.getString("transportMode","lan"))){showCloud(false);return;}
         page="home";legacyPage=false;setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);newRoot();
         if(dashboard==null)dashboard=new RemoteDashboard(this,new RemoteDashboard.Actions(){
             public void scan(){MainActivity.this.scan();}public void album(){MainActivity.this.album();}public void paste(){MainActivity.this.pasteLink();}
             public void connect(String base){try{MainActivity.this.connect(new RemoteAddress(base,""));}catch(Exception e){dashboard.setMessage(e.getMessage());}}
             public void discover(){dashboard.pause();legacyPage=true;homeTab="discovery";showLegacyHome("");refreshDiscovery();}
             public void quality(){chooseQuality();}
-            public void cloud(){showCloud();}
+            public String qualityLabel(){return qualityName(streamQuality);}
+            public void cloud(){showCloud(true);}
             public Dialog sheet(String title,LinearLayout content){return MainActivity.this.sheet(title,content);}
             public void stop(String base,Runnable complete){commands.execute(()->{try{request(base,token(base),"POST","/stop",new byte[0]);ui.post(complete);}catch(Exception e){ui.post(()->dashboard.setMessage(RemoteTls.explain(e,base)));}});}
         });
         if(dashboard.getParent()!=null)((ViewGroup)dashboard.getParent()).removeView(dashboard);root.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));dashboard.setMessage(message);if(foreground)dashboard.resume();
     }
-    private void showCloud(){
+    private void showWifi(String serverHost){
+        preferences.edit().putString("transportMode","lan").apply();
+        goHome("");
+        String address=RemoteHosts.lanAddress(serverHost);
+        if(!address.isEmpty()){dashboard.showComputer(address);return;}
+        dashboard.showTab("games");
+        if(!serverHost.isEmpty()){
+            dashboard.setMessage("这台电脑还没有 Wi-Fi 配对，请选择或添加电脑。");
+            dashboard.chooseComputer();
+        }
+    }
+    private void showCloud(boolean fromLan){
         if(cloudView!=null){cloudView.pauseRemote();cloudView.destroy();cloudView=null;}
         preferences.edit().putString("transportMode","server").apply();
         endInput();releaseManaged();closeStream();closeCamera();session=null;resumeStream=false;++generation;
         if(dashboard!=null)dashboard.pause();page="cloud";newRoot();
-        cloudView=new RemoteCloudView(this,()->{preferences.edit().putString("transportMode","lan").apply();goHome("");});root.addView(cloudView,new FrameLayout.LayoutParams(-1,-1));
+        String selectedLan=fromLan?getSharedPreferences("remote-dashboard",0).getString("filter",""):"";
+        cloudView=new RemoteCloudView(this,selectedLan,this::showWifi,()->{applySystemBars();root.requestApplyInsets();},()->{
+            preferences.edit().putString("transportMode","lan").apply();
+            goHome("");scanningFromCloud=true;scan();
+        });
+        root.addView(cloudView,new FrameLayout.LayoutParams(-1,-1));
+        RemoteCloudView current=cloudView;
+        JSONArray known=RemoteHosts.all();
+        discovery.execute(()->{
+            for(int i=0;i<known.length();i++){
+                JSONObject h=known.optJSONObject(i);
+                if(h==null||h.optJSONObject("cloud")!=null&&h.optJSONObject("cloud").has("grant"))continue;
+                try{
+                    RemoteHosts.request(h.getString("address"),h.getString("token"),"/games",null);
+                    ui.post(()->{if(cloudView==current)current.evaluateJavascript("window.remotePairingsChanged?.()",null);});
+                }catch(Exception ignored){/* Offline LAN hosts can still use a previously stored public binding. */}
+            }
+        });
         root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->updateCloudMetrics());root.postDelayed(this::updateCloudMetrics,250);
     }
     private void updateCloudMetrics(){if(cloudView!=null)try{JSONObject m=deviceMetrics();if(m!=null)cloudView.metrics(m.toString());}catch(JSONException ignored){}}
@@ -346,14 +379,22 @@ public final class MainActivity extends Activity {
     }
     private void showStream(String message){
         page="connecting";newRoot();videoSurface=new VideoSurface(this);root.addView(videoSurface,new FrameLayout.LayoutParams(-1,-1));screen=new StreamView();root.addView(screen,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout connection=column();connection.setPadding(dp(28),dp(24),dp(28),dp(24));connection.setGravity(Gravity.CENTER);connection.setBackgroundColor(BG);
-        connection.addView(icon("monitor",ACCENT),new LinearLayout.LayoutParams(dp(44),dp(44)));gap(connection,18);
-        TextView project=title(projectName(connectionTarget==null?"":connectionTarget.base),23);project.setMaxLines(2);project.setEllipsize(TextUtils.TruncateAt.END);project.setGravity(Gravity.CENTER);connection.addView(project);gap(connection,14);
-        overlay=title(message,20);overlay.setGravity(Gravity.CENTER);connection.addView(overlay);gap(connection,12);
-        TextView caption=label("电脑自动同步资源、本机构建并启动。可以返回列表，准备过程会继续。",14,MUTED);caption.setGravity(Gravity.CENTER);connection.addView(caption);gap(connection,24);
-        ProgressBar progress=new ProgressBar(this);progress.setIndeterminateTintList(ColorStateList.valueOf(ACCENT));connection.addView(progress,new LinearLayout.LayoutParams(dp(26),dp(26)));gap(connection,28);
-        connection.addView(button("返回游戏列表",()->goHome("准备过程在电脑后台继续")),new LinearLayout.LayoutParams(dp(180),dp(48)));ScrollView cover=new ScrollView(this);cover.setFillViewport(true);cover.setBackgroundColor(BG);cover.addView(connection);root.addView(cover,new FrameLayout.LayoutParams(-1,-1));overlay.setTag(cover);
+        LinearLayout cover=column();cover.setGravity(Gravity.CENTER);cover.setBackgroundColor(Color.BLACK);
+        ProgressBar progress=new ProgressBar(this);progress.setIndeterminateTintList(ColorStateList.valueOf(0xffdadce0));cover.addView(progress,new LinearLayout.LayoutParams(dp(20),dp(20)));gap(cover,10);
+        overlay=label(message,12,MUTED);overlay.setGravity(Gravity.CENTER);cover.addView(overlay);root.addView(cover,new FrameLayout.LayoutParams(-1,-1));overlay.setTag(cover);
+        previewMenu=new PreviewOrb(this,this::hideControls);
+        previewMenu.setOnClickListener(v->{if(controlPanel!=null&&controlPanel.getVisibility()==View.VISIBLE)hideControls();else showControls("");});
+        root.addView(previewMenu,new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT));
+        positionControls();
+
     }
+    private void returnFromPairing(){
+        boolean server=scanningFromCloud;scanningFromCloud=false;
+        if(server)preferences.edit().putString("transportMode","server").apply();
+        goHome("");
+        if(!server&&dashboard!=null)dashboard.showTab("games");
+    }
+    private void returnToProjects(String message){goHome(message);if(dashboard!=null)dashboard.showTab("games");}
     private void connect(RemoteAddress target){connect(target,true);}
     private void connect(RemoteAddress target,boolean autoStart){
         connect(target,autoStart,false);
@@ -370,7 +411,7 @@ public final class MainActivity extends Activity {
                     ui.post(()->{if(attempt==generation&&overlay!=null)overlay.setText("保存配对信息 · 正在读取共享项目…");});
                     if(token(target.base).isEmpty())throw new Exception("请扫描电脑管理器中的二维码");
                     JSONObject catalog=RemoteHosts.request(target.base,token(target.base),"/games",null);
-                    ui.post(()->{if(attempt!=generation||!foreground)return;dashboard.seedCatalog(target.base,catalog);goHome("电脑已配对");dashboard.showComputer(target.base);});return;
+                    ui.post(()->{if(attempt!=generation||!foreground)return;goHome("电脑已配对");dashboard.seedCatalog(target.base,catalog);dashboard.showComputer(target.base);if(scanningFromCloud){scanningFromCloud=false;showCloud(true);}});return;
                 }
                 String base=target.code.isEmpty()&&!managed?rediscover(target.base):target.base;
                 if(!base.equals(target.base)&&!token(target.base).isEmpty())preferences.edit().putString("token:"+base,token(target.base)).apply();
@@ -423,15 +464,15 @@ public final class MainActivity extends Activity {
         });
     }
     private void showPairing(RemoteAddress target){
-        page="pairing";newRoot();LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));body.addView(pageHeader("连接电脑",()->{goHome("");dashboard.showTab("computers");}));
+        page="pairing";newRoot();LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));body.addView(pageHeader("连接电脑",this::returnFromPairing));
         connectionContent=column();connectionContent.setPadding(dp(24),dp(32),dp(24),dp(24));body.addView(connectionContent,new LinearLayout.LayoutParams(-1,0,1));
         connectionContent.addView(title("正在验证电脑身份",25));gap(connectionContent,14);connectionContent.addView(label(target.base,13,MUTED));gap(connectionContent,28);
         overlay=title("验证电脑身份…",19);connectionContent.addView(overlay);gap(connectionContent,20);connectionContent.addView(label("验证身份 → 保存配对 → 读取共享项目",13,MUTED));gap(connectionContent,18);connectionContent.addView(label("配对完成后显示项目列表。选择游戏后才开始准备与运行。",14,MUTED));
-        body.addView(button("取消连接",()->{goHome("");dashboard.showTab("computers");}),new LinearLayout.LayoutParams(-1,dp(52)));
+        body.addView(button("取消连接",this::returnFromPairing),new LinearLayout.LayoutParams(-1,dp(52)));
     }
     private void showBuildFailure(RemoteAddress target,String error){
         boolean computer=target.base.startsWith("https:")&&!target.base.contains("/games/");page="failure";newRoot();
-        LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));body.addView(pageHeader(computer?"连接电脑未完成":"项目准备未完成",()->{goHome("");if(computer)dashboard.showTab("computers");}));
+        LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));body.addView(pageHeader(computer?"连接电脑未完成":"项目准备未完成",this::returnFromPairing));
         ScrollView area=new ScrollView(this);LinearLayout content=column();content.setPadding(dp(24),dp(20),dp(24),dp(16));area.addView(content);body.addView(area,new LinearLayout.LayoutParams(-1,0,1));
         TextView project=title(computer?"保留已识别的电脑":projectName(target.base),23);project.setMaxLines(2);project.setEllipsize(TextUtils.TruncateAt.END);content.addView(project);gap(content,10);content.addView(label(target.base,12,MUTED));gap(content,16);
         TextView details=label(errorSummary(error),13,0xffed8585);details.setMaxLines(5);details.setEllipsize(TextUtils.TruncateAt.END);details.setContentDescription("错误摘要");content.addView(details);gap(content,14);
@@ -514,12 +555,12 @@ public final class MainActivity extends Activity {
         if(session!=current||attempt!=generation||!foreground)return;
         if(!current.base.startsWith("https:"))setRequestedOrientation(width>=height?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         ((View)overlay.getTag()).setVisibility(View.GONE);
-        frameWidth=width;frameHeight=height;controlBusy=false;hideControls();
+        frameWidth=width;frameHeight=height;controlBusy=false;if(controlPanel!=null&&controlPanel.getVisibility()==View.VISIBLE)showControls("");
         if(current.audio&&audioPlayer==null)audioPlayer=new RemoteAudioPlayer(this,current.base,current.token);
         preferences.edit().putString("lastAddress",current.base).putString("lastId",current.id).apply();
         if(!current.base.startsWith("https:"))preferences.edit().putString("token:"+current.base,current.token).apply();
         Game old=games.get(current.id);games.put(current.id,new Game(current.id,current.base,current.name,old==null?"电脑":old.computer,"running",System.currentTimeMillis()));saveHistory();
-        if(!preferences.getBoolean("fourFingerControlsHint",false)){Toast.makeText(this,"四指下滑打开游戏控制",Toast.LENGTH_LONG).show();preferences.edit().putBoolean("fourFingerControlsHint",true).apply();}
+
     }
     private void readStream(Session current,int attempt){
         StreamRecovery recovery=new StreamRecovery(current.h264);
@@ -629,43 +670,93 @@ public final class MainActivity extends Activity {
             if(state.optString("state").equals("stopped")||state.optString("state").equals("error"))ui.post(()->{if(session==current&&attempt==generation&&!controlBusy&&!paused)pauseRemote("电脑游戏已停止");});
         }catch(RequestError e){if(e.status==403)ui.post(()->{if(session==current)goHome("配对已撤销，请重新扫码");});}catch(Exception ignored){}
     }
+    private Button previewAction(String text,Runnable action){
+        Button button=button(text,action);button.setTextSize(13);button.setTypeface(Typeface.DEFAULT);
+        button.setPadding(0,0,0,0);button.setBackground(new android.graphics.drawable.RippleDrawable(ColorStateList.valueOf(0x28ffffff),null,null));
+        return button;
+    }
     private void showControls(String message){
-        if(!page.equals("stream"))return;release();
+        if(!page.equals("stream")&&!page.equals("connecting"))return;release();
         if(controlPanel==null){
-            controlPanel=column();controlPanel.setPadding(dp(12),dp(10),dp(12),dp(10));controlPanel.setElevation(dp(8));controlPanel.setBackground(outlined(PANEL,16));
-            LinearLayout info=new LinearLayout(this);info.setGravity(Gravity.CENTER_VERTICAL);controlStatus=label("",12,MUTED);controlStatus.setSingleLine();controlStatus.setEllipsize(TextUtils.TruncateAt.END);info.addView(controlStatus,new LinearLayout.LayoutParams(0,-2,1));
-            fpsLabel=label("0 FPS",13,ACCENT);fpsLabel.setTypeface(Typeface.MONOSPACE);fpsLabel.setPadding(dp(10),0,0,0);fpsLabel.setContentDescription("手机实际显示帧率");info.addView(fpsLabel);controlPanel.addView(info);gap(controlPanel,8);
-            info.addView(iconButton("close","收起控制栏",this::hideControls),new LinearLayout.LayoutParams(dp(48),dp(48)));
-            LinearLayout actions=column();runButton=primary("继续游戏",this::runRemote);stopButton=button("停止这款游戏",()->new AlertDialog.Builder(this).setTitle("停止这款游戏？").setMessage("只停止当前游戏，其他项目继续运行。").setPositiveButton("停止游戏",(d,w)->stopRemote()).setNegativeButton("继续运行",null).show());
-            actions.addView(runButton,new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);actions.addView(button("返回游戏列表",()->goHome(paused?"电脑游戏保持停止":"电脑游戏继续后台运行")),new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);
-            qualityButton=button("",this::chooseQuality);actions.addView(qualityButton,new LinearLayout.LayoutParams(-1,dp(48)));gap(actions,8);actions.addView(stopButton,new LinearLayout.LayoutParams(-1,dp(48)));controlPanel.addView(actions);
-            FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(Math.min(getResources().getDisplayMetrics().widthPixels-dp(24),dp(420)),-2,Gravity.BOTTOM|Gravity.RIGHT);position.setMargins(dp(12),dp(12),dp(12),dp(12));root.addView(controlPanel,position);
+            controlPanel=column();controlPanel.setPadding(dp(6),dp(2),dp(6),dp(2));controlPanel.setElevation(dp(5));controlPanel.setBackground(outlined(PANEL,12));
+            controlStatus=label("",12,MUTED);controlStatus.setMaxLines(2);controlPanel.addView(controlStatus);
+            LinearLayout tools=new LinearLayout(this);tools.setGravity(Gravity.CENTER_VERTICAL);controlPanel.addView(tools);
+            qualityButton=previewAction("",this::chooseQuality);tools.addView(qualityButton,new LinearLayout.LayoutParams(dp(68),dp(44)));
+            fpsLabel=label("",11,MUTED);fpsLabel.setGravity(Gravity.CENTER);tools.addView(fpsLabel,new LinearLayout.LayoutParams(0,-2,1));
+            runButton=previewAction("",()->{if(paused)runRemote();else hideControls();});tools.addView(runButton,new LinearLayout.LayoutParams(dp(50),dp(44)));
+            divider(controlPanel);LinearLayout actions=new LinearLayout(this);controlPanel.addView(actions);
+            Button leave=previewAction("返回项目",()->returnToProjects(""));actions.addView(leave,new LinearLayout.LayoutParams(0,dp(44),1));
+            stopButton=previewAction("停止游戏",this::stopRemote);stopButton.setTextColor(0xffffaca6);actions.addView(stopButton,new LinearLayout.LayoutParams(0,dp(44),1));
+            root.addView(controlPanel,new FrameLayout.LayoutParams(dp(216),-2,Gravity.TOP|Gravity.LEFT));
         }
-        controlStatus.setText(message.isEmpty()?(paused?"游戏已停止":session!=null&&session.deviceWidth>0?"设备 · "+session.deviceWidth+" × "+session.deviceHeight:lastName):message);runButton.setText(paused?"运行游戏":"继续游戏");runButton.setEnabled(!controlBusy);stopButton.setEnabled(!controlBusy);runButton.setAlpha(controlBusy?.45f:1);stopButton.setAlpha(controlBusy?.45f:1);
-        qualityButton.setText("画质 · "+qualityName(streamQuality)+" · "+videoMode+(frameWidth>0?"   "+frameWidth+" × "+frameHeight:""));qualityButton.setEnabled(!controlBusy);
-        positionControls();controlPanel.setVisibility(View.VISIBLE);controlPanel.bringToFront();updateFps();
+        controlStatus.setText(message);controlStatus.setVisibility(message.isEmpty()?View.GONE:View.VISIBLE);
+        runButton.setText(paused?"运行":"收起");
+        stopButton.setEnabled(session!=null&&!controlBusy);qualityButton.setEnabled(session!=null&&!controlBusy);
+        qualityButton.setText(qualityName(streamQuality)+" ▾");
+        controlPanel.setVisibility(View.VISIBLE);updateFps();positionControls();controlPanel.bringToFront();previewMenu.bringToFront();
     }
     private void positionControls(){
-        int left=0,top=0,right=0,bottom=0;
-        if(Build.VERSION.SDK_INT>=28&&root.getRootWindowInsets()!=null){DisplayCutout cutout=root.getRootWindowInsets().getDisplayCutout();if(cutout!=null){left=cutout.getSafeInsetLeft();top=cutout.getSafeInsetTop();right=cutout.getSafeInsetRight();bottom=cutout.getSafeInsetBottom();}}
-        if(Build.VERSION.SDK_INT>=29&&root.getRootWindowInsets()!=null)bottom=Math.max(bottom,root.getRootWindowInsets().getMandatorySystemGestureInsets().bottom);
-        if(controlPanel==null)return;FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)controlPanel.getLayoutParams();position.width=Math.min(getResources().getDisplayMetrics().widthPixels-dp(24)-left-right,dp(420));position.setMargins(dp(12)+left,dp(12)+top,dp(12)+right,dp(12)+bottom);controlPanel.setLayoutParams(position);
+        if(previewMenu==null||root.getWidth()==0||root.getHeight()==0)return;
+        int left=dp(3),right=root.getWidth()-dp(3),top=dp(3),bottom=root.getHeight()-dp(3);
+        WindowInsets insets=root.getRootWindowInsets();
+        if(insets!=null&&Build.VERSION.SDK_INT>=28){
+            DisplayCutout cutout=insets.getDisplayCutout();
+            if(cutout!=null){left+=cutout.getSafeInsetLeft();right-=cutout.getSafeInsetRight();top+=cutout.getSafeInsetTop();bottom-=cutout.getSafeInsetBottom();}
+            if(Build.VERSION.SDK_INT>=29)bottom=Math.min(bottom,root.getHeight()-insets.getMandatorySystemGestureInsets().bottom-dp(3));
+        }
+        int hit=dp(48);
+        previewMenu.setTravel(left,top,Math.max(left,right-hit),Math.max(top,bottom-hit));
+        if(controlPanel==null||controlPanel.getVisibility()!=View.VISIBLE)return;
+        int width=Math.max(1,Math.min(dp(216),right-left));
+        FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)controlPanel.getLayoutParams();
+        if(lp.width!=width){lp.width=width;controlPanel.setLayoutParams(lp);}
+        controlPanel.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.UNSPECIFIED);
+        int height=controlPanel.getMeasuredHeight(),y=Math.round(previewMenu.getY());
+        int below=y+hit+dp(2);
+        controlPanel.setTranslationX(previewMenu.isRight()?right-width:left);
+        controlPanel.setTranslationY(Math.max(top,Math.min(bottom-height,below+height<=bottom?below:y-height-dp(2))));
     }
     private String qualityName(String quality){return quality.equals("original")?"原始尺寸":quality;}
     private void chooseQuality(){
         if(controlBusy)return;
         Session current=session;
         if(current!=null&&!current.qualitySupported){Toast.makeText(this,"请先将电脑 Defold 更新至 patch.93，以启用高清串流",Toast.LENGTH_LONG).show();return;}
-        LinearLayout options=column();TextView help=label("仅调整传输清晰度，不改变游戏的设备尺寸。",13,MUTED);help.setLineSpacing(dp(4),1);options.addView(help);gap(options,16);
-        String[] ids={"540p","720p","1080p","original"};String[] names={"流畅 · 540p","均衡 · 720p","高清 · 1080p","原始尺寸"};Dialog[] holder=new Dialog[1];
-        for(int i=0;i<ids.length;i++){final String choice=ids[i];Button option=button((choice.equals(streamQuality)?"✓  ":"")+names[i],()->{if(controlBusy)return;holder[0].dismiss();if(session!=current||choice.equals(streamQuality))return;streamQuality=choice;preferences.edit().putString("streamQuality",choice).apply();if(current==null){Toast.makeText(this,"默认画质已更新",Toast.LENGTH_SHORT).show();return;}if(paused){showControls("已选择 "+qualityName(choice)+"，运行后生效");return;}endInput();controlBusy=true;int attempt=++generation;closeStream();frameRate.reset();showControls("正在切换清晰度…");frames.execute(()->readStream(current,attempt));});if(choice.equals(streamQuality))option.setTextColor(ACCENT);options.addView(option,new LinearLayout.LayoutParams(-1,dp(52)));gap(options,6);}
-        holder[0]=sheet("串流分辨率",options);
+        showQualityOptions(streamQuality,true,choice->{
+            if(controlBusy||session!=current||choice.equals(streamQuality))return;
+            streamQuality=choice;preferences.edit().putString("streamQuality",choice).apply();
+            if(current==null){if(dashboard!=null)dashboard.updateQuality();return;}
+            if(paused){showControls("已选择 "+qualityName(choice)+"，运行后生效");return;}
+            endInput();controlBusy=true;int attempt=++generation;closeStream();frameRate.reset();
+            showControls("正在切换清晰度…");frames.execute(()->readStream(current,attempt));
+        });
+    }
+    void showQualityOptions(String selected,boolean allowOriginal,java.util.function.Consumer<String> apply){
+        LinearLayout options=column();
+        String[] values={"540p","720p","1080p","original"};
+        String[] labels={"流畅","均衡","高清","原始尺寸"};
+        Dialog[] dialog=new Dialog[1];
+        for(int i=0;i<(allowOriginal?4:3);i++){
+            String value=values[i];
+            boolean checked=value.equals(selected);
+            if(i>0)divider(options);
+            LinearLayout row=new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(10),0,dp(10),0);
+            clickable(row,checked?0xff263344:Color.TRANSPARENT,8,()->{dialog[0].dismiss();apply.accept(value);});
+            row.setSelected(checked);row.setFocusable(true);
+            row.setContentDescription(labels[i]+(i==3?"":" · "+value));
+            row.addView(label(labels[i],15,TEXT),new LinearLayout.LayoutParams(0,-2,1));
+            if(i!=3)row.addView(label(value,14,MUTED));
+            TextView mark=label(checked?"✓":"",16,ACCENT);mark.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+            row.addView(mark,new LinearLayout.LayoutParams(dp(24),-1));
+            options.addView(row,new LinearLayout.LayoutParams(-1,dp(48)));
+        }
+        dialog[0]=sheet("串流分辨率",options,320);
     }
     private void hideControls(){if(controlPanel!=null)controlPanel.setVisibility(View.GONE);}
     private void updateFps(){
         Session current=session;
         if(foreground&&!paused&&hasWindowFocus()&&current!=null&&audioPlayer!=null&&audioPlayer.needsFocusRetry())audioPlayer=new RemoteAudioPlayer(this,current.base,current.token);
-        if(fpsLabel!=null){fpsLabel.setVisibility(getSharedPreferences("remote-dashboard",0).getBoolean("showFps",false)?View.VISIBLE:View.GONE);fpsLabel.setText(Math.round(paused?0:frameRate.fps(SystemClock.elapsedRealtime()))+" FPS"+(audioPlayer==null?"":" · "+audioPlayer.status()));}
+        if(fpsLabel!=null){fpsLabel.setVisibility(getSharedPreferences("remote-dashboard",0).getBoolean("showFps",false)?View.VISIBLE:View.INVISIBLE);fpsLabel.setText(Math.round(paused?0:frameRate.fps(SystemClock.elapsedRealtime()))+" FPS"+(audioPlayer==null?"":" · "+audioPlayer.status()));}
     }
     private void pauseRemote(String message){
         endInput();paused=true;controlBusy=false;++generation;closeStream();frameRate.reset();if(screen!=null)screen.discardPending();
@@ -674,7 +765,7 @@ public final class MainActivity extends Activity {
     private void stopRemote(){
         Session current=session;if(current==null||controlBusy)return;
         if(current.base.startsWith("https:")){
-            pauseRemote("正在停止游戏…");controlBusy=true;commands.execute(()->{try{request(current.base,current.token,"POST","/stop",new byte[0]);ui.post(()->{if(session==current){String host=RemoteTls.origin(current.base);goHome("游戏已停止");dashboard.showTab("running");dashboard.refresh();}});}catch(Exception e){ui.post(()->{if(session==current){controlBusy=false;showControls(e.getMessage());}});}});return;
+            pauseRemote("正在停止游戏…");controlBusy=true;commands.execute(()->{try{request(current.base,current.token,"POST","/stop",new byte[0]);ui.post(()->{if(session==current){returnToProjects("游戏已停止");}});}catch(Exception e){ui.post(()->{if(session==current){controlBusy=false;showControls(e.getMessage());}});}});return;
         }
         pauseRemote("正在停止游戏…");controlBusy=true;showControls("正在停止游戏…");int attempt=generation;
         commands.execute(()->{try{
@@ -683,7 +774,7 @@ public final class MainActivity extends Activity {
             while(!request(current.base,current.token,"GET","/status",null).json().optString("state").equals("stopped")){
                 if(session!=current||attempt!=generation)return;if(SystemClock.elapsedRealtime()>deadline)throw new Exception("停止尚未完成，请重试");Thread.sleep(100);
             }
-            ui.post(()->{if(session==current&&attempt==generation){controlBusy=false;showControls("游戏已停止，点击运行继续");}});
+            ui.post(()->{if(session==current&&attempt==generation){controlBusy=false;returnToProjects("游戏已停止");}});
         }catch(Exception e){ui.post(()->{if(session==current&&attempt==generation){controlBusy=false;showControls("停止失败："+e.getMessage());}});}});
     }
     private void runRemote(){
@@ -813,7 +904,7 @@ public final class MainActivity extends Activity {
     private void scan(){endInput();releaseManaged();++generation;session=null;closeStream();closeCamera();if(dashboard!=null)dashboard.pause();page="scan";scanTorch=false;newRoot();
         boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         FrameLayout cameraArea=new FrameLayout(this);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-1);if(wide)cp.rightMargin=dp(236);root.addView(cameraArea,cp);
-        LinearLayout header=pageHeader("扫描电脑二维码",()->{goHome("");dashboard.showTab("computers");});header.setBackgroundColor(0x99181818);FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-1,dp(64),Gravity.TOP);root.addView(header,hp);
+        LinearLayout header=pageHeader("扫描电脑二维码",this::returnFromPairing);header.setBackgroundColor(0x99181818);FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-1,dp(64),Gravity.TOP);root.addView(header,hp);
         LinearLayout controls=column();controls.setPadding(dp(16),dp(12),dp(16),dp(16));controls.setBackgroundColor(0xde181818);
         scanStatus=label("将电脑上的二维码放入框内\n识别后自动对焦，不需要按快门",14,TEXT);scanStatus.setGravity(Gravity.CENTER);scanStatus.setPadding(dp(10),dp(10),dp(10),dp(10));controls.addView(scanStatus);gap(controls,10);
         LinearLayout tools=new LinearLayout(this);Button torch=button("补光",()->{if(scanner==null){scanStatus.setText("相机未就绪，仍可使用相册或链接");return;}scanTorch=!scanTorch;if(!scanner.setTorch(scanTorch)){scanTorch=false;scanStatus.setText("当前相机不支持补光");}});torch.setContentDescription("补光");tools.addView(torch,new LinearLayout.LayoutParams(0,dp(48),1));
@@ -837,7 +928,7 @@ public final class MainActivity extends Activity {
         private boolean posted,multi,hardware;
         private int videoWidth,videoHeight;
         void video(boolean enabled,int width,int height){hardware=enabled;videoWidth=width;videoHeight=height;if(enabled)bitmap=null;setBackgroundColor(enabled?Color.TRANSPARENT:Color.BLACK);invalidate();}
-        StreamView(){super(MainActivity.this);setBackgroundColor(Color.BLACK);setContentDescription("远程游戏。四指下滑或返回键打开控制栏");}
+        StreamView(){super(MainActivity.this);setBackgroundColor(Color.BLACK);setContentDescription("远程游戏。点右上角或四指下滑打开控制，返回键回到项目");}
         synchronized void offer(Session current,int attempt,Bitmap next){if(pending!=null)pending.recycle();pending=next;pendingSession=current;pendingGeneration=attempt;if(!posted){posted=true;postOnAnimation(()->{synchronized(StreamView.this){if(pending!=null){if(pendingSession==session&&pendingGeneration==generation&&foreground)bitmap=pending;else pending.recycle();}pending=null;posted=false;}invalidate();});}}
         synchronized void discardPending(){if(pending!=null){pending.recycle();pending=null;}}
         synchronized void clear(){bitmap=null;if(pending!=null){pending.recycle();pending=null;}destination.setEmpty();invalidate();}

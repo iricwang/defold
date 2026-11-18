@@ -324,7 +324,16 @@ public class RemoteManager implements AutoCloseable {
         Path temporary = directory.resolve("registry.json.part");
         JSON.writerWithDefaultPrettyPrinter().writeValue(temporary.toFile(), Map.of("version",1,"hostId",hostId,"settings",settings,
                 "projects", projects.values().stream().map(Project::saved).toList(), "devices", new ArrayList<>(devices.values())));
-        Files.move(temporary, directory.resolve("registry.json"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        for (int attempt = 0; ; attempt++) {
+            try {
+                Files.move(temporary, directory.resolve("registry.json"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                return;
+            } catch (java.nio.file.AccessDeniedException e) {
+                if (attempt >= 5 || !System.getProperty("os.name").startsWith("Windows")) throw e;
+                try { Thread.sleep(10L << attempt); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw e; }
+            }
+        }
     }
 
     static boolean excluded(Path relative) {
@@ -780,7 +789,7 @@ public class RemoteManager implements AutoCloseable {
                 Project p=new Project(UUID.randomUUID().toString(),root,title);projects.put(p.id,p);save();return status(p);}
         }
         if(method.equals("settings")){synchronized(this){if(params.containsKey("maxSessions")){int n=((Number)params.get("maxSessions")).intValue();if(n<1||n>8)throw new IllegalArgumentException("并发范围为 1–8");settings.put("maxSessions",n);}if(params.get("prepare") instanceof Boolean b)settings.put("prepare",b);save();}return status();}
-        if(method.equals("revoke")){String id=str(params,"id");synchronized(this){devices.remove(id);}for(Project p:all())synchronized(p){if(p.controller.equals(id))release(p);}save();return status();}
+        if(method.equals("revoke")){String id=str(params,"id");synchronized(this){devices.remove(id);}for(Project p:all())synchronized(p){if(p.controller.equals(id)||p.controller.endsWith("."+id))release(p);}save();cloud.pairingChanged();return status();}
         Project p=project(str(params,"id"));
         switch(method){
             case "start"->prepare(p,true,false);
@@ -823,7 +832,8 @@ public class RemoteManager implements AutoCloseable {
         // A failed registry write must not turn a previously persisted cache into an orphan.
         Path registry = directory.resolve("registry.json");
         if (Files.isRegularFile(registry)) {
-            Map<?,?> saved = JSON.readValue(registry.toFile(),Map.class);
+            Map<?,?> saved;
+            synchronized (this) { saved = JSON.readValue(registry.toFile(),Map.class); }
             if (saved.get("projects") instanceof List<?> entries) for (Object entry : entries) {
                 Map<?,?> p = (Map<?,?>)entry;
                 if (!str(p,"build").isEmpty()) keepBuilds.add(Path.of(str(p,"build")));
