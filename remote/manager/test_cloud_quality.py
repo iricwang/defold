@@ -39,4 +39,5 @@ with tempfile.TemporaryDirectory(prefix='defold-quality-test-') as d:
  work=Path(d);shutil.copytree(Path(__file__).resolve().parents[2]/'scripts/automation/fixture',work/'game');java=work/'CatalogTest.java';java.write_text(source)
  cp=str(base/runtime['classes'])+os.pathsep+str(base/runtime['jar'])
  subprocess.run([a.javac,'-cp',cp,'-d',d,str(java)],check=True)
- subprocess.run([str(base/runtime['java']),'--enable-native-access=ALL-UNNAMED','-cp',d+os.pathsep+cp,'com.defold.editor.CatalogTest',str(manifest),str(work/'manager'),str(work/'game')],check=True,timeout=150)
+ test_java = (base/runtime['java']).with_name('java.exe') if os.name == 'nt' else base/runtime['java']
+ subprocess.run([str(test_java),'--enable-native-access=ALL-UNNAMED','-cp',d+os.pathsep+cp,'com.defold.editor.CatalogTest',str(manifest),str(work/'manager'),str(work/'game')],check=True,timeout=150)

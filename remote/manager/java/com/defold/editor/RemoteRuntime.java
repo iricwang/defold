@@ -57,7 +57,7 @@ public final class RemoteRuntime implements AutoCloseable {
 
     private RemoteRuntime(Path directory) throws IOException {
         System.setProperty("sun.net.httpserver.nodelay", "true");
-        worker = new AutomationWorker(directory);
+        worker = new AutomationWorker(directory, false);
         audioPath = System.getProperty("os.name").startsWith("Mac") ? RemoteAudioFile.path(directory.resolve("runtime.shared")) : null;
         if (audioPath != null) RemoteAudioFile.create(directory.resolve("runtime.shared"));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 16);
@@ -199,6 +199,7 @@ public final class RemoteRuntime implements AutoCloseable {
                 int previous = -1; int[] pixels = frame.pixels();
                 long profileRevision = -1, keyframeRevision = -1;
                 int remoteFps = 30;
+                int remoteBitrate = 1200000;
                 long next = System.nanoTime();
                 while (!closed && stream == exchange && Boolean.TRUE.equals(worker.status().get("alive"))) {
                     long delay = next - System.nanoTime();
@@ -211,6 +212,7 @@ public final class RemoteRuntime implements AutoCloseable {
                         EncoderProfile profile = encoderProfile;
                         if (profile.revision() != profileRevision) {
                             encoder.configureRemote(profile.bitrate(), profile.fps(), profile.keyframe() != keyframeRevision);
+                            remoteBitrate = profile.bitrate();
                             profileRevision = profile.revision(); keyframeRevision = profile.keyframe(); remoteFps = profile.fps();
                         }
                     }
@@ -220,6 +222,9 @@ public final class RemoteRuntime implements AutoCloseable {
                     finally { synchronized (this) { if (stream == exchange) writingSince = 0; } }
                     frame = null;
                     long interval = remote ? 1_000_000_000L / remoteFps : hardware ? 16_666_667L : 33_333_333L;
+                    // Hardware encoders can overshoot their target on noisy frames. Charge the
+                    // actual packet size before sampling the next frame, without queuing input.
+                    if (remote) interval = Math.max(interval, bytes.length * 8_000_000_000L / remoteBitrate);
                     next = Math.max(next + interval, System.nanoTime());
                 }
             }

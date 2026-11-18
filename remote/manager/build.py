@@ -50,12 +50,28 @@ def build(app, output, engine=None, shell=False):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
     # The sidecar must load the matching JNI profile API before the selected editor jar.
-    codec = ROOT/'editor/resources/lib'/base['platform']/('remote_video.dll' if os.name == 'nt' else 'libremote_video.dylib')
+    if os.name == 'nt':
+        codec = ROOT/'tmp/remote-manager-runtime/codec/remote_video.dll'
+        subprocess.run([sys.executable, str(ROOT/'scripts/windows/editor.py'), 'remote-video-build',
+                        '--jdk', str(Path(compiler).resolve().parent.parent), '--output', str(codec)], check=True, **quiet)
+    else:
+        codec = ROOT/'editor/resources/lib'/base['platform']/'libremote_video.dylib'
     if codec.is_file():
         target = Path(base['classes'])/'lib'/base['platform']/codec.name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(codec,target)
-    transport = Path(os.environ.get('DEFOLD_REMOTE_TRANSPORT', ROOT/'tmp/remote-transport-cargo/release'/('defold-remote-transport.exe' if os.name == 'nt' else 'defold-remote-transport')))
+    transport_root = ROOT/'tmp/remote-transport-cargo'
+    if os.environ.get('DEFOLD_REMOTE_TRANSPORT'):
+        transport = Path(os.environ['DEFOLD_REMOTE_TRANSPORT']).resolve(strict=True)
+    elif os.name == 'nt':
+        target = 'x86_64-pc-windows-msvc'
+        env = dict(os.environ, CARGO_TARGET_DIR=str(transport_root),
+                   CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS='-C target-feature=+crt-static')
+        subprocess.run(['cargo', 'build', '--release', '--locked', '--target', target,
+                        '--manifest-path', str(ROOT/'remote/transport/Cargo.toml')], env=env, check=True, **quiet)
+        transport = transport_root/target/'release/defold-remote-transport.exe'
+    else:
+        transport = transport_root/'release/defold-remote-transport'
     inputs = {str(p.relative_to(ROOT)): automation.digest(p) for p in sources}
     inputs.update({str(p.relative_to(ROOT)): automation.digest(p) for p in resources})
     inputs.update(base['inputs'])
@@ -94,7 +110,9 @@ def build(app, output, engine=None, shell=False):
         for source, target in [(java_home, package/'jre'), (Path(base['classes']), package/'classes'), (Path(base['native']), package/'native')]:
             shutil.copytree(source, target, dirs_exist_ok=True)
         shutil.copy2(base['jar'], package/'editor.jar')
-        if transport.is_file(): shutil.copy2(transport,package/transport.name)
+        if transport.is_file():
+            transport_name = 'defold-remote-transport.exe' if os.name == 'nt' else 'defold-remote-transport'
+            shutil.copy2(transport, package/transport_name)
         engine_name = 'dmengine.exe' if os.name == 'nt' else 'dmengine'
         shutil.copy2(base['engine'], package/engine_name)
         shutil.copy2(HERE/'prepare.py', package/'prepare.py')

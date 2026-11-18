@@ -41,6 +41,7 @@ struct Encoder {
     std::vector<int> columns;
     int sourceWidth = 0;
     int width, height;
+    int fps = 60, bitrate = 0;
     LONGLONG frame = 0;
     bool com = false, media = false, needInput = false;
     ~Encoder() {
@@ -76,14 +77,14 @@ static HRESULT setting(IMFTransform* transform, const GUID& key, ULONG value, bo
     return codec->SetValue(&key, &v);
 }
 
-static HRESULT mediaType(IMFMediaType** result, const GUID& subtype, int w, int h) {
+static HRESULT mediaType(IMFMediaType** result, const GUID& subtype, int w, int h, int fps) {
     ComPtr<IMFMediaType> type;
     HRESULT hr = MFCreateMediaType(&type);
     if (FAILED(hr)) return hr;
     type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
     type->SetGUID(MF_MT_SUBTYPE, subtype);
     MFSetAttributeSize(type.Get(), MF_MT_FRAME_SIZE, w, h);
-    MFSetAttributeRatio(type.Get(), MF_MT_FRAME_RATE, 60, 1);
+    MFSetAttributeRatio(type.Get(), MF_MT_FRAME_RATE, fps, 1);
     MFSetAttributeRatio(type.Get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
     type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
     type->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT709);
@@ -105,14 +106,14 @@ static HRESULT configure(Encoder& e, IMFActivate* activation) {
     // Baseline additionally disallows B frames even on drivers ignoring the setting.
     setting(e.transform.Get(), CODECAPI_AVLowLatencyMode, 1, true);
     setting(e.transform.Get(), CODECAPI_AVEncMPVDefaultBPictureCount, 0);
-    setting(e.transform.Get(), CODECAPI_AVEncMPVGOPSize, 60);
+    setting(e.transform.Get(), CODECAPI_AVEncMPVGOPSize, e.bitrate ? e.fps * 2 : 60);
     setting(e.transform.Get(), CODECAPI_AVEncCommonRateControlMode, eAVEncCommonRateControlMode_CBR);
     ComPtr<IMFMediaType> output, input;
-    if (FAILED(hr = mediaType(&output, MFVideoFormat_H264, e.width, e.height))) return hr;
-    output->SetUINT32(MF_MT_AVG_BITRATE, std::clamp(e.width * e.height * 10, 6000000, 40000000));
+    if (FAILED(hr = mediaType(&output, MFVideoFormat_H264, e.width, e.height, e.fps))) return hr;
+    output->SetUINT32(MF_MT_AVG_BITRATE, e.bitrate ? e.bitrate : std::clamp(e.width * e.height * 10, 6000000, 40000000));
     output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Base);
     if (FAILED(hr = e.transform->SetOutputType(0, output.Get(), 0))) return hr;
-    if (FAILED(hr = mediaType(&input, MFVideoFormat_NV12, e.width, e.height))) return hr;
+    if (FAILED(hr = mediaType(&input, MFVideoFormat_NV12, e.width, e.height, e.fps))) return hr;
     input->SetUINT32(MF_MT_DEFAULT_STRIDE, e.width);
     input->SetUINT32(MF_MT_SAMPLE_SIZE, e.width * e.height * 3 / 2);
     if (FAILED(hr = e.transform->SetInputType(0, input.Get(), 0))) return hr;
@@ -120,9 +121,9 @@ static HRESULT configure(Encoder& e, IMFActivate* activation) {
     return e.transform->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
 }
 
-static jlong createEncoder(jint w, jint h) {
+static Encoder* createEncoder(jint w, jint h, int bitrate, int fps) {
     if (w < 2 || h < 2 || w > 4096 || h > 4096 || (w & 1) || (h & 1) || (int64_t)w*h > 8388608) return 0;
-    auto e = std::make_unique<Encoder>(); e->width = w; e->height = h;
+    auto e = std::make_unique<Encoder>(); e->width = w; e->height = h; e->fps = fps; e->bitrate = bitrate;
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(hr)) return 0;
     e->com = true;
@@ -164,12 +165,34 @@ static jlong createEncoder(jint w, jint h) {
     if (!ready) return 0;
     e->nv12.resize((size_t)w*h*3/2);
     e->columns.resize(w);
-    return (jlong)(intptr_t)e.release();
+    return e.release();
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_com_defold_editor_RemoteVideoEncoder_create(JNIEnv*, jclass, jint w, jint h) {
-    try { return createEncoder(w,h); }
+    try {
+        std::unique_ptr<Encoder> encoder(createEncoder(w, h, 0, 60));
+        if (!encoder) return 0;
+        return reinterpret_cast<jlong>(new std::unique_ptr<Encoder>(std::move(encoder)));
+    }
     catch (const std::exception& e) { fprintf(stderr,"Remote encoder allocation failed: %s\n",e.what()); return 0; }
+}
+
+// Media types fix the nominal frame rate on hardware MFTs. Recreate on profile
+// changes so the first sample has the requested rate and starts a new GOP.
+extern "C" JNIEXPORT jboolean JNICALL Java_com_defold_editor_RemoteVideoEncoder_configure(
+        JNIEnv*, jclass, jlong handle, jint bitrate, jint fps, jboolean keyframe) {
+    auto* owner = reinterpret_cast<std::unique_ptr<Encoder>*>(handle);
+    if (!owner || !*owner || bitrate < 250000 || bitrate > 1800000 || fps < 10 || fps > 30) return JNI_FALSE;
+    Encoder& current = **owner;
+    if (current.bitrate == bitrate && current.fps == fps) {
+        if (!keyframe || SUCCEEDED(setting(current.transform.Get(), CODECAPI_AVEncVideoForceKeyFrame, 1))) return JNI_TRUE;
+    }
+    try {
+        std::unique_ptr<Encoder> next(createEncoder(current.width, current.height, bitrate, fps));
+        if (!next) return JNI_FALSE;
+        owner->swap(next);
+        return JNI_TRUE;
+    } catch (const std::exception&) { return JNI_FALSE; }
 }
 
 static BYTE clampByte(int value) { return (BYTE)std::clamp(value, 0, 255); }
@@ -211,7 +234,7 @@ static HRESULT encode(Encoder& e, std::vector<BYTE>& packet) {
     buffer->SetCurrentLength((DWORD)e.nv12.size());
     if (FAILED(hr=MFCreateSample(&sample))) return hr;
     if (FAILED(hr=sample->AddBuffer(buffer.Get()))) return hr;
-    sample->SetSampleTime(e.frame*10000000/60); sample->SetSampleDuration(10000000/60); ++e.frame;
+    sample->SetSampleTime(e.frame*10000000/e.fps); sample->SetSampleDuration(10000000/e.fps); ++e.frame;
     if (FAILED(hr=e.transform->ProcessInput(0,sample.Get(),0))) return hr;
     e.needInput=false;
     if (FAILED(hr=e.wait(METransformHaveOutput))) return hr;
@@ -254,7 +277,8 @@ static HRESULT encode(Encoder& e, std::vector<BYTE>& packet) {
 
 extern "C" JNIEXPORT jbyteArray JNICALL Java_com_defold_editor_RemoteVideoEncoder_encode(JNIEnv* env, jclass, jlong handle, jintArray rgb, jint sw, jint sh) {
     try {
-    auto* e=(Encoder*)(intptr_t)handle;
+    auto* owner = reinterpret_cast<std::unique_ptr<Encoder>*>(handle);
+    Encoder* e = owner ? owner->get() : nullptr;
     if (!e || !rgb || sw<1 || sh<1 || sw>4096 || sh>4096 || env->GetArrayLength(rgb)!=(int64_t)sw*sh) return nullptr;
     if (e->sourceWidth != sw) {
         for (int x=0; x<e->width; ++x) e->columns[x]=x*sw/e->width;
@@ -273,5 +297,5 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_com_defold_editor_RemoteVideoEncode
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_defold_editor_RemoteVideoEncoder_destroy(JNIEnv*, jclass, jlong handle) {
-    delete (Encoder*)(intptr_t)handle;
+    delete reinterpret_cast<std::unique_ptr<Encoder>*>(handle);
 }

@@ -44,7 +44,14 @@ public final class AutomationWorker implements AutoCloseable {
     private long logCursor;
     private volatile int servicePort;
 
+    private final boolean captureScene;
+
     AutomationWorker(Path directory) throws IOException {
+        this(directory, true);
+    }
+
+    AutomationWorker(Path directory, boolean captureScene) throws IOException {
+        this.captureScene = captureScene;
         this.directory = directory;
         Files.createDirectories(directory);
         if (MAC) Files.setPosixFilePermissions(directory, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
@@ -127,7 +134,7 @@ public final class AutomationWorker implements AutoCloseable {
         Map<String, String> environment = Map.of(
                 "DM_EDITOR_GAME_FILE", directory.resolve("runtime.shared").toString(),
                 "DM_EDITOR_GAME_PARENT", Long.toString(ProcessHandle.current().pid()),
-                "DM_EDITOR_AUTOMATION_SCENE", directory.resolve("runtime.scene.json").toString(),
+                "DM_EDITOR_AUTOMATION_SCENE", captureScene ? directory.resolve("runtime.scene.json").toString() : "",
                 "DM_EDITOR_AUTOMATION", "1", "DM_SERVICE_PORT", "dynamic",
                 "DM_WINDOW_STATE", "");
         if (MAC) {
@@ -242,7 +249,7 @@ public final class AutomationWorker implements AutoCloseable {
     private Map<String, Object> capture(String name) throws IOException {
         if (!name.matches("[a-zA-Z0-9_-]+\\.png")) throw new IllegalArgumentException("Invalid image name");
         int request = get(267) + 1;
-        put(266, 0); // Deterministic MCP capture requires the matching scene snapshot.
+        put(266, captureScene ? 0 : 1);
         put(267, request);
         await(() -> get(276) == request, 10000);
         BufferedImage image;
