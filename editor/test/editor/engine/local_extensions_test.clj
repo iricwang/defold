@@ -69,12 +69,21 @@
     (is (nil? (local-extensions/ensure-server! "http://127.0.0.1:1" "test-sdk" "x86_64-win32" directory)))
     (is (not (.exists (io/file directory "starts.txt"))))))
 
-;; Stale SDK registrations fail explicitly before launching the wrong compiler.
+;; A stale registration allows both cold startup and reuse after an SDK upgrade.
 (deftest stale-sdk-test
+  (let [{:keys [directory url port profile]} (fixture)]
+    (spit (io/file directory (str port ".json")) (json/write-str (assoc profile :sdk "old-sdk")))
+    (try
+      (dotimes [_ 2]
+        (is (nil? (local-extensions/ensure-server! url "test-sdk" "x86_64-win32" directory))))
+      (is (= "started\n" (slurp (io/file directory "starts.txt"))))
+      (finally (request url "/shutdown")))))
+
+;; A cold builder serving the wrong SDK must fail before an upload.
+(deftest cold-sdk-mismatch-test
   (let [{:keys [directory url]} (fixture)]
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"stale or invalid"
-                          (local-extensions/ensure-server! url "other-sdk" "x86_64-win32" directory)))
-    (is (not (.exists (io/file directory "starts.txt"))))))
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"editor requires other-sdk.*builder reports test-sdk"
+                          (local-extensions/ensure-server! url "other-sdk" "x86_64-win32" directory)))))
 
 ;; Startup failures must retain a useful log path instead of an empty error.
 (deftest startup-failure-test

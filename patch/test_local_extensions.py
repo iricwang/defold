@@ -14,8 +14,13 @@
 from io import BytesIO
 from pathlib import Path
 import importlib.util
+import json
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import urlopen
 import zipfile
 
 spec = importlib.util.spec_from_file_location('local_extensions', Path(__file__).resolve().parents[1] / 'scripts/windows/local_extensions.py')
@@ -24,6 +29,62 @@ spec.loader.exec_module(local)
 
 
 class LocalExtensionsTest(unittest.TestCase):
+    # A running editor builder revalidates an upgraded SDK before registering it.
+    def test_registered_server_sdk_upgrade(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(local, 'ROOT', Path(directory)):
+            home = (Path(directory) / 'sdk').resolve()
+            bob = home / 'share/java/bob.jar'
+            engine = home / 'bin' / local.PLATFORM / local.engine_filename()
+            build = local.ROOT / 'engine/build' / local.PLATFORM
+            for path in (bob.parent, engine.parent, build):
+                path.mkdir(parents=True)
+            (build / '.defold_cmake_configure.json').write_text(json.dumps(
+                {'args': ['cmake', '-DDEFOLD_SDK_ROOT=' + home.as_posix()]}))
+            for base in (home / 'lib', local.ROOT / 'engine/engine/build'):
+                lib = base / local.PLATFORM
+                lib.mkdir(parents=True)
+                for name in ('engine.lib', 'engine_service.lib'):
+                    (lib / name).write_bytes(b'lib')
+
+            def install_bob(revision, comment=b''):
+                with zipfile.ZipFile(bob, 'w') as archive:
+                    archive.writestr('com/dynamo/bob/archive/EngineVersion.class', b'\x01\x00\x28' + revision)
+                    archive.comment = comment
+
+            old, new = b'a' * 40, b'b' * 40
+            install_bob(old)
+            engine.write_bytes(old + b'\0')
+            builder = local.Builder(home, Path(directory) / 'work')
+            with local.create_server(builder, registered=True) as server, patch.object(local, 'register_editor_builder') as register:
+                thread = threading.Thread(target=server.serve_forever)
+                thread.start()
+                url = f'http://127.0.0.1:{server.server_port}'
+                try:
+                    install_bob(new, b'upgraded SDK')
+                    with self.assertRaises(HTTPError) as failed:
+                        urlopen(url + '/health')
+                    self.assertEqual(503, failed.exception.code)
+                    failed.exception.close()
+                    register.assert_not_called()
+                    engine.write_bytes(new + b'\0')
+                    builder.jobs['previous'] = {'status': 0}
+                    with self.assertRaises(HTTPError) as busy:
+                        urlopen(url + '/health')
+                    self.assertEqual(503, busy.exception.code)
+                    busy.exception.close()
+                    register.assert_not_called()
+                    builder.jobs['previous'] = {'status': 1}
+                    for _ in range(2):
+                        with urlopen(url + '/health') as response:
+                            self.assertEqual(new.decode(), json.load(response)['sdk'])
+                    register.assert_called_once_with(server.builder, server.server_port)
+                    with urlopen(url + '/job_status?jobId=previous') as response:
+                        self.assertEqual(b'1', response.read())
+                finally:
+                    server.shutdown()
+                    thread.join()
+                    server.builder.close()
+
     # Keep the configured path spelling; realpath/PATH changes invalidate Ninja core commands.
     def test_configured_cmake_path_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:

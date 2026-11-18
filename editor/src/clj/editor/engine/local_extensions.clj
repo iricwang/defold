@@ -37,12 +37,11 @@
                  (nil? (.getFragment uri)))
         (io/file directory (str (.getPort uri) ".json"))))))
 
-(defn- read-profile [url sdk platform directory]
+(defn- read-profile [url platform directory]
   (when-let [^File file (profile-file url platform directory)]
     (when (.isFile file)
-      (let [{:keys [version command directory] :as profile} (json/read-str (slurp file) :key-fn keyword)]
+      (let [{:keys [version command directory] :as profile} (json/read-str (slurp file :encoding "UTF-8") :key-fn keyword)]
         (when-not (and (= 1 version)
-                       (= sdk (:sdk profile))
                        (= platform (:platform profile))
                        (contains? #{(:url profile) (str (:url profile) "/")} url)
                        (vector? command)
@@ -51,20 +50,28 @@
                        (.isFile (io/file (first command)))
                        (string? directory)
                        (.isDirectory (io/file directory)))
-          (throw (ex-info (str "Local extension builder configuration is stale or invalid: " file
-                               ". Register the matching SDK with extensions-serve.") {})))
+          (throw (ex-info (str "Invalid local extension builder launch configuration: " file
+                               ". Register the current tool paths with extensions-serve.") {})))
         profile))))
 
 (defn- healthy? [url sdk platform]
   (let [^HttpURLConnection connection (.openConnection (.toURL (URI. (str url "/health"))))]
     (try
       (.setConnectTimeout connection 750)
-      (.setReadTimeout connection 1500)
+      ;; A running builder may need to verify newly installed SDK artifacts.
+      (.setReadTimeout connection 15000)
       (.setInstanceFollowRedirects connection false)
+      (when (= 503 (.getResponseCode connection))
+        (let [reason (if-let [stream (.getErrorStream connection)]
+                       (slurp stream :encoding "UTF-8")
+                       (.getResponseMessage connection))]
+          (throw (ex-info (str "Local extension builder unavailable at " url ": " reason) {}))))
       (with-open [reader (io/reader (.getInputStream connection))]
         (let [health (json/read reader :key-fn keyword)]
           (when-not (and (= sdk (:sdk health)) (= platform (:platform health)))
-            (throw (ex-info (str "Local extension builder SDK/platform mismatch at " url) {})))
+            (throw (ex-info (str "Local extension builder SDK/platform mismatch at " url
+                                 ": editor requires " sdk " (" platform "), builder reports "
+                                 (:sdk health) " (" (:platform health) ").") {})))
           true))
       (catch ConnectException _ false)
       (finally (.disconnect connection)))))
@@ -80,9 +87,11 @@
 
 (defn ensure-server!
   "Start only an explicitly registered local SDK, on the build worker thread.
+
   Cached engines and unregistered/remote servers do not need this service."
   [url sdk platform registry-directory]
-  (when-let [{:keys [command directory] canonical-url :url} (read-profile url sdk platform registry-directory)]
+  ;; The registered toolchain can be upgraded in place between editor builds.
+  (when-let [{:keys [command directory] canonical-url :url} (read-profile url platform registry-directory)]
     (locking startup-lock
       (when-not (healthy? canonical-url sdk platform)
         (let [log-file (io/file registry-directory "startup.log")

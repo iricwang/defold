@@ -189,13 +189,14 @@ def main(*, baseline=None, full=False, engine_home=None):
         archive_domain='d.defold.com', launcher=str(home / 'bin/x86_64-win32/launcher.exe'), codesign=False)
     jdk = bundle.get_jdk('x86_64-win32')
     bundle.place_release_notes(options)
-    bundle.init_editor(options, 'x86_64-win32', jdk)
+    bundle.init_editor(options, ['x86_64-win32'], jdk)
     from remote_video import build as build_remote_video
     build_remote_video(jdk, ROOT / 'editor/resources/lib/x86_64-win32/remote_video.dll')
     build_windows_native(ROOT / 'scripts/windows/game-window-hook.c',
                          ROOT / 'editor/resources/_unpack/x86_64-win32/lib/game_window_hook.dll')
-    bundle.invoke_lein(['run', '-m', 'editor.ns-batch-builder', 'resources/sorted_clojure_ns_list.edn'], jdk_path=jdk)
+    bundle.invoke_lein(['with-profile', '+ns-batch-builder', 'run', '-m', 'editor.ns-batch-builder', 'resources/sorted_clojure_ns_list.edn'], jdk_path=jdk)
     bundle.invoke_lein(['prerelease'], jdk_path=jdk)
+    project_jar = bundle.create_project_jar(jdk)
     # Editor-only commits must not relabel an older, still-matching local native SDK.
     options.engine_sha1 = engine_revision if engine_home else ENGINE
     if full:
@@ -203,10 +204,10 @@ def main(*, baseline=None, full=False, engine_home=None):
         staging = ROOT / 'editor/tmp'
         if staging.is_symlink() or staging.resolve().parent != (ROOT / 'editor').resolve():
             raise ValueError('Full bundle staging must remain inside editor/')
-        bundle.create_bundle(jdk, 'x86_64-win32', options)
+        bundle.create_bundle(jdk, 'x86_64-win32', options, project_jar)
         verify_patch(ROOT / 'editor/target/editor/Defold-x86_64-win32.zip', jdk)
         return
-    bundle.create_patch(jdk, 'x86_64-win32', options)
+    bundle.create_patch(jdk, 'x86_64-win32', options, project_jar)
     base_revision = json.loads(Path(options.patch_base).read_text())['metadata']['revision']
     verify_patch(ROOT / 'editor/target/editor' / f"Defold-x86_64-win32-patch-{base_revision}-to-{metadata['revision']}.zip", jdk)
 

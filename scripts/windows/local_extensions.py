@@ -70,6 +70,11 @@ def sdk_revision(home):
     return revision
 
 
+def sdk_file_stamp(home):
+    paths = (home / 'share/java/bob.jar', home / 'bin' / PLATFORM / engine_filename())
+    return [(stamp.st_mtime_ns, stamp.st_size, stamp.st_ino) for stamp in map(Path.stat, paths)]
+
+
 def check_engine_libraries(home, binary_dir):
     # The version and SDK identity live in these linked libraries, not in
     # engine_main.cpp's (unused) generated version constants.
@@ -212,6 +217,7 @@ class Builder:
         self.work.mkdir(parents=True, exist_ok=True)
         self.build_dir = ROOT / 'engine/build' / PLATFORM
         self.cmake = configured_cmake(self.build_dir)
+        self.sdk_stamp = sdk_file_stamp(self.home)
         self.sdk = sdk_revision(self.home)
         self.engine_hash = file_hash(self.home / 'bin' / PLATFORM / engine_filename())
         self.bob_hash = file_hash(self.home / 'share/java/bob.jar')
@@ -364,7 +370,25 @@ class build_lock:
         self.stream.close()
 
 
-def create_server(builder, port=0, token=None):
+def create_server(builder, port=0, token=None, *, registered=False):
+    selection_lock = threading.Lock()
+
+    def current_builder(server):
+        current = server.builder
+        if not registered or sdk_file_stamp(current.home) == current.sdk_stamp:
+            return current
+        if any(job['status'] == 0 for job in current.jobs.values()):
+            raise ValueError('Local SDK changed while builds are pending; retry after they finish')
+        replacement = Builder(current.home, current.work)
+        try:
+            register_editor_builder(replacement, server.server_port)
+        except Exception:
+            replacement.close()
+            raise
+        replacement.jobs = current.jobs
+        current.close()
+        server.builder = replacement
+        return replacement
 
     class Handler(BaseHTTPRequestHandler):
         def reply(self, code, body, content_type='text/plain'):
@@ -391,9 +415,15 @@ def create_server(builder, port=0, token=None):
                 return
             url = urlsplit(self.path)
             if url.path == '/health':
-                self.reply(200, json.dumps({'sdk': builder.sdk, 'platform': PLATFORM, 'engine_sha256': builder.engine_hash}), 'application/json')
+                try:
+                    with selection_lock:
+                        current = current_builder(self.server)
+                        health = {'sdk': current.sdk, 'platform': PLATFORM, 'engine_sha256': current.engine_hash}
+                    self.reply(200, json.dumps(health), 'application/json')
+                except (ValueError, OSError, zipfile.BadZipFile, KeyError) as error:
+                    self.reply(503, str(error))
                 return
-            job = builder.jobs.get(parse_qs(url.query).get('jobId', [''])[0])
+            job = self.server.builder.jobs.get(parse_qs(url.query).get('jobId', [''])[0])
             if job is None:
                 self.reply(404, 'Unknown local job')
             elif url.path == '/job_status':
@@ -417,20 +447,24 @@ def create_server(builder, port=0, token=None):
                     # existing content-addressed engine cache still avoids rebuilds.
                     self.reply(404, 'Source cache disabled')
                     return
-                if self.path != '/build_async/' + PLATFORM.replace('-macos','-osx') + '/' + builder.sdk:
-                    self.reply(501, 'Local builder requires Windows debug SDK ' + builder.sdk)
-                    return
-                message = BytesParser(policy=policy.default).parsebytes(
-                    ('Content-Type: ' + self.headers.get('Content-Type', '') + '\r\n\r\n').encode() + data)
-                archives = [part.get_payload(decode=True) for part in message.iter_parts()
-                            if part.get_filename() == '__source_code__.zip']
-                if len(archives) != 1:
-                    raise ValueError('Expected one source archive')
-                self.reply(200, builder.submit(archives[0]))
-            except (ValueError, OSError) as error:
+                with selection_lock:
+                    current = current_builder(self.server)
+                    if self.path != '/build_async/' + PLATFORM.replace('-macos','-osx') + '/' + current.sdk:
+                        self.reply(501, 'Local builder requires debug SDK ' + current.sdk)
+                        return
+                    message = BytesParser(policy=policy.default).parsebytes(
+                        ('Content-Type: ' + self.headers.get('Content-Type', '') + '\r\n\r\n').encode() + data)
+                    archives = [part.get_payload(decode=True) for part in message.iter_parts()
+                                if part.get_filename() == '__source_code__.zip']
+                    if len(archives) != 1:
+                        raise ValueError('Expected one source archive')
+                    job = current.submit(archives[0])
+                self.reply(200, job)
+            except (ValueError, OSError, zipfile.BadZipFile, KeyError) as error:
                 self.reply(400, str(error))
 
     server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
+    server.builder = builder
     server.daemon_threads = True
     return server
 
@@ -462,7 +496,7 @@ def register_editor_builder(builder, port):
 
 def serve(engine_home, work, port):
     builder = Builder(engine_home, work)
-    server = create_server(builder, port)
+    server = create_server(builder, port, registered=True)
     try:
         register_editor_builder(builder, server.server_port)
         print(json.dumps({'url': 'http://127.0.0.1:' + str(server.server_port), 'sdk': builder.sdk,
@@ -470,4 +504,4 @@ def serve(engine_home, work, port):
         server.serve_forever()
     finally:
         server.server_close()
-        builder.close()
+        server.builder.close()

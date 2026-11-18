@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 132,
-  "version": "1.14.2-patch.132",
+  "revision": 135,
+  "version": "1.14.2-patch.135",
   "repository": "iricwang/defold",
-  "notes": "Sync official dev through 158906302d; rebuild matching Bob, resource protocols and native tools; preserve Spine, AI Canvas, Remote and RectTransform workflows."
+  "notes": "Windows: recover native extension builds after an in-place local SDK upgrade."
 }

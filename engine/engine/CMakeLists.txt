@@ -553,7 +553,11 @@ set(DEFOLD_LOCAL_EXTENSION_CONFIG "" CACHE FILEPATH "Generated local extension t
 if(DEFOLD_LOCAL_EXTENSION_CONFIG)
   include("${DEFOLD_LOCAL_EXTENSION_CONFIG}")
   set(_local_exports "${CMAKE_CURRENT_BINARY_DIR}/__exported_symbols_dmengine_local.cpp")
-  defold_create_exported_symbols_file("${_local_exports}" "${ENGINE_DMENGINE_SYMBOLS};${DEFOLD_LOCAL_EXTENSION_SYMBOLS}")
+  # Built-in and local extension registrations can share a symbol.
+  # Registering a resource descriptor twice creates a cycle in its linked list.
+  set(_local_symbols ${ENGINE_DMENGINE_SYMBOLS} ${DEFOLD_LOCAL_EXTENSION_SYMBOLS})
+  list(REMOVE_DUPLICATES _local_symbols)
+  defold_create_exported_symbols_file("${_local_exports}" "${_local_symbols}")
   engine_add_binary(dmengine_local ${ENGINE_MAIN_SOURCES} "${_local_exports}")
   set_target_properties(dmengine_local PROPERTIES EXCLUDE_FROM_ALL TRUE)
   engine_configure_executable(dmengine_local debug engine engine_service graphics "${ENGINE_PROFILE_LIBS}" "${ENGINE_PROFILE_SYMBOLS}")
