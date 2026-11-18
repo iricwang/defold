@@ -28,7 +28,7 @@
            [javafx.scene.layout BorderPane HBox Priority StackPane VBox]
            [javafx.scene.paint Color]
            [javafx.scene.shape Rectangle]
-           [javafx.stage Screen Stage]))
+           [javafx.stage Screen Stage WindowEvent]))
 
 (set! *warn-on-reflection* true)
 
@@ -488,25 +488,56 @@
   (doseq [[_ {:keys [^BorderPane host]}] @windows]
     (clear-content! (.getCenter host))
     (.setCenter host nil))
-  (doseq [[id {:keys [tree ^BorderPane host ^Stage stage drag-home]}] @windows]
+  (doseq [[id {:keys [tree ^BorderPane host ^Stage stage drag-home dispose!]}] @windows]
     (if (or tree drag-home)
-      (.setCenter host (build-node (cond-> manager drag-home (assoc :reserved-bodies {(:id drag-home) (:placeholder drag-home)}))
-                                  (or (:tree drag-home) tree)))
-      (do (swap! windows dissoc id) (.hide stage)))))
+      (let [panel (get @(:panels manager) (first (:tabs tree)))]
+        (.setCenter host (if (:window-only panel)
+                           (:body panel)
+                           (build-node (cond-> manager drag-home (assoc :reserved-bodies {(:id drag-home) (:placeholder drag-home)}))
+                                       (or (:tree drag-home) tree)))))
+      (do
+        (swap! windows dissoc id)
+        (when dispose! (dispose!))
+        (.hide stage)))))
+
+(defn- show-window! [{:keys [windows panels ^Scene scene] :as manager} id]
+  (let [^Stage stage (or (:stage (coll/first-where #(contains? (set (panel-ids (:tree %))) id) (coll/vals @windows)))
+                         (let [owner (.getWindow scene)]
+                           (float-panel! manager id (+ 32.0 (.getX owner)) (+ 32.0 (.getY owner)))))]
+    ((:home-visible! (get @panels id)) false)
+    (.setIconified stage false)
+    (.show stage)
+    (when-not (.isMaximized stage)
+      (let [screens (mapv (fn [^Screen screen]
+                            (let [bounds (.getVisualBounds screen)]
+                              {:x (.getMinX bounds) :y (.getMinY bounds)
+                               :width (.getWidth bounds) :height (.getHeight bounds)})) (Screen/getScreens))
+            {:keys [x y width height]} (fit-window-bounds {:x (.getX stage) :y (.getY stage)
+                                                           :width (.getWidth stage) :height (.getHeight stage)} screens)]
+        (.setX stage x)
+        (.setY stage y)
+        (.setWidth stage width)
+        (.setHeight stage height)))
+    (.toFront stage)
+    (.requestFocus stage)
+    stage))
 
 (defn restore! [{:keys [panels windows] :as manager} id]
-  (let [{:keys [^StackPane slot ^Node body floating! floating home-visible!]} (@panels id)]
-    (capture! manager)
-    (swap! windows (fn [entries]
-                     (into {} (map (fn [[key entry]] [key (update entry :tree remove-panel id)])) entries)))
-    (render! manager)
-    (.setAll (.getChildren slot) ^java.util.Collection (vector body))
-    (swap! panels assoc-in [id :floating] false)
-    (when floating (home-visible! true))
-    (when (and floating floating!) (floating! false))))
+  (if (:window-only (get @panels id))
+    (show-window! manager id)
+    (let [{:keys [^StackPane slot ^Node body floating! floating home-visible!]} (@panels id)]
+      (capture! manager)
+      (swap! windows (fn [entries]
+                       (coll/into-> entries {}
+                         (map (fn [[key entry]] [key (update entry :tree remove-panel id)])))))
+      (render! manager)
+      (.setAll (.getChildren slot) ^java.util.Collection (vector body))
+      (swap! panels assoc-in [id :floating] false)
+      (when floating (home-visible! true))
+      (when (and floating floating!) (floating! false)))))
 
 (defn float-panel! [{:keys [^Scene scene panels windows persistence] :as manager} id x y]
-  (let [{:keys [^StackPane slot title title-property floating! floating home-visible!]} (@panels id)
+  (let [{:keys [^StackPane slot title title-property floating! floating home-visible! window-only]} (@panels id)
         localization (ui/user-data scene :localization)
         host (BorderPane.)
         indicator (doto (Rectangle.)
@@ -514,18 +545,22 @@
                     (.setVisible false) (.setFill (Color/web "#4b9fe1" 0.12))
                     (.setStroke (Color/web "#4b9fe1")) (.setStrokeWidth 2.0))
         root (doto (StackPane. (into-array Node [host indicator])) (.setId "main-window"))
-        width (max 320.0 (.getWidth (.getLayoutBounds ^Node (:body (@panels id)))))
-        height (max 200.0 (.getHeight (.getLayoutBounds ^Node (:body (@panels id)))))
+        width (max (if window-only 1100.0 320.0) (.getWidth (.getLayoutBounds ^Node (:body (@panels id)))))
+        height (max (if window-only 720.0 200.0) (.getHeight (.getLayoutBounds ^Node (:body (@panels id)))))
         floating-scene (Scene. root width height)
+        project-window (.getWindow scene)
         stage (doto (ui/make-stage)
-                (.initOwner (.getWindow scene))
                 (.setTitle title)
                 (.setScene floating-scene)
-                (.setMinWidth 320.0)
-                (.setMinHeight 200.0)
+                (.setMinWidth (if window-only 900.0 320.0))
+                (.setMinHeight (if window-only 600.0 200.0))
                 (.setX (double x))
                 (.setY (double y)))
-        window-id (random-uuid)]
+        window-id (random-uuid)
+        project-hidden (when window-only (ui/event-handler _ (.hide stage)))]
+    ;; Owned windows lack native minimize controls on Windows.
+    (when-not window-only
+      (.initOwner stage project-window))
     (when title-property
       (.bind (.titleProperty stage) ^javafx.beans.value.ObservableValue title-property))
     (when-not (:restoring @persistence) (capture! manager))
@@ -538,12 +573,21 @@
     (.remove (.getChildren slot) ^Object (:body (@panels id)))
     (swap! windows (fn [entries]
                      (into {} (map (fn [[key entry]] [key (update entry :tree remove-panel id)])) entries)))
-    (swap! windows assoc window-id {:tree {:tabs [id]} :stage stage :host host :indicator indicator})
+    (when project-hidden
+      (.addEventHandler project-window WindowEvent/WINDOW_HIDDEN project-hidden))
+    (swap! windows assoc window-id
+           {:tree {:tabs [id]} :stage stage :host host :indicator indicator
+            :dispose! (when project-hidden
+                        (fn detach-project-window-listener []
+                          (.removeEventHandler project-window WindowEvent/WINDOW_HIDDEN project-hidden)))})
     (.setOnCloseRequest stage
-      (ui/event-handler event
-        (.consume event)
-        (doseq [panel (panel-ids (get-in @windows [window-id :tree]))]
-          (restore! manager panel))))
+                        (ui/event-handler event
+                          (.consume event)
+                          ;; Hiding retains drafts and running work.
+                          (if window-only
+                            (.hide stage)
+                            (doseq [panel (panel-ids (get-in @windows [window-id :tree]))]
+                              (restore! manager panel)))))
     (install-scene-drag! manager floating-scene)
     (ui/observe (.focusOwnerProperty floating-scene)
                 (fn [_ _ node]
@@ -569,23 +613,23 @@
 
 (defn register!
   "Register a stable home slot. Its body is moved, never copied; dispose before deleting the view."
-  [^StackPane slot title {:keys [focus! floating! menu-items title-property home-visible! reserve-home! release-home! bottom persistent-key drag-handle tab]}]
+  [^StackPane slot title {:keys [focus! floating! menu-items title-property home-visible! reserve-home! release-home! bottom persistent-key drag-handle tab window-only]}]
   (let [manager (manager (ui/main-scene))
         id (random-uuid)
         body (doto (StackPane.) (.setMinSize 0.0 0.0))
         children (vec (.getChildren slot))
-        button (when-not menu-items
+        button (when-not (or menu-items window-only)
                  (doto (MenuButton. "…")
-                 (.setId "dock-panel-menu")
-                 (.setFocusTraversable false)
-                 (.setMinSize 24.0 24.0)
-                 (.setPrefSize 24.0 24.0)
-                 (.setMaxSize 24.0 24.0)
-                 (.setStyle "-fx-min-width: 24px; -fx-pref-width: 24px; -fx-max-width: 24px; -fx-min-height: 24px; -fx-pref-height: 24px; -fx-max-height: 24px; -fx-padding: 0;")
-                 (.setTooltip (doto (Tooltip.)
-                                (localization/localize! (ui/user-data (:scene manager) :localization) (localization/message "dock.float"))))))
+                   (.setId "dock-panel-menu")
+                   (.setFocusTraversable false)
+                   (.setMinSize 24.0 24.0)
+                   (.setPrefSize 24.0 24.0)
+                   (.setMaxSize 24.0 24.0)
+                   (.setStyle "-fx-min-width: 24px; -fx-pref-width: 24px; -fx-max-width: 24px; -fx-min-height: 24px; -fx-pref-height: 24px; -fx-max-height: 24px; -fx-padding: 0;")
+                   (.setTooltip (doto (Tooltip.)
+                                  (localization/localize! (ui/user-data (:scene manager) :localization) (localization/message "dock.float"))))))
         item (doto (MenuItem.) (.setId "dock-float-panel"))
-        menu-items (or menu-items (.getItems ^MenuButton button))
+        menu-items (or menu-items (when button (.getItems ^MenuButton button)))
         localization (ui/user-data (:scene manager) :localization)
         raw-home-visible! (or home-visible! #(set-home-visible! slot %))
         placeholder (doto (Label. (str title "\n" (localization (localization/message "dock.return"))))
@@ -616,6 +660,7 @@
                         (raw-home-visible! (or visible @generic-reserved)))
         dispose! (fn []
                    (when (= id (:id @(:drag manager))) (cancel-gesture! manager))
+                   (swap! (:panels manager) update id dissoc :window-only)
                    (restore! manager id)
                    (swap! (:panels manager) dissoc id))]
     (.clear (.getChildren slot))
@@ -632,27 +677,29 @@
     (when button
       (.add (.getChildren body) button)
       (StackPane/setAlignment button (if bottom Pos/BOTTOM_RIGHT Pos/TOP_RIGHT)))
-    (.add ^java.util.List menu-items item)
-    (.add ^java.util.List menu-items (layout-menu (:scene manager)))
+    (when menu-items
+      (.add ^java.util.List menu-items item)
+      (.add ^java.util.List menu-items (layout-menu (:scene manager))))
     (localization/localize! item localization (localization/message "dock.float"))
     (ui/user-data! body ::focus! focus!)
     (when focus!
       (.addEventFilter body MouseEvent/MOUSE_PRESSED (ui/event-handler _ (focus!))))
-    (swap! (:panels manager) assoc id {:body body :slot slot :title title :title-property title-property :persistent-key persistent-key :tab tab
-                                     :floating! (fn [floating]
-                                                  (localization/localize! item localization (localization/message (if floating "dock.return" "dock.float")))
-                                                  (when floating! (floating! floating)))
-                                     :reserve-home! reserve-home! :release-home! release-home!
-                                     :home-visible! home-visible!})
+    (swap! (:panels manager) assoc id {:body body :slot slot :title title :title-property title-property :persistent-key (when-not window-only persistent-key) :tab tab :window-only window-only
+                                       :floating! (fn [floating]
+                                                    (localization/localize! item localization (localization/message (if floating "dock.return" "dock.float")))
+                                                    (when floating! (floating! floating)))
+                                       :reserve-home! reserve-home! :release-home! release-home!
+                                       :home-visible! home-visible!})
     (.setOnAction item
-      (ui/event-handler _
-        (if (:floating (@(:panels manager) id))
-          (restore! manager id)
-          (let [point (.localToScreen body 20.0 20.0)]
-            (float-panel! manager id (.getX point) (.getY point))))))
+                  (ui/event-handler _
+                    (if (:floating (@(:panels manager) id))
+                      (restore! manager id)
+                      (let [point (.localToScreen body 20.0 20.0)]
+                        (float-panel! manager id (.getX point) (.getY point))))))
     (ui/user-data! slot ::dispose! dispose!)
-    (ui/user-data! slot ::start-drag! #(start-drag! manager id %1 %2))
-    (when drag-handle
+    (when-not window-only
+      (ui/user-data! slot ::start-drag! #(start-drag! manager id %1 %2)))
+    (when (and drag-handle (not window-only))
       (.addEventFilter ^Node drag-handle MouseEvent/MOUSE_PRESSED
         (ui/event-handler event
           (when (and (.isPrimaryButtonDown ^MouseEvent event)
@@ -661,10 +708,14 @@
                                                        (instance? javafx.scene.control.ComboBoxBase %)
                                                        (instance? javafx.scene.control.TextInputControl %)) (.getTarget event))))
             (start-drag! manager id (.getScreenX ^MouseEvent event) (.getScreenY ^MouseEvent event))))))
-    (ui/user-data! slot ::float! #(float-panel! manager id %1 %2))
+    (ui/user-data! slot ::float! (if window-only
+                                   (fn show-dedicated-window [_x _y] (show-window! manager id))
+                                   #(float-panel! manager id %1 %2)))
+    (when window-only
+      (ui/user-data! slot ::show-window! #(show-window! manager id)))
     (ui/user-data! slot ::restore! #(when (and (not (:restoring @(:persistence manager)))
-                                            (:floating (@(:panels manager) id)))
-                                    (restore! manager id)))
+                                               (or window-only (:floating (@(:panels manager) id))))
+                                      (restore! manager id)))
     {:dispose! dispose!
      :visible? #(not (ui/inside-hidden-tab? body))}))
 
@@ -673,8 +724,12 @@
     (restore!))
   (when-let [manager (ui/user-data scene ::manager)]
     (cancel-gesture! manager)
-    (doseq [[id {:keys [floating]}] @(:panels manager)]
-      (when floating (restore! manager id)))))
+    (doseq [[id {:keys [floating window-only]}] @(:panels manager)]
+      (when (and floating (not window-only)) (restore! manager id)))))
+
+(defn show-slot-window! [slot]
+  (when-let [show! (ui/user-data slot ::show-window!)]
+    (show!)))
 
 (defn restore-slot! [slot]
   (when-let [restore! (ui/user-data slot ::restore!)] (restore!)))

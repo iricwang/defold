@@ -363,7 +363,6 @@
         gap (javafx.scene.layout.Region.)
         buttons (atom [])
         select! (fn select-section [section]
-                  (ui/visible! tree (= "resources" section))
                   (if (= "settings" section)
                     (open! {:path roles/document-path})
                     (open! {:overview true :preserve true :section section})))
@@ -375,7 +374,9 @@
                   (doseq [[^Button button target] @buttons]
                     (.pseudoClassStateChanged button (PseudoClass/getPseudoClass "selected") (and home-selected (= section target))))))]
     (.add (.getStyleClass sidebar) "studio-sidebar")
-    (.setMinWidth sidebar 238.0) (.setPrefWidth sidebar 238.0) (.setMaxWidth sidebar 238.0)
+    (.setMinWidth sidebar 200.0)
+    (.setPrefWidth sidebar 238.0)
+    (.setMaxWidth sidebar Double/MAX_VALUE)
     (.clear (.getChildren sidebar))
     (.setId nav "studio-navigation")
     (doseq [[text target kind] [["项目总览" "overview" :home] ["任务" "tasks" :tasks] ["阶段" "stages" :stages] ["成果" "outputs" :assets] ["成员" "staff" :people] ["资源" "resources" :resources] ["配置" "settings" :settings]]]
@@ -386,7 +387,7 @@
         (when (= target "resources")
           (.add (.getChildren nav) tree))))
     (.bind (.managedProperty tree) (.visibleProperty tree))
-    (ui/visible! tree false)
+    (ui/visible! tree true)
     (.setMinHeight tree 0.0)
     (.bind (.prefHeightProperty tree) (.add (.multiply (.expandedItemCountProperty tree) 30.0) 4.0))
     (.setMaxHeight tree javafx.scene.layout.Region/USE_PREF_SIZE)
@@ -434,7 +435,7 @@
 (defn make-view! [^AnchorPane parent root initial-context resource-types make-content!]
   (let [tabs (doto (TabPane.) (.setId "ai-document-tabs") (.setTabClosingPolicy TabPane$TabClosingPolicy/ALL_TABS))
         status (Label.)
-        split (SplitPane.)
+        split (doto (SplitPane.) (.setId "ai-workspace-split"))
         pane (VBox.)
         documents (atom {})
         browser (atom nil)

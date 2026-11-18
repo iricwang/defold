@@ -378,7 +378,7 @@
           ((:close! workspace))))
       (finally (fs/delete-directory! root)))))
 ;; The studio navigation must keep the same browser and document tabs while
-;; switching dashboard sections; resources expose the resident file tree.
+;; switching dashboard sections; the file tree stays visible on every page.
 (deftest studio-navigation-keeps-workspace-test
   (let [root (.toFile (Files/createTempDirectory "ai-studio-navigation" (make-array java.nio.file.attribute.FileAttribute 0)))]
     (try
@@ -391,19 +391,23 @@
               ^TreeView tree (.lookup pane "#ai-project-tree")
               original-root (.getRoot tree)]
           (try
-            (is (not (.isManaged tree)))
+            (is (.isManaged tree))
             ((:open! view) {:path "/notes.md"})
             (let [doc-tab (ui/selected-tab tabs)]
               (doseq [id ["studio-nav-tasks" "studio-nav-stages" "studio-nav-outputs" "studio-nav-staff"]]
                 (.fire ^Button (.lookup pane (str "#" id)))
+                (is (.isVisible tree))
+                (is (.isManaged tree))
                 (is (= "ai-overview-tab" (.getId (ui/selected-tab tabs))))
                 (is (= 2 (count (.getTabs tabs)))))
               (.fire ^Button (.lookup pane "#studio-nav-resources"))
               (is (.isManaged tree))
               (is (identical? original-root (.getRoot tree)))
               (.fire ^Button (.lookup pane "#ai-project-home"))
-              (is (not (.isManaged tree)))
+              (is (.isManaged tree))
               (.select (.getSelectionModel tabs) doc-tab)
+              (is (.isVisible tree))
+              (is (identical? original-root (.getRoot tree)))
               (is (not (.contains (.getPseudoClassStates tabs) (javafx.css.PseudoClass/getPseudoClass "studio-home"))))
               (.setText ^TextField (.lookup pane "#studio-search") "装备")
               (is (= "ai-overview-tab" (.getId (ui/selected-tab tabs))))

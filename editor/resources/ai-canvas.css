@@ -345,6 +345,7 @@ specific language governing permissions and limitations under the License.
 .ai-studio .scroll-bar .increment-button, .ai-studio .scroll-bar .decrement-button { -fx-padding: 0; }
 .ai-studio .split-pane { -fx-background-color: transparent; -fx-padding: 0; }
 .ai-studio .split-pane > .split-pane-divider { -fx-padding: 0 0.5; -fx-background-color: #2b2e36; }
+.ai-studio #ai-workspace-split > .split-pane-divider { -fx-padding: 0 3; -fx-cursor: h_resize; }
 .ai-studio .tab-pane > .tab-header-area > .tab-header-background { -fx-background-color: #1c1e24; }
 .ai-studio .tab-pane > .tab-header-area .tab { -fx-background-color: #242830; -fx-background-radius: 7 7 0 0; }
 .ai-studio .tab-pane > .tab-header-area .tab:selected { -fx-background-color: #303745; }

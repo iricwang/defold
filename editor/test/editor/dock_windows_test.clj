@@ -22,10 +22,63 @@
             [integration.test-util :as test-util])
   (:import [javafx.event Event]
            [javafx.scene Node Scene]
-           [javafx.scene.control Button Label MenuBar SplitPane TabPane]
+           [javafx.scene.control Button Label MenuBar SplitPane TabPane TextArea]
            [javafx.scene.input MouseButton MouseEvent PickResult]
            [javafx.scene.layout BorderPane HBox Priority StackPane VBox]
-           [javafx.stage Stage]))
+           [javafx.stage Stage WindowEvent]))
+
+;; A dedicated workspace cannot dock back or lose drafts when its window closes;
+;; minimizing preserves drafts, and closing the project hides its workspace.
+(deftest window-only-workspace-test
+  (ui/run-now
+    (let [preferences (test-util/make-test-prefs)
+          content (TextArea. "unsaved draft")
+          slot (StackPane. (into-array Node [content]))
+          root (doto (StackPane. (into-array Node [slot])) (.setId "workbench"))
+          scene (Scene. root 1000.0 700.0)
+          owner (doto (Stage.) (.setScene scene))
+          previous-main-stage (ui/main-stage)]
+      (ui/user-data! scene :localization (localization/make-editor preferences #(throw %)))
+      (try
+        (.show owner)
+        (ui/set-main-stage owner)
+        (let [{:keys [dispose!]} (dock/register! slot "AI Canvas" {:window-only true :persistent-key [:view "ai"]})
+              manager (ui/user-data scene :editor.dock-windows/manager)]
+          (try
+            (let [^Stage stage (dock/show-slot-window! slot)
+                  body (.getParent content)
+                  panel (val (first @(:panels manager)))]
+              (is (not (identical? scene (.getScene content))))
+              (is (nil? (.getOwner stage)))
+              (.setIconified stage true)
+              (is (.isIconified stage))
+              (is (identical? stage (dock/show-slot-window! slot)))
+              (is (not (.isIconified stage)))
+              (is (= "unsaved draft" (.getText content)))
+              (is (nil? (:persistent-key panel)))
+              (is (nil? (ui/user-data slot :editor.dock-windows/start-drag!)))
+              (is (nil? (.lookup body "#dock-panel-menu")))
+              (is (zero? (count (.lookupAll (.getRoot (.getScene stage)) ".floating-dock-group"))))
+              (dock/restore-slot! slot)
+              (dock/restore-all! scene)
+              (is (identical? stage (dock/float-slot! slot 40.0 40.0)))
+              (is (identical? (.getScene stage) (.getScene content)))
+              (is (zero? (count (.getChildren slot))))
+              (Event/fireEvent stage (WindowEvent. stage WindowEvent/WINDOW_CLOSE_REQUEST))
+              (is (not (.isShowing stage)))
+              (is (= "unsaved draft" (.getText content)))
+              (is (identical? stage (dock/show-slot-window! slot)))
+              (is (.isShowing stage))
+              (is (= 1 (count @(:windows manager))))
+              (is (identical? body (.getParent content)))
+              (.hide owner)
+              (is (not (.isShowing stage))))
+            (finally (dispose!)))
+          (is (zero? (count @(:windows manager))))
+          (is (zero? (count @(:panels manager)))))
+        (finally
+          (.hide owner)
+          (ui/set-main-stage previous-main-stage))))))
 
 (defn- click-header! [^Node node button clicks]
   (let [point (.localToScene node 4.0 4.0)]
@@ -134,6 +187,7 @@
               stage ^javafx.stage.Stage (:stage window)
               group ^javafx.scene.control.TabPane (.getCenter ^javafx.scene.layout.BorderPane (:host window))
               label ^javafx.scene.control.Label (.getGraphic (.get (.getTabs group) 0))]
+          (is (identical? owner (.getOwner stage)))
           (.set title "Game · screen.gui")
           (is (= "Game · screen.gui" (.getTitle stage)))
           (is (= "Game · screen.gui" (.getText label)))
@@ -273,7 +327,6 @@
       (is (not (docking/floating-zone? scene :bottom)))
       (swap! floating conj :preview)
       (is (docking/floating-zone? scene :right)))))
-
 
 ;; Named layouts are project scoped, trim names, overwrite intentionally, and retain docked arrangements.
 (deftest named-layout-library-test

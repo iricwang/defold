@@ -2742,10 +2742,12 @@
     `:on-closed-fn` - optional, (fn [view-node-id]) called when the tab closes,
                       before the view node is disposed
 
+  `:window-only` keeps the view in a dedicated window without docking.
+
   `opts` is passed on to `:make-view-fn` with the AppView and the Tab added."
   [app-view localization ^ObservableList tabs tab-spec opts]
   (let [{:keys [icon instance-key style-classes title tooltip view-type
-                connect-view-fn make-view-fn on-closed-fn wrap-content-fn]} tab-spec
+                connect-view-fn make-view-fn on-closed-fn wrap-content-fn window-only]} tab-spec
         parent (AnchorPane.)
         tab (doto (Tab.)
               (localization/localize! localization title)
@@ -2806,6 +2808,7 @@
                                                         :focus! focus-view!
                                                         :floating! #(.set (editor-tab/floating-property tab) %)
                                                         :tab tab
+                                                        :window-only window-only
                                                         :bottom true
                                                         :home-visible! #(dock-windows/set-tab-empty! tab (not %))})]
         (ui/on-closed! tab (fn [_] (dispose!)))))
@@ -2964,9 +2967,12 @@
         tab (or existing-tab
                 (let [^TabPane tab-pane (g/node-value app-view :active-tab-pane)]
                   (make-editor-tab! app-view localization (.getTabs tab-pane) tab-spec opts)))]
-    (select-editor-tab! tab opts)
+    (when-not (:window-only tab-spec)
+      (select-editor-tab! tab opts))
     (when-let [on-open-fn (:on-open-fn tab-spec)]
       (on-open-fn tab opts))
+    (when (:window-only tab-spec)
+      (dock-windows/show-slot-window! (.getContent ^Tab tab)))
     tab))
 
 (defn make-open-resource-plan

@@ -1668,6 +1668,7 @@
 (editor-tab/register-type! ::chat
   {:make-tab-spec-fn (fn tab-spec [{:keys [root]}]
                        {:instance-key [::chat (.getCanonicalPath (io/file root))]
+                        :window-only true
                         :title "AI Canvas"
                         :tooltip "Person → Action → Result → Assets · Companion / Codex"
                         :on-open-fn (fn open-workspace-document [tab opts]
