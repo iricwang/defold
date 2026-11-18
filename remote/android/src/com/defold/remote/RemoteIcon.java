@@ -35,6 +35,8 @@ final class RemoteIcon extends View {
         super.onDraw(canvas);canvas.save();float scale=Math.min(getWidth(),getHeight())/24f;
         canvas.translate((getWidth()-24*scale)/2,(getHeight()-24*scale)/2);canvas.scale(scale,scale);
         switch(kind){
+        case "wifi":canvas.drawArc(1,4,23,26,225,90,false,paint);canvas.drawArc(5,9,19,23,225,90,false,paint);canvas.drawArc(9,14,15,20,225,90,false,paint);canvas.drawCircle(12,20,0.7f,paint);break;
+        case "cloud":Path cloud=new Path();cloud.moveTo(7,18);cloud.cubicTo(1,18,1,10,6,10);cloud.cubicTo(6,2,18,2,18,10);cloud.cubicTo(24,10,24,18,18,18);cloud.close();canvas.drawPath(cloud,paint);break;
         case "plus":line(canvas,12,5,12,19);line(canvas,5,12,19,12);break;
         case "game":Path game=new Path();game.moveTo(6,7);game.lineTo(18,7);game.lineTo(22,18);game.lineTo(18,20);game.lineTo(14,16);game.lineTo(10,16);game.lineTo(6,20);game.lineTo(2,18);game.close();canvas.drawPath(game,paint);line(canvas,7,10,7,15);line(canvas,4.5f,12.5f,9.5f,12.5f);canvas.drawCircle(16,11,0.7f,paint);canvas.drawCircle(18,14,0.7f,paint);break;
         case "layers":Path layers=new Path();layers.moveTo(12,3);layers.lineTo(2,8);layers.lineTo(12,13);layers.lineTo(22,8);layers.close();canvas.drawPath(layers,paint);line(canvas,2,12,12,17);line(canvas,12,17,22,12);line(canvas,2,16,12,21);line(canvas,12,21,22,16);break;

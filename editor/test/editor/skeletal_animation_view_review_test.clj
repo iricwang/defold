@@ -38,7 +38,7 @@
       (data/set-deform-keyframe "default" "mesh" 0.0 [1.0 2.0 3.0 4.0 5.0 6.0] "linear")))
 
 (defn- context [doc]
-  {:state (atom {:draft doc :mode "setup" :selected-kind :slot :selected "mesh"
+  {:state (atom {:draft doc :mode "setup" :time 0.0 :selected-kind :slot :selected "mesh"
                  :vertices #{2} :vertex 2 :selected-keys #{{:type :deform :id "mesh" :time 0.0}}})
    :localization (constantly "setup-only")})
 
@@ -70,12 +70,12 @@
         changed (data/update-bone doc "root" {:x 17.0})]
     (with-redefs-fn
       {#'g/node-value (fn [_ _] (:draft @(:state context)))
-         #'view/attempt! (fn [_ operation] (operation))
+       #'view/attempt! (fn [_ operation] (operation))
        #'view/background-io! (fn [_ work complete]
-                              (swap! jobs inc)
-                              (let [result (work)]
-                                (swap! (:state context) assoc :draft changed)
-                                (complete result)))
+                               (swap! jobs inc)
+                               (let [result (work)]
+                                 (swap! (:state context) assoc :draft changed)
+                                 (complete result)))
        #'view/commit! (fn [_ updated] (swap! commits conj updated))}
       #(do
          (is (thrown-with-msg? clojure.lang.ExceptionInfo #"document changed" (#'view/rebuild-mesh! context :generate)))
@@ -91,7 +91,7 @@
         doc (-> doc
                 (data/set-deform-keyframe "default" "mesh" 1.0 [900.0 500.0 700.0 400.0 500.0 300.0] "linear")
                 (data/set-deform-keyframe "default" "mesh" 0.0 [0.0 0.0 0.0 0.0 0.0 0.0]
-                                         {:type "bezier" :curve [0.1 0.8 0.9 0.2]}))
+                                          {:type "bezier" :curve [0.1 0.8 0.9 0.2]}))
         source (json/read-str (data/export-spine-json doc))
         alternate (assoc (get-in source ["skins" 0 "attachments" "mesh" "mesh"]) "path" "alternate")
         source (-> source
@@ -110,7 +110,7 @@
   (let [sampled (slots/sample-slots doc "default" (:time @(:state context)))
         context (assoc context :sampled-slots sampled :sampled-deforms (:deforms sampled))]
     (#'view/attachment-points context doc (first (:slots sampled))
-                             (:transforms (data/evaluate-pose doc "default" (:time @(:state context)))))))
+                              (:transforms (data/evaluate-pose doc "default" (:time @(:state context)))))))
 
 (defn- near? [expected actual]
   (and (= (count expected) (count actual))
@@ -120,13 +120,15 @@
 ;; playback switches attachments or selection changes, including a same-name bone.
 (deftest stale-attachment-inspector-commit-test
   (let [doc (preview-fixture true)
-        context (assoc (preview-context doc) :attachment-edit-slot "mesh")
+        context (assoc (preview-context doc)
+                  :attachment-edit-slot "mesh"
+                  :attachment-edit-key (:preview-attachment-key (first (:slots (slots/sample-slots doc "default" 0.233)))))
         commits (atom [])
         invoked (atom 0)
         change #(do (swap! invoked inc) (data/update-slot % "mesh" {:attachment {:width 81.0}}))]
     (with-redefs-fn
       {#'g/node-value (fn [_ _] (:draft @(:state context)))
-         #'view/attempt! (fn [_ operation] (operation))
+       #'view/attempt! (fn [_ operation] (operation))
        #'view/commit! (fn [_ updated] (swap! commits conj updated))}
       #(do
          (swap! (:state context) assoc :time 0.8)
@@ -172,8 +174,8 @@
       (is (= 1 (count @commits)))
       (is (near? before (preview-points context (first @commits)))))))
 
-;; Exercise the actual retained slot-name control, not only the shared guard:
-;; renaming must not bypass read-only checks or steal selection after rejection.
+;; Exercise the nested setup slot-name control retained across a mode or selection
+;; change: renaming must reject stale callbacks without stealing selection.
 (deftest stale-slot-name-control-test
   (ui/run-now
     (let [doc (-> (preview-fixture false)
@@ -181,8 +183,9 @@
                              #(-> % (assoc :type "region") (dissoc :vertices :uvs :triangles :weights)))
                   (update :animations #(mapv (fn [animation] (assoc animation :deforms [])) %)))
           context (preview-context doc)
-          ^TextField field (coll/first-where #(= "skeletal-slot-name" (.getId ^Node %))
-                                             (#'view/entity-inspector context doc))
+          _ (swap! (:state context) assoc :mode "setup")
+          controls (#'view/entity-inspector context doc)
+          ^TextField field (coll/first-where some? (mapv #(.lookup ^Node % "#skeletal-slot-name") controls))
           commits (atom [])]
       (is (some? field))
       (.setText field "renamed")
@@ -191,11 +194,11 @@
          #'view/attempt! (fn [_ operation] (operation))
          #'view/commit! (fn [_ updated] (swap! commits conj updated))}
         #(let [activate (fn [] (.handle (.getOnAction field) (ActionEvent. field field)))]
-           (swap! (:state context) assoc :time 0.8)
+           (swap! (:state context) assoc :mode "animate" :time 0.8)
            (is (thrown? clojure.lang.ExceptionInfo (activate)))
            (is (= [] @commits))
            (is (= "mesh" (:selected @(:state context))))
-           (swap! (:state context) assoc :time 0.233 :selected-kind :bone :selected "root")
+           (swap! (:state context) assoc :mode "setup" :time 0.233 :selected-kind :bone :selected "root")
            (is (thrown? clojure.lang.ExceptionInfo (activate)))
            (is (= :bone (:selected-kind @(:state context))))
            (is (= "root" (:selected @(:state context))))

@@ -89,7 +89,8 @@ public class ProjectTest {
         }
     }
 
-    private final static int SERVER_PORT = 8081;
+    // Bind an isolated loopback port so other local development servers cannot receive test requests.
+    private int serverPort;
     private final static String EMAIL = "unittest@defold.com";
     private final static String AUTH = "secret-auth";
     private final static String BASIC_AUTH = "user:secret";
@@ -109,7 +110,8 @@ public class ProjectTest {
         httpServer = new Server();
 
         SocketConnector connector = new SocketConnector();
-        connector.setPort(SERVER_PORT);
+        connector.setHost("127.0.0.1");
+        connector.setPort(0);
         httpServer.addConnector(connector);
         HandlerList handlerList = new HandlerList();
         FileHandler fileHandler = new FileHandler();
@@ -119,6 +121,7 @@ public class ProjectTest {
 
         try {
             httpServer.start();
+            serverPort = connector.getLocalPort();
         } catch (Exception e) {
             throw new IOException("Unable to start http server", e);
         }
@@ -144,12 +147,13 @@ public class ProjectTest {
         String[] authEnv = selectLibraryAuthEnv();
         String basicAuthEnvToken = "user:__" + authEnv[0] + "__";
         basicAuthEnvTokenResolved = "user:" + authEnv[1];
+        initHttpServer(testLibs.getServerLocation());
         libraryUrls = new ArrayList<URI>();
-        libraryUrls.add(URI.create("http://localhost:8081/test_lib1.zip"));
-        libraryUrls.add(URI.create("http://localhost:8081/test_lib2.zip"));
-        libraryUrls.add(URI.create("http://" + BASIC_AUTH + "@localhost:8081/test_lib5.zip"));
-        libraryUrls.add(URI.create("http://" + basicAuthEnvToken + "@localhost:8081/test_lib6.zip"));
-        libraryUrls.add(URI.create("http://localhost:8081/test.zip"));
+        libraryUrls.add(URI.create("http://127.0.0.1:" + serverPort + "/test_lib1.zip"));
+        libraryUrls.add(URI.create("http://127.0.0.1:" + serverPort + "/test_lib2.zip"));
+        libraryUrls.add(URI.create("http://" + BASIC_AUTH + "@127.0.0.1:" + serverPort + "/test_lib5.zip"));
+        libraryUrls.add(URI.create("http://" + basicAuthEnvToken + "@127.0.0.1:" + serverPort + "/test_lib6.zip"));
+        libraryUrls.add(URI.create("http://127.0.0.1:" + serverPort + "/test.zip"));
 
         MockFileSystem fileSystem = new MockFileSystem();
         project = new MockProject(fileSystem, Files.createTempDirectory("defold_").toString(), "build/default");
@@ -158,7 +162,6 @@ public class ProjectTest {
         project.scan(new ClassLoaderScanner(), "com.dynamo.bob.test");
         project.setLibUrls(libraryUrls);
 
-        initHttpServer(testLibs.getServerLocation());
         System.out.print("setUp end");
     }
 
@@ -216,7 +219,7 @@ public class ProjectTest {
     @Test
     public void testResolveHandlesMixedSuccessAndFailure() throws Exception {
         var mixedLibraryUrls = new ArrayList<>(libraryUrls);
-        var missingUri = URI.create("http://localhost:8081/missing.zip");
+        var missingUri = URI.create("http://127.0.0.1:" + serverPort + "/missing.zip");
         mixedLibraryUrls.add(missingUri);
         project.setLibUrls(mixedLibraryUrls);
 
@@ -247,7 +250,7 @@ public class ProjectTest {
         assertTrue(metadataFile.exists());
         ObjectMapper mapper = new ObjectMapper();
         List<Map<String, String>> metadataDependencies = mapper.readValue(metadataFile, List.class);
-        Map<String, String> missingDependency = findDependency(metadataDependencies, "http://localhost:8081/missing.zip");
+        Map<String, String> missingDependency = findDependency(metadataDependencies, "http://127.0.0.1:" + serverPort + "/missing.zip");
         assertEquals("failed_http_request", missingDependency.get("problem"));
         assertEquals("", missingDependency.get("commit-sha1"));
         assertFalse(missingDependency.containsKey("payload-sha1"));
@@ -269,15 +272,15 @@ public class ProjectTest {
         URI progressUri = null;
         for (IProgress.Message message : reporter.messages) {
             if (message instanceof IProgress.Message.DownloadingArchive(URI uri)) {
-                if ("localhost".equals(uri.getHost()) && "/test_lib5.zip".equals(uri.getPath())) {
+                if ("127.0.0.1".equals(uri.getHost()) && "/test_lib5.zip".equals(uri.getPath())) {
                     progressUri = uri;
                     break;
                 }
             }
         }
 
-        assertEquals(new URI("http://user:secret@localhost:8081/test_lib5.zip"), originalUri);
-        assertEquals(new URI("http://localhost:8081/test_lib5.zip"), progressUri);
+        assertEquals(new URI("http://user:secret@127.0.0.1:" + serverPort + "/test_lib5.zip"), originalUri);
+        assertEquals(new URI("http://127.0.0.1:" + serverPort + "/test_lib5.zip"), progressUri);
     }
 
     @Test
@@ -289,7 +292,7 @@ public class ProjectTest {
 
         ObjectMapper mapper = new ObjectMapper();
         List<Map<String, String>> metadataDependencies = mapper.readValue(metadataFile, List.class);
-        Map<String, String> testLib1 = findDependency(metadataDependencies, "http://localhost:8081/test_lib1.zip");
+        Map<String, String> testLib1 = findDependency(metadataDependencies, "http://127.0.0.1:" + serverPort + "/test_lib1.zip");
         assertFalse(testLib1.containsKey("version"));
         assertNull(testLib1.get("zip_comment"));
         assertNull(testLib1.get("sha1"));
@@ -300,7 +303,7 @@ public class ProjectTest {
         assertNotNull(testLib1.get("payload-sha1"));
         assertTrue(testLib1.get("payload-sha1").matches("[0-9a-f]{40}"));
 
-        Map<String, String> testLib5 = findDependency(metadataDependencies, "http://localhost:8081/test_lib5.zip");
+        Map<String, String> testLib5 = findDependency(metadataDependencies, "http://127.0.0.1:" + serverPort + "/test_lib5.zip");
         assertFalse(testLib5.containsKey("version"));
         assertNull(testLib5.get("zip_comment"));
         assertNull(testLib5.get("sha1"));
@@ -313,11 +316,11 @@ public class ProjectTest {
             Map<String, Object> buildInputData = mapper.readValue(new File(buildInputOutputDir, "build_input_data.json"), Map.class);
             assertEquals(metadataDependencies, buildInputData.get("dependencies"));
             List<Map<String, String>> buildInputDependencies = (List<Map<String, String>>) buildInputData.get("dependencies");
-            Map<String, String> buildInputTestLib1 = findDependency(buildInputDependencies, "http://localhost:8081/test_lib1.zip");
+            Map<String, String> buildInputTestLib1 = findDependency(buildInputDependencies, "http://127.0.0.1:" + serverPort + "/test_lib1.zip");
             assertNull(buildInputTestLib1.get("link"));
             assertEquals("0123456789abcdef0123456789abcdef01234567", buildInputTestLib1.get("commit-sha1"));
 
-            Map<String, String> buildInputTestLib5 = findDependency(buildInputDependencies, "http://localhost:8081/test_lib5.zip");
+            Map<String, String> buildInputTestLib5 = findDependency(buildInputDependencies, "http://127.0.0.1:" + serverPort + "/test_lib5.zip");
             assertNull(buildInputTestLib5.get("link"));
             assertFalse(buildInputTestLib5.get("url").contains("secret"));
             assertEquals("", buildInputTestLib5.get("commit-sha1"));
@@ -414,7 +417,7 @@ public class ProjectTest {
     @Test
     public void testFindResourcePaths() throws Exception {
         System.out.print("testFindResourcePaths start");
-        libraryUrls.add(URI.create("http://localhost:8081/test_lib3.zip"));
+        libraryUrls.add(URI.create("http://127.0.0.1:" + serverPort + "/test_lib3.zip"));
         project.resolveLibUrls(Progress.discarding());
         project.mount(new ClassLoaderResourceScanner());
         project.setInputs(Arrays.asList("test_lib1/file1.in", "test_lib2/file2.in", "test_lib1/subdir/file5.in", "builtins/cp_test.in"));
@@ -431,7 +434,7 @@ public class ProjectTest {
     @Test
     public void testFindResourceDirs() throws Exception {
         System.out.print("testFindResourceDirs start");
-        libraryUrls.add(URI.create("http://localhost:8081/test_lib3.zip"));
+        libraryUrls.add(URI.create("http://127.0.0.1:" + serverPort + "/test_lib3.zip"));
         project.resolveLibUrls(Progress.discarding());
         project.mount(new ClassLoaderResourceScanner());
         project.setInputs(Arrays.asList("test_lib1/file1.in", "test_lib2/file2.in", "test_lib1/subdir/file5.in", "builtins/cp_test.in"));

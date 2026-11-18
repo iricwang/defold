@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "channel": "dev",
-  "revision": 131,
-  "version": "1.14.2-patch.131",
+  "revision": 132,
+  "version": "1.14.2-patch.132",
   "repository": "iricwang/defold",
-  "notes": "IK and path control navigation, visible controller handles and priority picking; editor interaction and undo dependencies verified with cold-start background tests. Runtime engine unchanged."
+  "notes": "Sync official dev through 158906302d; rebuild matching Bob, resource protocols and native tools; preserve Spine, AI Canvas, Remote and RectTransform workflows."
 }

@@ -25,7 +25,9 @@ typedef struct {
     CFMutableDataRef packet;
     OSStatus status;
     int width, height;
-    int64_t frame;
+    int fps;
+    int64_t timestampMicros;
+    bool forceKeyframe;
     CIContext *scaler;
     CVPixelBufferRef source;
 } RemoteEncoder;
@@ -75,7 +77,7 @@ JNIEXPORT jlong JNICALL Java_com_defold_editor_RemoteVideoEncoder_create(JNIEnv 
         if (width < 2 || height < 2 || width > 4096 || height > 4096 || (int64_t)width * height > 8388608) return 0;
         RemoteEncoder *encoder = calloc(1, sizeof(*encoder));
         if (!encoder) return 0;
-        encoder->width = width; encoder->height = height;
+        encoder->width = width; encoder->height = height; encoder->fps = 60;
         encoder->completed = dispatch_semaphore_create(0);
         encoder->packet = CFDataCreateMutable(NULL, 0);
         NSDictionary *spec = @{(__bridge NSString *)kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: @YES,
@@ -101,6 +103,23 @@ JNIEXPORT jlong JNICALL Java_com_defold_editor_RemoteVideoEncoder_create(JNIEnv 
             CFRelease(encoder->packet); dispatch_release(encoder->completed); free(encoder); return 0;
         }
         return (jlong)(intptr_t)encoder;
+    }
+}
+
+// Called only by the stream's encoder thread, including WebRTC congestion feedback.
+JNIEXPORT jboolean JNICALL Java_com_defold_editor_RemoteVideoEncoder_configure(JNIEnv *env, jclass cls, jlong handle, jint bitrate, jint fps, jboolean keyframe) {
+    @autoreleasepool {
+        RemoteEncoder *encoder = (RemoteEncoder *)(intptr_t)handle;
+        if (!encoder || bitrate < 250000 || bitrate > 1800000 || fps < 10 || fps > 30) return JNI_FALSE;
+        NSDictionary *properties = @{
+            (__bridge NSString *)kVTCompressionPropertyKey_AverageBitRate: @(bitrate),
+            (__bridge NSString *)kVTCompressionPropertyKey_DataRateLimits: @[@(bitrate / 8), @1],
+            (__bridge NSString *)kVTCompressionPropertyKey_ExpectedFrameRate: @(fps),
+            (__bridge NSString *)kVTCompressionPropertyKey_MaxKeyFrameInterval: @(fps * 2)};
+        if (VTSessionSetProperties(encoder->session, (__bridge CFDictionaryRef)properties)) return JNI_FALSE;
+        encoder->fps = fps;
+        encoder->forceKeyframe |= keyframe;
+        return JNI_TRUE;
     }
 }
 
@@ -138,7 +157,12 @@ JNIEXPORT jbyteArray JNICALL Java_com_defold_editor_RemoteVideoEncoder_encode(JN
     }
     CFDataSetLength(encoder->packet, 0);
     encoder->status = 0;
-    OSStatus status = VTCompressionSessionEncodeFrame(encoder->session, pixel, CMTimeMake(encoder->frame++, 60), CMTimeMake(1, 60), NULL, NULL, NULL);
+    NSDictionary *options = encoder->forceKeyframe ? @{(__bridge NSString *)kVTEncodeFrameOptionKey_ForceKeyFrame: @YES} : nil;
+    OSStatus status = VTCompressionSessionEncodeFrame(encoder->session, pixel,
+        CMTimeMake(encoder->timestampMicros, 1000000), CMTimeMake(1, encoder->fps),
+        (__bridge CFDictionaryRef)options, NULL, NULL);
+    encoder->timestampMicros += 1000000 / encoder->fps;
+    encoder->forceKeyframe = false;
     CVPixelBufferRelease(pixel);
     if (status || dispatch_semaphore_wait(encoder->completed, dispatch_time(DISPATCH_TIME_NOW, 500 * NSEC_PER_MSEC)) || encoder->status) return NULL;
     jsize length = (jsize)CFDataGetLength(encoder->packet);

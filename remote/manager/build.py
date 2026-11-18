@@ -49,9 +49,18 @@ def build(app, output, engine=None, shell=False):
         target = Path(base['classes']) / source.relative_to(HERE/'resources')
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
+    # The sidecar must load the matching JNI profile API before the selected editor jar.
+    codec = ROOT/'editor/resources/lib'/base['platform']/('remote_video.dll' if os.name == 'nt' else 'libremote_video.dylib')
+    if codec.is_file():
+        target = Path(base['classes'])/'lib'/base['platform']/codec.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(codec,target)
+    transport = Path(os.environ.get('DEFOLD_REMOTE_TRANSPORT', ROOT/'tmp/remote-transport-cargo/release'/('defold-remote-transport.exe' if os.name == 'nt' else 'defold-remote-transport')))
     inputs = {str(p.relative_to(ROOT)): automation.digest(p) for p in sources}
     inputs.update({str(p.relative_to(ROOT)): automation.digest(p) for p in resources})
     inputs.update(base['inputs'])
+    if codec.is_file(): inputs['remoteCodec'] = automation.digest(codec)
+    if transport.is_file(): inputs['remoteTransport'] = automation.digest(transport)
     for source in [HERE/'prepare.py', ROOT/'scripts/windows/local_extensions.py', Path(__file__)]:
         inputs[str(source.relative_to(ROOT))] = automation.digest(source)
     sdk = Path(os.environ.get('DYNAMO_HOME', ROOT/'tmp/dynamo_home'))
@@ -85,6 +94,7 @@ def build(app, output, engine=None, shell=False):
         for source, target in [(java_home, package/'jre'), (Path(base['classes']), package/'classes'), (Path(base['native']), package/'native')]:
             shutil.copytree(source, target, dirs_exist_ok=True)
         shutil.copy2(base['jar'], package/'editor.jar')
+        if transport.is_file(): shutil.copy2(transport,package/transport.name)
         engine_name = 'dmengine.exe' if os.name == 'nt' else 'dmengine'
         shutil.copy2(base['engine'], package/engine_name)
         shutil.copy2(HERE/'prepare.py', package/'prepare.py')

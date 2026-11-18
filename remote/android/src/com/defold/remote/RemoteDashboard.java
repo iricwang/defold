@@ -31,7 +31,7 @@ import java.util.concurrent.*;
 final class RemoteDashboard extends LinearLayout {
     interface Actions {
         void scan(); void album(); void paste(); void connect(String base); void discover();
-        void quality(); void stop(String base,Runnable complete);
+        void cloud(); void quality(); void stop(String base,Runnable complete);
         Dialog sheet(String title,LinearLayout content);
     }
     private static final int BG=0xff181818,PANEL=0xff222222,LINE=0xff303030,TEXT=0xffededed,MUTED=0xffaaa9a6,BLUE=0xff4386e5,GREEN=0xff6bc6a5;
@@ -81,6 +81,23 @@ final class RemoteDashboard extends LinearLayout {
     private Button button(String title,Runnable action,boolean primary){Button b=new Button(activity);b.setText(title);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(TEXT);b.setMinWidth(0);b.setPadding(dp(12),0,dp(12),0);b.setMinimumHeight(dp(48));b.setStateListAnimator(null);b.setBackground(bg(primary?0xff286bcc:PANEL));b.setOnClickListener(v->action.run());return b;}
     private View symbol(String name,int color){return new RemoteIcon(activity,name,color);}
     private View iconButton(String name,String label,Runnable action){FrameLayout v=new FrameLayout(activity);v.setContentDescription(label);v.setFocusable(true);v.setOnClickListener(w->action.run());v.addView(symbol(name,TEXT),new android.widget.FrameLayout.LayoutParams(dp(22),dp(22),Gravity.CENTER));return v;}
+    private View transportTabs(){
+        LinearLayout group=new LinearLayout(activity);group.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable track=bg(PANEL);track.setCornerRadius(dp(11));
+        group.setBackground(new android.graphics.drawable.InsetDrawable(track,0,dp(6),0,dp(6)));
+        String[] icons={"wifi","cloud"},labels={"局域网","服务器"};
+        for(int i=0;i<icons.length;i++){
+            final boolean selected=i==0;FrameLayout item=new FrameLayout(activity);
+            item.setContentDescription(labels[i]);item.setTooltipText(labels[i]);item.setSelected(selected);item.setFocusable(true);
+            GradientDrawable fill=new GradientDrawable();fill.setCornerRadius(dp(8));fill.setColor(selected?0xff263b53:Color.TRANSPARENT);
+            item.setBackground(new android.graphics.drawable.InsetDrawable(fill,dp(3),dp(9),dp(3),dp(9)));
+            GradientDrawable mask=new GradientDrawable();mask.setColor(Color.WHITE);mask.setCornerRadius(dp(8));
+            item.setForeground(new android.graphics.drawable.RippleDrawable(ColorStateList.valueOf(0x334386e5),null,new android.graphics.drawable.InsetDrawable(mask,dp(3),dp(9),dp(3),dp(9))));
+            item.addView(symbol(icons[i],selected?BLUE:MUTED),new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER));
+            item.setOnClickListener(v->{if(!selected)actions.cloud();});group.addView(item,new LayoutParams(dp(48),dp(48)));
+        }
+        return group;
+    }
     private LinearLayout card(){LinearLayout v=column();v.setPadding(dp(16),dp(16),dp(16),dp(16));v.setBackground(bg(PANEL));LayoutParams p=new LayoutParams(-1,-2);p.bottomMargin=dp(14);rows.addView(v,p);return v;}
     private void info(LinearLayout parent,String value){TextView t=text(value,13,MUTED);t.setLineSpacing(dp(3),1);parent.addView(t);}
     void resume(){if(active)return;active=true;ui.post(poll);}
@@ -96,6 +113,7 @@ final class RemoteDashboard extends LinearLayout {
         LinearLayout header=new LinearLayout(activity);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(12),dp(6),dp(12),dp(6));
         header.addView(symbol(tab.equals("computers")?"monitor":tab.equals("settings")?"settings":tab.equals("running")?"layers":"game",TEXT),new LayoutParams(dp(30),dp(30)));
         LinearLayout names=column();names.setPadding(dp(12),0,0,0);names.addView(heading(tabName(tab),18));subtitle=text("",12,MUTED);names.addView(subtitle);header.addView(names,new LayoutParams(0,-2,1));
+        header.addView(transportTabs(),new LayoutParams(dp(96),dp(48)));
         header.addView(iconButton(tab.equals("settings")?"refresh":"plus",tab.equals("settings")?"刷新连接":"添加电脑",()->{if(tab.equals("settings"))refresh();else addComputer();}),new LayoutParams(dp(48),dp(48)));body.addView(header);
         View line=new View(activity);line.setBackgroundColor(LINE);body.addView(line,new LayoutParams(-1,dp(1)));
         if(scroll.getParent()!=null)((android.view.ViewGroup)scroll.getParent()).removeView(scroll);if(rows.getParent()!=null)((android.view.ViewGroup)rows.getParent()).removeView(rows);
@@ -187,6 +205,7 @@ final class RemoteDashboard extends LinearLayout {
     }
     void addComputer(){
         LinearLayout content=column();info(content,"在电脑 Remote Manager 打开“连接手机”。手机与电脑需要处于可互通的局域网。");gap(content,18);Dialog[] dialog=new Dialog[1];
+        option(content,"公网连接",false,()->{dialog[0].dismiss();actions.cloud();});
         option(content,"扫描电脑二维码",true,()->{dialog[0].dismiss();actions.scan();});
         option(content,"从相册识别",false,()->{dialog[0].dismiss();actions.album();});
         option(content,"粘贴完整配对链接",false,()->{dialog[0].dismiss();actions.paste();});
@@ -219,6 +238,6 @@ final class RemoteDashboard extends LinearLayout {
         rows.addView(button("默认画质",actions::quality,false),new LayoutParams(-1,dp(52)));gap(rows,12);
         for(String key:new String[]{"showFps","keepAwake"}){Switch sw=new Switch(activity);sw.setText(key.equals("showFps")?"显示帧率":"游戏时屏幕常亮");sw.setTextColor(TEXT);sw.setTextSize(14);sw.setMinHeight(dp(52));sw.setChecked(preferences.getBoolean(key,key.equals("keepAwake")));sw.setOnCheckedChangeListener((v,on)->{preferences.edit().putBoolean(key,on).apply();if(key.equals("keepAwake")){if(on)activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);}});rows.addView(sw);gap(rows,8);}
         rows.addView(button("连接与扫码帮助",()->new AlertDialog.Builder(activity).setTitle("连接与扫码").setMessage("1. 手机和电脑处于可互通的局域网。\n2. 电脑管理器打开“连接手机”。\n3. 从电脑页 + 扫码；识别困难时使用补光、2×、相册或完整链接。\n4. 配对成功后选择项目，电脑自动准备并运行。\n5. 返回列表保留电脑游戏；停止为单独操作。").setPositiveButton("关闭",null).show(),false));gap(rows,12);
-        rows.addView(button("连接诊断",()->{StringBuilder value=new StringBuilder();for(Catalog c:catalogs.values())value.append(c.name).append(" · ").append(c.online?"在线":"离线").append("\n").append(c.address).append("\n").append(c.error).append("\n\n");new AlertDialog.Builder(activity).setTitle("连接诊断").setMessage(value.length()==0?"还没有配对电脑。":value.toString()).setPositiveButton("刷新",(d,w)->refresh()).setNegativeButton("关闭",null).show();},false));gap(rows,24);info(rows,"Defold Remote 0.8.1\n游戏和原生扩展在电脑本地构建，源码不上传云构建服务。");
+        rows.addView(button("连接诊断",()->{StringBuilder value=new StringBuilder();for(Catalog c:catalogs.values())value.append(c.name).append(" · ").append(c.online?"在线":"离线").append("\n").append(c.address).append("\n").append(c.error).append("\n\n");new AlertDialog.Builder(activity).setTitle("连接诊断").setMessage(value.length()==0?"还没有配对电脑。":value.toString()).setPositiveButton("刷新",(d,w)->refresh()).setNegativeButton("关闭",null).show();},false));gap(rows,24);info(rows,"Defold Remote 0.9.5\n游戏和原生扩展在电脑本地构建，源码不上传云构建服务。");
     }
 }

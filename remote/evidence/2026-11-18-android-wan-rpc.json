@@ -1,0 +1,28 @@
+{
+  "managerVersion": "0.3.1",
+  "apkVersion": "0.9.3",
+  "apkVersionCode": 22,
+  "cause": "JS SDK responseTimeout accepts milliseconds; 12 was 12 ms, not 12 seconds",
+  "responseTimeoutMs": 12000,
+  "clientRegressionChecks": 14,
+  "physicalAndroid": {
+    "androidVersion": "17",
+    "webViewVersion": "157.0.8103.50",
+    "connectionStages": [
+      "authorization",
+      "webrtc-connecting",
+      "webrtc-connected",
+      "audio-starting",
+      "catalog-loading",
+      "catalog-ready"
+    ],
+    "userConfirmedMobileData": true,
+    "visibleGameCount": 3
+  },
+  "publicServerParticipantStates": {
+    "desktop": "ACTIVE",
+    "phone": "ACTIVE"
+  },
+  "physicalDeviceMediaPlaybackTested": false,
+  "apkSha256": "e69481db6989a78ebc59712e8ae31c8087bd1d457bd862c915cfb4519213f7b2"
+}

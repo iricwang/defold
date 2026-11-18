@@ -16,6 +16,7 @@ package com.dynamo.bob.util;
 
 import com.dynamo.bob.Bob;
 import com.dynamo.bob.Progress;
+import com.dynamo.bob.Platform;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.Test;
 
@@ -49,6 +50,9 @@ public class TimeProfilerTest {
                 "--texture-compression",
                 "--strip-executable",
                 "--verbose",
+                // Avoid the legacy CLI default architecture when testing a local engine.
+                "--platform", Platform.getHostPlatform().getPair(),
+                "--architectures", Platform.getHostPlatform().getPair(),
                 "--variant", "release",
                 "--archive",
                 "distclean", "resolve", "build", "bundle"

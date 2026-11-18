@@ -35,7 +35,9 @@ their debug information; the original binaries remain available for debugging.
 Windows `lipo.exe` is left unchanged: stripping its debug sections with LLVM
 produces a binary that Windows cannot load.
 The build uses the host's `llvm-strip` (`llvm-strip.exe` on Windows) from `PATH`.
-If it is unavailable, the build falls back to the host's packaged `strip_android`
+On macOS, it also checks Homebrew's keg-only LLVM installation when it is not on
+`PATH`. The strip task times out after two minutes instead of waiting indefinitely
+for a tool that cannot start. If LLVM is unavailable, the build falls back to the host's packaged `strip_android`
 tool in `$DYNAMO_HOME/ext/bin/<host>`. Despite its name, this is LLVM strip and
 supports the Linux and macOS binaries packaged by Bob as well as Android binaries.
 Set `LLVM_STRIP` to an absolute executable path to override both choices; an

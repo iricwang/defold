@@ -1,0 +1,35 @@
+{
+  "managerVersion": "0.3.3",
+  "apkVersion": "0.9.5",
+  "clientRegressionChecks": 21,
+  "realH264Checks": 25,
+  "sourceDimensions": [
+    1080,
+    2400
+  ],
+  "encodedDimensions": {
+    "540p": [
+      432,
+      960
+    ],
+    "720p": [
+      576,
+      1280
+    ],
+    "1080p": [
+      864,
+      1920
+    ]
+  },
+  "liveSwitchPreservesGameSession": true,
+  "liveSwitchPreservesDeviceRevision": true,
+  "lanQualityUnaffected": true,
+  "apkInstalledOnPhone": false,
+  "phoneUnavailableDuringInstall": true,
+  "apkSha256": "8bc2b23a918c29c7140aef98418c45080e4d3d7200fa4912bffffa264d629e1e",
+  "desktopRestartVerified": true,
+  "desktopProjectCount": 2,
+  "desktopRunningGameCount": 1,
+  "desktopConnectedDeviceCount": 1,
+  "apkInstallation": "user_will_install_manually"
+}

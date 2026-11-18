@@ -264,6 +264,12 @@ def stripToolName = hostPlatform.endsWith('win32') ? 'llvm-strip.exe' : 'llvm-st
 def stripToolCandidates = configuredStripTool ? [file(configuredStripTool)] :
         (System.getenv('PATH') ?: '').split(File.pathSeparator).collect { path -> file(new File(path, stripToolName)) }
 if (!configuredStripTool) {
+    // Homebrew LLVM is keg-only, so it may be installed without being on PATH.
+    // Prefer it to older packaged strip binaries on recent macOS releases.
+    if (hostPlatform.endsWith('macos')) {
+        stripToolCandidates.addAll(['/opt/homebrew/opt/llvm/bin/llvm-strip',
+                                    '/usr/local/opt/llvm/bin/llvm-strip'].collect { file(it) })
+    }
     def packagedStripToolName = hostPlatform.endsWith('win32') ? 'strip_android.exe' : 'strip_android'
     stripToolCandidates << file("${dynamoHome}/ext/bin/${hostPlatform}/${packagedStripToolName}")
 }
@@ -278,6 +284,8 @@ def stripTool = providers.provider {
 }
 
 tasks.register('stripBobNativeTools') {
+    // Also bounds a tool blocked before main() (for example by OS loading).
+    timeout = java.time.Duration.ofMinutes(2)
     dependsOn 'prepareBobBuildContext'
     inputs.files { bobStrippableArtifacts().values() }
     inputs.property('libraryPaths', { bobStrippableArtifacts().keySet().sort() })

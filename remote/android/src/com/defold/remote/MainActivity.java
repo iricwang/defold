@@ -52,6 +52,7 @@ public final class MainActivity extends Activity {
     private final LinkedHashMap<String,Bitmap> thumbnails=new LinkedHashMap<>();
     private SharedPreferences preferences;
     private FrameLayout root;
+    private RemoteCloudView cloudView;
     private StreamView screen;
     private VideoSurface videoSurface;
     private volatile String videoMode="JPEG";
@@ -180,7 +181,7 @@ public final class MainActivity extends Activity {
         }catch(Exception e){showHome(e.getMessage());resumeStream=false;}
         return true;
     }
-    @Override public void onResume(){super.onResume();foreground=true;ui.post(heartbeat);if(dashboard!=null&&page.equals("home")&&!legacyPage)dashboard.resume();
+    @Override public void onResume(){super.onResume();foreground=true;if(cloudView!=null)cloudView.resumeRemote();ui.post(heartbeat);if(dashboard!=null&&page.equals("home")&&!legacyPage)dashboard.resume();
         if(pendingExternal!=null){RemoteAddress target=pendingExternal;pendingExternal=null;connect(target);}
         else if(resumeStream&&!resumeAddress.isEmpty()){resumeStream=false;try{connect(new RemoteAddress(resumeAddress,""),!resumePaused);}catch(Exception e){showHome(e.getMessage());}}
         else if(page.equals("home")&&legacyPage)refreshDiscovery();
@@ -188,17 +189,18 @@ public final class MainActivity extends Activity {
         applySystemBars();
     }
     @Override public void onStop(){
+        if(cloudView!=null)cloudView.pauseRemote();
         resumeStream=page.equals("stream")||page.equals("connecting");resumePaused=paused;
         if(session!=null)resumeAddress=session.base;
         foreground=false;if(dashboard!=null)dashboard.pause();if(activeSheet!=null)activeSheet.dismiss();ui.removeCallbacks(heartbeat);endInput();releaseManaged();++generation;session=null;closeStream();closeCamera();super.onStop();
     }
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putBoolean("resumeStream",resumeStream||page.equals("stream")||page.equals("connecting"));out.putString("resumeAddress",resumeAddress);out.putBoolean("resumePaused",paused);}
-    @Override public void onDestroy(){if(dashboard!=null)dashboard.close();closeCamera();closeStream();commands.shutdownNow();frames.shutdownNow();discovery.shutdownNow();monitor.shutdownNow();inputs.shutdown();super.onDestroy();}
+    @Override public void onDestroy(){if(cloudView!=null){cloudView.destroy();cloudView=null;}if(dashboard!=null)dashboard.close();closeCamera();closeStream();commands.shutdownNow();frames.shutdownNow();discovery.shutdownNow();monitor.shutdownNow();inputs.shutdown();super.onDestroy();}
     @Override public void onConfigurationChanged(android.content.res.Configuration config){super.onConfigurationChanged(config);if(page.equals("home"))renderCards();else if(page.equals("scan"))scan();else if(page.equals("stream")){positionControls();scheduleDeviceSync();}}
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)applySystemBars();}
-    @Override public void onBackPressed(){if(page.equals("stream"))showControls("");else if(page.equals("scan")||page.equals("pairing")){goHome("");dashboard.showTab("computers");}else if(page.equals("failure")){boolean computer=connectionTarget!=null&&connectionTarget.base.startsWith("https:")&&!connectionTarget.base.contains("/games/");goHome("");dashboard.showTab(computer?"computers":"games");}else if(!page.equals("home")||legacyPage)goHome("");else if(dashboard!=null&&!dashboard.currentTab().equals("games"))dashboard.showTab("games");else super.onBackPressed();}
+    @Override public void onBackPressed(){if(cloudView!=null){cloudView.menu();return;}if(page.equals("stream"))showControls("");else if(page.equals("scan")||page.equals("pairing")){goHome("");dashboard.showTab("computers");}else if(page.equals("failure")){boolean computer=connectionTarget!=null&&connectionTarget.base.startsWith("https:")&&!connectionTarget.base.contains("/games/");goHome("");dashboard.showTab(computer?"computers":"games");}else if(!page.equals("home")||legacyPage)goHome("");else if(dashboard!=null&&!dashboard.currentTab().equals("games"))dashboard.showTab("games");else super.onBackPressed();}
     private void applySystemBars(){
-        boolean immersive=page.equals("stream");
+        boolean immersive=page.equals("stream")||page.equals("cloud");
         if(Build.VERSION.SDK_INT>=28){WindowManager.LayoutParams lp=getWindow().getAttributes();lp.layoutInDisplayCutoutMode=immersive?(Build.VERSION.SDK_INT>=30?WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS:WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES):WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;getWindow().setAttributes(lp);}
         if(Build.VERSION.SDK_INT>=30){
             getWindow().setDecorFitsSystemWindows(false);
@@ -207,24 +209,35 @@ public final class MainActivity extends Activity {
         }else getWindow().getDecorView().setSystemUiVisibility(immersive?View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_STABLE:View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }
     private void newRoot(){if(activeSheet!=null)activeSheet.dismiss();controlPanel=null;fpsLabel=null;root=new FrameLayout(this);root.setBackgroundColor(BG);
-        root.setOnApplyWindowInsetsListener((v,insets)->{boolean full=page.equals("stream");v.setPadding(full?0:insets.getSystemWindowInsetLeft(),full?0:insets.getSystemWindowInsetTop(),full?0:insets.getSystemWindowInsetRight(),full?0:insets.getSystemWindowInsetBottom());if(full){positionControls();scheduleDeviceSync();}return insets;});
+        root.setOnApplyWindowInsetsListener((v,insets)->{boolean full=page.equals("stream")||page.equals("cloud");v.setPadding(full?0:insets.getSystemWindowInsetLeft(),full?0:insets.getSystemWindowInsetTop(),full?0:insets.getSystemWindowInsetRight(),full?0:insets.getSystemWindowInsetBottom());if(full){positionControls();scheduleDeviceSync();updateCloudMetrics();}return insets;});
         root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot)scheduleDeviceSync();});
         setContentView(root);applySystemBars();}
-    private void goHome(String message){endInput();releaseManaged();++generation;session=null;resumeStream=false;paused=false;controlBusy=false;frameRate.reset();closeStream();closeCamera();if(screen!=null)screen.clear();showHome(message);refreshDiscovery();}
+    private void goHome(String message){if(cloudView!=null){cloudView.pauseRemote();cloudView.destroy();cloudView=null;}endInput();releaseManaged();++generation;session=null;resumeStream=false;paused=false;controlBusy=false;frameRate.reset();closeStream();closeCamera();if(screen!=null)screen.clear();showHome(message);refreshDiscovery();}
     private void releaseManaged(){releaseManaged(session);}
     private void releaseManaged(Session current){if(current!=null&&current.base.startsWith("https:"))try{inputs.execute(()->{try{request(current.base,current.token,"POST","/release",new byte[0]);}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}}
     private void showHome(String message){
+        if("server".equals(preferences.getString("transportMode","lan"))){showCloud();return;}
         page="home";legacyPage=false;setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);newRoot();
         if(dashboard==null)dashboard=new RemoteDashboard(this,new RemoteDashboard.Actions(){
             public void scan(){MainActivity.this.scan();}public void album(){MainActivity.this.album();}public void paste(){MainActivity.this.pasteLink();}
             public void connect(String base){try{MainActivity.this.connect(new RemoteAddress(base,""));}catch(Exception e){dashboard.setMessage(e.getMessage());}}
             public void discover(){dashboard.pause();legacyPage=true;homeTab="discovery";showLegacyHome("");refreshDiscovery();}
             public void quality(){chooseQuality();}
+            public void cloud(){showCloud();}
             public Dialog sheet(String title,LinearLayout content){return MainActivity.this.sheet(title,content);}
             public void stop(String base,Runnable complete){commands.execute(()->{try{request(base,token(base),"POST","/stop",new byte[0]);ui.post(complete);}catch(Exception e){ui.post(()->dashboard.setMessage(RemoteTls.explain(e,base)));}});}
         });
         if(dashboard.getParent()!=null)((ViewGroup)dashboard.getParent()).removeView(dashboard);root.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));dashboard.setMessage(message);if(foreground)dashboard.resume();
     }
+    private void showCloud(){
+        if(cloudView!=null){cloudView.pauseRemote();cloudView.destroy();cloudView=null;}
+        preferences.edit().putString("transportMode","server").apply();
+        endInput();releaseManaged();closeStream();closeCamera();session=null;resumeStream=false;++generation;
+        if(dashboard!=null)dashboard.pause();page="cloud";newRoot();
+        cloudView=new RemoteCloudView(this,()->{preferences.edit().putString("transportMode","lan").apply();goHome("");});root.addView(cloudView,new FrameLayout.LayoutParams(-1,-1));
+        root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->updateCloudMetrics());root.postDelayed(this::updateCloudMetrics,250);
+    }
+    private void updateCloudMetrics(){if(cloudView!=null)try{JSONObject m=deviceMetrics();if(m!=null)cloudView.metrics(m.toString());}catch(JSONException ignored){}}
     private void showLegacyHome(String message){
         page="home";setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);newRoot();
         LinearLayout body=column();root.addView(body,new FrameLayout.LayoutParams(-1,-1));
@@ -346,6 +359,8 @@ public final class MainActivity extends Activity {
         connect(target,autoStart,false);
     }
     private void connect(RemoteAddress target,boolean autoStart,boolean takeover){
+        preferences.edit().putString("transportMode","lan").apply();
+        if(cloudView!=null){cloudView.pauseRemote();cloudView.destroy();cloudView=null;}
         endInput();releaseManaged();closeCamera();closeStream();session=null;paused=false;controlBusy=false;frameRate.reset();final int attempt=++generation;resumeAddress=target.base;connectionTarget=target;if(dashboard!=null)dashboard.pause();if(target.base.startsWith("https:")&&!target.base.contains("/games/"))showPairing(target);else showStream("正在连接电脑…");
         final String projectLabel=projectName(target.base);commands.execute(()->{
             try{

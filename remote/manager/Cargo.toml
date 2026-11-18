@@ -1,6 +1,6 @@
 [package]
 name = "defold-remote-manager"
-version = "0.2.9"
+version = "0.3.3"
 edition = "2021"
 build = "build.rs"
 

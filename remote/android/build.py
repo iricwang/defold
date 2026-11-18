@@ -63,6 +63,8 @@ def main():
     run(tools / ('aapt2' + exe), 'link', '-I', android, '--manifest', root / 'AndroidManifest.xml', '-o', unsigned, resources)
     with zipfile.ZipFile(unsigned, 'a', compression=zipfile.ZIP_DEFLATED) as archive:
         archive.write(root.parent / 'vendor/ZXING-LICENSE', 'assets/ZXING-LICENSE')
+        for path in sorted((root.parent/'cloud').iterdir()):
+            if path.is_file():archive.write(path,'assets/cloud/'+path.name)
         for path in sorted((build / 'dex').glob('*.dex')):
             archive.write(path, path.name)
     aligned = build / 'aligned.apk'

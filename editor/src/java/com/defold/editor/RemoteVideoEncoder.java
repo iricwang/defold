@@ -47,6 +47,15 @@ public final class RemoteVideoEncoder implements AutoCloseable {
         this.width = width; this.height = height;
         if (!AVAILABLE || (handle = create(width, height)) == 0) throw new IOException("Hardware encoder unavailable");
     }
+    /** Apply the WAN profile on the encoder thread. Fail closed with older JNI libraries. */
+    public void configureRemote(int bitrate, int fps, boolean keyframe) throws IOException {
+        if (handle == 0) throw new IOException("Encoder closed");
+        if (bitrate < 250000 || bitrate > 1800000 || fps < 10 || fps > 30)
+            throw new IllegalArgumentException("Invalid remote encoder budget");
+        try { if (!configure(handle, bitrate, fps, keyframe)) throw new IOException("Remote encoder profile unavailable"); }
+        catch (UnsatisfiedLinkError e) { throw new IOException("Update Remote video codec for WAN preview", e); }
+    }
+    private static native boolean configure(long handle, int bitrate, int fps, boolean keyframe);
     public byte[] frame(int[] rgb) throws IOException { return frame(rgb, width, height); }
     public byte[] frame(int[] rgb, int sourceWidth, int sourceHeight) throws IOException {
         if (handle == 0) throw new IOException("Encoder closed");

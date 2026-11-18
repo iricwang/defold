@@ -46,6 +46,14 @@ public final class RemoteRuntime implements AutoCloseable {
     private long frames;
     private volatile String codec = "none";
     private String lease = "";
+    private record EncoderProfile(int bitrate, int fps, long revision, long keyframe) {}
+    private volatile RemoteStreamQuality remoteQuality = RemoteStreamQuality.SMOOTH;
+    static RemoteStreamQuality remoteQuality(String id) {
+        RemoteStreamQuality quality=RemoteStreamQuality.parse(id);
+        if(quality==RemoteStreamQuality.ORIGINAL)throw new IllegalArgumentException("公网支持 540p、720p 和 1080p");
+        return quality;
+    }
+    private volatile EncoderProfile encoderProfile = new EncoderProfile(1200000, 30, 0, 0);
 
     private RemoteRuntime(Path directory) throws IOException {
         System.setProperty("sun.net.httpserver.nodelay", "true");
@@ -117,6 +125,25 @@ public final class RemoteRuntime implements AutoCloseable {
                 if (!value.matches("[A-Za-z0-9_-]{43}")) throw new IllegalArgumentException("Invalid lease");
                 synchronized (this) { closeStream(); closeAudio(); lease = value; }
                 reply(exchange, 200, Map.of("ok", true));
+            } else if (route.equals("/encoder") && exchange.getRequestMethod().equals("POST")) {
+                byte[] bytes = exchange.getRequestBody().readNBytes(1025);
+                if (bytes.length > 1024) throw new IllegalArgumentException("Encoder request too large");
+                Map<?, ?> values = JSON.readValue(bytes, Map.class);
+                synchronized (this) {
+                    if (lease.isEmpty() || !lease.equals(exchange.getRequestHeaders().getFirst("X-Remote-Lease"))) {
+                        reply(exchange, 403, Map.of("error", "Control lease expired")); return;
+                    }
+                    RemoteStreamQuality quality=values.containsKey("resolution")?remoteQuality(Objects.toString(values.get("resolution"))):remoteQuality;
+                    EncoderProfile old = encoderProfile;
+                    int bitrate = values.get("bitrate") instanceof Number n ? n.intValue() : old.bitrate();
+                    int fps = values.get("fps") instanceof Number n ? n.intValue() : old.fps();
+                    if (bitrate < 250000 || bitrate > 1800000 || fps < 10 || fps > 30)
+                        throw new IllegalArgumentException("Invalid encoder budget");
+                    remoteQuality=quality;
+                    encoderProfile = new EncoderProfile(bitrate, fps, old.revision() + 1,
+                        old.keyframe() + (Boolean.TRUE.equals(values.get("keyframe")) ? 1 : 0));
+                }
+                reply(exchange, 200, Map.of("ok", true));
             } else if (route.equals("/status") && exchange.getRequestMethod().equals("GET")) {
                 reply(exchange, 200, status());
             } else if (route.equals("/thumbnail") && exchange.getRequestMethod().equals("GET")) {
@@ -148,7 +175,9 @@ public final class RemoteRuntime implements AutoCloseable {
     private void video(HttpExchange exchange, boolean hardware) throws Exception {
         if (hardware && !RemoteVideoEncoder.available()) { reply(exchange, 503, Map.of("error", "Hardware encoder unavailable")); return; }
         String query = exchange.getRequestURI().getRawQuery();
-        RemoteStreamQuality quality = RemoteStreamQuality.parse(query == null ? "720p" : query.replaceFirst("^resolution=", ""));
+        boolean remote = query != null && query.equals("resolution=540p&profile=remote");
+        RemoteStreamQuality quality = remote ? remoteQuality : RemoteStreamQuality.parse(query == null ? "720p" : query.replaceFirst("^resolution=", ""));
+        if (remote && !hardware) throw new IllegalArgumentException("WAN requires hardware H264");
         AutomationWorker.LiveFrame frame = firstFrame();
         int sourceWidth = frame.width(), sourceHeight = frame.height();
         int[] dimensions = quality.dimensions(sourceWidth, sourceHeight);
@@ -159,6 +188,7 @@ public final class RemoteRuntime implements AutoCloseable {
                 reply(exchange, 403, Map.of("error", "Control lease expired")); return;
             }
             closeStream(); stream = exchange; codec = hardware ? "h264" : "jpeg";
+            if (remote) encoderProfile = new EncoderProfile(quality==RemoteStreamQuality.HIGH?1800000:quality==RemoteStreamQuality.BALANCED?1500000:1200000, 30, encoderProfile.revision() + 1, encoderProfile.keyframe() + 1);
         }
         try {
             exchange.getResponseHeaders().set("Content-Type", hardware ? "application/x-defold-h264" : "application/x-defold-jpeg");
@@ -167,6 +197,8 @@ public final class RemoteRuntime implements AutoCloseable {
             try (DataOutputStream output = new DataOutputStream(exchange.getResponseBody())) {
                 if (hardware) { output.writeInt(dimensions[0] & ~1); output.writeInt(dimensions[1] & ~1); }
                 int previous = -1; int[] pixels = frame.pixels();
+                long profileRevision = -1, keyframeRevision = -1;
+                int remoteFps = 30;
                 long next = System.nanoTime();
                 while (!closed && stream == exchange && Boolean.TRUE.equals(worker.status().get("alive"))) {
                     long delay = next - System.nanoTime();
@@ -175,12 +207,19 @@ public final class RemoteRuntime implements AutoCloseable {
                     if (frame == null) { Thread.sleep(1); continue; }
                     if (frame.width() != sourceWidth || frame.height() != sourceHeight) break;
                     pixels = frame.pixels(); previous = frame.sequence();
+                    if (remote) {
+                        EncoderProfile profile = encoderProfile;
+                        if (profile.revision() != profileRevision) {
+                            encoder.configureRemote(profile.bitrate(), profile.fps(), profile.keyframe() != keyframeRevision);
+                            profileRevision = profile.revision(); keyframeRevision = profile.keyframe(); remoteFps = profile.fps();
+                        }
+                    }
                     byte[] bytes = hardware ? encoder.frame(pixels, sourceWidth, sourceHeight) : jpeg(frame, quality.maxEdge);
                     synchronized (this) { if (stream != exchange) break; writingSince = System.nanoTime(); }
                     try { output.writeInt(bytes.length); output.writeInt(previous); output.write(bytes); output.flush(); frames++; }
                     finally { synchronized (this) { if (stream == exchange) writingSince = 0; } }
                     frame = null;
-                    long interval = hardware ? 16_666_667L : 33_333_333L;
+                    long interval = remote ? 1_000_000_000L / remoteFps : hardware ? 16_666_667L : 33_333_333L;
                     next = Math.max(next + interval, System.nanoTime());
                 }
             }

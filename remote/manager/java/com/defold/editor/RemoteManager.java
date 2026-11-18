@@ -47,6 +47,7 @@ public class RemoteManager implements AutoCloseable {
     final String hostId;
     final String computer;
     final RemoteGateway gateway;
+    final RemoteCloud cloud;
     volatile boolean closed;
     // All collection runs on the build executor, after copies/compilers have settled.
     // A running game can still use A while the project has already published B.
@@ -195,7 +196,7 @@ public class RemoteManager implements AutoCloseable {
             }
             projects.put(p.id, p);
         }
-        save(); gateway = new RemoteGateway(this, port);
+        save(); gateway = new RemoteGateway(this, port); cloud = new RemoteCloud(this);
         requestCleanup();
         monitor.scheduleWithFixedDelay(this::observe, 3, 3, TimeUnit.SECONDS);
         } catch(Exception | Error failure) {
@@ -315,6 +316,9 @@ public class RemoteManager implements AutoCloseable {
         }
     }
     synchronized List<Project> all() { return new ArrayList<>(projects.values()); }
+    List<Project> sharedProjects() {
+        return all().stream().filter(p->{synchronized(p){return p.shared;}}).toList();
+    }
     synchronized Project project(String id) { Project p = projects.get(id); if (p == null) throw new IllegalArgumentException("项目不存在"); return p; }
     synchronized void save() throws IOException {
         Path temporary = directory.resolve("registry.json.part");
@@ -464,6 +468,7 @@ public class RemoteManager implements AutoCloseable {
         state.put("hostId",hostId); state.put("computer",computer); state.put("port",gateway.port()); state.put("fingerprint",gateway.fingerprint);
         state.put("addresses",gateway.addresses()); state.put("connectionAddress",gateway.selectedAddress()); state.put("projects",all().stream().map(this::status).toList());
         state.put("devices",devices.values().stream().map(d->Map.of("id",str(d,"id"),"name",str(d,"name"),"pairedAt",str(d,"pairedAt"))).toList());
+        state.put("cloud",cloud.status());
         state.put("settings",new LinkedHashMap<>(settings)); state.put("platform",runtime.get("platform")); state.put("runtime",runtime.get("revision"));
         state.put("engine",Map.of("directory",engineDirectory,"error",engineError,"nativeCompatible",!Boolean.FALSE.equals(runtime.get("nativeEngineCompatible")))); return state;
     }
@@ -761,6 +766,7 @@ public class RemoteManager implements AutoCloseable {
 
     Object command(Map<String,Object> request) throws Exception {
         String method=str(request,"method");Map<String,Object> params=(Map<String,Object>)request.getOrDefault("params",Map.of());
+        if(method.startsWith("cloud-"))return cloud.command(method,params);
         if(method.equals("status"))return status();
         if(method.equals("engine-directory")){selectEngine(Path.of(str(params,"path")));return status();}
         if(method.equals("pairing"))return gateway.pairing();
@@ -906,7 +912,7 @@ public class RemoteManager implements AutoCloseable {
         }
     }
 
-    @Override public void close(){closed=true;monitor.shutdownNow();gateway.close();for(Project p:all())stop(p);builds.shutdownNow();
+    @Override public void close(){closed=true;cloud.close();monitor.shutdownNow();gateway.close();for(Project p:all())stop(p);builds.shutdownNow();
         try { if(builds.awaitTermination(10,TimeUnit.SECONDS)){save();cleanupStorage();} }
         catch(InterruptedException e){Thread.currentThread().interrupt();}catch(IOException e){System.err.println(e);}
         finally {

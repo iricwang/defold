@@ -1,0 +1,20 @@
+{
+  "managerVersion": "0.3.2",
+  "apkVersion": "0.9.4",
+  "cause": "WAN pixel coordinates were forwarded directly to a worker requiring unsigned 16-bit normalized coordinates",
+  "fixes": [
+    "Convert physical pixels to worker-normalized coordinates at WAN gateway",
+    "Serialize press/release RPCs and prevent lossy motion overtaking transitions",
+    "Discard queued input on device revision or connection changes"
+  ],
+  "coordinateProtocolChecks": 221629,
+  "clientRegressionChecks": 17,
+  "catalogRegressionChecks": 19,
+  "installedOnPhysicalPhone": true,
+  "userConfirmedCloudGame": "Eatventure",
+  "userConfirmedClickRespondsCorrectly": true,
+  "observedInputDownReceipt": false,
+  "observedInputUpReceipt": false,
+  "runtimeEngineSourceChanged": false,
+  "apkSha256": "9a28ee124740bb40c49f5d9e37f7945fd4e2c8bf848b8927f3e937361e1bf13e"
+}

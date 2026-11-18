@@ -1,0 +1,16 @@
+{
+  "managerVersion": "0.3.1",
+  "apkVersion": "0.9.1",
+  "catalogChecks": 19,
+  "catalogFixtureProjects": 73,
+  "clientNavigationChecks": 13,
+  "apkSignatureVerified": true,
+  "bundledUiMatchesSource": true,
+  "toolbarBrowserPreviewChecked": true,
+  "androidPhysicalDeviceTested": false,
+  "runtimeEngineSourceChanged": false,
+  "apkSha256": "ae1e153f51d74d5f983f8013dcf50278705426b158565f9847a62d9689ea4546",
+  "managerActivation": "installed-and-restarted",
+  "retainedProjectCount": 3,
+  "retainedDeviceCount": 1
+}

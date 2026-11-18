@@ -87,8 +87,10 @@ public class MacOSBundlerTest {
             project.scan(scanner, "com.dynamo.bob");
             project.scan(scanner, "com.dynamo.bob.pipeline");
 
-            project.setOption("platform", Platform.X86_64MacOS.getPair());
-            project.setOption("architectures", Platform.X86_64MacOS.getPair());
+            // Exercise the installed native engine on both Intel and Apple Silicon hosts.
+            Platform platform = Platform.getHostPlatform().isMacOS() ? Platform.getHostPlatform() : Platform.X86_64MacOS;
+            project.setOption("platform", platform.getPair());
+            project.setOption("architectures", platform.getPair());
             project.setOption("archive", "true");
             project.setOption("bundle-output", outputDir);
             project.build(Progress.discarding(), "clean", "build", "bundle");

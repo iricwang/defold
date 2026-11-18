@@ -131,7 +131,7 @@ final class RemoteGateway implements AutoCloseable {
             if(path.equals("/games")&&method.equals("GET")){
                 if(device.isEmpty()){denied(e,403,"请先扫码配对此电脑");return;}
                 seen.put(device,System.nanoTime());
-                reply(e,200,Map.of("host_id",manager.hostId,"computer",manager.computer,"protocol",2,"games",manager.all().stream().filter(p->p.shared).map(p->{Map<String,Object>s=new LinkedHashMap<>(manager.status(p));s.remove("root");s.remove("build");s.remove("engine");s.remove("builtStamp");return s;}).toList()));return;
+                reply(e,200,Map.of("host_id",manager.hostId,"computer",manager.computer,"protocol",2,"games",manager.sharedProjects().stream().map(p->{Map<String,Object>s=new LinkedHashMap<>(manager.status(p));s.remove("root");s.remove("build");s.remove("engine");s.remove("builtStamp");return s;}).toList()));return;
             }
             if(!path.matches("/games/[a-zA-Z0-9-]+/[a-z]+")){denied(e,404,"接口不存在");return;}
             String[] parts=path.split("/");RemoteManager.Project p=manager.project(parts[2]);String action=parts[3];
