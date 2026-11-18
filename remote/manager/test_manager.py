@@ -66,6 +66,11 @@ def run(manifest, extension=None):
             folder=work/f'game-{i}';shutil.copytree(ROOT/'scripts/automation/fixture',folder)
             if extension and i==0:
                 shutil.copytree(extension, folder/Path(extension).name)
+                if runtime['platform'].endswith('win32'):
+                    editor_output = folder/'build'/runtime['platform']
+                    editor_output.mkdir(parents=True, exist_ok=True)
+                    for name in ('dmengine.exe', 'dmengine.pdb'):
+                        (editor_output/name).write_bytes(b'editor-owned artifact')
                 if Path(extension).name=='event':
                     with (folder/'main.gui_script').open('a',encoding='utf-8') as out:
                         out.write('\nassert(event_context_manager, "Native Event extension missing")\nprint("NATIVE_EVENT_READY")\n')
@@ -123,6 +128,12 @@ def run(manifest, extension=None):
                 raise AssertionError('Timed out: '+expected)
             import hashlib
             native_engine = Path(next(p for p in ps if p['id']==native)['engine'])
+            if runtime['platform'].endswith('win32'):
+                check('Remote keeps editor-owned Windows engine and symbols intact',
+                      all((editor_output/name).read_bytes() == b'editor-owned artifact'
+                          for name in ('dmengine.exe', 'dmengine.pdb')))
+                check('Remote launches its private Windows native build',
+                      native_engine.is_relative_to(work/'game-0/.internal/remote-manager'))
             original_engine_hash = hashlib.sha256(native_engine.read_bytes()).hexdigest()
             rpc('stop',id=native)
             with (work/'game-0/main.gui_script').open('a',encoding='utf-8') as out:out.write('\nprint("LUA_ONLY_UPDATE")\n')

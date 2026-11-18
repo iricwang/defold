@@ -78,6 +78,7 @@ def prepare(manifest, project, cache):
         # now that the build root is the user's actual game project.
         native = has_extensions(project)
         extra = ['--build-server', 'http://127.0.0.1:1']
+        binary_output = project / 'build'
         if native:
             stage = '准备本地原生扩展工具链';kind = 'environment'
             write_state(status, stage=stage)
@@ -95,12 +96,17 @@ def prepare(manifest, project, cache):
             thread = threading.Thread(target=server.serve_forever, daemon=True);thread.start()
             extra = ['--build-server', 'http://127.0.0.1:' + str(server.server_port),
                      '--build-server-header', 'X-Remote-Build-Token:' + token]
+            if runtime['platform'].endswith('win32'):
+                # Bob unpacks the EXE and its PDB even on native cache hits.
+                # A running editor preview locks the EXE under build/<platform>.
+                binary_output = state / 'engines'
+                extra.extend(['--binary-output', str(binary_output)])
         stage = '编译原生扩展与游戏资源' if native else '构建游戏资源';kind = 'project'
         write_state(status, stage=stage)
         run(command + extra + ['build'])
         engine = path('engine')
         if native:
-            engine = project/'build'/runtime['platform'].replace('-macos','-osx')/('dmengine.exe' if os.name=='nt' else 'dmengine')
+            engine = binary_output/runtime['platform'].replace('-macos','-osx')/('dmengine.exe' if os.name=='nt' else 'dmengine')
             validate_native_engine(engine, runtime['platform'])
             if os.name!='nt':
                 engine.chmod(engine.stat().st_mode | 0o111)
